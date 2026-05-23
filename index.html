@@ -222,23 +222,13 @@ select option{background:var(--s1)}.H{display:none!important}
     <div id="topbar">
       <button style="background:none;border:none;color:var(--tx);font-size:22px;padding:4px" onclick="toggleSb()">&#9776;</button>
       <div style="font-size:15px;font-weight:700;flex:1" id="topbar-empresa-nome">BioVale</div>
-      <button style="background:none;border:none;color:var(--mt);font-size:20px;padding:4px" onclick="go(&apos;configuracoes&apos;)" title="Configuracoes">&#9881;</button>
-      <div class="sbav" id="tbav" style="width:30px;height:30px;font-size:11px">?</div>
+      <button style="background:none;border:none;color:var(--mt);font-size:20px;padding:4px" onclick="go('configuracoes')" title="Configuracoes">&#9881;</button>
     </div>
     <div id="ct"></div>
   </div>
   <div id="bnn"></div>
 </div>
 <script>
-// Inicializa Supabase assim que a lib do CDN estiver disponível
-(function _waitSB(){
-  if(typeof supabase !== 'undefined' && supabase.createClient){
-    _initSupabase();
-  } else {
-    setTimeout(_waitSB, 80);
-  }
-})();
-
 var USERS=[
   {id:1,nome:'Carlos',  perfil:'adm',      pin:'1234',av:'C',cor:'#16a34a'},
   {id:2,nome:'Fernanda',perfil:'caixa',    pin:'2222',av:'F',cor:'#2563eb'},
@@ -496,7 +486,7 @@ function buildSidebar(){
       :'';
   }
   document.getElementById('sbav').textContent=CU.av;document.getElementById('sbun').textContent=CU.nome;
-  document.getElementById('sbur').textContent=PNOME[CU.perfil];document.getElementById('tbav').textContent=CU.av;
+  document.getElementById('sbur').textContent=PNOME[CU.perfil];
 }
 function buildBottomNav(){
   var r=getRoleById(CU.perfil);
@@ -629,6 +619,15 @@ function _sbGet(chave, onDone){
     else{try{if(onDone)onDone(JSON.parse(r.data.valor));}catch(e){if(onDone)onDone(null);}}
   });
 }
+
+// Inicia Supabase assim que a lib CDN estiver disponível
+(function _waitSB(){
+  if(typeof supabase !== 'undefined' && supabase.createClient){
+    _initSupabase();
+  } else {
+    setTimeout(_waitSB, 80);
+  }
+})();
 
 // ── PERSISTENCIA DO DB (localStorage + Supabase cloud) ───────────────────
 var _dbSaveTimer=null;
@@ -6495,7 +6494,7 @@ function pgUsers(){
       +'<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">'
       +'<span class="tag '+rTag+'">'+roleName+'</span>'
       +(blocked?'<span class="tag tr">Bloqueado</span>':'<span class="tag tg">Ativo</span>')
-      +(u.id!==CU.id?'<button onclick="mEditUser(\&apos;'+u.id+'\&apos;)" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:6px;padding:4px 9px;font-size:12px">&#9998;</button>':'')
+      +'<button onclick="mEditUser(\&apos;'+u.id+'\&apos;)" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:6px;padding:4px 9px;font-size:12px">&#9998;</button>'
       +(u.id!==CU.id?'<button onclick="toggleBlockUser(\&apos;'+u.id+'\&apos;)" style="background:'+(blocked?'var(--grb)':'var(--orb)')+';border:1px solid '+(blocked?'rgba(34,197,94,.3)':'rgba(245,158,11,.3)')+';color:'+(blocked?'var(--gr)':'var(--or)')+';border-radius:6px;padding:4px 9px;font-size:12px">'+(blocked?'&#128275;':'&#128274;')+'</button>':'')
       +(u.id!==CU.id?'<button onclick="delUser(\&apos;'+u.id+'\&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:4px 9px;font-size:12px">&#128465;</button>':'')
       +'</div></div>';
@@ -7092,29 +7091,46 @@ function cfgZerarSistema(){
   var ov=document.getElementById('m-ov');
   if(!ov){ov=document.createElement('div');ov.id='m-ov';ov.className='mov';document.body.appendChild(ov);}
   window._confirmCb=function(){
-    // Zera todos os dados operacionais
+    // ── RESET COMPLETO — sistema novo ──────────────────────────
+    // Dados operacionais
     DB.transf=[];DB.entradas=[];DB.movs=[];
     DB.caixaDia=null;DB.caixaOntem=null;DB.caixasHist=[];
     DB.atendNum=1000;
     DB.coletas=[];
-    DB.revenda=[];
-    DB.funcs=[];
-    DB.clientes=[];
-    DB.tabelas=[];
-    DB.contasFixas=[];
     DB.pesagensEmAberto=[];
+    // Estoque zerado (mantém produtos cadastrados mas com est=0)
+    for(var i=0;i<DB.produtos.length;i++){DB.produtos[i].est=0;}
+    // Revenda vazia
+    DB.revenda=[];
+    // Funcionários vazios
+    DB.funcs=[];
+    // Clientes/fornecedores vazios
+    DB.clientes=[];
+    // Tabelas de preço vazias
+    DB.tabelas=[];
+    // Contas fixas vazias
+    DB.contasFixas=[];
+    // Contas financeiras zeradas (mantém só Caixa com saldo 0)
     DB.contas=[
       {id:1,nome:'Caixa',tipo:'Dinheiro',saldo:0,ic:'&#128181;'},
     ];
-    // Limpa localStorage de dados operacionais
+    // Usuários e PINs padrão
+    USERS.length=0;
+    USERS.push({id:1,nome:'Carlos',  perfil:'adm',      pin:'1234',av:'C',cor:'#16a34a',bloqueado:false});
+    USERS.push({id:2,nome:'Fernanda',perfil:'caixa',    pin:'2222',av:'F',cor:'#2563eb',bloqueado:false});
+    USERS.push({id:3,nome:'Roberto', perfil:'motorista',pin:'3333',av:'R',cor:'#d97706',bloqueado:false});
+    USERS.push({id:4,nome:'Marcos',  perfil:'operador', pin:'4444',av:'M',cor:'#7c3aed',bloqueado:false});
+    // Limpa localStorage completo
     try{
       localStorage.removeItem('bv_db');
       localStorage.removeItem('bv_pesAbas');
       localStorage.removeItem('bv_pesAtiva');
     }catch(e){}
-    // Persiste estado zerado
+    // Salva estado zerado na nuvem
     saveDB();
-    go('dashboard');
+    // Volta para tela de login
+    doLogout();
+    buildLoginList();
   };
   ov.innerHTML='<div class="mbx" style="width:380px">'
     +'<div class="mhd"><div class="mtl" style="color:var(--rd)">&#9888; Zerar Sistema</div><button class="mcl" onclick="closeM()">&#215;</button></div>'
