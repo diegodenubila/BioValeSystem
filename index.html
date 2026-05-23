@@ -1,6 +1,8 @@
 <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
-<title>BioVale</title><style>
+<title>BioVale</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
 :root{--bg:#0b0f1a;--s1:#111827;--s2:#1a2235;--s3:#1e2a40;--bd:#2a3a52;
 --gr:#22c55e;--gr2:#16a34a;--grb:rgba(34,197,94,.1);
 --bl:#3b82f6;--blb:rgba(59,130,246,.1);--or:#f59e0b;--orb:rgba(245,158,11,.1);
@@ -177,7 +179,19 @@ select option{background:var(--s1)}.H{display:none!important}
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="BioVale">
+<style>
+#bv-sync-badge{position:fixed;bottom:12px;right:12px;z-index:9999;display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;font-size:11px;font-weight:600;transition:all .3s;pointer-events:none;backdrop-filter:blur(6px)}
+#bv-sync-badge.idle{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);color:#22c55e}
+#bv-sync-badge.saving{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);color:#3b82f6}
+#bv-sync-badge.error{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);color:#ef4444}
+#bv-sync-badge.local{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.25);color:#f59e0b}
+#bv-sync-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+#bv-sync-badge.saving #bv-sync-dot{animation:bv-pulse .8s ease-in-out infinite}
+@keyframes bv-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@media(max-width:768px){#bv-sync-badge{bottom:66px}}
+</style>
 </head><body>
+<div id="bv-sync-badge" class="idle"><div id="bv-sync-dot"></div><span id="bv-sync-txt">Nuvem ativa</span></div>
 <div id="ls"><div class="lbox">
   <div class="llogo">&#9850;</div>
   <div class="ltit">BioVale</div><div class="lsub">Selecione seu perfil</div>
@@ -216,6 +230,15 @@ select option{background:var(--s1)}.H{display:none!important}
   <div id="bnn"></div>
 </div>
 <script>
+// Inicializa Supabase assim que a lib do CDN estiver disponível
+(function _waitSB(){
+  if(typeof supabase !== 'undefined' && supabase.createClient){
+    _initSupabase();
+  } else {
+    setTimeout(_waitSB, 80);
+  }
+})();
+
 var USERS=[
   {id:1,nome:'Carlos',  perfil:'adm',      pin:'1234',av:'C',cor:'#16a34a'},
   {id:2,nome:'Fernanda',perfil:'caixa',    pin:'2222',av:'F',cor:'#2563eb'},
@@ -538,7 +561,76 @@ function savePesState(){try{localStorage.setItem('bv_pesAbas',JSON.stringify(pes
 function loadPesState(){try{var a=localStorage.getItem('bv_pesAbas');var i=localStorage.getItem('bv_pesAtiva');if(a){var arr=JSON.parse(a);if(arr&&arr.length){pesAbas=arr;pesAtiva=Math.min(parseInt(i)||0,arr.length-1);return true;}}return false;}catch(e){return false;}}
 function clearPesState(){try{localStorage.removeItem('bv_pesAbas');localStorage.removeItem('bv_pesAtiva');}catch(e){}}
 
-// ── PERSISTENCIA DO DB (caixa + estoque sobrevivem a refresh/reboot) ──
+// ── SUPABASE ──────────────────────────────────────────────────────────────
+var _SB_URL  = 'https://ovhwnrawjnshcvohbgco.supabase.co';
+var _SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92aHducmF3am5zaGN2b2hiZ2NvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1NDcxNTcsImV4cCI6MjA5NTEyMzE1N30.krfJoxd_iMlZfvm9oU96azPn02Kb9hiaFQ14kUvXkTI';
+var _sbClient = null;
+var _sbReady  = false;
+var _sbInitTried = false;
+
+function _initSupabase(){
+  if(_sbInitTried)return;
+  _sbInitTried=true;
+  try{
+    if(typeof supabase !== 'undefined' && supabase.createClient){
+      _sbClient = supabase.createClient(_SB_URL, _SB_ANON);
+      _sbReady  = true;
+      _syncBadge('idle','Nuvem ativa');
+      // Garante que a tabela exista via upsert silencioso na inicialização
+      _sbEnsureTable();
+    } else {
+      _syncBadge('local','Só local');
+    }
+  }catch(e){
+    _syncBadge('local','Só local');
+  }
+}
+
+function _syncBadge(cls,txt){
+  try{
+    var b=document.getElementById('bv-sync-badge');
+    var t=document.getElementById('bv-sync-txt');
+    if(!b)return;
+    b.className='';b.classList.add(cls);
+    if(t)t.textContent=txt;
+  }catch(e){}
+}
+
+// Cria a tabela se não existir (usa upsert para ser idempotente)
+function _sbEnsureTable(){
+  if(!_sbReady||!_sbClient)return;
+  // Faz um select silencioso — se a tabela não existir, cria via SQL pelo Supabase
+  // (o usuário deve criar a tabela manualmente caso apareça erro; ver instrução no badge)
+  _sbClient.from('biovale_dados').select('chave').limit(1).then(function(r){
+    if(r.error){
+      // Tabela não existe ainda — informa usuário
+      _syncBadge('error','Criar tabela no Supabase');
+      console.warn('BioVale Supabase: crie a tabela "biovale_dados" com colunas: chave (text, PK), valor (text), atualizado_em (timestamptz). Erro:', r.error.message);
+    } else {
+      _syncBadge('idle','Nuvem ativa');
+    }
+  });
+}
+
+// Salva um par chave/valor na tabela biovale_dados
+function _sbSet(chave, valor, onDone){
+  if(!_sbReady||!_sbClient){if(onDone)onDone(false);return;}
+  _sbClient.from('biovale_dados').upsert({chave:chave, valor: JSON.stringify(valor), atualizado_em: new Date().toISOString()}, {onConflict:'chave'}).then(function(r){
+    if(r.error){console.warn('BioVale SB save error:',r.error.message);if(onDone)onDone(false);}
+    else{if(onDone)onDone(true);}
+  });
+}
+
+// Lê um valor da tabela biovale_dados
+function _sbGet(chave, onDone){
+  if(!_sbReady||!_sbClient){if(onDone)onDone(null);return;}
+  _sbClient.from('biovale_dados').select('valor').eq('chave',chave).maybeSingle().then(function(r){
+    if(r.error||!r.data){if(onDone)onDone(null);}
+    else{try{if(onDone)onDone(JSON.parse(r.data.valor));}catch(e){if(onDone)onDone(null);}}
+  });
+}
+
+// ── PERSISTENCIA DO DB (localStorage + Supabase cloud) ───────────────────
 var _dbSaveTimer=null;
 function saveDB(){
   try{
@@ -546,30 +638,68 @@ function saveDB(){
       caixaDia:DB.caixaDia,caixaOntem:DB.caixaOntem,caixasHist:DB.caixasHist,
       atendNum:DB.atendNum,produtos:DB.produtos,movs:DB.movs,contas:DB.contas,
       revenda:DB.revenda,revendaCats:DB.revendaCats,revendaStates:DB.revendaStates,
-      entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto
+      entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
+      transf:DB.transf,coletas:DB.coletas,funcs:DB.funcs,clientes:DB.clientes,
+      tabelas:DB.tabelas,contasFixas:DB.contasFixas
     };
+    // 1. Salva local como fallback imediato
     localStorage.setItem('bv_db',JSON.stringify(snap));
+    // 2. Sincroniza na nuvem
+    if(_sbReady){
+      _syncBadge('saving','Salvando…');
+      _sbSet('bv_db', snap, function(ok){
+        if(ok) _syncBadge('idle','Nuvem ativa');
+        else   _syncBadge('error','Erro na nuvem');
+      });
+    }
   }catch(e){}
 }
 function loadDB(){
+  // Carrega imediatamente do localStorage (síncrono) para não travar o boot
+  var localOk=false;
   try{
-    var raw=localStorage.getItem('bv_db');if(!raw)return false;
-    var s=JSON.parse(raw);
-    if(s.caixaDia!==undefined)DB.caixaDia=s.caixaDia;
-    if(s.caixaOntem!==undefined)DB.caixaOntem=s.caixaOntem;
-    if(s.caixasHist)DB.caixasHist=s.caixasHist;
-    if(s.atendNum)DB.atendNum=s.atendNum;
-    if(s.produtos&&s.produtos.length)DB.produtos=s.produtos;
-    if(s.movs)DB.movs=s.movs;
-    if(s.contas&&s.contas.length)DB.contas=s.contas;
-    if(s.revenda)DB.revenda=s.revenda;
-    if(s.revendaCats&&s.revendaCats.length)DB.revendaCats=s.revendaCats;
-    if(s.revendaStates&&s.revendaStates.length)DB.revendaStates=s.revendaStates;
-    if(s.entradas)DB.entradas=s.entradas;
-    if(s.atendHistLS)atendHist=s.atendHistLS;
-    if(s.pesagensEmAberto)DB.pesagensEmAberto=s.pesagensEmAberto;
-    return true;
-  }catch(e){return false;}
+    var raw=localStorage.getItem('bv_db');
+    if(raw){var s=JSON.parse(raw);_applySnap(s);localOk=true;}
+  }catch(e){}
+  // Em seguida busca da nuvem de forma assíncrona e sobrescreve se mais recente
+  if(_sbReady){
+    _syncBadge('saving','Carregando nuvem…');
+    _sbGet('bv_db', function(s){
+      if(s){
+        _applySnap(s);
+        // Atualiza também o localStorage com dado da nuvem
+        try{localStorage.setItem('bv_db',JSON.stringify(s));}catch(e){}
+        _syncBadge('idle','Nuvem ativa');
+        // Re-renderiza a tela atual se o usuário já estiver logado
+        if(pgAtiva){go(pgAtiva);}
+      } else {
+        _syncBadge(localOk?'local':'idle', localOk?'Só local':'Nuvem ativa');
+      }
+    });
+  }
+  return localOk;
+}
+function _applySnap(s){
+  if(!s)return;
+  if(s.caixaDia!==undefined)DB.caixaDia=s.caixaDia;
+  if(s.caixaOntem!==undefined)DB.caixaOntem=s.caixaOntem;
+  if(s.caixasHist)DB.caixasHist=s.caixasHist;
+  if(s.atendNum)DB.atendNum=s.atendNum;
+  if(s.produtos&&s.produtos.length)DB.produtos=s.produtos;
+  if(s.movs)DB.movs=s.movs;
+  if(s.contas&&s.contas.length)DB.contas=s.contas;
+  if(s.revenda)DB.revenda=s.revenda;
+  if(s.revendaCats&&s.revendaCats.length)DB.revendaCats=s.revendaCats;
+  if(s.revendaStates&&s.revendaStates.length)DB.revendaStates=s.revendaStates;
+  if(s.entradas)DB.entradas=s.entradas;
+  if(s.atendHistLS)atendHist=s.atendHistLS;
+  if(s.pesagensEmAberto)DB.pesagensEmAberto=s.pesagensEmAberto;
+  if(s.transf)DB.transf=s.transf;
+  if(s.coletas)DB.coletas=s.coletas;
+  if(s.funcs)DB.funcs=s.funcs;
+  if(s.clientes)DB.clientes=s.clientes;
+  if(s.tabelas)DB.tabelas=s.tabelas;
+  if(s.contasFixas)DB.contasFixas=s.contasFixas;
 }
 function autoSave(){if(_dbSaveTimer)clearTimeout(_dbSaveTimer);_dbSaveTimer=setTimeout(saveDB,400);}
 function pgPesagem(){
@@ -1098,6 +1228,15 @@ function selBlocoForma(prefix,tipo,tot){
     var lbl=document.getElementById(prefix+'simples-lbl');if(lbl)lbl.textContent=vlbl[tipo]||tipo;
     var val=document.getElementById(prefix+'simples-val');if(val)val.textContent=fR(tot);
     if(simplesOk)simplesOk.style.display='block';
+    // Auto-seleciona conta: Dinheiro → Caixa; Pix/Cartao → primeira conta bancária
+    var bancSel=document.getElementById(prefix+'banco-sel');
+    if(bancSel){
+      if(tipo==='din'){
+        for(var _i=0;_i<DB.contas.length;_i++){if(DB.contas[_i].tipo==='Dinheiro'){bancSel.value=DB.contas[_i].nome;break;}}
+      } else {
+        for(var _i=0;_i<DB.contas.length;_i++){if(DB.contas[_i].tipo!=='Dinheiro'){bancSel.value=DB.contas[_i].nome;break;}}
+      }
+    }
   }
 }
 function calcBloco(prefix,tot){
@@ -1429,8 +1568,8 @@ function pgPendencias(){
         +'<div style="font-size:11px;color:var(--mt)">'+at.itens.length+' item(s)'+(at.obs?' &middot; '+at.obs:'')+'</div>'
         +'<div style="font-size:16px;font-weight:800;font-family:monospace;color:var(--or)">~'+fR(at.valTotal)+'</div></div>'
         +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
-        +'<button class="btn" style="background:var(--bl)" onclick="reabrirPendencia("+at.id+")">&#9998; Reabrir p/ Ajuste</button>'
-        +'<button class="btn" style="background:var(--gr2)" onclick="liquidarPendencia("+at.id+")">&#10003; Liquidar (Concluir)</button>'
+        +'<button class="btn" style="background:var(--bl)" onclick="reabrirPendencia('+at.id+')">&#9998; Reabrir p/ Ajuste</button>'
+        +'<button class="btn" style="background:var(--gr2)" onclick="liquidarPendencia('+at.id+')">&#10003; Liquidar (Concluir)</button>'
         +'</div></div>';
     }
   }
@@ -1504,6 +1643,15 @@ function selLiqForma(btn,forma){
   for(var i=0;i<ids.length;i++){var b=document.getElementById('liq-f-'+ids[i]);if(b){b.style.borderColor='var(--bd)';b.style.background='var(--bg)';}}
   if(btn){btn.style.borderColor='var(--gr)';btn.style.background='rgba(34,197,94,.12)';}
   var hv=document.getElementById('liq-forma-val');if(hv)hv.value=forma;
+  // Auto-seleciona conta: Dinheiro → Caixa; Pix/Cartao → primeira conta bancária
+  var contaSel=document.getElementById('liq-conta');
+  if(contaSel){
+    if(forma==='Dinheiro'){
+      for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].tipo==='Dinheiro'){contaSel.value=DB.contas[i].nome;break;}}
+    } else {
+      for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].tipo!=='Dinheiro'){contaSel.value=DB.contas[i].nome;break;}}
+    }
+  }
 }
 function confirmarLiquidacao(pendId,valReceb,valPagei){
   if(!DB.pesagensEmAberto)DB.pesagensEmAberto=[];
@@ -7029,7 +7177,7 @@ document.addEventListener('keydown',function(e){
     }
   }catch(e){}
 })();
-loadDB(); // Restaura caixa, estoque e movimentos do localStorage
+loadDB(); // Restaura caixa, estoque e movimentos do localStorage (+ nuvem async)
 buildLoginList();
 document.addEventListener('keydown',function(e){if(e.key==='Enter'&&document.activeElement===document.getElementById('pi'))doLogin();});
 document.addEventListener('click',function(e){var sb=document.getElementById('sb');var tbBtn=document.querySelector('#topbar button');if(window.innerWidth<=768&&sb&&sb.classList.contains('open')&&!sb.contains(e.target)&&e.target!==tbBtn&&!tbBtn.contains(e.target))closeSb();var pdd=document.getElementById('pdd-mat');if(pdd&&!pdd.contains(e.target)){var ab=pesAbas[pesAtiva];if(ab&&ab.pddOpen)closePdd();}var pddU=document.getElementById('pdd-unit');if(pddU&&!pddU.contains(e.target)){var ab=pesAbas[pesAtiva];if(ab&&ab.pddUnitOpen)closePddUnit();}});
