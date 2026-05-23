@@ -423,7 +423,7 @@ function buildLoginList(){
   var h='';
   for(var i=0;i<USERS.length;i++){
     var u=USERS[i];
-    h+='<button class="lu" onclick="selU(&apos;+u.id+&apos;,this)">'
+    h+='<button class="lu" onclick="selU('+u.id+',this)">'
       +'<div class="lav" style="background:'+u.cor+'22;border:2px solid '+u.cor+';color:'+u.cor+'">'+u.av+'</div>'
       +'<div style="text-align:left"><div style="font-size:13px;font-weight:600">'+u.nome+'</div>'
       +'<div style="font-size:11px;color:var(--mt)">'+PNOME[u.perfil]+'</div></div></button>';
@@ -463,7 +463,7 @@ function buildSidebar(){
     if(p.id==='configuracoes')continue;
     var badge='';
     if(p.id==='pendencias'){var n=DB.pesagensEmAberto?DB.pesagensEmAberto.length:0;if(n>0)badge='<span style="margin-left:auto;background:var(--or);color:#000;font-size:10px;font-weight:800;padding:1px 7px;border-radius:20px;min-width:18px;text-align:center">'+n+'</span>';}
-    h+='<button class="nb" id="nb-'+p.id+'" onclick="go(\&apos;&apos;+p.id+&apos;\&apos;)"><span style="font-size:14px;flex-shrink:0;width:20px;text-align:center">'+p.icon+'</span>'+p.label+badge+'</button>';
+    h+='<button class="nb" id="nb-'+p.id+'" onclick="go(\&apos;'+p.id+'\&apos;)"><span style="font-size:14px;flex-shrink:0;width:20px;text-align:center">'+p.icon+'</span>'+p.label+badge+'</button>';
   }
   document.getElementById('sbnav').innerHTML=h;
   var cfgEl=document.getElementById('sb-cfg');
@@ -498,7 +498,7 @@ function buildBottomNav(){
   var h='';
   for(var i=0;i<pages.length;i++){
     var p=pages[i];
-    h+='<button class="bnb" id="bn-'+p.id+'" onclick="go(\&apos;&apos;+p.id+&apos;\&apos;)">'
+    h+='<button class="bnb" id="bn-'+p.id+'" onclick="go(\&apos;'+p.id+'\&apos;)">'
       +'<span class="bni">'+p.icon+'</span>'+p.label+'</button>';
   }
   if(perms.indexOf('configuracoes')>=0){h+='<button class="bnb" id="bn-configuracoes" onclick="go(\&apos;configuracoes\&apos;)"><span class="bni">&#9881;</span>Config</button>';}
@@ -589,13 +589,13 @@ function renderPesagem(){
   var abH='';
   for(var i=0;i<pesAbas.length;i++){
     var a=pesAbas[i];
-    var cl=pesAbas.length>1?'<button class="aba-close" onclick="delPesAba(event,&apos;+i+&apos;)">&#215;</button>':'';
-    abH+='<div class="aba-tab'+(i===pesAtiva?' on':'')+'" onclick="selPesAba(&apos;+i+&apos;)"'+(a.fin?' style="opacity:.5"':'')+'>'+tipoIco(a.tipo)+' '+a.label+(a.fin?' &#10003;':'')+cl+'</div>';
+    var cl=pesAbas.length>1?'<button class="aba-close" onclick="delPesAba(event,'+i+')">&#215;</button>':'';
+    abH+='<div class="aba-tab'+(i===pesAtiva?' on':'')+'" onclick="selPesAba('+i+')"'+(a.fin?' style="opacity:.5"':'')+'>'+tipoIco(a.tipo)+' '+a.label+(a.fin?' &#10003;':'')+cl+'</div>';
   }
   var tipos=['Compra','Venda','Doacao'];var tbH='';
   for(var i=0;i<tipos.length;i++){
     var t=tipos[i];var tc=tipoCol(t);var on=(ab.tipo===t)||(ab.tipo==='Doacao'&&t==='Doacao');
-    tbH+='<button onclick="setPesTipo(\&apos;&apos;+t+&apos;\&apos;)" style="border:2px solid '+(on?tc:'var(--bd)')+';background:'+(on?tc+'15':'var(--s2)')+';color:'+(on?tc:'var(--mt)')+';border-radius:var(--r);padding:9px;font-size:13px;font-weight:600">'+tipoIco(t)+' '+t+'</button>';
+    tbH+='<button onclick="setPesTipo(\&apos;'+t+'\&apos;)" style="border:2px solid '+(on?tc:'var(--bd)')+';background:'+(on?tc+'15':'var(--s2)')+';color:'+(on?tc:'var(--mt)')+';border-radius:var(--r);padding:9px;font-size:13px;font-weight:600">'+tipoIco(t)+' '+t+'</button>';
   }
   var cliO='<option value="">Avulso</option>';
   for(var i=0;i<DB.clientes.length;i++){var c=DB.clientes[i];cliO+='<option value="'+c.id+'"'+(ab.cliId==c.id?' selected':'')+'>'+c.nome+'</option>';}
@@ -610,7 +610,7 @@ function renderPesagem(){
     var p=DB.produtos[i];var preco=getPreco(p,ab.tipo,ab.tabId);
     var semEst=ab.tipo==='Venda'&&p.est===0;
     var estColor=semEst?'#ef4444':'#22c55e';
-    prodCards+='<div class="prod-card" data-nome="'+p.nome.toLowerCase()+'" onclick="selProdCard(&apos;+p.id+&apos;)" >' 
+    prodCards+='<div class="prod-card" data-nome="'+p.nome.toLowerCase()+'" onclick="selProdCard('+p.id+')" >' 
       +'<span style="font-size:20px;flex-shrink:0">'+p.ic+'</span>'
       +'<div style="flex:1;min-width:0">'
       +'<div style="font-size:13px;font-weight:600">'+p.nome+'</div>'
@@ -640,7 +640,7 @@ function renderPesagem(){
   var unitCards='';var hasD=false;
   for(var i=0;i<DB.revenda.length;i++){
     if(DB.revenda[i].status==='Disponivel'){hasD=true;var rv=DB.revenda[i];
-      unitCards+='<div class="prod-card" data-nome="'+rv.prod.toLowerCase()+'" onclick="selUnit(&apos;+rv.id+&apos;)">'
+      unitCards+='<div class="prod-card" data-nome="'+rv.prod.toLowerCase()+'" onclick="selUnit('+rv.id+')">'
         +'<span style="font-size:20px;flex-shrink:0">&#127991;</span>'
         +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:13px;font-weight:600">'+rv.prod+'</div>'
@@ -698,7 +698,7 @@ function renderPesagem(){
         +ubadge+'</div>'+detalhe+ctrl+'</div>'
         +'<div style="text-align:right;flex-shrink:0">'
         +'<div style="font-size:14px;font-weight:700;color:'+ic+';font-family:monospace">'+fR(it.uni?it.preco:pesoEfetivo*it.preco)+'</div>'
-        +'<button onclick="delIP(&apos;+i+&apos;)" style="background:none;border:none;color:var(--mt);font-size:16px;padding:4px;border-radius:5px">&#128465;</button>'
+        +'<button onclick="delIP('+i+')" style="background:none;border:none;color:var(--mt);font-size:16px;padding:4px;border-radius:5px">&#128465;</button>'
         +'</div></div></div>';
     }
   }
@@ -912,7 +912,7 @@ function selProd(prodId){
     +'</div>'
     +'<div class="al alg" style="display:flex;justify-content:space-between"><span>Total estimado</span><strong id="ai-tv" style="font-family:monospace">'+fR(0)+'</strong></div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="confAddP(&apos;+prodId+&apos;)">+ Adicionar</button></div></div>',460);
+    +'<button class="btn" onclick="confAddP('+prodId+')">+ Adicionar</button></div></div>',460);
   setTimeout(function(){
     var kg=document.getElementById('ai-kg');
     var pr=document.getElementById('ai-pr');
@@ -949,7 +949,7 @@ function selUnit(uid){
     +'<div style="font-size:12px;color:var(--mt)">'+rv.cond+' &middot; '+fKg(rv.peso)+'kg</div></div>'
     +'<div style="font-size:18px;font-weight:800;color:var(--or)">'+fR(rv.preco)+'</div></div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn btn-or" onclick="confAddU(&apos;+uid+&apos;)">+ Adicionar Unidade</button></div></div>',420);
+    +'<button class="btn btn-or" onclick="confAddU('+uid+')">+ Adicionar Unidade</button></div></div>',420);
 }
 function confAddU(uid){
   var rv=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===uid){rv=DB.revenda[i];break;}}if(!rv)return;
@@ -975,7 +975,7 @@ function confAddP(prodId){
       +'<div class="fld"><label>Material de origem</label><select class="inp" id="ori-d">'+opts+'</select></div>'
       +'<div class="fld"><label>Peso a transferir kg</label><input class="inp" type="number" inputmode="decimal" id="ori-p" value="'+falta+'" step="0.01"></div>'
       +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-      +'<button class="btn btn-or" onclick="confTransfP(&apos;+prodId+&apos;,&apos;+pesoLiquido+&apos;,&apos;+preco+&apos;)">Transferir e adicionar</button></div></div>',460);
+      +'<button class="btn btn-or" onclick="confTransfP('+prodId+','+pesoLiquido+','+preco+')">Transferir e adicionar</button></div></div>',460);
     return;
   }
   var tabN='Padrao';if(ab.tabId){for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].id==ab.tabId){tabN=DB.tabelas[i].nome;break;}}}
@@ -1015,10 +1015,10 @@ function mFinPes(){
       +'</div>'
       // 4 botoes forma simples
       +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">'
-      +'<button onclick="selBlocoForma(\&apos;&apos;+prefix+&apos;\&apos;,\&apos;din\&apos;,&apos;+total+&apos;)" id="'+prefix+'sb-din" style="background:var(--bg);border:2px solid var(--bd);border-radius:var(--r);padding:9px 4px;cursor:pointer;text-align:center;transition:all .15s"><div style="font-size:18px">&#128181;</div><div style="font-size:10px;color:var(--mt);margin-top:2px">Dinheiro</div></button>'
-      +'<button onclick="selBlocoForma(\&apos;&apos;+prefix+&apos;\&apos;,\&apos;pix\&apos;,&apos;+total+&apos;)" id="'+prefix+'sb-pix" style="background:var(--bg);border:2px solid var(--bd);border-radius:var(--r);padding:9px 4px;cursor:pointer;text-align:center;transition:all .15s"><div style="font-size:18px">&#128241;</div><div style="font-size:10px;color:var(--mt);margin-top:2px">Pix</div></button>'
-      +'<button onclick="selBlocoForma(\&apos;&apos;+prefix+&apos;\&apos;,\&apos;crt\&apos;,&apos;+total+&apos;)" id="'+prefix+'sb-crt" style="background:var(--bg);border:2px solid var(--bd);border-radius:var(--r);padding:9px 4px;cursor:pointer;text-align:center;transition:all .15s"><div style="font-size:18px">&#128179;</div><div style="font-size:10px;color:var(--mt);margin-top:2px">Cartao</div></button>'
-      +'<button onclick="selBlocoForma(\&apos;&apos;+prefix+&apos;\&apos;,\&apos;misto\&apos;,&apos;+total+&apos;)" id="'+prefix+'sb-misto" style="background:var(--bg);border:2px solid var(--bd);border-radius:var(--r);padding:9px 4px;cursor:pointer;text-align:center;transition:all .15s"><div style="font-size:18px">&#10010;</div><div style="font-size:10px;color:var(--mt);margin-top:2px">Misto</div></button>'
+      +'<button onclick="selBlocoForma(\&apos;'+prefix+'\&apos;,\&apos;din\&apos;,'+total+')" id="'+prefix+'sb-din" style="background:var(--bg);border:2px solid var(--bd);border-radius:var(--r);padding:9px 4px;cursor:pointer;text-align:center;transition:all .15s"><div style="font-size:18px">&#128181;</div><div style="font-size:10px;color:var(--mt);margin-top:2px">Dinheiro</div></button>'
+      +'<button onclick="selBlocoForma(\&apos;'+prefix+'\&apos;,\&apos;pix\&apos;,'+total+')" id="'+prefix+'sb-pix" style="background:var(--bg);border:2px solid var(--bd);border-radius:var(--r);padding:9px 4px;cursor:pointer;text-align:center;transition:all .15s"><div style="font-size:18px">&#128241;</div><div style="font-size:10px;color:var(--mt);margin-top:2px">Pix</div></button>'
+      +'<button onclick="selBlocoForma(\&apos;'+prefix+'\&apos;,\&apos;crt\&apos;,'+total+')" id="'+prefix+'sb-crt" style="background:var(--bg);border:2px solid var(--bd);border-radius:var(--r);padding:9px 4px;cursor:pointer;text-align:center;transition:all .15s"><div style="font-size:18px">&#128179;</div><div style="font-size:10px;color:var(--mt);margin-top:2px">Cartao</div></button>'
+      +'<button onclick="selBlocoForma(\&apos;'+prefix+'\&apos;,\&apos;misto\&apos;,'+total+')" id="'+prefix+'sb-misto" style="background:var(--bg);border:2px solid var(--bd);border-radius:var(--r);padding:9px 4px;cursor:pointer;text-align:center;transition:all .15s"><div style="font-size:18px">&#10010;</div><div style="font-size:10px;color:var(--mt);margin-top:2px">Misto</div></button>'
       +'</div>'
       // banco row (pix/crt)
       +'<div id="'+prefix+'banco-row" style="display:none" class="fld" style="margin-bottom:7px"><label>Conta bancaria</label><select class="inp" id="'+prefix+'banco-sel" style="padding:7px 10px">'+bancOpts+'</select></div>'
@@ -1495,7 +1495,7 @@ function liquidarPendencia(pendId){
     +'<input type="hidden" id="liq-forma-val" value="Dinheiro">'
     +'<div class="al aly" style="font-size:11px">&#9888; O estoque ja foi movimentado ao suspender. So o financeiro sera registrado agora.</div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" style="flex:1" onclick="confirmarLiquidacao(&apos;&apos;+pendId+&apos;&apos;,&apos;+valReceb+&apos;,&apos;+valPagei+&apos;)">&#10003; Confirmar Liquidacao</button>'
+    +'<button class="btn" style="flex:1" onclick="confirmarLiquidacao(&apos;'+pendId+'&apos;,'+valReceb+','+valPagei+')">&#10003; Confirmar Liquidacao</button>'
     +'</div></div>',520);
   setTimeout(function(){selLiqForma(document.getElementById('liq-f-din'),'Dinheiro');},50);
 }
@@ -1537,7 +1537,7 @@ function mHist(){
       +'<div><span style="font-weight:700">#'+a.num+'</span><span style="color:var(--mt);font-size:12px;margin-left:8px">'+a.hora+'</span></div>'
       +'<span style="font-size:14px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(a.total)+'</span></div>'
       +'<div style="font-size:12px;color:var(--mt);margin-bottom:7px">'+a.itens.length+' item(s)'+(a.obs?' &middot; '+a.obs:'')+'</div>'
-      +'<button class="bsm bsmg" onclick="reabrirA(&apos;+i+&apos;);closeM()">Reabrir para edicao</button></div>';
+      +'<button class="bsm bsmg" onclick="reabrirA('+i+');closeM()">Reabrir para edicao</button></div>';
   }
   openM('Historico','<div>'+h+'<button class="btnO bOgr" style="width:100%;margin-top:6px" onclick="closeM()">Fechar</button></div>',480);
 }
@@ -1630,9 +1630,9 @@ function _renderAtendRow(m,fromHistCaixaIdx){
   var reabrirBtn='';
   if(temItens){
     if(fromHistCaixaIdx!=null){
-      reabrirBtn='<button class="bsm bsmg" onclick="mReabrirCaixaHist(&apos;+fromHistCaixaIdx+&apos;,\&apos;&apos;+m.num+&apos;\&apos;)" style="white-space:nowrap;font-size:11px;padding:4px 10px">\u270F Reabrir</button>';
+      reabrirBtn='<button class="bsm bsmg" onclick="mReabrirCaixaHist('+fromHistCaixaIdx+',\&apos;'+m.num+'\&apos;)" style="white-space:nowrap;font-size:11px;padding:4px 10px">\u270F Reabrir</button>';
     }else{
-      reabrirBtn='<button class="bsm bsmg" onclick="reabrirDoCaixa(\&apos;&apos;+m.num+&apos;\&apos;)" style="white-space:nowrap;font-size:11px;padding:4px 10px">\u270F Reabrir</button>';
+      reabrirBtn='<button class="bsm bsmg" onclick="reabrirDoCaixa(\&apos;'+m.num+'\&apos;)" style="white-space:nowrap;font-size:11px;padding:4px 10px">\u270F Reabrir</button>';
     }
   }
   return '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--bd)">'
@@ -1669,7 +1669,7 @@ function _buildHistHtml(){
     var hDif=hc.diferenca||0;
     var difColor=Math.abs(hDif)<0.01?'var(--gr)':hDif<0?'var(--rd)':'var(--or)';
     h+='<div style="border-bottom:1px solid var(--bd)">'
-      +'<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer" onclick="toggleHistCaixa(&apos;+hi+&apos;)">'
+      +'<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer" onclick="toggleHistCaixa('+hi+')">'
       +'<div style="flex:1">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'
       +'<span style="font-weight:700;font-size:13px">'+hc.data+'</span>'
@@ -1689,7 +1689,7 @@ function _buildHistHtml(){
       +'<div id="hc-det-'+hi+'" style="display:none;border-top:1px solid var(--bd)">'
       +'<div style="padding:10px 14px;background:var(--s2);display:flex;align-items:center;justify-content:space-between;gap:10px">'
       +'<span style="font-size:12px;color:var(--mt)">'+hMovs.length+' atendimento(s)</span>'
-      +'<button class="btn btn-or" style="font-size:12px;padding:6px 13px;background:var(--or);color:#000" onclick="mReabrirCaixaCompleto(&apos;+hi+&apos;)">&#9099; Reabrir Caixa Inteiro</button>'
+      +'<button class="btn btn-or" style="font-size:12px;padding:6px 13px;background:var(--or);color:#000" onclick="mReabrirCaixaCompleto('+hi+')">&#9099; Reabrir Caixa Inteiro</button>'
       +'</div>'
       +(hMovs.length?hMovs.map(function(m){return _renderAtendRow(m,hi);}).join(''):'<div style="padding:16px;text-align:center;color:var(--mt)">Sem atendimentos.</div>')
       +'</div></div>';
@@ -1828,7 +1828,7 @@ function _buildCatBtns(cats, prefix){
     +'<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:4px" id="'+prefix+'-cats">';
   for(var i=0;i<cats.length;i++){
     var c=cats[i];
-    h+='<button type="button" onclick="selCatBtn(\&apos;&apos;+prefix+&apos;\&apos;,\&apos;&apos;+c.nome+&apos;\&apos;,this)"'
+    h+='<button type="button" onclick="selCatBtn(\&apos;'+prefix+'\&apos;,\&apos;'+c.nome+'\&apos;,this)"'
       +' style="display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--s2);border:1.5px solid var(--bd);border-radius:var(--r);cursor:pointer;text-align:left;transition:all .15s;width:100%">'
       +'<span style="width:11px;height:11px;border-radius:50%;background:'+c.cor+';flex-shrink:0;display:inline-block;box-shadow:0 0 5px '+c.cor+'88"></span>'
       +'<span style="flex:1;font-size:13px;color:var(--tx)">'+c.nome+'</span>'
@@ -1959,7 +1959,7 @@ function confDespesaRapida(){
 }
 
 
-function mFecharCaixa(){var saldoAt=0;for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){saldoAt=DB.contas[i].saldo;break;}}openM('Fechar Caixa','<div class="mf"><div class="al aly">Voce esta prestes a fechar o caixa de hoje.</div><div style="background:var(--s2);border-radius:var(--r);padding:13px"><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--bd)"><span style="color:var(--mt)">Abertura</span><span style="font-family:monospace">'+fR(DB.caixaDia.saldoAbertura)+'</span></div><div style="display:flex;justify-content:space-between;padding:7px 0;font-size:15px;font-weight:700"><span>Saldo esperado</span><span style="color:var(--gr);font-family:monospace">'+fR(saldoAt)+'</span></div></div><div class="fld"><label>Valor contado R$</label><input class="inp" type="number" inputmode="decimal" id="fc-v" value="'+saldoAt+'" style="font-size:20px;text-align:center;font-family:monospace" oninput="calcFD('+saldoAt+')"></div><div id="fc-dif"></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-rd" onclick="confirmarFech(&apos;+saldoAt+&apos;)">Fechar Caixa</button></div></div>');}
+function mFecharCaixa(){var saldoAt=0;for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){saldoAt=DB.contas[i].saldo;break;}}openM('Fechar Caixa','<div class="mf"><div class="al aly">Voce esta prestes a fechar o caixa de hoje.</div><div style="background:var(--s2);border-radius:var(--r);padding:13px"><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--bd)"><span style="color:var(--mt)">Abertura</span><span style="font-family:monospace">'+fR(DB.caixaDia.saldoAbertura)+'</span></div><div style="display:flex;justify-content:space-between;padding:7px 0;font-size:15px;font-weight:700"><span>Saldo esperado</span><span style="color:var(--gr);font-family:monospace">'+fR(saldoAt)+'</span></div></div><div class="fld"><label>Valor contado R$</label><input class="inp" type="number" inputmode="decimal" id="fc-v" value="'+saldoAt+'" style="font-size:20px;text-align:center;font-family:monospace" oninput="calcFD('+saldoAt+')"></div><div id="fc-dif"></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-rd" onclick="confirmarFech('+saldoAt+')">Fechar Caixa</button></div></div>');}
 function calcFD(esp){var v=parseFloat(document.getElementById('fc-v')?document.getElementById('fc-v').value:0)||0,dif=+(v-esp).toFixed(2);var el=document.getElementById('fc-dif');if(!el)return;if(Math.abs(dif)<0.01)el.innerHTML='<div class="al alg">&#10003; Caixa confere!</div>';else if(dif<0)el.innerHTML='<div class="al alr">Falta '+fR(Math.abs(dif))+'</div>';else el.innerHTML='<div class="al aly">Sobra '+fR(dif)+'</div>';}
 function confirmarFech(esp){
   var v=parseFloat(document.getElementById('fc-v').value)||0;
@@ -2256,7 +2256,7 @@ function pgDash(){
   var perTabH='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px">';
   for(var i=0;i<pers.length;i++){
     var on=pers[i]===per;
-    perTabH+='<button onclick="swDashPer(\&apos;&apos;+pers[i]+&apos;\&apos;)" style="border:1px solid '+(on?'var(--gr)':'var(--bd)')+';background:'+(on?'var(--grb)':'transparent')+';color:'+(on?'var(--gr)':'var(--mt)')+';border-radius:20px;padding:4px 10px;font-size:11px;font-weight:'+(on?'700':'400')+';cursor:pointer">'+perNms[pers[i]]+'</button>';
+    perTabH+='<button onclick="swDashPer(\&apos;'+pers[i]+'\&apos;)" style="border:1px solid '+(on?'var(--gr)':'var(--bd)')+';background:'+(on?'var(--grb)':'transparent')+';color:'+(on?'var(--gr)':'var(--mt)')+';border-radius:20px;padding:4px 10px;font-size:11px;font-weight:'+(on?'700':'400')+';cursor:pointer">'+perNms[pers[i]]+'</button>';
   }
   perTabH+='</div>';
 
@@ -2476,9 +2476,9 @@ function pgEstoque(){
       +'<div style="font-size:12px;color:var(--or);font-weight:600;margin-top:2px">Valor: '+fR(p.est*p.vV)+'</div>'
       +'<div class="bw" style="margin:7px 0"><div class="bf" style="width:'+Math.round((p.est/max)*100)+'%;background:'+(p.est<0?'var(--rd)':'linear-gradient(90deg,var(--gr2),var(--gr))')+'"></div></div>'
       +'<div style="display:flex;gap:6px;margin-top:4px">'
-      +'<button class="btn" style="flex:1;font-size:12px;padding:6px" onclick="mTransfPre(&apos;+p.id+&apos;)">Transferir</button>'
-      +'<button class="btnO bOb" style="font-size:12px;padding:6px 10px" onclick="mEditProd(&apos;+p.id+&apos;)" title="Editar precos">&#9998;</button>'
-      +'<button class="btnO bOr" style="font-size:12px;padding:6px 10px" onclick="mDelProd(&apos;+p.id+&apos;)" title="Excluir produto">&#128465;</button>'
+      +'<button class="btn" style="flex:1;font-size:12px;padding:6px" onclick="mTransfPre('+p.id+')">Transferir</button>'
+      +'<button class="btnO bOb" style="font-size:12px;padding:6px 10px" onclick="mEditProd('+p.id+')" title="Editar precos">&#9998;</button>'
+      +'<button class="btnO bOr" style="font-size:12px;padding:6px 10px" onclick="mDelProd('+p.id+')" title="Excluir produto">&#128465;</button>'
       +'</div></div>';
   }
   var rows='';
@@ -2534,7 +2534,7 @@ function pgEstoque(){
   var filtH='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">';
   for(var i=0;i<tipos_entr.length;i++){
     var on=tipos_entr[i]===ef;
-    filtH+='<button onclick="_swEntrFiltro(\&apos;&apos;+tipos_entr[i]+&apos;\&apos;)" style="border:1px solid '+(on?'var(--gr)':'var(--bd)')+';background:'+(on?'var(--grb)':'transparent')+';color:'+(on?'var(--gr)':'var(--mt)')+';border-radius:20px;padding:4px 10px;font-size:11px;font-weight:'+(on?'700':'400')+';cursor:pointer">'+tipos_entr[i]+'</button>';
+    filtH+='<button onclick="_swEntrFiltro(\&apos;'+tipos_entr[i]+'\&apos;)" style="border:1px solid '+(on?'var(--gr)':'var(--bd)')+';background:'+(on?'var(--grb)':'transparent')+';color:'+(on?'var(--gr)':'var(--mt)')+';border-radius:20px;padding:4px 10px;font-size:11px;font-weight:'+(on?'700':'400')+';cursor:pointer">'+tipos_entr[i]+'</button>';
   }
   filtH+='</div>';
   var entrRows='';var totEntrKg=0,totEntrVal=0;
@@ -2667,7 +2667,7 @@ function mNovoProd(){openM('Novo Material','<div class="mf"><div style="display:
 function saveNP(){var n=document.getElementById('np-n').value.trim();if(!n){alert('Informe o nome!');return;}DB.produtos.push({id:nid(),nome:n,ic:document.getElementById('np-i').value,vV:parseFloat(document.getElementById('np-vv').value)||0,vC:parseFloat(document.getElementById('np-vc').value)||0,est:0,cat:document.getElementById('np-c').value});closeM();go('estoque');}
 function mEditProd(id){
   var p=gP(id);if(!p)return;
-  openM('Editar Precos - '+p.nome,'<div class="mf"><div class="al alb" style="margin-bottom:2px">Alterar o preco de venda tambem atualiza a tabela <strong>Padrao</strong> automaticamente.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><div class="fld"><label>Venda R$/kg</label><input class="inp" type="number" inputmode="decimal" id="ep-vv" value="'+p.vV+'" step="0.01"></div><div class="fld"><label>Compra R$/kg</label><input class="inp" type="number" inputmode="decimal" id="ep-vc" value="'+p.vC+'" step="0.01"></div></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveEditProd(&apos;+id+&apos;)">Salvar</button></div></div>');
+  openM('Editar Precos - '+p.nome,'<div class="mf"><div class="al alb" style="margin-bottom:2px">Alterar o preco de venda tambem atualiza a tabela <strong>Padrao</strong> automaticamente.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><div class="fld"><label>Venda R$/kg</label><input class="inp" type="number" inputmode="decimal" id="ep-vv" value="'+p.vV+'" step="0.01"></div><div class="fld"><label>Compra R$/kg</label><input class="inp" type="number" inputmode="decimal" id="ep-vc" value="'+p.vC+'" step="0.01"></div></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveEditProd('+id+')">Salvar</button></div></div>');
 }
 function saveEditProd(id){
   var p=gP(id);if(!p)return;
@@ -2690,7 +2690,7 @@ function saveEditProd(id){
 }
 function mDelProd(id){
   var p=gP(id);if(!p)return;
-  openM('Excluir Produto','<div class="mf"><div class="al alr">Tem certeza que deseja excluir <strong>'+p.nome+'</strong>? Esta acao nao pode ser desfeita.</div><div style="background:var(--s2);border-radius:var(--r);padding:11px;font-size:13px"><div style="display:flex;justify-content:space-between"><span style="color:var(--mt)">Estoque atual:</span><span style="font-family:monospace">'+fKg(p.est)+' kg</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--mt)">Valor em estoque:</span><span style="color:var(--or);font-family:monospace">'+fR(p.est*p.vV)+'</span></div></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-rd" onclick="confDelProd(&apos;+id+&apos;)">Excluir</button></div></div>');
+  openM('Excluir Produto','<div class="mf"><div class="al alr">Tem certeza que deseja excluir <strong>'+p.nome+'</strong>? Esta acao nao pode ser desfeita.</div><div style="background:var(--s2);border-radius:var(--r);padding:11px;font-size:13px"><div style="display:flex;justify-content:space-between"><span style="color:var(--mt)">Estoque atual:</span><span style="font-family:monospace">'+fKg(p.est)+' kg</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--mt)">Valor em estoque:</span><span style="color:var(--or);font-family:monospace">'+fR(p.est*p.vV)+'</span></div></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-rd" onclick="confDelProd('+id+')">Excluir</button></div></div>');
 }
 function confDelProd(id){
   var idx=-1;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].id===id){idx=i;break;}}
@@ -2725,7 +2725,7 @@ function addTransfDest(){
   row.style.cssText='display:grid;grid-template-columns:1fr 110px 28px;gap:7px;align-items:end;margin-bottom:7px';
   row.innerHTML='<div class="fld"><label>Material destino</label><select class="inp" id="td-pa-'+idx+'">'+o2+'</select></div>'
     +'<div class="fld"><label>Peso (kg)</label><input class="inp" type="number" inputmode="decimal" id="td-pe-'+idx+'" placeholder="0.00" oninput="updTransfTotal()"></div>'
-    +'<button class="btnO bOr" style="padding:6px;min-height:36px;font-size:15px;align-self:flex-end" onclick="remTransfDest(&apos;+idx+&apos;)" title="Remover">&#215;</button>';
+    +'<button class="btnO bOr" style="padding:6px;min-height:36px;font-size:15px;align-self:flex-end" onclick="remTransfDest('+idx+')" title="Remover">&#215;</button>';
   box.appendChild(row);
   updTransfTotal();
 }
@@ -2783,7 +2783,7 @@ function pgRevenda(){
   var catBar='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:7px">';
   for(var i=0;i<cats.length;i++){
     var c=cats[i];var on=(revCatFiltro===c);
-    catBar+='<button onclick="setRevCat(\&apos;&apos;+c+&apos;\&apos;)" style="background:'+(on?'var(--grb)':'var(--s2)')+';border:1px solid '+(on?'var(--gr)':'var(--bd)')+';color:'+(on?'var(--gr)':'var(--mt)')+';border-radius:20px;padding:5px 14px;font-size:12px;font-weight:'+(on?'700':'400')+';cursor:pointer;white-space:nowrap">'+c+'</button>';
+    catBar+='<button onclick="setRevCat(\&apos;'+c+'\&apos;)" style="background:'+(on?'var(--grb)':'var(--s2)')+';border:1px solid '+(on?'var(--gr)':'var(--bd)')+';color:'+(on?'var(--gr)':'var(--mt)')+';border-radius:20px;padding:5px 14px;font-size:12px;font-weight:'+(on?'700':'400')+';cursor:pointer;white-space:nowrap">'+c+'</button>';
   }
   catBar+='<button onclick="mGerenciarCats()" style="background:var(--s3);border:1px solid var(--bd);color:var(--mt);border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer" title="Gerenciar Categorias">&#9881;</button>';
   catBar+='</div>';
@@ -2792,7 +2792,7 @@ function pgRevenda(){
   var condBar='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px">';
   for(var i=0;i<conds.length;i++){
     var c=conds[i];var on=(revCondFiltro===c);
-    condBar+='<button onclick="setRevCond(\&apos;&apos;+c+&apos;\&apos;)" style="background:'+(on?'rgba(168,85,247,.15)':'var(--s2)')+';border:1px solid '+(on?'var(--pu)':'var(--bd)')+';color:'+(on?'var(--pu)':'var(--mt)')+';border-radius:20px;padding:5px 14px;font-size:12px;font-weight:'+(on?'700':'400')+';cursor:pointer;white-space:nowrap">'+c+'</button>';
+    condBar+='<button onclick="setRevCond(\&apos;'+c+'\&apos;)" style="background:'+(on?'rgba(168,85,247,.15)':'var(--s2)')+';border:1px solid '+(on?'var(--pu)':'var(--bd)')+';color:'+(on?'var(--pu)':'var(--mt)')+';border-radius:20px;padding:5px 14px;font-size:12px;font-weight:'+(on?'700':'400')+';cursor:pointer;white-space:nowrap">'+c+'</button>';
   }
   condBar+='<button onclick="mGerenciarStates()" style="background:var(--s3);border:1px solid var(--bd);color:var(--mt);border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer" title="Gerenciar Condicoes">&#9881;</button>';
   condBar+='</div>';
@@ -2823,7 +2823,7 @@ function pgRevenda(){
         +'<div style="display:flex;flex-wrap:wrap;gap:4px">'+badgesList+'</div>'
         +'</div>';
     }
-    cards+='<div class="card" style="position:relative;cursor:pointer;transition:border-color .15s" onclick="mEditRev(&apos;+p.id+&apos;)" onmouseover="this.style.borderColor=\'var(--gr)\'" onmouseout="this.style.borderColor=\'\'">'
+    cards+='<div class="card" style="position:relative;cursor:pointer;transition:border-color .15s" onclick="mEditRev('+p.id+')" onmouseover="this.style.borderColor=\'var(--gr)\'" onmouseout="this.style.borderColor=\'\'">'
       +'<div style="position:absolute;top:13px;right:13px;display:flex;gap:5px;pointer-events:none">'
       +'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:'+stBg+';color:'+stCor+'">'+p.status+'</span></div>'
       +'<div style="font-size:22px;margin-bottom:7px">&#127991;</div>'
@@ -2834,8 +2834,8 @@ function pgRevenda(){
       +'<div style="display:flex;justify-content:space-between;align-items:center">'
       +'<span style="font-size:19px;font-weight:700;color:var(--gr)">'+fR(p.preco)+'</span>'
       +'<div style="display:flex;gap:5px" onclick="event.stopPropagation()">'
-      +(p.status==='Disponivel'?'<button class="btn" style="font-size:12px;padding:6px 11px" onclick="mVU(&apos;+p.id+&apos;)">Vender</button>':'')
-      +'<button class="btnO bOr" style="font-size:12px;padding:5px 9px;min-height:30px" title="Excluir" onclick="mDelRev(&apos;+p.id+&apos;)">&#128465;</button>'
+      +(p.status==='Disponivel'?'<button class="btn" style="font-size:12px;padding:6px 11px" onclick="mVU('+p.id+')">Vender</button>':'')
+      +'<button class="btnO bOr" style="font-size:12px;padding:5px 9px;min-height:30px" title="Excluir" onclick="mDelRev('+p.id+')">&#128465;</button>'
       +'</div></div></div>';
   }
   if(!cards)cards='<div class="card" style="text-align:center;color:var(--mt);padding:30px">Nenhum produto encontrado.</div>';
@@ -2852,12 +2852,12 @@ function mGerenciarCats(){
     h+='<div style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:9px 11px">'
       +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">'
       +'<span style="flex:1;font-size:13px;font-weight:600;color:var(--tx)">'+cat.nome+'</span>'
-      +'<button onclick="delRevCat(&apos;+i+&apos;)" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer">&#215;</button>'
+      +'<button onclick="delRevCat('+i+')" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer">&#215;</button>'
       +'</div>'
       +'<div style="display:flex;align-items:center;gap:6px">'
       +'<span style="font-size:10px;color:var(--mt);white-space:nowrap">Checklist:</span>'
       +'<input class="inp" id="rv-cl-'+i+'" value="'+cat.checklist.join(', ')+'" placeholder="Item1, Item2, Item3" style="font-size:12px;padding:5px 9px">'
-      +'<button onclick="saveRevCatChecklist(&apos;+i+&apos;)" style="background:var(--gr2);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">&#10003; Salvar</button>'
+      +'<button onclick="saveRevCatChecklist('+i+')" style="background:var(--gr2);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">&#10003; Salvar</button>'
       +'</div>'
       +'</div>';
   }
@@ -2908,7 +2908,7 @@ function mGerenciarStates(){
   for(var i=0;i<DB.revendaStates.length;i++){
     h+='<div style="display:flex;align-items:center;gap:7px;background:var(--s2);border-radius:var(--r);padding:7px 11px">'
       +'<span style="flex:1;font-size:13px">'+DB.revendaStates[i]+'</span>'
-      +'<button onclick="delRevStateGlobal(&apos;+i+&apos;)" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer">&#215;</button>'
+      +'<button onclick="delRevStateGlobal('+i+')" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer">&#215;</button>'
       +'</div>';
   }
   h+='</div>';
@@ -2946,7 +2946,7 @@ function renderChecklistHtml(catNome, aprovados, prefix){
     var checked=aprovados&&aprovados.indexOf(cl[j])>=0;
     var eid=prefix+'-ck-'+j;
     h+='<label style="display:flex;align-items:center;gap:7px;background:var(--s1);border:1px solid '+(checked?'rgba(34,197,94,.4)':'var(--bd)')+';border-radius:6px;padding:7px 9px;cursor:pointer;transition:all .15s" '
-      +'onclick="var cb=document.getElementById(\&apos;&apos;+eid+&apos;\&apos;);this.style.borderColor=cb.checked?\&apos;var(--bd)\&apos;:\&apos; rgba(34,197,94,.4)\&apos;;this.style.background=cb.checked?\&apos;var(--s1)\&apos;:\&apos; rgba(34,197,94,.07)\&apos;">'
+      +'onclick="var cb=document.getElementById(\&apos;'+eid+'\&apos;);this.style.borderColor=cb.checked?\&apos;var(--bd)\&apos;:\&apos; rgba(34,197,94,.4)\&apos;;this.style.background=cb.checked?\&apos;var(--s1)\&apos;:\&apos; rgba(34,197,94,.07)\&apos;">'
       +'<input type="checkbox" id="'+eid+'" value="'+cl[j]+'"'+(checked?' checked':'')+' style="width:14px;height:14px;cursor:pointer;accent-color:var(--gr)">'
       +'<span style="font-size:12px;font-weight:500">'+cl[j]+'</span>'
       +'</label>';
@@ -2984,7 +2984,7 @@ function mEditRev(id){
     +'<div class="fld"><label>Peso kg</label><input class="inp" type="number" inputmode="decimal" id="er-kg" value="'+it.peso+'"></div>'
     +'<div class="brow">'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="saveEditRev(&apos;+id+&apos;)">Salvar</button>'
+    +'<button class="btn" onclick="saveEditRev('+id+')">Salvar</button>'
     +'</div></div>';
   openM('Editar Produto Revenda',h,500);
 }
@@ -3019,7 +3019,7 @@ function saveEditRev(id){
 function mDelRev(id){
   var it=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){it=DB.revenda[i];break;}}if(!it)return;
   openM('Excluir Produto','<div class="mf"><div class="al alr">Tem certeza que deseja excluir <strong>'+it.prod+'</strong>? Esta acao nao pode ser desfeita.</div>'
-    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-rd" onclick="confDelRev(&apos;+id+&apos;)">Excluir</button></div></div>');
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-rd" onclick="confDelRev('+id+')">Excluir</button></div></div>');
 }
 function confDelRev(id){
   var idx=-1;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){idx=i;break;}}
@@ -3098,7 +3098,7 @@ function mAcaoRapida(){
   ];
   for(var i=0;i<acoes.length;i++){
     var a=acoes[i];
-    opts+='<button onclick="closeM();&apos;+a.fn+&apos;" style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--tx);cursor:pointer;font-size:12px;font-weight:600">'
+    opts+='<button onclick="closeM();'+a.fn+'" style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--tx);cursor:pointer;font-size:12px;font-weight:600">'
       +'<span style="font-size:24px">'+a.ic+'</span>'+a.label+'</button>';
   }
   opts+='</div>';
@@ -3156,7 +3156,7 @@ function pgFin(){
   var tabH='';
   for(var i=0;i<tabs.length;i++){
     var t=tabs[i];
-    tabH+='<button class="tabbtn'+(_finTab===t.id?' on':'')+'" onclick="finTab(\&apos;&apos;+t.id+&apos;\&apos;)">'+t.ic+' '+t.lbl+'</button>';
+    tabH+='<button class="tabbtn'+(_finTab===t.id?' on':'')+'" onclick="finTab(\&apos;'+t.id+'\&apos;)">'+t.ic+' '+t.lbl+'</button>';
   }
   return '<div class="fc">'
     +'<div class="ptop"><div><div class="pl">Financeiro</div><div class="pt">Caixa e Controle</div></div>'
@@ -3297,7 +3297,7 @@ function _finResumo(){
       +'<div style="font-size:10px;color:var(--mt)">Dia '+_c.venc+'</div></div></div>'
       +'<div style="display:flex;align-items:center;gap:7px">'
       +(_v>0?'<span style="font-size:13px;font-weight:700;font-family:monospace;color:'+(_s==='Pendente'?'var(--rd)':'var(--mt)')+'">'+fR(_v)+'</span>':'<span style="font-size:11px;color:var(--or)">sem valor</span>')
-      +(_s==='Pendente'&&_v>0?'<button class="bsm bsmg" onclick="finTab(\&apos;fixas\&apos;);setTimeout(function(){mPagarCF(&apos;+_c.id+&apos;)},80)">Pagar</button>':_s==='Pago'?'<span class="tag tg">Pago</span>':'<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="finTab(\&apos;fixas\&apos;);setTimeout(function(){mLancarCF(&apos;+_c.id+&apos;)},80)">Lancar</button>')
+      +(_s==='Pendente'&&_v>0?'<button class="bsm bsmg" onclick="finTab(\&apos;fixas\&apos;);setTimeout(function(){mPagarCF('+_c.id+')},80)">Pagar</button>':_s==='Pago'?'<span class="tag tg">Pago</span>':'<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="finTab(\&apos;fixas\&apos;);setTimeout(function(){mLancarCF('+_c.id+')},80)">Lancar</button>')
       +'</div></div>';
   }
   if(!DB.contasFixas.length) cfCardRows='<div style="text-align:center;padding:14px;color:var(--mt);font-size:12px">Nenhuma conta cadastrada.</div>';
@@ -3422,8 +3422,8 @@ function _finContas(){
       +'<div><div style="font-size:13px;font-weight:600">'+c.nome+'</div><div style="font-size:11px;color:var(--mt)">'+c.tipo+'</div></div></div>'
       +'<div style="display:flex;align-items:center;gap:8px">'
       +'<span style="font-size:16px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(c.saldo)+'</span>'
-      +'<button onclick="mEditConta(&apos;+c.id+&apos;)" style="background:none;border:none;color:var(--mt);font-size:15px;cursor:pointer;padding:2px 5px" title="Editar">&#9998;</button>'
-      +(DB.contas.length>1?'<button onclick="delConta(&apos;+c.id+&apos;)" style="background:none;border:none;color:var(--mt);font-size:13px;cursor:pointer;padding:2px 5px" title="Excluir">&#128465;</button>':'')
+      +'<button onclick="mEditConta('+c.id+')" style="background:none;border:none;color:var(--mt);font-size:15px;cursor:pointer;padding:2px 5px" title="Editar">&#9998;</button>'
+      +(DB.contas.length>1?'<button onclick="delConta('+c.id+')" style="background:none;border:none;color:var(--mt);font-size:13px;cursor:pointer;padding:2px 5px" title="Excluir">&#128465;</button>':'')
       +'</div></div>';
   }
   return '<div class="fc">'
@@ -3444,7 +3444,7 @@ function mNovaConta(){
   var icH='<div style="display:flex;flex-wrap:wrap;gap:6px">';
   var icons=_CONTA_ICONS;
   for(var i=0;i<icons.length;i++){
-    icH+='<button type="button" onclick="selContaIc(this,\&apos;&apos;+icons[i]+&apos;\&apos;)" data-cic="'+icons[i]+'" style="width:36px;height:36px;background:var(--s2);border:2px solid var(--bd);border-radius:8px;font-size:18px;cursor:pointer">'+icons[i]+'</button>';
+    icH+='<button type="button" onclick="selContaIc(this,\&apos;'+icons[i]+'\&apos;)" data-cic="'+icons[i]+'" style="width:36px;height:36px;background:var(--s2);border:2px solid var(--bd);border-radius:8px;font-size:18px;cursor:pointer">'+icons[i]+'</button>';
   }
   icH+='</div>';
   openM('Nova Conta Bancaria',
@@ -3482,7 +3482,7 @@ function mEditConta(id){
   var icH='<div style="display:flex;flex-wrap:wrap;gap:6px">';
   for(var i=0;i<icons.length;i++){
     var sel=icons[i]===c.ic;
-    icH+='<button type="button" onclick="selContaIc(this,\&apos;&apos;+icons[i]+&apos;\&apos;)" data-cic="'+icons[i]+'" style="width:36px;height:36px;background:'+(sel?'var(--grb)':'var(--s2)')+';border:2px solid '+(sel?'var(--gr)':'var(--bd)')+';border-radius:8px;font-size:18px;cursor:pointer">'+icons[i]+'</button>';
+    icH+='<button type="button" onclick="selContaIc(this,\&apos;'+icons[i]+'\&apos;)" data-cic="'+icons[i]+'" style="width:36px;height:36px;background:'+(sel?'var(--grb)':'var(--s2)')+';border:2px solid '+(sel?'var(--gr)':'var(--bd)')+';border-radius:8px;font-size:18px;cursor:pointer">'+icons[i]+'</button>';
   }
   icH+='</div>';
   openM('Editar Conta: '+c.nome,
@@ -3497,8 +3497,8 @@ function mEditConta(id){
     +'<option'+(c.tipo==='Investimento'?' selected':'')+'>Investimento</option>'
     +'</select></div>'
     +'<div class="fld"><label>Saldo Atual R$</label><input class="inp" type="number" inputmode="decimal" id="ct-s" value="'+c.saldo+'"></div>'
-    +(DB.contas.length>1?'<button class="btnO bOr" onclick="closeM();delConta(&apos;+id+&apos;)" style="font-size:12px">&#128465; Excluir esta conta</button>':'')
-    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveEditConta(&apos;+id+&apos;)">Salvar</button></div>'
+    +(DB.contas.length>1?'<button class="btnO bOr" onclick="closeM();delConta('+id+')" style="font-size:12px">&#128465; Excluir esta conta</button>':'')
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveEditConta('+id+')">Salvar</button></div>'
     +'</div>',480);
 }
 function saveEditConta(id){
@@ -3642,12 +3642,12 @@ function _finFixas(){
       // Mes atual: logica normal
       if(c.tipo==='parcelada'){
         if(!mesHist) acoes='<span style="font-size:11px;color:var(--mt)">sem parcela</span>';
-        else if(!mesHist.pago) acoes='<button class="bsm bsmg" onclick="mPagarCF(&apos;+c.id+&apos;)">Pagar parcela</button>';
+        else if(!mesHist.pago) acoes='<button class="bsm bsmg" onclick="mPagarCF('+c.id+')">Pagar parcela</button>';
         else acoes='<span class="tag tg">Pago</span>';
       } else if(s==='Pendente'){
-        if(c.tipo==='variavel'&&v===0) acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="mLancarCF(&apos;+c.id+&apos;)">Lancar Valor</button>';
-        else if(v>0) acoes='<button class="bsm bsmg" onclick="mPagarCF(&apos;+c.id+&apos;)">Pagar</button>';
-        else acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="mLancarCF(&apos;+c.id+&apos;)">Lancar Valor</button>';
+        if(c.tipo==='variavel'&&v===0) acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="mLancarCF('+c.id+')">Lancar Valor</button>';
+        else if(v>0) acoes='<button class="bsm bsmg" onclick="mPagarCF('+c.id+')">Pagar</button>';
+        else acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="mLancarCF('+c.id+')">Lancar Valor</button>';
       } else {
         acoes='<span class="tag tg">Pago</span>';
       }
@@ -3660,13 +3660,13 @@ function _finFixas(){
       +'<div>'
       +'<div style="display:flex;align-items:center;gap:6px">'
       +'<span style="font-size:13px;font-weight:600">'+c.nome+'</span>'+tipoTag+'</div>'
-      +'<div style="font-size:10px;color:var(--mt);margin-top:2px">Vence dia '+c.venc+' &middot; <button onclick="mHistCF(&apos;+c.id+&apos;)" style="background:none;border:none;color:var(--bl);font-size:10px;cursor:pointer;padding:0">ver historico</button></div>'
+      +'<div style="font-size:10px;color:var(--mt);margin-top:2px">Vence dia '+c.venc+' &middot; <button onclick="mHistCF('+c.id+')" style="background:none;border:none;color:var(--bl);font-size:10px;cursor:pointer;padding:0">ver historico</button></div>'
       +'</div></div>'
       +'<div style="display:flex;align-items:center;gap:9px">'
       +(v>0?'<span style="font-size:14px;font-weight:700;font-family:monospace;color:'+(isFuturo?'var(--pu)':statusParc==='Pendente'?'var(--rd)':'var(--mt)')+'">'+fR(v)+'</span>':'')
       +acoes
-      +(!isFuturo&&!isPast?'<button onclick="mEditCF(&apos;+c.id+&apos;)" style="background:none;border:none;color:var(--mt);font-size:15px;cursor:pointer;padding:2px 4px" title="Editar">&#9998;</button>':'')
-      +(!isFuturo&&!isPast?'<button onclick="delCF(&apos;+c.id+&apos;)" style="background:none;border:none;color:var(--mt);font-size:13px;cursor:pointer;padding:2px 4px" title="Excluir">&#128465;</button>':'')
+      +(!isFuturo&&!isPast?'<button onclick="mEditCF('+c.id+')" style="background:none;border:none;color:var(--mt);font-size:15px;cursor:pointer;padding:2px 4px" title="Editar">&#9998;</button>':'')
+      +(!isFuturo&&!isPast?'<button onclick="delCF('+c.id+')" style="background:none;border:none;color:var(--mt);font-size:13px;cursor:pointer;padding:2px 4px" title="Excluir">&#128465;</button>':'')
       +'</div></div>';
   }
   if(!DB.contasFixas.length) cfH='<div style="text-align:center;padding:28px;color:var(--mt);font-size:13px">Nenhuma conta cadastrada.<br>Clique em + Nova Conta para comecar.</div>';
@@ -3723,7 +3723,7 @@ function mNovaCF(){
   var icns=_cfIcons();
   var icH='<div style="display:flex;flex-wrap:wrap;gap:6px">';
   for(var i=0;i<icns.length;i++){
-    icH+='<button type="button" onclick="selCFIc(this,\&apos;&apos;+icns[i]+&apos;\&apos;)" data-ic="'+icns[i]+'" style="width:36px;height:36px;background:var(--s2);border:2px solid var(--bd);border-radius:8px;font-size:18px;cursor:pointer;transition:all .15s">'+icns[i]+'</button>';
+    icH+='<button type="button" onclick="selCFIc(this,\&apos;'+icns[i]+'\&apos;)" data-ic="'+icns[i]+'" style="width:36px;height:36px;background:var(--s2);border:2px solid var(--bd);border-radius:8px;font-size:18px;cursor:pointer;transition:all .15s">'+icns[i]+'</button>';
   }
   icH+='</div>';
   openM('Nova Conta a Pagar',
@@ -3827,7 +3827,7 @@ function mEditCF(id){
   var icH='<div style="display:flex;flex-wrap:wrap;gap:6px">';
   for(var i=0;i<icns.length;i++){
     var sel=icns[i]===c.ic;
-    icH+='<button type="button" onclick="selCFIc(this,\&apos;&apos;+icns[i]+&apos;\&apos;)" data-ic="'+icns[i]+'" style="width:36px;height:36px;background:'+(sel?'var(--grb)':'var(--s2)')+';border:2px solid '+(sel?'var(--gr)':'var(--bd)')+';border-radius:8px;font-size:18px;cursor:pointer">'+icns[i]+'</button>';
+    icH+='<button type="button" onclick="selCFIc(this,\&apos;'+icns[i]+'\&apos;)" data-ic="'+icns[i]+'" style="width:36px;height:36px;background:'+(sel?'var(--grb)':'var(--s2)')+';border:2px solid '+(sel?'var(--gr)':'var(--bd)')+';border-radius:8px;font-size:18px;cursor:pointer">'+icns[i]+'</button>';
   }
   icH+='</div>';
   openM('Editar Conta: '+c.nome,
@@ -3846,9 +3846,9 @@ function mEditCF(id){
     +'<div class="fld" id="cf-valor-wrap" style="display:'+(c.tipo!=='variavel'?'flex':'none')+'"><label>'+(c.tipo==='parcelada'?'Valor por Parcela R$':'Valor Fixo R$')+'</label><input class="inp" type="number" inputmode="decimal" id="cf-v" value="'+(c.tipo!=='variavel'?c.valor:'')+'" placeholder="0.00"></div>'
     +'<div class="fld"><label>Dia de Vencimento</label><input class="inp" type="number" inputmode="numeric" id="cf-venc" value="'+c.venc+'" min="1" max="31"></div>'
     +'<div class="brow">'
-    +'<button class="btnO bOr" onclick="delCF(&apos;+id+&apos;)">&#128465; Excluir</button>'
+    +'<button class="btnO bOr" onclick="delCF('+id+')">&#128465; Excluir</button>'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="saveEditCF(&apos;+id+&apos;)">Salvar</button>'
+    +'<button class="btn" onclick="saveEditCF('+id+')">Salvar</button>'
     +'</div></div>',500);
 }
 function saveEditCF(id){
@@ -3890,8 +3890,8 @@ function mLancarCF(id){
     +DB.contas.map(function(ct){return'<option>'+ct.nome+'</option>';}).join('')
     +'</select></div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btnO bOgr" onclick="saveLancarCF(&apos;+id+&apos;,false)">So Lancar</button>'
-    +'<button class="btn" onclick="saveLancarCF(&apos;+id+&apos;,true)">Lancar e Pagar</button>'
+    +'<button class="btnO bOgr" onclick="saveLancarCF('+id+',false)">So Lancar</button>'
+    +'<button class="btn" onclick="saveLancarCF('+id+',true)">Lancar e Pagar</button>'
     +'</div></div>',460);
   setTimeout(function(){var el=document.getElementById('cf-lv');if(el)el.focus();},80);
 }
@@ -3927,11 +3927,11 @@ function mPagarCF(id){
     +'<div style="font-size:24px;font-weight:700;font-family:monospace;color:var(--rd)">'+fR(v)+'</div>'
     +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Vence dia '+c.venc+'</div>'
     +'</div>'
-    +(c.tipo==='variavel'?'<button type="button" class="btnO bOgr" style="font-size:11px;width:100%" onclick="closeM();mLancarCF(&apos;+id+&apos;)">&#9998; Alterar Valor</button>':'')
+    +(c.tipo==='variavel'?'<button type="button" class="btnO bOgr" style="font-size:11px;width:100%" onclick="closeM();mLancarCF('+id+')">&#9998; Alterar Valor</button>':'')
     +'<div class="fld"><label>Conta para debitar</label><select class="inp" id="cf-pc">'
     +DB.contas.map(function(ct){return'<option>'+ct.nome+'</option>';}).join('')
     +'</select></div>'
-    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="confirmarPagCF(&apos;+id+&apos;)">Confirmar Pagamento</button></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="confirmarPagCF('+id+')">Confirmar Pagamento</button></div>'
     +'</div>',420);
 }
 function confirmarPagCF(id){
@@ -3970,7 +3970,7 @@ function mHistCF(id){
         +'<span style="font-size:13px;font-weight:700;font-family:monospace;color:'+(h.pago?'var(--mt)':'var(--rd)')+'">'+fR(h.valor)+'</span>'
         +(h.pago
           ?'<span class="tag tg" style="font-size:10px">Pago</span>'
-           +'<button onclick="mDesfazerPagCF(&apos;+id+&apos;,\&apos;&apos;+h.mes+&apos;\&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer" title="Desfazer pagamento">&#8592; Desfazer</button>'
+           +'<button onclick="mDesfazerPagCF('+id+',\&apos;'+h.mes+'\&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer" title="Desfazer pagamento">&#8592; Desfazer</button>'
           :'<span class="tag tr" style="font-size:10px">Pendente</span>')
         +'</div></div>';
     }
@@ -4020,8 +4020,8 @@ function _finCategorias(){
       h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--s2);border-radius:var(--r);margin-bottom:6px;border:1.5px solid '+c.cor+'44;border-left:4px solid '+c.cor+'">'
         +'<div style="width:14px;height:14px;border-radius:50%;background:'+c.cor+';flex-shrink:0;box-shadow:0 0 8px '+c.cor+'99"></div>'
         +'<span style="flex:1;font-size:13px;font-weight:600;color:var(--tx)">'+c.nome+'</span>'
-        +'<button onclick="mEditCat(&apos;+c.id+&apos;,\&apos;&apos;+tipo+&apos;\&apos;)" style="background:none;border:none;color:var(--mt);font-size:14px;cursor:pointer;padding:2px 5px" title="Editar">&#9998;</button>'
-        +'<button onclick="delCat(&apos;+c.id+&apos;,\&apos;&apos;+tipo+&apos;\&apos;)" style="background:none;border:none;color:var(--mt);font-size:13px;cursor:pointer;padding:2px 5px" title="Excluir">&#128465;</button>'
+        +'<button onclick="mEditCat('+c.id+',\&apos;'+tipo+'\&apos;)" style="background:none;border:none;color:var(--mt);font-size:14px;cursor:pointer;padding:2px 5px" title="Editar">&#9998;</button>'
+        +'<button onclick="delCat('+c.id+',\&apos;'+tipo+'\&apos;)" style="background:none;border:none;color:var(--mt);font-size:13px;cursor:pointer;padding:2px 5px" title="Excluir">&#128465;</button>'
         +'</div>';
     }
     if(!arr.length) h='<div style="text-align:center;padding:16px;color:var(--mt);font-size:12px">Nenhuma categoria cadastrada.</div>';
@@ -4053,7 +4053,7 @@ function _buildColorPicker(selCor){
   var h='<div style="display:flex;flex-wrap:wrap;gap:7px" id="cp-wrap">';
   for(var i=0;i<_CORES_OPCOES.length;i++){
     var c=_CORES_OPCOES[i];var sel=c===selCor;
-    h+='<button type="button" onclick="selCor(this,\&apos;&apos;+c+&apos;\&apos;)" data-cor="'+c+'" style="width:28px;height:28px;border-radius:50%;background:'+c+';border:3px solid '+(sel?'#fff':'transparent')+';cursor:pointer;transition:all .15s;box-shadow:'+(sel?'0 0 0 2px '+c:'none')+'"></button>';
+    h+='<button type="button" onclick="selCor(this,\&apos;'+c+'\&apos;)" data-cor="'+c+'" style="width:28px;height:28px;border-radius:50%;background:'+c+';border:3px solid '+(sel?'#fff':'transparent')+';cursor:pointer;transition:all .15s;box-shadow:'+(sel?'0 0 0 2px '+c:'none')+'"></button>';
   }
   h+='</div>';
   return h;
@@ -4073,7 +4073,7 @@ function mNovaCat(tipo){
     +'<input type="hidden" id="cat-cor" value="'+defCor+'">'
     +'<div class="fld"><label>Cor</label>'+_buildColorPicker(defCor)+'</div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn'+(tipo==='saida'?' btn-rd':'')+'" onclick="saveNovaCat(\&apos;&apos;+tipo+&apos;\&apos;)">Criar</button>'
+    +'<button class="btn'+(tipo==='saida'?' btn-rd':'')+'" onclick="saveNovaCat(\&apos;'+tipo+'\&apos;)">Criar</button>'
     +'</div></div>',420);
 }
 function saveNovaCat(tipo){
@@ -4095,9 +4095,9 @@ function mEditCat(id,tipo){
     +'<input type="hidden" id="cat-cor" value="'+c.cor+'">'
     +'<div class="fld"><label>Cor</label>'+_buildColorPicker(c.cor)+'</div>'
     +'<div class="brow">'
-    +'<button class="btnO bOr" onclick="delCat(&apos;+id+&apos;,\&apos;&apos;+tipo+&apos;\&apos;)">&#128465;</button>'
+    +'<button class="btnO bOr" onclick="delCat('+id+',\&apos;'+tipo+'\&apos;)">&#128465;</button>'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="saveEditCat(&apos;+id+&apos;,\&apos;&apos;+tipo+&apos;\&apos;)">Salvar</button>'
+    +'<button class="btn" onclick="saveEditCat('+id+',\&apos;'+tipo+'\&apos;)">Salvar</button>'
     +'</div></div>',420);
 }
 function saveEditCat(id,tipo){
@@ -4136,7 +4136,7 @@ function mMov(tipo){
     +catsH+'</div>'
     +'<div class="brow">'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn'+(tipo==='saida'?' btn-rd':'')+'" onclick="saveMov(\&apos;&apos;+tipo+&apos;\&apos;)">Registrar</button>'
+    +'<button class="btn'+(tipo==='saida'?' btn-rd':'')+'" onclick="saveMov(\&apos;'+tipo+'\&apos;)">Registrar</button>'
     +'</div></div>');
   setTimeout(function(){var d=document.getElementById('m-dt');if(d){var n=new Date();d.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}},50);
 }
@@ -4172,7 +4172,7 @@ function pgAgenda(){
     for(var i=0;i<DB.coletas.length;i++){
       var col=DB.coletas[i];if(col.data!==dias[d])continue;
       var sc_=col.status==='Confirmada'?'var(--gr)':col.status==='Agendada'?'var(--bl)':'var(--or)';
-      var actBtns=CU.perfil!=='motorista'?'<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--bd);display:flex;gap:5px;flex-wrap:wrap"><button class="bsm bsmg" onclick="updCol(&apos;+col.id+&apos;,\&apos;Confirmada\&apos;)">Confirmar</button><button style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:6px;padding:4px 10px;font-size:11px" onclick="notifC(&apos;+col.id+&apos;)">Notificar</button><button style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:4px 10px;font-size:11px" onclick="mEditCol(&apos;+col.id+&apos;)">&#9998; Editar</button><button class="bsm bsmr" onclick="updCol(&apos;+col.id+&apos;,\&apos;Cancelada\&apos;)">Cancelar</button><button onclick=\"mMDFe('+col.id+')\" style="background:#7c3aed18;color:#7c3aed;border:1px solid rgba(124,58,237,.3);padding:4px 10px;border-radius:6px;font-size:11px">MDF-e</button></div>':'';
+      var actBtns=CU.perfil!=='motorista'?'<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--bd);display:flex;gap:5px;flex-wrap:wrap"><button class="bsm bsmg" onclick="updCol('+col.id+',\&apos;Confirmada\&apos;)">Confirmar</button><button style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:6px;padding:4px 10px;font-size:11px" onclick="notifC('+col.id+')">Notificar</button><button style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:4px 10px;font-size:11px" onclick="mEditCol('+col.id+')">&#9998; Editar</button><button class="bsm bsmr" onclick="updCol('+col.id+',\&apos;Cancelada\&apos;)">Cancelar</button><button onclick=\"mMDFe('+col.id+')\" style="background:#7c3aed18;color:#7c3aed;border:1px solid rgba(124,58,237,.3);padding:4px 10px;border-radius:6px;font-size:11px">MDF-e</button></div>':'';
       lista+='<div class="card" style="margin-bottom:9px;border-color:'+sc_+'30"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:9px"><div style="display:flex;gap:11px"><div style="background:var(--s2);border-radius:7px;padding:7px 9px;text-align:center;min-width:46px;flex-shrink:0"><div style="font-size:14px;font-weight:800;color:var(--gr);font-family:monospace">'+(col.hora?col.hora.split(':')[0]:'--')+'</div><div style="font-size:10px;color:var(--mt)">:'+(col.hora?col.hora.split(':')[1]:'00')+'h</div></div><div><div style="font-size:13px;font-weight:700">'+col.cli+'</div><div style="font-size:11px;color:var(--mt);margin-top:2px">'+col.end+'</div><div style="font-size:11px;color:var(--mt)">'+col.mat+' &middot; ~'+col.peso+'kg</div>'+(col.obs?'<div style="font-size:11px;color:var(--or);margin-top:2px">'+col.obs+'</div>':'')+'</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">'+stag(col.status)+'<div style="font-size:11px;color:var(--mt)">'+col.mot+'</div><div style="font-size:11px;color:var(--bl)">'+col.tel+'</div></div></div>'+actBtns+'</div>';
     }
   }
@@ -4226,9 +4226,9 @@ function mEditCol(id){
   openM('Editar Coleta',
     _buildColForm(c)
     +'<div class="brow">'
-    +'<button class="btnO bOr" onclick="delCol(&apos;+id+&apos;)">&#128465; Excluir</button>'
+    +'<button class="btnO bOr" onclick="delCol('+id+')">&#128465; Excluir</button>'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="saveEditCol(&apos;+id+&apos;)">Salvar</button>'
+    +'<button class="btn" onclick="saveEditCol('+id+')">Salvar</button>'
     +'</div></div>',540);
 }
 function saveEditCol(id){
@@ -4370,7 +4370,7 @@ function pgFuncs(){
     var on=fSel===i;
     var semana=getTotalSemana(f);
     var mes=getTotalMes(f);
-    lista+='<div class="card" style="cursor:pointer;border-color:'+(on?'var(--gr)':'var(--bd)')+';background:'+(on?'rgba(34,197,94,.04)':'var(--s1)')+'" onclick="selF(&apos;+i+&apos;)">'
+    lista+='<div class="card" style="cursor:pointer;border-color:'+(on?'var(--gr)':'var(--bd)')+';background:'+(on?'rgba(34,197,94,.04)':'var(--s1)')+'" onclick="selF('+i+')">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
       +'<div style="display:flex;gap:9px;align-items:center">'
       +'<div style="width:37px;height:37px;border-radius:50%;background:hsl('+(i*70+100)+',40%,20%);border:2px solid hsl('+(i*70+100)+',50%,35%);display:flex;align-items:center;justify-content:center;font-weight:700;color:hsl('+(i*70+100)+',70%,65%)">'+f.nome[0]+'</div>'
@@ -4379,8 +4379,8 @@ function pgFuncs(){
       +'<div style="font-size:11px;color:var(--bl);margin-top:2px">'+fR(f.vHora)+'/h</div>'
       +'</div></div>'
       +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">'
-      +'<button onclick="event.stopPropagation();mEditFunc(&apos;+i+&apos;)" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer">&#9998;</button>'
-      +'<button onclick="event.stopPropagation();delFunc(&apos;+i+&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer">&#128465;</button>'
+      +'<button onclick="event.stopPropagation();mEditFunc('+i+')" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer">&#9998;</button>'
+      +'<button onclick="event.stopPropagation();delFunc('+i+')" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer">&#128465;</button>'
       +'</div></div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px">'
       +'<div style="background:var(--bg);border-radius:6px;padding:6px 10px"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Esta semana</div><div style="font-size:13px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(semana)+'</div></div>'
@@ -4437,8 +4437,8 @@ function pgFuncs(){
           +'</div>'
           +'<div style="display:flex;align-items:center;gap:7px">'
           +'<span style="font-size:14px;font-weight:700;color:'+(pt.pago?'var(--mt)':'var(--gr)')+';font-family:monospace">'+fR(pt.val)+'</span>'
-          +(pt.pago?'<span class="tag tg">Pago</span>':'<button class="bsm bsmg" onclick="pgPt(&apos;+fSel+&apos;,&apos;+j+&apos;)">Pagar</button>')
-          +'<button onclick="delPt(&apos;+fSel+&apos;,&apos;+j+&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer">&#215;</button>'
+          +(pt.pago?'<span class="tag tg">Pago</span>':'<button class="bsm bsmg" onclick="pgPt('+fSel+','+j+')">Pagar</button>')
+          +'<button onclick="delPt('+fSel+','+j+')" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer">&#215;</button>'
           +'</div></div></div>';
       }
       tabContent=ptH;
@@ -4486,7 +4486,7 @@ function pgFuncs(){
             +'<div style="font-size:15px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(sw.total)+'</div>'
             +'<div style="font-size:10px;color:var(--mt)">trabalhado</div>'
             +'</div>'
-            +(isSemanaAtual&&temAberto?'<button style="background:var(--bl);border:none;border-radius:var(--r);padding:6px 13px;color:#fff;font-size:12px;font-weight:700;cursor:pointer" onclick="mPagarSemana(&apos;+fSel+&apos;)">&#10003; Pagar semana &mdash; '+fR(saldo)+'</button>':'')
+            +(isSemanaAtual&&temAberto?'<button style="background:var(--bl);border:none;border-radius:var(--r);padding:6px 13px;color:#fff;font-size:12px;font-weight:700;cursor:pointer" onclick="mPagarSemana('+fSel+')">&#10003; Pagar semana &mdash; '+fR(saldo)+'</button>':'')
             +'</div></div>'
             +(sw.adiant>0?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">'
               +'<div style="background:var(--orb);border-radius:6px;padding:6px 10px">'
@@ -4559,8 +4559,8 @@ function pgFuncs(){
           +'</div>'
           +'<div style="display:flex;align-items:center;gap:7px">'
           +'<span style="font-size:14px;font-weight:700;color:'+(ad.descontado?'var(--mt)':'var(--or)')+';font-family:monospace">'+fR(ad.val)+'</span>'
-          +(ad.descontado?'<span class="tag to">Descontado</span>':'<button class="bsm" style="background:var(--orb);border:1px solid rgba(245,158,11,.4);color:var(--or)" onclick="descAdiant(&apos;+fSel+&apos;,&apos;+j+&apos;)">Descontar</button>')
-          +'<button onclick="delAdiant(&apos;+fSel+&apos;,&apos;+j+&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer">&#215;</button>'
+          +(ad.descontado?'<span class="tag to">Descontado</span>':'<button class="bsm" style="background:var(--orb);border:1px solid rgba(245,158,11,.4);color:var(--or)" onclick="descAdiant('+fSel+','+j+')">Descontar</button>')
+          +'<button onclick="delAdiant('+fSel+','+j+')" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer">&#215;</button>'
           +'</div></div>';
       }
       tabContent=adH;
@@ -4572,8 +4572,8 @@ function pgFuncs(){
       +'<div><div style="font-size:15px;font-weight:700">'+f.nome+'</div>'
       +'<div style="font-size:11px;color:var(--mt)">'+f.cargo+(f.tel?' &middot; '+f.tel:'')+'</div></div>'
       +'<div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end">'
-      +'<button class="btn btn-or" style="font-size:12px;padding:7px 12px" onclick="mAdiantamento(&apos;+fSel+&apos;)">&#128181; Adiantar</button>'
-      +'<button class="btn" onclick="mPonto(&apos;+fSel+&apos;)">&#128197; Registrar Ponto</button>'
+      +'<button class="btn btn-or" style="font-size:12px;padding:7px 12px" onclick="mAdiantamento('+fSel+')">&#128181; Adiantar</button>'
+      +'<button class="btn" onclick="mPonto('+fSel+')">&#128197; Registrar Ponto</button>'
       +'</div></div>'
       +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:7px">'+vH+'</div>'
       +'</div>'
@@ -4615,9 +4615,9 @@ function mEditFunc(fi){
   var f=DB.funcs[fi];
   openM('Editar - '+f.nome, _buildFuncForm(f)
     +'<div class="brow">'
-    +'<button class="btnO bOr" onclick="delFunc(&apos;+fi+&apos;)">&#128465; Excluir</button>'
+    +'<button class="btnO bOr" onclick="delFunc('+fi+')">&#128465; Excluir</button>'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="saveEditFunc(&apos;+fi+&apos;)">Salvar</button></div></div>', 520);
+    +'<button class="btn" onclick="saveEditFunc('+fi+')">Salvar</button></div></div>', 520);
 }
 
 function _buildFuncForm(f){
@@ -4706,7 +4706,7 @@ function mPonto(fi){
     +'<input class="inp" type="time" id="pt-s" value="12:00" readonly style="opacity:.5;cursor:not-allowed"></div>'
     +'</div>'
     +'<div id="pt-preview" class="al alg" style="font-size:13px">Valor: <strong id="pt-v">'+fR(f.vM)+'</strong></div>'
-    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="savePt(&apos;+fi+&apos;)">Registrar</button></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="savePt('+fi+')">Registrar</button></div>'
     +'</div>', 440);
   setTimeout(function(){updPtV(fi);},50);
 }
@@ -4843,7 +4843,7 @@ function mAdiantamento(fi){
     +'<div class="fld"><label>Valor R$ (max: '+fR(saldoSemana)+')</label><input class="inp" type="number" inputmode="decimal" id="ad-v" placeholder="0,00" step="0.01" max="'+saldoSemana+'"></div>'
     +'</div>'
     +'<div class="fld"><label>Obs (opcional)</label><input class="inp" id="ad-obs" placeholder="Ex: 3 dias trabalhados (seg, ter, qua)"></div>'
-    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-or" onclick="saveAdiant(&apos;+fi+&apos;)">Registrar Adiantamento</button></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-or" onclick="saveAdiant('+fi+')">Registrar Adiantamento</button></div>'
     +'</div>', 460);
 }
 
@@ -4910,7 +4910,7 @@ function mPagarSemana(fi){
     +(saldo===0?'<div class="al alg" style="font-size:12px">Tudo ja foi coberto pelos adiantamentos. Basta marcar os pontos como pagos.</div>':'')
     +'<div class="brow">'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" style="background:var(--bl)" onclick="confirmarPagarSemana(&apos;+fi+&apos;)">&#10003; Confirmar Pagamento de '+fR(saldo)+'</button>'
+    +'<button class="btn" style="background:var(--bl)" onclick="confirmarPagarSemana('+fi+')">&#10003; Confirmar Pagamento de '+fR(saldo)+'</button>'
     +'</div></div>', 480);
 }
 
@@ -5037,15 +5037,15 @@ function pgClis(){
       +'<div><div style="font-size:14px;font-weight:700">'+c.nome+'</div><div style="font-size:11px;color:var(--mt)">'+(c.tel||'Sem telefone')+'</div></div>'
       +'</div>'
       +'<div style="display:flex;gap:5px">'
-      +'<button onclick="mEditCli(&apos;+dbIdx+&apos;)" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer">&#9998; Editar</button>'
-      +'<button onclick="delCli(&apos;+dbIdx+&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer">&#128465;</button>'
+      +'<button onclick="mEditCli('+dbIdx+')" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer">&#9998; Editar</button>'
+      +'<button onclick="delCli('+dbIdx+')" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer">&#128465;</button>'
       +'</div></div>'
       +(c.email?'<div style="font-size:11px;color:var(--mt);margin-bottom:4px">&#128140; '+c.email+'</div>':'')
       +(c.cnpj?'<div style="font-size:11px;color:var(--mt);margin-bottom:4px">&#128196; '+c.cnpj+'</div>':'')
       +(c.end?'<div style="font-size:11px;color:var(--mt);margin-bottom:4px">&#128205; '+c.end+'</div>':'')
       +(c.obs?'<div style="font-size:11px;color:var(--mt);margin-bottom:7px">&#128172; '+c.obs+'</div>':'')
       +'<div style="background:var(--bg);border-radius:6px;padding:5px 9px;font-size:11px"><span style="color:var(--mt)">Tabela: </span><span style="color:var(--or);font-weight:600">'+(t?t.nome:'--')+'</span></div>'
-      +'<div class="brow"><button class="btnO bOb" style="flex:1;font-size:12px" onclick="mHistCli(&apos;+dbIdx+&apos;)">&#128203; Historico</button></div>'
+      +'<div class="brow"><button class="btnO bOb" style="flex:1;font-size:12px" onclick="mHistCli('+dbIdx+')">&#128203; Historico</button></div>'
       +'</div>';
   }
   return '<div class="fc"><div class="ptop"><div><div class="pl">Cadastros</div><div class="pt">Clientes e Fornecedores</div></div><button class="btn" onclick="mNovoCli()">+ Novo</button></div><div class="tabs"><button class="tabbtn'+(cTab==='c'?' on':'')+'" onclick="swCT(\&apos;c\&apos;)">&#127970; Clientes</button><button class="tabbtn'+(cTab==='f'?' on':'')+'" onclick="swCT(\&apos;f\&apos;)">&#128666; Fornecedores</button></div><div class="g2">'+(cards||'<p style="color:var(--mt);padding:20px">Nenhum cadastrado.</p>')+'</div></div>';
@@ -5071,7 +5071,7 @@ function mNovoCli(){
   var tipo=cTab==='c'?'cliente':'fornecedor';
   openM('Novo '+(tipo==='cliente'?'Cliente':'Fornecedor'),
     _buildCliForm(null)
-    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveCli(\&apos;&apos;+tipo+&apos;\&apos;)">Cadastrar</button></div></div>',540);
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveCli(\&apos;'+tipo+'\&apos;)">Cadastrar</button></div></div>',540);
 }
 function saveCli(tipo){
   var n=document.getElementById('nc2-n').value.trim();if(!n){alert('Informe o nome!');return;}
@@ -5085,9 +5085,9 @@ function mEditCli(idx){
   openM('Editar '+(tipo==='cliente'?'Cliente':'Fornecedor'),
     _buildCliForm(c)
     +'<div class="brow">'
-    +'<button class="btnO bOr" onclick="delCli(&apos;+idx+&apos;)">&#128465; Excluir</button>'
+    +'<button class="btnO bOr" onclick="delCli('+idx+')">&#128465; Excluir</button>'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="saveEditCli(&apos;+idx+&apos;)">Salvar</button>'
+    +'<button class="btn" onclick="saveEditCli('+idx+')">Salvar</button>'
     +'</div></div>',540);
 }
 function saveEditCli(idx){
@@ -5139,7 +5139,7 @@ function buildCorPicker(selectedId, inputId){
   for(var i=0;i<TAB_CORES.length;i++){
     var c=TAB_CORES[i];
     var isSel=(c.id===(selectedId||'padrao'));
-    h+='<button type="button" onclick="selCorPicker(\&apos;&apos;+inputId+&apos;\&apos;,\&apos;&apos;+c.id+&apos;\&apos;)" '
+    h+='<button type="button" onclick="selCorPicker(\&apos;'+inputId+'\&apos;,\&apos;'+c.id+'\&apos;)" '
       +'title="'+c.label+'" '
       +'style="width:32px;height:32px;border-radius:7px;background:'+c.hex+';border:2px solid '+(isSel?c.text:'transparent')+';cursor:pointer;position:relative;transition:all .15s" '
       +'id="cpbtn-'+inputId+'-'+c.id+'">'
@@ -5335,7 +5335,7 @@ function buildGerarTabelas(){
       // ── Cabeçalho: checkbox + nome + botões de modo ──
       +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:'+(isAtivo?'12':'0')+'px;flex-wrap:wrap">'
       // Checkbox visual
-      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;flex-shrink:0" onclick="_gToggleTab(\&apos;&apos;+cfg.key+&apos;\&apos;)">'
+      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;flex-shrink:0" onclick="_gToggleTab(\&apos;'+cfg.key+'\&apos;)">'
       +'<div style="width:22px;height:22px;border-radius:6px;border:2px solid '+(isAtivo?cfg.cor:'var(--bd)')+';background:'+(isAtivo?cfg.cor:'transparent')+';display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0">'
       +(isAtivo?'<span style="color:#fff;font-size:13px;font-weight:700;line-height:1">✓</span>':'')
       +'</div>'
@@ -5343,16 +5343,16 @@ function buildGerarTabelas(){
       +'</label>'
       +(isAtivo?
         '<div style="display:flex;gap:5px;margin-left:auto">'
-        +'<button onclick="_gSetModo(\&apos;&apos;+cfg.key+&apos;\&apos;,\&apos;geral\&apos;)" style="background:'+(isModoGeral?cfg.cor:'var(--bg)')+';border:1px solid '+(isModoGeral?cfg.cor:'var(--bd)')+';border-radius:6px;padding:3px 9px;color:'+(isModoGeral?'#fff':'var(--mt)')+';font-size:11px;cursor:pointer">Geral</button>'
-        +'<button onclick="_gSetModo(\&apos;&apos;+cfg.key+&apos;\&apos;,\&apos;prod\&apos;)" style="background:'+(!isModoGeral?cfg.cor:'var(--bg)')+';border:1px solid '+(!isModoGeral?cfg.cor:'var(--bd)')+';border-radius:6px;padding:3px 9px;color:'+(!isModoGeral?'#fff':'var(--mt)')+';font-size:11px;cursor:pointer">Por Produto</button>'
+        +'<button onclick="_gSetModo(\&apos;'+cfg.key+'\&apos;,\&apos;geral\&apos;)" style="background:'+(isModoGeral?cfg.cor:'var(--bg)')+';border:1px solid '+(isModoGeral?cfg.cor:'var(--bd)')+';border-radius:6px;padding:3px 9px;color:'+(isModoGeral?'#fff':'var(--mt)')+';font-size:11px;cursor:pointer">Geral</button>'
+        +'<button onclick="_gSetModo(\&apos;'+cfg.key+'\&apos;,\&apos;prod\&apos;)" style="background:'+(!isModoGeral?cfg.cor:'var(--bg)')+';border:1px solid '+(!isModoGeral?cfg.cor:'var(--bd)')+';border-radius:6px;padding:3px 9px;color:'+(!isModoGeral?'#fff':'var(--mt)')+';font-size:11px;cursor:pointer">Por Produto</button>'
         +'</div>'
       :'<span style="font-size:11px;color:var(--mt);margin-left:4px">— não será gerada</span>')
       +'</div>'
       +(isAtivo?(isModoGeral?
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
         +'<div style="display:flex;gap:5px">'
-        +'<button onclick="_gSetTipoVal(\&apos;&apos;+cfg.key+&apos;\&apos;,\&apos;pct\&apos;)" style="background:'+(isTipoPct?cfg.cor:'var(--bg)')+';border:1px solid '+(isTipoPct?cfg.cor:'var(--bd)')+';border-radius:6px;padding:3px 10px;color:'+(isTipoPct?'#fff':'var(--mt)')+';font-size:11px;cursor:pointer">% do Preço</button>'
-        +'<button onclick="_gSetTipoVal(\&apos;&apos;+cfg.key+&apos;\&apos;,\&apos;rs\&apos;)" style="background:'+(!isTipoPct?cfg.cor:'var(--bg)')+';border:1px solid '+(!isTipoPct?cfg.cor:'var(--bd)')+';border-radius:6px;padding:3px 10px;color:'+(!isTipoPct?'#fff':'var(--mt)')+';font-size:11px;cursor:pointer">R$/kg fixo</button>'
+        +'<button onclick="_gSetTipoVal(\&apos;'+cfg.key+'\&apos;,\&apos;pct\&apos;)" style="background:'+(isTipoPct?cfg.cor:'var(--bg)')+';border:1px solid '+(isTipoPct?cfg.cor:'var(--bd)')+';border-radius:6px;padding:3px 10px;color:'+(isTipoPct?'#fff':'var(--mt)')+';font-size:11px;cursor:pointer">% do Preço</button>'
+        +'<button onclick="_gSetTipoVal(\&apos;'+cfg.key+'\&apos;,\&apos;rs\&apos;)" style="background:'+(!isTipoPct?cfg.cor:'var(--bg)')+';border:1px solid '+(!isTipoPct?cfg.cor:'var(--bd)')+';border-radius:6px;padding:3px 10px;color:'+(!isTipoPct?'#fff':'var(--mt)')+';font-size:11px;cursor:pointer">R$/kg fixo</button>'
         +'</div>'
         +'<div style="display:flex;align-items:center;gap:6px;flex:1;min-width:120px">'
         +'<input class="inp" type="number" inputmode="decimal" style="width:90px;text-align:center;font-size:14px;font-weight:700" value="'+cfg.valGeral+'" onchange="_gSetValGeral(\''+cfg.key+'\',this.value)">'
@@ -5472,11 +5472,11 @@ function buildComparacao(){
         var diffColor=diff===null?'var(--mt)':diff>0?'#86efac':diff<0?'#fca5a5':'var(--mt)';
         var diffSign=diff===null?'':diff>=0?'+':'';
         var editA=pA!==null
-          ?'<button onclick="mEditCmpPreco(\&apos;A\&apos;,&apos;+p.id+&apos;)" style="margin-left:6px;background:rgba(255,255,255,.08);border:1px solid var(--bd);color:var(--mt);border-radius:5px;padding:1px 6px;font-size:11px;cursor:pointer" title="Editar preço em '+tA.nome+'">✏️</button>'
-          :'<button onclick="mEditCmpPreco(\&apos;A\&apos;,&apos;+p.id+&apos;)" style="margin-left:6px;background:var(--grb);border:1px solid rgba(34,197,94,.3);color:var(--gr);border-radius:5px;padding:1px 6px;font-size:11px;cursor:pointer" title="Adicionar à '+tA.nome+'">+</button>';
+          ?'<button onclick="mEditCmpPreco(\&apos;A\&apos;,'+p.id+')" style="margin-left:6px;background:rgba(255,255,255,.08);border:1px solid var(--bd);color:var(--mt);border-radius:5px;padding:1px 6px;font-size:11px;cursor:pointer" title="Editar preço em '+tA.nome+'">✏️</button>'
+          :'<button onclick="mEditCmpPreco(\&apos;A\&apos;,'+p.id+')" style="margin-left:6px;background:var(--grb);border:1px solid rgba(34,197,94,.3);color:var(--gr);border-radius:5px;padding:1px 6px;font-size:11px;cursor:pointer" title="Adicionar à '+tA.nome+'">+</button>';
         var editB=pB!==null
-          ?'<button onclick="mEditCmpPreco(\&apos;B\&apos;,&apos;+p.id+&apos;)" style="margin-left:6px;background:rgba(255,255,255,.08);border:1px solid var(--bd);color:var(--mt);border-radius:5px;padding:1px 6px;font-size:11px;cursor:pointer" title="Editar preço em '+tB.nome+'">✏️</button>'
-          :'<button onclick="mEditCmpPreco(\&apos;B\&apos;,&apos;+p.id+&apos;)" style="margin-left:6px;background:var(--grb);border:1px solid rgba(34,197,94,.3);color:var(--gr);border-radius:5px;padding:1px 6px;font-size:11px;cursor:pointer" title="Adicionar à '+tB.nome+'">+</button>';
+          ?'<button onclick="mEditCmpPreco(\&apos;B\&apos;,'+p.id+')" style="margin-left:6px;background:rgba(255,255,255,.08);border:1px solid var(--bd);color:var(--mt);border-radius:5px;padding:1px 6px;font-size:11px;cursor:pointer" title="Editar preço em '+tB.nome+'">✏️</button>'
+          :'<button onclick="mEditCmpPreco(\&apos;B\&apos;,'+p.id+')" style="margin-left:6px;background:var(--grb);border:1px solid rgba(34,197,94,.3);color:var(--gr);border-radius:5px;padding:1px 6px;font-size:11px;cursor:pointer" title="Adicionar à '+tB.nome+'">+</button>';
         rows+='<tr>'
           +'<td style="padding:8px 10px;font-size:13px;border-bottom:1px solid var(--bd)">'+p.ic+' '+p.nome+'</td>'
           +'<td style="padding:8px 10px;text-align:right;font-family:monospace;font-size:13px;border-bottom:1px solid var(--bd);color:'+(pA!==null?'var(--tx)':'var(--mt)')+';font-weight:600">'
@@ -5553,9 +5553,9 @@ function mEditCmpPreco(lado,prodId){
     +'<input class="inp" type="number" inputmode="decimal" id="cmp-pr" value="'+(precoAtual||'')+'" placeholder="0,00" step="0.01" style="font-size:20px;text-align:center;font-family:monospace">'
     +'</div>'
     +'<div class="brow">'
-    +(!isNovo?'<button class="btnO bOr" onclick="delCmpPreco(\&apos;&apos;+lado+&apos;\&apos;,&apos;+prodId+&apos;,&apos;+itemIdx+&apos;)">Remover da tabela</button>':'')
+    +(!isNovo?'<button class="btnO bOr" onclick="delCmpPreco(\&apos;'+lado+'\&apos;,'+prodId+','+itemIdx+')">Remover da tabela</button>':'')
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="saveCmpPreco(\&apos;&apos;+lado+&apos;\&apos;,&apos;+prodId+&apos;,&apos;+itemIdx+&apos;)">Salvar</button>'
+    +'<button class="btn" onclick="saveCmpPreco(\&apos;'+lado+'\&apos;,'+prodId+','+itemIdx+')">Salvar</button>'
     +'</div></div>',400);
   setTimeout(function(){var el=document.getElementById('cmp-pr');if(el){el.focus();el.select();}},80);
 }
@@ -5606,9 +5606,9 @@ function buildConcorrentes(){
       +'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+(c.data||'')+(c.obs?' &middot; '+c.obs:'')+'</div>'
       +'</div>'
       +'<div style="display:flex;gap:6px">'
-      +'<button onclick="mCompararConc(&apos;+i+&apos;)" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer">&#9878; Comparar</button>'
-      +'<button onclick="mEditConc(&apos;+i+&apos;)" style="background:var(--s3);border:1px solid var(--bd);color:var(--mt);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer">✏️</button>'
-      +'<button onclick="delConc(&apos;+i+&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer">&#128465;</button>'
+      +'<button onclick="mCompararConc('+i+')" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer">&#9878; Comparar</button>'
+      +'<button onclick="mEditConc('+i+')" style="background:var(--s3);border:1px solid var(--bd);color:var(--mt);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer">✏️</button>'
+      +'<button onclick="delConc('+i+')" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer">&#128465;</button>'
       +'</div></div>'
       +(rows||'<div style="font-size:12px;color:var(--mt);text-align:center;padding:8px">Sem itens</div>')
       +'<div style="margin-top:8px;font-size:11px;color:var(--mt)">'+c.itens.length+' produto(s)</div>'
@@ -5664,7 +5664,7 @@ function _concItemRow(idx,nome,preco){
   return '<div style="display:grid;grid-template-columns:1fr 110px 32px;gap:6px;align-items:center" id="nc-row-'+idx+'">'
     +'<input class="inp" style="font-size:13px;padding:6px 9px" placeholder="Nome do produto" value="'+nome+'" id="nc-pn-'+idx+'">'
     +'<input class="inp" type="number" inputmode="decimal" style="font-size:13px;padding:6px 9px;text-align:right;font-family:monospace" placeholder="R$/kg" value="'+(preco||'')+'" id="nc-pp-'+idx+'">'
-    +'<button onclick="document.getElementById(\&apos;nc-row-&apos;+idx+&apos;\&apos;).remove()" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:5px 7px;font-size:13px;cursor:pointer;min-height:32px">✕</button>'
+    +'<button onclick="document.getElementById(\&apos;nc-row-'+idx+'\&apos;).remove()" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:5px 7px;font-size:13px;cursor:pointer;min-height:32px">✕</button>'
     +'</div>';
 }
 
@@ -5894,7 +5894,7 @@ function _imtSalvar(){
   var msg='Tabela <b>'+nome+'</b> importada com '+tabItens.length+' produto(s)!';
   if(naoVinculados.length)msg+='<br><br><span style="color:var(--or)">⚠️ '+naoVinculados.length+' produto(s) não encontrado(s) no cadastro:<br>'+naoVinculados.join(', ')+'<br>Cadastre-os em Estoque e edite a tabela.</span>';
   closeM();
-  openM('Importação Concluída','<div class="mf"><div class="al" style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac">'+msg+'</div><div class="brow"><button class="btn" onclick="closeM();swTabF(\&apos;&apos;+_imtTabTipo+&apos;\&apos;);go(\&apos;tabelas\&apos;)">Ver Tabelas</button></div></div>',480);
+  openM('Importação Concluída','<div class="mf"><div class="al" style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac">'+msg+'</div><div class="brow"><button class="btn" onclick="closeM();swTabF(\&apos;'+_imtTabTipo+'\&apos;);go(\&apos;tabelas\&apos;)">Ver Tabelas</button></div></div>',480);
 }
 
 // ── Importar CSV (Concorrentes) ──
@@ -5997,7 +5997,7 @@ function mCompararConc(idx){
     +'<div class="fld"><label>Minha Tabela para Comparar</label><select class="inp" id="conc-tab-sel">'+optsTab+'</select></div>'
     +'<div class="brow">'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" style="background:var(--pu)" onclick="_execCompararConc(&apos;+idx+&apos;)">&#9878; Ver Comparação</button>'
+    +'<button class="btn" style="background:var(--pu)" onclick="_execCompararConc('+idx+')">&#9878; Ver Comparação</button>'
     +'</div></div>',460);
 }
 
@@ -6109,7 +6109,7 @@ function pgTabs(){
         +'<span style="font-size:13px;font-weight:700;color:'+(showRiscado?(df>=0?'#86efac':'#fca5a5'):'#fff')+';font-family:monospace">'+fR(it.preco)+'/kg</span>'
         +'</div></div>';
     }
-    cards+='<div class="card" style="cursor:pointer;background:'+cor.hex+';border:none;border-left:4px solid rgba(255,255,255,.35);box-shadow:0 4px 18px rgba(0,0,0,.5);transition:transform .15s,box-shadow .15s" onclick="mVerTab(&apos;+tIdx+&apos;)" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 8px 28px rgba(0,0,0,.6)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'0 4px 18px rgba(0,0,0,.5)\'">'
+    cards+='<div class="card" style="cursor:pointer;background:'+cor.hex+';border:none;border-left:4px solid rgba(255,255,255,.35);box-shadow:0 4px 18px rgba(0,0,0,.5);transition:transform .15s,box-shadow .15s" onclick="mVerTab('+tIdx+')" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 8px 28px rgba(0,0,0,.6)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'0 4px 18px rgba(0,0,0,.5)\'">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:11px">'
       +'<div><div style="display:flex;align-items:center;gap:6px">'
       +'<div style="font-size:14px;font-weight:700;color:#fff">'+t.nome+'</div>'
@@ -6119,7 +6119,7 @@ function pgTabs(){
       +'</div>'
       +'<div style="display:flex;align-items:center;gap:6px">'
       +'<span style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600">'+(t.tipo==='venda'?'🏷️ Venda':'📥 Compra')+'</span>'
-      +'<button style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer" onclick="event.stopPropagation();mEditTab(&apos;+tIdx+&apos;)">✏️</button>'
+      +'<button style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer" onclick="event.stopPropagation();mEditTab('+tIdx+')">✏️</button>'
       +'</div></div>'
       +itH
       +'<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.4);text-align:center">Clique para ver / editar produtos</div>'
@@ -6138,7 +6138,7 @@ function mVerTab(idx){
     rows+='<div style="display:grid;grid-template-columns:1fr 130px 36px;gap:7px;align-items:center;padding:6px 8px;background:var(--bg);border-radius:7px;margin-bottom:5px">'
       +'<span style="font-size:13px">'+p.ic+' '+p.nome+'</span>'
       +'<input class="inp" type="number" inputmode="decimal" value="'+it.preco+'" style="text-align:right;font-family:monospace;padding:5px 8px" onchange="updTabItem('+idx+','+j+',this.value)">'
-      +'<button onclick="delTabItem(&apos;+idx+&apos;,&apos;+j+&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:5px 7px;font-size:14px;cursor:pointer;min-height:32px">✕</button>'
+      +'<button onclick="delTabItem('+idx+','+j+')" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:5px 7px;font-size:14px;cursor:pointer;min-height:32px">✕</button>'
       +'</div>';
   }
   var opts='';for(var i=0;i<DB.produtos.length;i++)opts+='<option value="'+DB.produtos[i].id+'">'+DB.produtos[i].ic+' '+DB.produtos[i].nome+'</option>';
@@ -6151,11 +6151,11 @@ function mVerTab(idx){
     +'<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:7px">'
     +'<select class="inp" id="vt-p">'+opts+'</select>'
     +'<input class="inp" type="number" inputmode="decimal" id="vt-pr" placeholder="R$/kg">'
-    +'<button class="btn" onclick="addTabItemExist(&apos;+idx+&apos;)">+</button>'
+    +'<button class="btn" onclick="addTabItemExist('+idx+')">+</button>'
     +'</div></div>'
     +'<div class="brow">'
     +'<button class="btnO bOgr" onclick="closeM()">Fechar</button>'
-    +'<button class="btn" style="background:var(--bl)" onclick="printTab(&apos;+idx+&apos;)">&#128438; Imprimir</button>'
+    +'<button class="btn" style="background:var(--bl)" onclick="printTab('+idx+')">&#128438; Imprimir</button>'
     +'</div>'
     +'</div>',560);
 }
@@ -6232,9 +6232,9 @@ function mEditTab(idx){
     +'</div>'
     +buildCorPicker(t.cor||'padrao','et-cor')
     +'<div class="brow">'
-    +'<button class="btnO bOr" onclick="delTab(&apos;+idx+&apos;)">Excluir</button>'
+    +'<button class="btnO bOr" onclick="delTab('+idx+')">Excluir</button>'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="saveEditTab(&apos;+idx+&apos;)">Salvar</button>'
+    +'<button class="btn" onclick="saveEditTab('+idx+')">Salvar</button>'
     +'</div></div>',520);
 }
 
@@ -6297,7 +6297,7 @@ function addTI(){
   var row='<div id="ti-row-'+idx+'" style="display:grid;grid-template-columns:1fr 130px 36px;gap:6px;align-items:center;background:var(--grb);border-radius:6px;padding:4px 7px;margin-bottom:4px">'
     +'<span style="font-size:12px">'+p.ic+' '+p.nome+'</span>'
     +'<input class="inp" type="number" inputmode="decimal" value="'+pr+'" style="text-align:right;font-family:monospace;padding:5px 8px" onchange="tabItens['+idx+'].preco=parseFloat(this.value)||0">'
-    +'<button onclick="removeTI(&apos;+idx+&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:5px 7px;font-size:14px;cursor:pointer;min-height:32px">✕</button>'
+    +'<button onclick="removeTI('+idx+')" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:5px 7px;font-size:14px;cursor:pointer;min-height:32px">✕</button>'
     +'</div>';
   document.getElementById('nt-items').insertAdjacentHTML('beforeend',row);
   document.getElementById('nt-pr').value='';
@@ -6347,9 +6347,9 @@ function pgUsers(){
       +'<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">'
       +'<span class="tag '+rTag+'">'+roleName+'</span>'
       +(blocked?'<span class="tag tr">Bloqueado</span>':'<span class="tag tg">Ativo</span>')
-      +(u.id!==CU.id?'<button onclick="mEditUser(\&apos;&apos;+u.id+&apos;\&apos;)" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:6px;padding:4px 9px;font-size:12px">&#9998;</button>':'')
-      +(u.id!==CU.id?'<button onclick="toggleBlockUser(\&apos;&apos;+u.id+&apos;\&apos;)" style="background:'+(blocked?'var(--grb)':'var(--orb)')+';border:1px solid '+(blocked?'rgba(34,197,94,.3)':'rgba(245,158,11,.3)')+';color:'+(blocked?'var(--gr)':'var(--or)')+';border-radius:6px;padding:4px 9px;font-size:12px">'+(blocked?'&#128275;':'&#128274;')+'</button>':'')
-      +(u.id!==CU.id?'<button onclick="delUser(\&apos;&apos;+u.id+&apos;\&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:4px 9px;font-size:12px">&#128465;</button>':'')
+      +(u.id!==CU.id?'<button onclick="mEditUser(\&apos;'+u.id+'\&apos;)" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:6px;padding:4px 9px;font-size:12px">&#9998;</button>':'')
+      +(u.id!==CU.id?'<button onclick="toggleBlockUser(\&apos;'+u.id+'\&apos;)" style="background:'+(blocked?'var(--grb)':'var(--orb)')+';border:1px solid '+(blocked?'rgba(34,197,94,.3)':'rgba(245,158,11,.3)')+';color:'+(blocked?'var(--gr)':'var(--or)')+';border-radius:6px;padding:4px 9px;font-size:12px">'+(blocked?'&#128275;':'&#128274;')+'</button>':'')
+      +(u.id!==CU.id?'<button onclick="delUser(\&apos;'+u.id+'\&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:4px 9px;font-size:12px">&#128465;</button>':'')
       +'</div></div>';
   }
   var rolesH='';var allRoles=getAllRoles();
@@ -6361,8 +6361,8 @@ function pgUsers(){
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px">'
       +'<span class="tag '+rTag2+'">'+r.nome+'</span>'
       +'<div style="display:flex;gap:5px">'
-      +'<button onclick="mEditRole(\&apos;&apos;+r.id+&apos;\&apos;)" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:5px;padding:3px 8px;font-size:11px">&#9998; Editar</button>'
-      +'<button onclick="delRole(\&apos;&apos;+r.id+&apos;\&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:5px;padding:3px 8px;font-size:11px">&#128465;</button>'
+      +'<button onclick="mEditRole(\&apos;'+r.id+'\&apos;)" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:5px;padding:3px 8px;font-size:11px">&#9998; Editar</button>'
+      +'<button onclick="delRole(\&apos;'+r.id+'\&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:5px;padding:3px 8px;font-size:11px">&#128465;</button>'
       +'</div></div>'
       +'<div style="font-size:11px;color:var(--mt);line-height:1.7">Acesso: '+pageLabels.join(', ')+'</div>'
       +'</div>';
@@ -6442,9 +6442,9 @@ function mEditUser(uid){
   openM('Editar Usuario',
     _buildUserForm(u)
     +'<div class="brow">'
-    +(u.id!==CU.id?'<button class="btnO bOr" onclick="delUser(\&apos;&apos;+u.id+&apos;\&apos;)">&#128465; Excluir</button>':'')
+    +(u.id!==CU.id?'<button class="btnO bOr" onclick="delUser(\&apos;'+u.id+'\&apos;)">&#128465; Excluir</button>':'')
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="saveEditUser(&apos;+idx+&apos;)">Salvar</button>'
+    +'<button class="btn" onclick="saveEditUser('+idx+')">Salvar</button>'
     +'</div></div>',500);
   setTimeout(previewRolePgs,50);
 }
@@ -6534,7 +6534,7 @@ function _buildRoleForm(r){
   for(var i=0;i<ALLPAGES.length;i++){
     var p=ALLPAGES[i];if(p.id==='estoque_vis')continue;
     var checked=r&&r.pages.indexOf(p.id)>=0;
-    pagesH+='<label style="display:flex;align-items:center;gap:7px;background:var(--s1);border:1px solid var(--bd);border-radius:6px;padding:7px 9px;cursor:pointer;transition:border-color .15s" onclick="this.style.borderColor=document.getElementById(\&apos;rp-&apos;+p.id+&apos;\&apos;).checked?\&apos;var(--bd)\&apos;:\&apos; var(--gr)\&apos;">'
+    pagesH+='<label style="display:flex;align-items:center;gap:7px;background:var(--s1);border:1px solid var(--bd);border-radius:6px;padding:7px 9px;cursor:pointer;transition:border-color .15s" onclick="this.style.borderColor=document.getElementById(\&apos;rp-'+p.id+'\&apos;).checked?\&apos;var(--bd)\&apos;:\&apos; var(--gr)\&apos;">'
       +'<input type="checkbox" id="rp-'+p.id+'"'+(checked?' checked':'')+' style="width:14px;height:14px;cursor:pointer;accent-color:var(--gr)"> '
       +'<span style="font-size:15px">'+p.icon+'</span>'
       +'<span style="font-size:12px;font-weight:500">'+p.label+'</span>'
@@ -6567,9 +6567,9 @@ function mEditRole(roleId){
   openM('Editar Funcao: '+r.nome,
     _buildRoleForm(r)
     +'<div class="brow">'
-    +'<button class="btnO bOr" onclick="delRole(\&apos;&apos;+roleId+&apos;\&apos;)">&#128465; Excluir</button>'
+    +'<button class="btnO bOr" onclick="delRole(\&apos;'+roleId+'\&apos;)">&#128465; Excluir</button>'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="saveEditRole(\&apos;&apos;+roleId+&apos;\&apos;)">Salvar</button>'
+    +'<button class="btn" onclick="saveEditRole(\&apos;'+roleId+'\&apos;)">Salvar</button>'
     +'</div></div>',500);
 }
 function saveEditRole(roleId){
