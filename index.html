@@ -7042,6 +7042,12 @@ var CUSTOM_ROLES=[];
 function getAllRoles(){return BASE_ROLES.concat(CUSTOM_ROLES);}
 function getRoleById(id){var all=getAllRoles();for(var i=0;i<all.length;i++){if(all[i].id===id)return all[i];}return null;}
 function getRoleName(id){var r=getRoleById(id);return r?r.nome:id;}
+function moveUser(idx,dir){
+  var newIdx=idx+dir;
+  if(newIdx<0||newIdx>=USERS.length)return;
+  var tmp=USERS[idx];USERS[idx]=USERS[newIdx];USERS[newIdx]=tmp;
+  saveDB();go('usuarios');
+}
 function pgUsers(){
   var uTab=window._uTab||'users';
   var usersH='';
@@ -7050,8 +7056,13 @@ function pgUsers(){
     var color='hsl('+(i*80+140)+',50%,20%)';var textColor='hsl('+(i*80+140)+',70%,65%)';var borderColor='hsl('+(i*80+140)+',60%,35%)';
     var roleName=getRoleName(u.perfil);
     var rTag=u.perfil==='adm'?'to':u.perfil==='caixa'?'tb':u.perfil==='motorista'?'tp':'tgr';
+    var isFirst=i===0;var isLast=i===USERS.length-1;
     usersH+='<div class="card" style="'+(blocked?'opacity:.55;':'')+'display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:9px">'
-      +'<div style="display:flex;gap:11px;align-items:center">'
+      +'<div style="display:flex;gap:8px;align-items:center">'
+      +'<div style="display:flex;flex-direction:column;gap:2px">'
+      +'<button onclick="moveUser('+i+',-1)" '+(isFirst?'disabled':'')+' style="background:'+(isFirst?'var(--ft)':'var(--s3)')+';border:1px solid var(--bd);color:'+(isFirst?'var(--ft)':'var(--mt)')+';border-radius:5px;padding:2px 6px;font-size:10px;line-height:1;cursor:'+(isFirst?'default':'pointer')+'">&#9650;</button>'
+      +'<button onclick="moveUser('+i+',1)" '+(isLast?'disabled':'')+' style="background:'+(isLast?'var(--ft)':'var(--s3)')+';border:1px solid var(--bd);color:'+(isLast?'var(--ft)':'var(--mt)')+';border-radius:5px;padding:2px 6px;font-size:10px;line-height:1;cursor:'+(isLast?'default':'pointer')+'">&#9660;</button>'
+      +'</div>'
       +'<div style="width:38px;height:38px;border-radius:50%;background:'+color+';border:2px solid '+borderColor+';display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:'+textColor+'">'+u.av+'</div>'
       +'<div><div style="font-size:13px;font-weight:700">'+u.nome+(blocked?' <span style="font-size:10px;color:var(--rd)">[BLOQUEADO]</span>':'')+'</div>'
       +'<div style="font-size:11px;color:var(--mt)">'+roleName+'</div></div>'
@@ -7145,7 +7156,8 @@ function saveNovoUser(){
   for(var i=0;i<USERS.length;i++){if(USERS[i].pin===pin){alert('Este PIN ja esta em uso!');return;}}
   USERS.push({id:nid(),nome:n,perfil:role,pin:pin,av:av.toUpperCase(),cor:'#16a34a',bloqueado:false});
   PPAGES[role]=r.pages;
-  closeM();go('usuarios');
+  saveDB();
+  closeM();doLogout();buildLoginList();
 }
 function mEditUser(uid){
   var idx=-1;for(var i=0;i<USERS.length;i++){if(String(USERS[i].id)===String(uid)){idx=i;break;}}
@@ -7171,7 +7183,8 @@ function saveEditUser(idx){
   var r=getRoleById(role);if(!r){alert('Selecione uma funcao!');return;}
   USERS[idx].nome=n;USERS[idx].pin=pin;USERS[idx].perfil=role;USERS[idx].av=av.toUpperCase();
   PPAGES[role]=r.pages;
-  closeM();go('usuarios');
+  saveDB();
+  closeM();doLogout();buildLoginList();
 }
 function mMeuPin(){
   openM('Alterar meu PIN',
@@ -7229,7 +7242,8 @@ function delUser(uid){
   var nome=USERS[idx].nome;
   confirmar('Excluir usuario <b>'+nome+'</b>?<br><span style="font-size:12px;color:var(--mt)">Esta acao nao pode ser desfeita.</span>',function(){
     for(var i=0;i<USERS.length;i++){if(String(USERS[i].id)===String(uid)){USERS.splice(i,1);break;}}
-    go('usuarios');
+    saveDB();
+    doLogout();buildLoginList();
   });
 }
 
