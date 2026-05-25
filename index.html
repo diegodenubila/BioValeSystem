@@ -7169,7 +7169,7 @@ function delTabItem(tIdx,iIdx){
 }
 
 function addTabItemExist(tIdx){
-  var pId=parseInt(document.getElementById('vt-p').value);
+  var pId=parseFloat(document.getElementById('vt-p').value);
   var pr=parseFloat(document.getElementById('vt-pr').value)||0;
   var t=DB.tabelas[tIdx];
   for(var i=0;i<t.itens.length;i++){if(t.itens[i].pId===pId){alert('Produto ja esta na tabela!');return;}}
@@ -7245,7 +7245,7 @@ function mNovaTab(){
 }
 
 function addTI(){
-  var pId=parseInt(document.getElementById('nt-p').value);
+  var pId=parseFloat(document.getElementById('nt-p').value);
   var pr=parseFloat(document.getElementById('nt-pr').value)||0;
   for(var k=0;k<tabItens.length;k++){if(tabItens[k]&&tabItens[k].pId===pId){alert('Produto ja adicionado!');return;}}
   var idx=tabItens.length;
