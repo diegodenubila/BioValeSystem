@@ -2515,8 +2515,8 @@ function pgDash(){
 
   // ── Estoque barras ──
   var max=0.1;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].est>max)max=DB.produtos[i].est;}
-  var estH='';
-  for(var i=0;i<DB.produtos.length;i++){
+  var estH='';var _estMax=5;
+  for(var i=0;i<DB.produtos.length&&i<_estMax;i++){
     var p=DB.produtos[i];var ec=p.est===0?'var(--rd)':'var(--gr)';
     estH+='<div style="margin-bottom:10px">'
       +'<div style="display:flex;justify-content:space-between;margin-bottom:3px">'
@@ -2526,6 +2526,7 @@ function pgDash(){
       +'<div class="bw"><div class="bf" style="width:'+Math.round((p.est/max)*100)+'%;background:'+(p.est===0?'var(--rd)':'linear-gradient(90deg,var(--gr2),var(--gr))')+'"></div></div>'
       +'</div>';
   }
+  if(DB.produtos.length>_estMax){estH+='<div style="text-align:center;padding:4px 0 2px;font-size:11px;color:var(--gr);font-weight:600;opacity:.8">+ '+(DB.produtos.length-_estMax)+' materiais — clique para ver todos ›</div>';}
 
   // ── Últimas entradas ──
   var entrH='';var ec2=0;
@@ -2922,7 +2923,7 @@ function pgEstoque(){
       +'<button class="btnO bOr" style="font-size:12px;padding:6px 10px" onclick="mDelProd('+p.id+')" title="Excluir">&#128465;</button>'
       +'</div></div>';
     lista+='<tr style="border-bottom:1px solid var(--bd)">'
-      +'<td style="padding:9px 12px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">'+p.ic+'</span><div><div style="font-size:13px;font-weight:700">'+p.nome+'</div><span class="tag" style="font-size:10px;color:'+fcor+';background:'+fcor+'22;border:1px solid '+fcor+'44">'+p.cat+'</span></div></div></td>'
+      +'<td style="padding:9px 12px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">'+p.ic+'</span><div><div style="font-size:13px;font-weight:700">'+p.nome+'</div><span style="display:inline-block;margin-top:2px;padding:1px 6px;border-radius:10px;font-size:9px;font-weight:600;color:'+fcor+';background:'+fcor+'22;border:1px solid '+fcor+'44;letter-spacing:.3px">'+p.cat+'</span></div></div></td>'
       +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-weight:700;color:'+ec+'">'+fKg(p.est)+' kg</td>'
       +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-size:12px;color:var(--gr)">'+fR(p.vV)+'/kg</td>'
       +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-size:12px;color:var(--bl)">'+fR(p.vC)+'/kg</td>'
@@ -3129,11 +3130,73 @@ function pgEstVis(){
 function swET(t){eTab=t;go('estoque');}
 var eVista='card'; // 'card' ou 'lista'
 function swEVista(v){eVista=v;go('estoque');}
+var _ICONES_MAT={
+  'Placas':['🟫','🟩','🟨','🟦','🟥','🟪','⬛','🔲','📟','💾','💿','📀','🖥️','💻','📠','📺','📡','🔌','🔋','🖨️'],
+  'Eletrônicos':['📱','☎️','📞','⌨️','🖱️','📷','📸','📹','🎥','📻','🔭','🔬','💡','🔦','🕹️','🎮','⌚','📲','🖲️','🗜️'],
+  'Metais':['⚙️','🔩','🔧','🔨','⛏️','🪛','🪚','🧲','🪝','🔗','⛓️','🪜','🔑','🗝️','🛢️','🪣','⚖️','🏗️','🪤','🔰'],
+  'Fios':['🔌','🪫','🔋','💡','⚡','📡','🛜','〰️','➰','🔁','🌀','🧵','🧶','🪢','🌡️','🔆','〽️','↩️','🔄','⚡'],
+  'Plásticos':['🧴','🪣','🛒','🛍️','📦','🗑️','♻️','🫙','🧃','🪟','🪑','🛋️','🚿','🧺','🧻','🪥','🫧','🧹','🪠','🧼'],
+  'Outros':['📦','🎁','🗃️','🗄️','🏷️','🪙','💰','♻️','🏭','🚛','🏗️','🪨','🪵','🌿','🌱','🌾','🗑️','🧾','🔖','🪬']
+};
+function _buildIconDrop(sel,prefix){
+  var h='<div id="'+prefix+'-ic-drop" onclick="event.stopPropagation()" style="display:none;position:absolute;z-index:500;background:var(--s1);border:1px solid var(--bd);border-radius:var(--r2);box-shadow:0 8px 32px rgba(0,0,0,.55);padding:11px;width:280px;max-height:320px;overflow-y:auto;top:calc(100% + 5px);left:0">';
+  var grupos=Object.keys(_ICONES_MAT);
+  for(var g=0;g<grupos.length;g++){
+    var grp=grupos[g];var ics=_ICONES_MAT[grp];
+    h+='<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin:8px 0 5px">'+grp+'</div>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:3px">';
+    for(var i=0;i<ics.length;i++){
+      var ic=ics[i];var isSel=(ic===sel);
+      h+='<button type="button" onclick="_selMatIc(this,\''+prefix+'\')" data-ic="'+ic+'" style="width:34px;height:34px;background:'+(isSel?'var(--grb)':'transparent')+';border:2px solid '+(isSel?'var(--gr)':'transparent')+';border-radius:7px;font-size:20px;cursor:pointer">'+ic+'</button>';
+    }
+    h+='</div>';
+  }
+  h+='</div>';
+  return h;
+}
+function _selMatIc(btn,prefix){
+  var ic=btn.getAttribute('data-ic');
+  var drop=document.getElementById(prefix+'-ic-drop');
+  if(drop){drop.querySelectorAll('button[data-ic]').forEach(function(b){b.style.background='transparent';b.style.borderColor='transparent';});btn.style.background='var(--grb)';btn.style.borderColor='var(--gr)';drop.style.display='none';}
+  var trigger=document.getElementById(prefix+'-ic-btn');if(trigger)trigger.textContent=ic;
+  var hidden=document.getElementById(prefix+'-ic-val');if(hidden)hidden.value=ic;
+}
+function _toggleIconDrop(prefix,e){
+  if(e)e.stopPropagation();
+  var drop=document.getElementById(prefix+'-ic-drop');
+  if(!drop)return;
+  var isOpen=drop.style.display!=='none';
+  // Fecha todos os outros drops abertos
+  document.querySelectorAll('[id$="-ic-drop"]').forEach(function(d){d.style.display='none';});
+  if(!isOpen)drop.style.display='block';
+}
+// Fecha drop ao clicar fora (registra uma vez)
+if(!window._icDropListenerSet){
+  window._icDropListenerSet=true;
+  document.addEventListener('click',function(){document.querySelectorAll('[id$="-ic-drop"]').forEach(function(d){d.style.display='none';});});
+}
 function mNovoProd(){
   var catO='';for(var i=0;i<DB.filtrosMat.length;i++){var f=DB.filtrosMat[i];if(f.nome==='Todos')continue;catO+='<option value="'+f.nome+'">'+f.ic+' '+f.nome+'</option>';}
-  openM('Novo Material','<div class="mf"><div style="display:grid;grid-template-columns:65px 1fr;gap:9px"><div class="fld"><label>Icone</label><input class="inp" id="np-i" value="&#128230;" style="font-size:17px;text-align:center"></div><div class="fld"><label>Nome</label><input class="inp" id="np-n" placeholder="Ex: Placa Marrom"></div></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px"><div class="fld"><label>Venda R$/kg</label><input class="inp" type="number" inputmode="decimal" id="np-vv"></div><div class="fld"><label>Compra R$/kg</label><input class="inp" type="number" inputmode="decimal" id="np-vc"></div><div class="fld"><label>Filtro/Categoria</label><select class="inp" id="np-c">'+catO+'</select></div></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveNP()">Cadastrar</button></div></div>');
+  var defIc='📦';
+  openM('Novo Material','<div class="mf">'
+    +'<div style="display:grid;grid-template-columns:56px 1fr;gap:9px;align-items:end">'
+    +'<div class="fld"><label>Ícone</label>'
+    +'<div style="position:relative">'
+    +'<button type="button" id="np-ic-btn" onclick="_toggleIconDrop(\'np\',event)" title="Escolher ícone" style="width:52px;height:40px;background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--gr)\'" onmouseout="this.style.borderColor=\'var(--bd)\'">'+defIc+'</button>'
+    +'<input type="hidden" id="np-ic-val" value="'+defIc+'">'
+    +_buildIconDrop(defIc,'np')
+    +'</div></div>'
+    +'<div class="fld"><label>Nome</label><input class="inp" id="np-n" placeholder="Ex: Placa Marrom"></div>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Venda R$/kg</label><input class="inp" type="number" inputmode="decimal" id="np-vv"></div>'
+    +'<div class="fld"><label>Compra R$/kg</label><input class="inp" type="number" inputmode="decimal" id="np-vc"></div>'
+    +'<div class="fld"><label>Filtro/Categoria</label><select class="inp" id="np-c">'+catO+'</select></div>'
+    +'</div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveNP()">Cadastrar</button></div>'
+    +'</div>',480);
 }
-function saveNP(){var n=document.getElementById('np-n').value.trim();if(!n){alert('Informe o nome!');return;}DB.produtos.push({id:nid(),nome:n,ic:document.getElementById('np-i').value,vV:parseFloat(document.getElementById('np-vv').value)||0,vC:parseFloat(document.getElementById('np-vc').value)||0,est:0,cat:document.getElementById('np-c').value});saveDB();closeM();go('estoque');}
+function saveNP(){var n=document.getElementById('np-n').value.trim();if(!n){alert('Informe o nome!');return;}var ic=document.getElementById('np-ic-val').value||'📦';DB.produtos.push({id:nid(),nome:n,ic:ic,vV:parseFloat(document.getElementById('np-vv').value)||0,vC:parseFloat(document.getElementById('np-vc').value)||0,est:0,cat:document.getElementById('np-c').value});saveDB();closeM();go('estoque');}
 function mEditProd(id){
   var p=gP(id);if(!p)return;
   var catO='';
@@ -3144,8 +3207,13 @@ function mEditProd(id){
   }
   openM('&#9998; Editar Material',
     '<div class="mf">'
-    +'<div style="display:grid;grid-template-columns:65px 1fr;gap:9px">'
-    +'<div class="fld"><label>Icone</label><input class="inp" id="ep-ic" value="'+p.ic+'" style="font-size:17px;text-align:center"></div>'
+    +'<div style="display:grid;grid-template-columns:56px 1fr;gap:9px;align-items:end">'
+    +'<div class="fld"><label>Ícone</label>'
+    +'<div style="position:relative">'
+    +'<button type="button" id="ep-ic-btn" onclick="_toggleIconDrop(\'ep\',event)" title="Escolher ícone" style="width:52px;height:40px;background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--gr)\'" onmouseout="this.style.borderColor=\'var(--bd)\'">'+p.ic+'</button>'
+    +'<input type="hidden" id="ep-ic-val" value="'+p.ic+'">'
+    +_buildIconDrop(p.ic,'ep')
+    +'</div></div>'
     +'<div class="fld"><label>Nome</label><input class="inp" id="ep-n" value="'+p.nome+'" placeholder="Ex: Placa Marrom"></div>'
     +'</div>'
     +'<div class="fld"><label>Filtro / Categoria</label><select class="inp" id="ep-c">'+catO+'</select></div>'
@@ -3155,7 +3223,7 @@ function mEditProd(id){
     +'<div class="fld"><label>Compra R$/kg</label><input class="inp" type="number" inputmode="decimal" id="ep-vc" value="'+p.vC+'" step="0.01"></div>'
     +'</div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveEditProd('+id+')">Salvar</button></div>'
-    +'</div>');
+    +'</div>',480);
 }
 function saveEditProd(id){
   var p=gP(id);if(!p)return;
@@ -3165,7 +3233,7 @@ function saveEditProd(id){
   var novoVC=parseFloat(document.getElementById('ep-vc').value)||0;
   var antigoVV=p.vV;
   p.nome=novoNome;
-  p.ic=document.getElementById('ep-ic').value||p.ic;
+  p.ic=document.getElementById('ep-ic-val').value||p.ic;
   p.cat=document.getElementById('ep-c').value;
   p.vV=novoVV;p.vC=novoVC;
   // Atualiza tabela Padrao automaticamente se o preco de venda mudou
@@ -3321,6 +3389,7 @@ function pgRevenda(){
       +'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:'+stBg+';color:'+stCor+'">'+p.status+'</span></div>'
       +'<div style="font-size:22px;margin-bottom:7px">&#127991;</div>'
       +'<div style="font-size:14px;font-weight:700;margin-bottom:4px">'+p.prod+'</div>'
+      +(p.desc?'<div style="font-size:11px;color:var(--mt);margin-bottom:5px;line-height:1.4;white-space:pre-line">'+p.desc+'</div>':'')
       +'<div style="font-size:11px;color:var(--mt);margin-bottom:5px">'+(p.cat?'<span style="color:var(--bl)">'+p.cat+'</span> &middot; ':'')+fKg(p.peso)+'kg</div>'
       +(p.cond?'<div style="margin-bottom:6px">'+condBadge+'</div>':'<div style="margin-bottom:6px"></div>')
       +testesHtml
@@ -3468,6 +3537,7 @@ function mEditRev(id){
   var clHtml=renderChecklistHtml(it.cat, it.testesAprovados||[], 'er');
   var h='<div class="mf">'
     +'<div class="fld"><label>Produto</label><input class="inp" id="er-p" value="'+it.prod+'"></div>'
+    +'<div class="fld"><label>Descricao / Especificacoes</label><textarea class="inp" id="er-desc" rows="3" placeholder="Ex: 8GB RAM, 256GB SSD, Intel i5 10ª geração..." style="resize:vertical;min-height:64px;line-height:1.5">'+(it.desc||'')+'</textarea></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Preco R$</label><input class="inp" type="number" inputmode="decimal" id="er-pr" value="'+it.preco+'"></div>'
     +'<div class="fld"><label>Categoria</label><select class="inp" id="er-cat" onchange="onRevCatChange(\'er\')">'+catO+'</select></div>'
@@ -3497,6 +3567,7 @@ function saveEditRev(id){
   var it=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){it=DB.revenda[i];break;}}if(!it)return;
   var n=document.getElementById('er-p').value.trim();if(!n){alert('Informe o nome!');return;}
   it.prod=n;
+  it.desc=(document.getElementById('er-desc').value||'').trim();
   it.preco=parseFloat(document.getElementById('er-pr').value)||0;
   it.cat=document.getElementById('er-cat').value;
   it.cond=document.getElementById('er-c').value;
@@ -3557,6 +3628,7 @@ function mNovoRev(){
   var clHtml=firstCat?renderChecklistHtml(firstCat,[],'nr'):'';
   openM('Novo Produto Revenda','<div class="mf">'
     +'<div class="fld"><label>Produto</label><input class="inp" id="nr-p" placeholder="Ex: Notebook Dell i5"></div>'
+    +'<div class="fld"><label>Descricao / Especificacoes</label><textarea class="inp" id="nr-desc" rows="3" placeholder="Ex: 8GB RAM, 256GB SSD, Intel i5 10ª geração, bateria ok, tela sem riscos..." style="resize:vertical;min-height:64px;line-height:1.5"></textarea></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Categoria</label><select class="inp" id="nr-cat" onchange="onRevCatChange(\'nr\')">'+catO+'</select></div>'
     +'<div class="fld"><label>Preco R$</label><input class="inp" type="number" inputmode="decimal" id="nr-pr"></div>'
@@ -3565,7 +3637,7 @@ function mNovoRev(){
     +clHtml
     +'<div class="fld"><label>Produto do Estoque (peso manual)</label><select class="inp" id="nr-estprod">'+prodO+'</select></div>'
     +'<div class="fld"><label>Peso kg</label><input class="inp" type="number" inputmode="decimal" id="nr-kg"></div>'
-    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveRev()">Cadastrar</button></div></div>',480);
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveRev()">Cadastrar</button></div></div>',500);
 }
 function saveRev(){
   var n=document.getElementById('nr-p').value.trim();if(!n)return;
@@ -3573,7 +3645,7 @@ function saveRev(){
   var aprovados=[];
   var cbs=document.querySelectorAll('#nr-cl-wrap input[type=checkbox]');
   for(var i=0;i<cbs.length;i++){if(cbs[i].checked)aprovados.push(cbs[i].value);}
-  DB.revenda.push({id:nid(),prod:n,peso:parseFloat(document.getElementById('nr-kg').value)||0,cond:document.getElementById('nr-c').value,preco:parseFloat(document.getElementById('nr-pr').value)||0,status:'Disponivel',cat:document.getElementById('nr-cat').value,estProdId:pIdSel,testesAprovados:aprovados});
+  DB.revenda.push({id:nid(),prod:n,desc:(document.getElementById('nr-desc').value||'').trim(),peso:parseFloat(document.getElementById('nr-kg').value)||0,cond:document.getElementById('nr-c').value,preco:parseFloat(document.getElementById('nr-pr').value)||0,status:'Disponivel',cat:document.getElementById('nr-cat').value,estProdId:pIdSel,testesAprovados:aprovados});
   saveDB();closeM();go('revenda');
 }
 
@@ -6871,7 +6943,7 @@ function pgTabs(){
     var itensVisiveis=0;
     for(var j=0;j<t.itens.length;j++){
       var it=t.itens[j];var p=gP(it.pId);if(!p)continue;
-      if(itensVisiveis>=3)break;
+      if(itensVisiveis>=5)break;
       itensVisiveis++;
       var padPreco=null;
       if(tabPad&&!isPadrao){for(var k=0;k<tabPad.itens.length;k++){if(tabPad.itens[k].pId===p.id){padPreco=tabPad.itens[k].preco;break;}}}
@@ -6885,7 +6957,7 @@ function pgTabs(){
         +'</div></div>';
     }
     var totalItens=t.itens.filter(function(it){return gP(it.pId);}).length;
-    if(totalItens>3){itH+='<div style="text-align:center;padding:4px;font-size:11px;color:rgba(255,255,255,.5)">+ '+(totalItens-3)+' outros materiais…</div>';}
+    if(totalItens>5){itH+='<div style="text-align:center;padding:4px;font-size:11px;color:rgba(255,255,255,.5)">+ '+(totalItens-5)+' outros materiais…</div>';}
     cards+='<div class="card" style="cursor:pointer;background:'+cor.hex+';border:none;border-left:4px solid rgba(255,255,255,.35);box-shadow:0 4px 18px rgba(0,0,0,.5);transition:transform .15s,box-shadow .15s" onclick="mVerTab('+tIdx+')" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 8px 28px rgba(0,0,0,.6)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'0 4px 18px rgba(0,0,0,.5)\'">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:11px">'
       +'<div><div style="display:flex;align-items:center;gap:6px">'
@@ -6899,7 +6971,7 @@ function pgTabs(){
       +'<button style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer" onclick="event.stopPropagation();mEditTab('+tIdx+')">✏️</button>'
       +'</div></div>'
       +itH
-      +'<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.4);text-align:center">Clique para ver / editar produtos</div>'
+      +'<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.4);text-align:center">✏️ Clique para editar preços e imprimir</div>'
       +'</div>';
   }
   return header+'<div class="g2">'+(cards||'<p style="color:var(--mt)">Nenhuma tabela nesta categoria.</p>')+'</div></div>';
@@ -6985,6 +7057,7 @@ function mVerTab(idx){
     +'<div style="height:5px;border-radius:4px;background:'+cor.hex+';margin-bottom:8px"></div>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
     +'<span style="font-size:12px;color:var(--mt)"><b style="color:var(--gr)">'+emTabela+' produto(s) inclusos</b>'+(produtosFora.length>0?' &nbsp;·&nbsp; '+produtosFora.length+' fora':' &nbsp;·&nbsp; todos adicionados')+'</span>'
+    +'<button onclick="closeM();mEditTab('+idx+')" style="background:var(--s3);border:1px solid var(--bd);color:var(--mt);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;flex-shrink:0">⚙️ Editar tabela</button>'
     +'</div>'
     +'<div id="vt-rows" style="max-height:52vh;overflow-y:auto;padding-right:2px">'+rowsInclusos+'</div>'
     +cascataHtml
