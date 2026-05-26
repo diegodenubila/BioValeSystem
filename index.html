@@ -257,7 +257,7 @@ var USERS=[
 ];
 var PNOME={adm:'Administrador',caixa:'Caixa',motorista:'Motorista',operador:'Operador'};
 var PPAGES={
-  adm:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','usuarios','configuracoes'],
+  adm:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','configuracoes'],
   caixa:['caixa_dia','pesagem','pendencias','estoque_vis'],
   motorista:['agenda'],
   operador:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','funcionarios','clientes','tabelas'],
@@ -275,7 +275,6 @@ var ALLPAGES=[
   {id:'funcionarios',label:'Funcionarios',icon:'&#128119;'},
   {id:'clientes',    label:'Clientes',    icon:'&#127970;'},
   {id:'tabelas',     label:'Tabelas',     icon:'&#128203;'},
-  {id:'usuarios',    label:'Usuarios',    icon:'&#128101;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
 var DB={
@@ -348,7 +347,7 @@ var DB={
 };
 
 // ── HELPERS ──────────────────────────────────────────────────
-function fR(v){return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});}
+function fR(v){return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fKg(v){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:3,maximumFractionDigits:3});}
 function hj(){return new Date().toLocaleDateString('pt-BR');}
 function nid(){return Date.now()+Math.random();}
@@ -453,7 +452,6 @@ var _MS_GROUPS=[
   {label:'Agenda',    icon:'📅', ids:['agenda']},
   {label:'Pessoas',   icon:'👥', ids:['funcionarios','clientes']},
   {label:'Tabelas',   icon:'📋', ids:['tabelas']},
-  {label:'Admin',     icon:'🔧', ids:['usuarios']},
 ];
 function buildSidebar(){
   var r=getRoleById(CU.perfil);
@@ -582,7 +580,7 @@ function setNav(pid){
   }
 }
 
-var _LABELS={dashboard:'Dashboard',pesagem:'Pesagem',pendencias:'Em Aberto',caixa_dia:'Caixa',estoque:'Estoque',estoque_vis:'Estoque',revenda:'Revenda',financeiro:'Financeiro',agenda:'Agenda',funcionarios:'Funcionarios',clientes:'Clientes',tabelas:'Tabelas',usuarios:'Usuarios',configuracoes:'Configuracoes'};
+var _LABELS={dashboard:'Dashboard',pesagem:'Pesagem',pendencias:'Em Aberto',caixa_dia:'Caixa',estoque:'Estoque',estoque_vis:'Estoque',revenda:'Revenda',financeiro:'Financeiro',agenda:'Agenda',funcionarios:'Funcionarios',clientes:'Clientes',tabelas:'Tabelas',configuracoes:'Configuracoes'};
 function _breadcrumb(pid){
   var lbl=_LABELS[pid]||pid;
   return '<div class="breadcrumb">&#127968; Inicio <span class="sep">&#8250;</span> <span>'+lbl+'</span></div>';
@@ -2668,8 +2666,8 @@ function pgDash(){
     +'<div style="font-size:10px;color:var(--mt);margin-top:1px">kg &nbsp;·&nbsp; '+fR(totEstVal)+'</div></div>'
     +'<span style="font-size:22px;opacity:.4">&#128230;</span></div></div>'
 
-    // Card doações → Estoque
-    +'<div class="card" style="'+dcc+'background:linear-gradient(135deg,var(--s1),rgba(168,85,247,0.06));border-color:rgba(168,85,247,0.2)" onclick="go(\&apos;estoque\&apos;)" title="Ver Estoque" '+dca+'>'
+    // Card doações → Estoque (aba entradas)
+    +'<div class="card" style="'+dcc+'background:linear-gradient(135deg,var(--s1),rgba(168,85,247,0.06));border-color:rgba(168,85,247,0.2)" onclick="swET(\'e\');go(\'estoque\')" title="Ver Entradas no Estoque" '+dca+'>'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
     +'<div><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">Doacoes <span style="color:var(--pu);opacity:.6">›</span></div>'
     +'<div style="font-size:22px;font-weight:800;color:var(--pu);font-family:monospace;line-height:1">'+fKg(docKg)+'</div>'
@@ -3135,8 +3133,32 @@ function pgEstoque(){
   var entradasH=resumoEntr+filtH
     +'<div class="card" style="padding:0;overflow:hidden">'+entrRows+'</div>';
 
+  // ── Totais gerais do estoque ──
+  var _totEstKg=0,_totEstVal=0,_totEstValC=0,_totProdutos=0,_totProdNeg=0;
+  for(var _i=0;_i<DB.produtos.length;_i++){var _pp=DB.produtos[_i];_totEstKg+=_pp.est;_totEstVal+=_pp.est*_pp.vV;_totEstValC+=_pp.est*_pp.vC;_totProdutos++;if(_pp.est<0)_totProdNeg++;}
+  var estTotalBanner='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:12px">'
+    +'<div class="card" style="padding:10px 14px;background:linear-gradient(135deg,var(--s1),rgba(34,197,94,0.07));border-color:rgba(34,197,94,0.25)">'
+    +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">&#9997; Total em Estoque</div>'
+    +'<div style="font-size:20px;font-weight:800;color:var(--gr);font-family:monospace;line-height:1">'+fKg(_totEstKg)+' <span style="font-size:12px">kg</span></div>'
+    +'</div>'
+    +'<div class="card" style="padding:10px 14px;background:linear-gradient(135deg,var(--s1),rgba(245,158,11,0.07));border-color:rgba(245,158,11,0.25)">'
+    +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">&#128176; Valor (Venda)</div>'
+    +'<div style="font-size:18px;font-weight:800;color:var(--or);font-family:monospace;line-height:1">'+fR(_totEstVal)+'</div>'
+    +'</div>'
+    +'<div class="card" style="padding:10px 14px;background:linear-gradient(135deg,var(--s1),rgba(59,130,246,0.07));border-color:rgba(59,130,246,0.25)">'
+    +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">&#128201; Valor (Compra)</div>'
+    +'<div style="font-size:18px;font-weight:800;color:var(--bl);font-family:monospace;line-height:1">'+fR(_totEstValC)+'</div>'
+    +'</div>'
+    +'<div class="card" style="padding:10px 14px">'
+    +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">&#128230; Materiais</div>'
+    +'<div style="font-size:20px;font-weight:800;color:var(--tx);font-family:monospace;line-height:1">'+_totProdutos+'</div>'
+    +(_totProdNeg>0?'<div style="font-size:10px;color:var(--rd);margin-top:2px">&#9888; '+_totProdNeg+' negativo(s)</div>':'<div style="font-size:10px;color:var(--gr);margin-top:2px">&#10003; Tudo positivo</div>')
+    +'</div>'
+    +'</div>';
+
   return '<div class="fc"><div class="ptop"><div><div class="pl">Materiais</div><div class="pt">Estoque</div></div><div style="display:flex;gap:7px"><button class="btnO bOb" onclick="mTransf()">Transferencia</button><button class="btn" onclick="mNovoProd()">+ Material</button></div></div>'
     +alertasBanner
+    +(eTab==='p'?estTotalBanner:'')
     +'<div class="tabs"><button class="tabbtn'+(eTab==='p'?' on':'')+'" onclick="swET(\&apos;p\&apos;)">Produtos</button><button class="tabbtn'+(eTab==='e'?' on':'')+'" onclick="swET(\&apos;e\&apos;)">&#128229; Entradas</button><button class="tabbtn'+(eTab==='t'?' on':'')+'" onclick="swET(\&apos;t\&apos;)">Transferencias</button><button class="tabbtn'+(eTab==='pr'?' on':'')+'" onclick="swET(\&apos;pr\&apos;)">&#9998; Precos</button></div>'
     +(eTab==='p'?buscaBar+sortBar+chipsBar
       +'<div style="display:flex;justify-content:flex-end;gap:5px;margin-bottom:10px">'
@@ -4021,8 +4043,22 @@ function _finResumo(){
     +cfCardRows+'</div>';
 
   var _perLabel='<div style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:7px 13px;font-size:12px;color:var(--mt);margin-bottom:2px">'+_finPeriodoLabel()+'</div>';
+  function _scLink(icon,lbl,val,sub,cor,fn){
+    cor=cor||'var(--gr)';
+    return '<div class="card" style="display:flex;flex-direction:column;gap:5px;cursor:pointer;transition:transform .15s,box-shadow .15s" onclick="'+fn+'" onmouseenter="this.style.transform=\'scale(1.02)\';this.style.boxShadow=\'0 4px 20px rgba(0,0,0,0.25)\'" onmouseleave="this.style.transform=\'\';this.style.boxShadow=\'\'">'
+      +'<div style="display:flex;justify-content:space-between">'
+      +'<span style="font-size:18px">'+icon+'</span>'
+      +'<span style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">'+lbl+' <span style="color:'+cor+';opacity:.6">›</span></span></div>'
+      +'<div style="font-size:21px;font-weight:700;font-family:monospace;color:'+cor+'">'+val+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+sub+'</div></div>';
+  }
   return '<div class="fc">'+_perLabel+resCard
-    +'<div class="g4">'+sc('&#128176;','Saldo Total',fR(sal),'em '+DB.contas.length+' contas','var(--gr)')+sc('&#128200;','Entradas',fR(ent),vendas.length+' vendas','var(--gr)')+sc('&#128201;','Saidas',fR(sai),compras.length+' compras','var(--rd)')+sc('&#128161;','Pendentes',fR(totP),pend.length+' contas','var(--or)')+'</div>'
+    +'<div class="g4">'
+    +_scLink('&#128176;','Saldo Total',fR(sal),'em '+DB.contas.length+' contas','var(--gr)',"finTab('contas')")
+    +_scLink('&#128200;','Entradas',fR(ent),vendas.length+' vendas','var(--gr)',"finTab('movs')")
+    +_scLink('&#128201;','Saidas',fR(sai),compras.length+' compras','var(--rd)',"finTab('movs')")
+    +_scLink('&#128161;','Pendentes',fR(totP),pend.length+' contas','var(--or)',"finTab('fixas')")
+    +'</div>'
     +cfResumoCard
     +ticketH+rankH+matH+'</div>';
 }
@@ -5026,14 +5062,16 @@ function pgAgenda(){
       var dStr=_fmtDataBR(dia);
       var isHj=_sameDay(dia,hoje);
       var colDia=DB.coletas.filter(function(c){return c.data===dStr;});
-      html+='<div style="background:var(--s2);border:1px solid '+(isHj?'var(--gr)':'var(--bd)')+';border-radius:10px;padding:8px 6px;min-height:90px">'+
-        '<div style="font-size:10px;color:var(--mt);text-align:center">'+_diasCurtos[dia.getDay()]+'</div>'+
-        '<div style="font-size:18px;font-weight:800;text-align:center;color:'+(isHj?'var(--gr)':'var(--tx)')+'">'+dia.getDate()+'</div>'+
+      var temColSem=colDia.length>0;
+      html+='<div onclick="agFiltrarDia(\''+dStr+'\')" style="cursor:'+(temColSem?'pointer':'default')+';background:'+(agDiaFiltro===dStr?'rgba(34,197,94,0.08)':isHj?'var(--grb)':'var(--s2)')+';border:1px solid '+(agDiaFiltro===dStr?'var(--gr)':isHj?'var(--gr)':'var(--bd)')+';border-radius:10px;padding:8px 6px;min-height:90px;transition:all .15s'+(temColSem?';box-shadow:0 2px 8px rgba(0,0,0,.15)':'')+'" '+(temColSem?'title="'+colDia.length+' coleta(s) — clique para ver"':'')+'>'+
+        '<div style="font-size:10px;color:'+(agDiaFiltro===dStr?'var(--gr)':'var(--mt)')+';text-align:center">'+_diasCurtos[dia.getDay()]+'</div>'+
+        '<div style="font-size:18px;font-weight:800;text-align:center;color:'+(agDiaFiltro===dStr?'var(--gr)':isHj?'var(--gr)':'var(--tx)')+'">'+dia.getDate()+'</div>'+
+        (temColSem?'<div style="font-size:9px;text-align:center;color:var(--mt);margin-top:1px">'+colDia.length+' coleta'+(colDia.length>1?'s':'')+'</div>':'')+
         '<div style="margin-top:4px">';
       var sorted=colDia.sort(function(a,b){return (a.hora||'99:99').localeCompare(b.hora||'99:99');});
       for(var i=0;i<sorted.length;i++){
         var c=sorted[i];var cor=stCorCol(c.status);
-        html+='<div onclick="agFiltrarDia(\''+dStr+'\')" style="cursor:pointer;background:'+cor+'18;border-left:2px solid '+cor+';border-radius:4px;padding:2px 5px;margin-bottom:3px;font-size:10px;font-weight:600;color:'+cor+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+c.cli+' '+c.hora+'">'+
+        html+='<div style="background:'+cor+'18;border-left:2px solid '+cor+';border-radius:4px;padding:2px 5px;margin-bottom:3px;font-size:10px;font-weight:600;color:'+cor+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
           (c.hora?c.hora+' ':'')+(c.cli.length>10?c.cli.substring(0,10)+'…':c.cli)+'</div>';
       }
       if(!colDia.length)html+='<div style="font-size:10px;color:var(--ft);text-align:center;margin-top:6px">—</div>';
@@ -5042,15 +5080,31 @@ function pgAgenda(){
     html+='</div>';
     // lista detalhada da semana
     var temColeta=false;
-    for(var d=0;d<7;d++){
-      var dia=_addDays(semInicio,d);var dStr=_fmtDataBR(dia);
-      var colDia=DB.coletas.filter(function(c){return c.data===dStr;}).sort(function(a,b){return (a.hora||'99:99').localeCompare(b.hora||'99:99');});
-      if(!colDia.length)continue;
+    // Se há filtro de dia ativo na semana, mostra apenas esse dia no detalhe
+    if(agDiaFiltro){
+      var colFiltroSem=DB.coletas.filter(function(c){return c.data===agDiaFiltro;}).sort(function(a,b){return (a.hora||'99:99').localeCompare(b.hora||'99:99');});
+      var dtFS=_parseDataBR(agDiaFiltro);
+      var diasSemSel=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+      html+='<div style="margin-top:16px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+        '<div style="height:1px;flex:1;background:var(--bd)"></div>'+
+        '<span style="font-size:10px;font-weight:700;color:var(--gr);text-transform:uppercase;letter-spacing:2px">'+diasSemSel[dtFS.getDay()]+' '+agDiaFiltro+'</span>'+
+        '<button onclick="agDiaFiltro=null;go(\'agenda\')" style="background:var(--s2);border:1px solid var(--bd);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--mt)">✕ Fechar</button>'+
+        '<div style="height:1px;flex:1;background:var(--bd)"></div></div>';
+      if(!colFiltroSem.length)html+='<div style="text-align:center;padding:18px;color:var(--mt)">Nenhuma coleta neste dia</div>';
+      else{for(var i=0;i<colFiltroSem.length;i++)html+=_cardColeta(colFiltroSem[i]);}
+      html+='</div>';
       temColeta=true;
-      var isHj=_sameDay(dia,hoje);
-      var diasSemana=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-      html+='<div style="display:flex;align-items:center;gap:8px;margin:10px 0 7px"><div style="height:1px;flex:1;background:var(--bd)"></div><span style="font-size:10px;color:'+(isHj?'var(--gr)':'var(--mt)')+';font-weight:700;text-transform:uppercase;letter-spacing:2px;white-space:nowrap">'+(isHj?'🟢 HOJE — ':'')+diasSemana[dia.getDay()]+' '+dia.getDate()+'</span><div style="height:1px;flex:1;background:var(--bd)"></div></div>';
-      for(var i=0;i<colDia.length;i++)html+=_cardColeta(colDia[i]);
+    } else {
+      for(var d=0;d<7;d++){
+        var dia=_addDays(semInicio,d);var dStr=_fmtDataBR(dia);
+        var colDia=DB.coletas.filter(function(c){return c.data===dStr;}).sort(function(a,b){return (a.hora||'99:99').localeCompare(b.hora||'99:99');});
+        if(!colDia.length)continue;
+        temColeta=true;
+        var isHj=_sameDay(dia,hoje);
+        var diasSemana=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+        html+='<div style="display:flex;align-items:center;gap:8px;margin:10px 0 7px"><div style="height:1px;flex:1;background:var(--bd)"></div><span style="font-size:10px;color:'+(isHj?'var(--gr)':'var(--mt)')+';font-weight:700;text-transform:uppercase;letter-spacing:2px;white-space:nowrap">'+(isHj?'🟢 HOJE — ':'')+diasSemana[dia.getDay()]+' '+dia.getDate()+'</span><div style="height:1px;flex:1;background:var(--bd)"></div></div>';
+        for(var i=0;i<colDia.length;i++)html+=_cardColeta(colDia[i]);
+      }
     }
     if(!temColeta)html+='<div style="text-align:center;padding:24px;color:var(--mt);font-size:13px">Nenhuma coleta nesta semana</div>';
     return html;
@@ -6055,8 +6109,21 @@ function pgClis(){
 }
 var cTab='c';
 function swCT(t){cTab=t;go('clientes');}
-function _buildCliForm(c){
-  var tO='<option value="">-- Sem tabela --</option>';for(var i=0;i<DB.tabelas.length;i++)tO+='<option value="'+DB.tabelas[i].id+'"'+(c&&String(c.tabId)===String(DB.tabelas[i].id)?' selected':'')+'>'+DB.tabelas[i].nome+'</option>';
+function _buildCliForm(c,tipo){
+  var tipoForm=tipo||(c?c.tipo:(cTab==='c'?'cliente':'fornecedor'));
+  var tipoTabEsperado=tipoForm==='cliente'?'venda':'compra';
+  var tabelasFiltradas=[];
+  for(var i=0;i<DB.tabelas.length;i++){
+    if(DB.tabelas[i].tipo===tipoTabEsperado)tabelasFiltradas.push(DB.tabelas[i]);
+  }
+  // fallback: se não há tabelas do tipo correto, mostra todas
+  if(!tabelasFiltradas.length)tabelasFiltradas=DB.tabelas.slice();
+  var tO='<option value="">-- Sem tabela --</option>';
+  for(var i=0;i<tabelasFiltradas.length;i++){
+    var t=tabelasFiltradas[i];
+    tO+='<option value="'+t.id+'"'+(c&&String(c.tabId)===String(t.id)?' selected':'')+'>'+t.nome+(t.nome.toLowerCase()==='padrao'?' ⭐':'')+'</option>';
+  }
+  var labelTab=tipoForm==='cliente'?'Tabela de Venda (opcional)':'Tabela de Compra (opcional)';
   return '<div class="mf">'
     +'<div class="fld"><label>Nome *</label><input class="inp" id="nc2-n" value="'+(c?c.nome:'')+'" placeholder="Nome completo"></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
@@ -6065,28 +6132,37 @@ function _buildCliForm(c){
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>CNPJ/CPF (opcional)</label><input class="inp" id="nc2-cnpj" value="'+(c&&c.cnpj?c.cnpj:'')+'" placeholder="00.000.000/0001-00"></div>'
-    +'<div class="fld"><label>Tabela de precos (opcional)</label><select class="inp" id="nc2-tb">'+tO+'</select></div>'
+    +'<div class="fld"><label>'+labelTab+'</label><select class="inp" id="nc2-tb">'+tO+'</select></div>'
     +'</div>'
+    +(tabelasFiltradas.length===0?'<div class="al aly" style="font-size:11px">&#9888; Nenhuma tabela de '+tipoTabEsperado+' cadastrada. Crie em Tabelas primeiro.</div>':'')
     +'<div class="fld"><label>Endereco (opcional)</label><input class="inp" id="nc2-end" value="'+(c&&c.end?c.end:'')+'" placeholder="Rua, numero, cidade"></div>'
     +'<div class="fld"><label>Obs (opcional)</label><textarea class="inp" id="nc2-o" rows="2" placeholder="Observacoes...">'+(c&&c.obs?c.obs:'')+'</textarea></div>';
 }
 function mNovoCli(){
   var tipo=cTab==='c'?'cliente':'fornecedor';
   openM('Novo '+(tipo==='cliente'?'Cliente':'Fornecedor'),
-    _buildCliForm(null)
+    _buildCliForm(null,tipo)
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveCli(\&apos;'+tipo+'\&apos;)">Cadastrar</button></div></div>',540);
 }
 function saveCli(tipo){
   var n=document.getElementById('nc2-n').value.trim();if(!n){alert('Informe o nome!');return;}
-  var tbVal=document.getElementById('nc2-tb').value;
-  DB.clientes.push({id:nid(),tipo:tipo,nome:n,tel:document.getElementById('nc2-t').value,email:document.getElementById('nc2-e').value,cnpj:document.getElementById('nc2-cnpj').value,end:document.getElementById('nc2-end').value,tabId:tbVal?parseInt(tbVal):null,obs:document.getElementById('nc2-o').value});
+  var tbEl=document.getElementById('nc2-tb');
+  var tbVal=tbEl?tbEl.value:'';
+  // tabId pode ser inteiro ou string — preserva o tipo do DB
+  var tabIdSalvo=null;
+  if(tbVal){
+    // tenta achar o id exato na lista de tabelas
+    for(var _ti=0;_ti<DB.tabelas.length;_ti++){if(String(DB.tabelas[_ti].id)===String(tbVal)){tabIdSalvo=DB.tabelas[_ti].id;break;}}
+    if(tabIdSalvo===null)tabIdSalvo=isNaN(Number(tbVal))?tbVal:Number(tbVal);
+  }
+  DB.clientes.push({id:nid(),tipo:tipo,nome:n,tel:document.getElementById('nc2-t').value,email:document.getElementById('nc2-e').value,cnpj:document.getElementById('nc2-cnpj').value,end:document.getElementById('nc2-end').value,tabId:tabIdSalvo,obs:document.getElementById('nc2-o').value});
   saveDB();closeM();go('clientes');
 }
 function mEditCli(idx){
   var c=DB.clientes[idx];
   var tipo=c.tipo;
   openM('Editar '+(tipo==='cliente'?'Cliente':'Fornecedor'),
-    _buildCliForm(c)
+    _buildCliForm(c,tipo)
     +'<div class="brow">'
     +'<button class="btnO bOr" onclick="delCli('+idx+')">&#128465; Excluir</button>'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
@@ -6095,11 +6171,17 @@ function mEditCli(idx){
 }
 function saveEditCli(idx){
   var n=document.getElementById('nc2-n').value.trim();if(!n){alert('Informe o nome!');return;}
-  var tbVal=document.getElementById('nc2-tb').value;
+  var tbEl=document.getElementById('nc2-tb');
+  var tbVal=tbEl?tbEl.value:'';
+  var tabIdSalvo=null;
+  if(tbVal){
+    for(var _ti=0;_ti<DB.tabelas.length;_ti++){if(String(DB.tabelas[_ti].id)===String(tbVal)){tabIdSalvo=DB.tabelas[_ti].id;break;}}
+    if(tabIdSalvo===null)tabIdSalvo=isNaN(Number(tbVal))?tbVal:Number(tbVal);
+  }
   var c=DB.clientes[idx];
   c.nome=n;c.tel=document.getElementById('nc2-t').value;c.email=document.getElementById('nc2-e').value;
   c.cnpj=document.getElementById('nc2-cnpj').value;c.end=document.getElementById('nc2-end').value;
-  c.tabId=tbVal?parseInt(tbVal):null;c.obs=document.getElementById('nc2-o').value;
+  c.tabId=tabIdSalvo;c.obs=document.getElementById('nc2-o').value;
   saveDB();closeM();go('clientes');
 }
 function delCli(idx){
@@ -6363,10 +6445,10 @@ function buildGerarTabelas(){
         var pctNovo=bprod.preco>0?((1-(precoNovo/bprod.preco))*100):null;
         var rowH='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:6px;align-items:center;padding:5px 8px;background:rgba(0,0,0,.15);border-radius:6px">'
           +'<span style="font-size:12px;color:var(--tx)">'+bprod.ic+' '+bprod.nome+'</span>'
-          +(precoAtual!==null?'<span style="font-size:11px;font-family:monospace;color:var(--mt)">Atual: R$ '+precoAtual.toLocaleString('pt-BR',{minimumFractionDigits:2})+(pctAtual!==null?' (−'+pctAtual.toFixed(1)+'%)':'')+'</span>':'<span style="font-size:11px;color:var(--mt)">— não estava</span>')
+          +(precoAtual!==null?'<span style="font-size:11px;font-family:monospace;color:var(--mt)">Atual: R$ '+precoAtual.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+(pctAtual!==null?' (−'+pctAtual.toFixed(1)+'%)':'')+'</span>':'<span style="font-size:11px;color:var(--mt)">— não estava</span>')
           +'<span style="font-size:13px;color:var(--mt)">→</span>'
-          +'<span style="font-size:11px;font-family:monospace;color:#86efac">Novo: R$ '+precoNovo.toLocaleString('pt-BR',{minimumFractionDigits:2})+(pctNovo!==null?' (−'+pctNovo.toFixed(1)+'%)':'')+'</span>'
-          +(diff!==null?'<span style="font-size:11px;font-family:monospace;color:'+diffColor+';font-weight:700">'+(diff>=0?'+':'')+diff.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>':'<span></span>')
+          +'<span style="font-size:11px;font-family:monospace;color:#86efac">Novo: R$ '+precoNovo.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+(pctNovo!==null?' (−'+pctNovo.toFixed(1)+'%)':'')+'</span>'
+          +(diff!==null?'<span style="font-size:11px;font-family:monospace;color:'+diffColor+';font-weight:700">'+(diff>=0?'+':'')+diff.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'</span>':'<span></span>')
           +'</div>';
         if(bi<ALIM)atualRowsVis+=rowH;
         else atualRowsHid+=rowH;
@@ -6399,13 +6481,13 @@ function buildGerarTabelas(){
         if(jaExiste){for(var ki=0;ki<tabExistObj.itens.length;ki++){if(tabExistObj.itens[ki].pId===bprod.pId){precoAtualProd=tabExistObj.itens[ki].preco;break;}}}
         var pctAtualProd=precoAtualProd!==null&&bprod.preco>0?((1-(precoAtualProd/bprod.preco))*100):null;
         prodRows+='<div style="display:grid;grid-template-columns:1fr 80px 90px auto;gap:5px;align-items:center;background:rgba(0,0,0,.2);padding:6px 8px;border-radius:7px">'
-          +'<span style="font-size:12px;color:var(--tx)">'+bprod.ic+' '+bprod.nome+'<br><span style="color:var(--mt);font-size:10px">Venda: R$ '+bprod.preco.toLocaleString('pt-BR',{minimumFractionDigits:2})+(jaExiste&&precoAtualProd!==null?' · Atual: R$ '+precoAtualProd.toLocaleString('pt-BR',{minimumFractionDigits:2})+(pctAtualProd!==null?' (−'+pctAtualProd.toFixed(1)+'%)':''):'')+'</span></span>'
+          +'<span style="font-size:12px;color:var(--tx)">'+bprod.ic+' '+bprod.nome+'<br><span style="color:var(--mt);font-size:10px">Venda: R$ '+bprod.preco.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+(jaExiste&&precoAtualProd!==null?' · Atual: R$ '+precoAtualProd.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+(pctAtualProd!==null?' (−'+pctAtualProd.toFixed(1)+'%)':''):'')+'</span></span>'
           +'<select class="inp" style="padding:4px 6px;font-size:11px" onchange="_gSetProdVal(\''+cfg.key+'\','+bprod.pId+',\'tipo\',this.value)">'
           +'<option value="pct"'+(ppconf.tipo==='pct'?' selected':'')+'>%</option>'
           +'<option value="rs"'+(ppconf.tipo==='rs'?' selected':'')+'>R$</option>'
           +'</select>'
           +'<input class="inp" type="number" inputmode="decimal" style="padding:4px 6px;font-size:12px;text-align:right" placeholder="0" value="'+(ppconf.val||'')+'" onchange="_gSetProdVal(\''+cfg.key+'\','+bprod.pId+',\'val\',this.value)">'
-          +'<span style="font-size:11px;font-family:monospace;color:#86efac;white-space:nowrap">= R$ '+precoCalc.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>'
+          +'<span style="font-size:11px;font-family:monospace;color:#86efac;white-space:nowrap">= R$ '+precoCalc.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'</span>'
           +'</div>';
       }
       prodRows+=atualBlock+'</div>';
@@ -6486,7 +6568,7 @@ function buildGerarTabelas(){
       for(var bi=0;bi<baseOrd2.length;bi++){
         var bpr=baseOrd2[bi];
         var rowCols='<td style="padding:7px 10px;font-size:12px;border-bottom:1px solid var(--bd)">'+bpr.ic+' '+bpr.nome+'</td>'
-          +'<td style="padding:7px 10px;text-align:right;font-family:monospace;font-size:12px;border-bottom:1px solid var(--bd);font-weight:600">R$ '+bpr.preco.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>';
+          +'<td style="padding:7px 10px;text-align:right;font-family:monospace;font-size:12px;border-bottom:1px solid var(--bd);font-weight:600">R$ '+bpr.preco.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td>';
         for(var ai2=0;ai2<ativasT.length;ai2++){
           var tIdx=_gTabs.indexOf(ativasT[ai2]);
           var pc=_gCalcPreco(tIdx,bpr.pId,bpr.preco);
@@ -6495,7 +6577,7 @@ function buildGerarTabelas(){
           totalVenda[ai2]+=bpr.preco;
           totalCompra[ai2]+=pc;
           rowCols+='<td style="padding:7px 10px;text-align:right;font-family:monospace;font-size:12px;border-bottom:1px solid var(--bd)">'
-            +'<div style="font-weight:700">R$ '+pc.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div>'
+            +'<div style="font-weight:700">R$ '+pc.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'</div>'
             +'<div style="font-size:10px;color:#86efac">'+pct2.toFixed(1)+'% lucro</div>'
             +'</td>';
         }
@@ -7582,11 +7664,20 @@ var CUSTOM_ROLES=[];
 function getAllRoles(){return BASE_ROLES.concat(CUSTOM_ROLES);}
 function getRoleById(id){var all=getAllRoles();for(var i=0;i<all.length;i++){if(all[i].id===id)return all[i];}return null;}
 function getRoleName(id){var r=getRoleById(id);return r?r.nome:id;}
+function _goUsuarios(){
+  // Se estamos dentro de Configuracoes > Usuarios, recarrega configuracoes
+  if(pgAtiva==='configuracoes'&&cfgAba==='usuarios'){
+    document.getElementById('ct').innerHTML=_breadcrumb('configuracoes')+pgConfig();
+    if(typeof _cfgBindAll==='function')_cfgBindAll();
+  } else {
+    go('usuarios');
+  }
+}
 function moveUser(idx,dir){
   var newIdx=idx+dir;
   if(newIdx<0||newIdx>=USERS.length)return;
   var tmp=USERS[idx];USERS[idx]=USERS[newIdx];USERS[newIdx]=tmp;
-  saveDB();go('usuarios');
+  saveDB();_goUsuarios();
 }
 function pgUsers(){
   var uTab=window._uTab||'users';
@@ -7652,7 +7743,7 @@ function pgUsers(){
       +'</div>';
   }
 }
-function swUT(t){window._uTab=t;go('usuarios');}
+function swUT(t){window._uTab=t;_goUsuarios();}
 
 function _buildUserForm(u){
   var allRoles=getAllRoles();var rO='';
@@ -7774,7 +7865,7 @@ function saveMeuPin(){
 }
 function toggleBlockUser(uid){
   for(var i=0;i<USERS.length;i++){if(String(USERS[i].id)===String(uid)){USERS[i].bloqueado=!USERS[i].bloqueado;break;}}
-  saveDB();go('usuarios');
+  saveDB();_goUsuarios();
 }
 function delUser(uid){
   var idx=-1;for(var i=0;i<USERS.length;i++){if(String(USERS[i].id)===String(uid)){idx=i;break;}}
@@ -7790,7 +7881,7 @@ function delUser(uid){
 // ── Gestão de Funções ──────────────────────────────────────────
 // Base roles stored separately so we can edit them
 var BASE_ROLES=[
-  {id:'adm',     nome:'Administrador',pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','usuarios','configuracoes']},
+  {id:'adm',     nome:'Administrador',pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','configuracoes']},
   {id:'caixa',   nome:'Caixa',         pages:['caixa_dia','pesagem','pendencias','estoque_vis']},
   {id:'motorista',nome:'Motorista',    pages:['agenda']},
   {id:'operador', nome:'Operador',     pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','funcionarios','clientes','tabelas']},
@@ -7825,7 +7916,7 @@ function saveNovaRole(){
   var id='role_'+Date.now();
   CUSTOM_ROLES.push({id:id,nome:n,pages:pages});
   PPAGES[id]=pages;PNOME[id]=n;
-  closeM();go('usuarios');
+  closeM();_goUsuarios();
 }
 function mEditRole(roleId){
   var r=getRoleById(roleId);
@@ -7853,7 +7944,7 @@ function saveEditRole(roleId){
     }
   }
   PPAGES[roleId]=pages;PNOME[roleId]=n;
-  closeM();go('usuarios');
+  closeM();_goUsuarios();
 }
 function delRole(roleId){
   var inUse=false;for(var i=0;i<USERS.length;i++){if(USERS[i].perfil===roleId){inUse=true;break;}}
@@ -7862,7 +7953,7 @@ function delRole(roleId){
   confirmar('Excluir a funcao <b>'+nome+'</b>?',function(){
     for(var i=0;i<BASE_ROLES.length;i++){if(BASE_ROLES[i].id===roleId){BASE_ROLES.splice(i,1);break;}}
     for(var i=0;i<CUSTOM_ROLES.length;i++){if(CUSTOM_ROLES[i].id===roleId){CUSTOM_ROLES.splice(i,1);break;}}
-    go('usuarios');
+    _goUsuarios();
   });
 }
 
@@ -7900,6 +7991,7 @@ function pgConfig(){
     +'<option value="empresa" '+(cfgAba==='empresa'?'selected':'')+'>&#127970; Empresa</option>'
     +'<option value="aparencia" '+(cfgAba==='aparencia'?'selected':'')+'>&#127775; Aparencia</option>'
     +'<option value="atalhos" '+(cfgAba==='atalhos'?'selected':'')+'>&#9875; Atalhos</option>'
+    +'<option value="usuarios" '+(cfgAba==='usuarios'?'selected':'')+'>&#128101; Usuarios</option>'
     +'</select>'
     +'<div style="position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--mt);font-size:11px">&#9660;</div></div>'
     +_cfgConteudo()
@@ -7910,8 +8002,77 @@ function _cfgConteudo(){
   if(cfgAba==='empresa')return _cfgEmpresa();
   if(cfgAba==='aparencia')return _cfgAparencia();
   if(cfgAba==='atalhos')return _cfgAtalhos();
+  if(cfgAba==='usuarios')return _cfgUsuarios();
   return '';
 }
+function _cfgUsuarios(){
+  var uTab=window._cfgUTab||'users';
+  var usersH='';
+  for(var i=0;i<USERS.length;i++){
+    var u=USERS[i];var blocked=u.bloqueado;
+    var color='hsl('+(i*80+140)+',50%,20%)';var textColor='hsl('+(i*80+140)+',70%,65%)';var borderColor='hsl('+(i*80+140)+',60%,35%)';
+    var roleName=getRoleName(u.perfil);
+    var rTag=u.perfil==='adm'?'to':u.perfil==='caixa'?'tb':u.perfil==='motorista'?'tp':'tgr';
+    var isFirst=i===0;var isLast=i===USERS.length-1;
+    usersH+='<div class="card" style="'+(blocked?'opacity:.55;':'')+'display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:9px">'
+      +'<div style="display:flex;gap:8px;align-items:center">'
+      +'<div style="display:flex;flex-direction:column;gap:2px">'
+      +'<button onclick="moveUser('+i+',-1)" '+(isFirst?'disabled':'')+' style="background:'+(isFirst?'var(--ft)':'var(--s3)')+';border:1px solid var(--bd);color:'+(isFirst?'var(--ft)':'var(--mt)')+';border-radius:5px;padding:2px 6px;font-size:10px;line-height:1;cursor:'+(isFirst?'default':'pointer')+'">&#9650;</button>'
+      +'<button onclick="moveUser('+i+',1)" '+(isLast?'disabled':'')+' style="background:'+(isLast?'var(--ft)':'var(--s3)')+';border:1px solid var(--bd);color:'+(isLast?'var(--ft)':'var(--mt)')+';border-radius:5px;padding:2px 6px;font-size:10px;line-height:1;cursor:'+(isLast?'default':'pointer')+'">&#9660;</button>'
+      +'</div>'
+      +'<div style="width:38px;height:38px;border-radius:50%;background:'+color+';border:2px solid '+borderColor+';display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:'+textColor+'">'+u.av+'</div>'
+      +'<div><div style="font-size:13px;font-weight:700">'+u.nome+(blocked?' <span style="font-size:10px;color:var(--rd)">[BLOQUEADO]</span>':'')+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+roleName+'</div></div>'
+      +'</div>'
+      +'<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">'
+      +'<span class="tag '+rTag+'">'+roleName+'</span>'
+      +(blocked?'<span class="tag tr">Bloqueado</span>':'<span class="tag tg">Ativo</span>')
+      +'<button onclick="mEditUser(\&apos;'+u.id+'\&apos;)" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:6px;padding:4px 9px;font-size:12px">&#9998;</button>'
+      +(u.id!==CU.id?'<button onclick="toggleBlockUser(\&apos;'+u.id+'\&apos;)" style="background:'+(blocked?'var(--grb)':'var(--orb)')+';border:1px solid '+(blocked?'rgba(34,197,94,.3)':'rgba(245,158,11,.3)')+';color:'+(blocked?'var(--gr)':'var(--or)')+';border-radius:6px;padding:4px 9px;font-size:12px">'+(blocked?'&#128275;':'&#128274;')+'</button>':'')
+      +(u.id!==CU.id?'<button onclick="delUser(\&apos;'+u.id+'\&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:4px 9px;font-size:12px">&#128465;</button>':'')
+      +'</div></div>';
+  }
+  var rolesH='';var allRoles=getAllRoles();
+  for(var i=0;i<allRoles.length;i++){
+    var r=allRoles[i];
+    var pageLabels=[];for(var j=0;j<r.pages.length;j++){for(var k=0;k<ALLPAGES.length;k++){if(ALLPAGES[k].id===r.pages[j]){pageLabels.push(ALLPAGES[k].label);break;}}}
+    var rTag2=r.id==='adm'?'to':r.id==='caixa'?'tb':r.id==='motorista'?'tp':'tgr';
+    rolesH+='<div style="background:var(--bg);border:1px solid var(--bd);border-radius:var(--r);padding:13px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px">'
+      +'<span class="tag '+rTag2+'">'+r.nome+'</span>'
+      +'<div style="display:flex;gap:5px">'
+      +'<button onclick="mEditRole(\&apos;'+r.id+'\&apos;)" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:5px;padding:3px 8px;font-size:11px">&#9998; Editar</button>'
+      +'<button onclick="delRole(\&apos;'+r.id+'\&apos;)" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:5px;padding:3px 8px;font-size:11px">&#128465;</button>'
+      +'</div></div>'
+      +'<div style="font-size:11px;color:var(--mt);line-height:1.7">Acesso: '+pageLabels.join(', ')+'</div>'
+      +'</div>';
+  }
+  // Sub-tabs: Usuarios / Funcoes
+  var tabBar='<div style="display:flex;gap:5px;margin-bottom:14px">'
+    +'<button class="tabbtn'+(uTab==='users'?' on':'')+'" onclick="_cfgUSwTab(\&apos;users\&apos;)">&#128101; Usuarios</button>'
+    +'<button class="tabbtn'+(uTab==='roles'?' on':'')+'" onclick="_cfgUSwTab(\&apos;roles\&apos;)">&#128274; Funcoes</button>'
+    +(uTab==='users'?'<button class="btn" style="margin-left:auto;font-size:12px;padding:6px 12px" onclick="mNovoUser()">+ Novo Usuario</button>'
+      :'<button class="btn" style="margin-left:auto;font-size:12px;padding:6px 12px" onclick="mNovaRole()">+ Nova Funcao</button>')
+    +'</div>';
+  var body=uTab==='users'
+    ?'<div class="fc">'+usersH+'</div>'
+    :'<div class="g2">'+rolesH+'</div>';
+  return '<div class="card">'
+    +_cfgSectionHeader('&#128101;','Usuarios e Permissoes','Gerencie os usuarios e funcoes de acesso ao sistema')
+    +'<div style="padding:14px">'+tabBar+body+'</div>'
+    +'</div>';
+}
+function _cfgUSwTab(t){
+  window._cfgUTab=t;
+  window._uTab=t;
+  if(pgAtiva==='configuracoes'&&cfgAba==='usuarios'){
+    document.getElementById('ct').innerHTML=_breadcrumb('configuracoes')+pgConfig();
+    if(typeof _cfgBindAll==='function')_cfgBindAll();
+  } else {
+    go('usuarios');
+  }
+}
+function cfgSectionHeader(ico,titulo,sub){return _cfgSectionHeader(ico,titulo,sub);}
 function _cfgSectionHeader(ico,titulo,sub){
   return '<div style="display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid var(--bd)">'
     +'<div style="width:30px;height:30px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">'+ico+'</div>'
