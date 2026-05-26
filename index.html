@@ -756,6 +756,14 @@ function _applySnap(s){
   if(s.contasFixas)DB.contasFixas=s.contasFixas;
   if(s.filtrosMat&&s.filtrosMat.length)DB.filtrosMat=s.filtrosMat;
   if(s.concorrentes)DB.concorrentes=s.concorrentes;
+  // Garante que as Tabelas Padrão sempre existam (migração de versões antigas)
+  var temPadVenda=false,temPadCompra=false;
+  for(var i=0;i<DB.tabelas.length;i++){
+    if(DB.tabelas[i].nome.toLowerCase()==='padrao'&&DB.tabelas[i].tipo==='venda')temPadVenda=true;
+    if(DB.tabelas[i].nome.toLowerCase()==='padrao'&&DB.tabelas[i].tipo==='compra')temPadCompra=true;
+  }
+  if(!temPadVenda) DB.tabelas.unshift({id:nid(),nome:'Padrao',tipo:'venda', itens:[]});
+  if(!temPadCompra)DB.tabelas.push( {id:nid(),nome:'Padrao',tipo:'compra',itens:[]});
 }
 function autoSave(){if(_dbSaveTimer)clearTimeout(_dbSaveTimer);_dbSaveTimer=setTimeout(saveDB,400);}
 function pgPesagem(){
@@ -765,7 +773,15 @@ function pgPesagem(){
   return '<div id="pes-ct"></div>';
 }
 function novaPesAba(){
-  pesAbas.push({id:nid(),label:'Atend.'+(pesAbas.length+1),tipo:'Compra',cliId:'',tabId:null,itens:[],obs:'',showUnit:false});
+  // Auto-seleciona a Tabela Padrão do tipo correspondente (Compra por padrão)
+  var tipoDefault='Compra';
+  var tabPadraoId=null;
+  for(var i=0;i<DB.tabelas.length;i++){
+    if(DB.tabelas[i].nome.toLowerCase()==='padrao'&&DB.tabelas[i].tipo==='compra'){
+      tabPadraoId=DB.tabelas[i].id;break;
+    }
+  }
+  pesAbas.push({id:nid(),label:'Atend.'+(pesAbas.length+1),tipo:tipoDefault,cliId:'',tabId:tabPadraoId,itens:[],obs:'',showUnit:false});
   pesAtiva=pesAbas.length-1;savePesState();renderPesagem();
 }
 function renderPesagem(){
@@ -785,10 +801,15 @@ function renderPesagem(){
   }
   var cliO='<option value="">Avulso</option>';
   for(var i=0;i<DB.clientes.length;i++){var c=DB.clientes[i];cliO+='<option value="'+c.id+'"'+(ab.cliId==c.id?' selected':'')+'>'+c.nome+'</option>';}
-  var tabO='<option value="">Padrão</option>';
+  var tabO='';
   var tipoTabFiltro=ab.tipo==='Compra'?'compra':'venda';
-  for(var i=0;i<DB.tabelas.length;i++){var t=DB.tabelas[i];if(t.tipo!==tipoTabFiltro)continue;tabO+='<option value="'+t.id+'"'+(ab.tabId&&String(ab.tabId)===String(t.id)?' selected':'')+'>'+t.nome+'</option>';}
-  var tabNome='Padrao';if(ab.tabId){for(var i=0;i<DB.tabelas.length;i++){if(String(DB.tabelas[i].id)===String(ab.tabId)){tabNome=DB.tabelas[i].nome;break;}}}
+  // Encontra tabela Padrão do tipo atual para marcar como default
+  var tabPadraoIdPes=null;
+  for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].nome.toLowerCase()==='padrao'&&DB.tabelas[i].tipo===tipoTabFiltro){tabPadraoIdPes=DB.tabelas[i].id;break;}}
+  // Se não há tabela selecionada, seleciona a Padrão
+  if(!ab.tabId&&tabPadraoIdPes)ab.tabId=tabPadraoIdPes;
+  for(var i=0;i<DB.tabelas.length;i++){var t=DB.tabelas[i];if(t.tipo!==tipoTabFiltro)continue;tabO+='<option value="'+t.id+'"'+(ab.tabId&&String(ab.tabId)===String(t.id)?' selected':'')+'>'+t.nome+(t.nome.toLowerCase()==='padrao'?' ⭐':'')+'</option>';}
+  var tabNome='Padrão';if(ab.tabId){for(var i=0;i<DB.tabelas.length;i++){if(String(DB.tabelas[i].id)===String(ab.tabId)){tabNome=DB.tabelas[i].nome;break;}}}
   // Build card list for custom dropdown product picker
   var prodCards='';
   var tabNomeGlobal='Padrao';if(ab.tabId){for(var j=0;j<DB.tabelas.length;j++){if(String(DB.tabelas[j].id)===String(ab.tabId)){tabNomeGlobal=DB.tabelas[j].nome;break;}}}
@@ -951,8 +972,18 @@ function delPesAba(e,i){e.stopPropagation();pesAbas.splice(i,1);if(pesAtiva>=pes
 function setPesTipo(t){
   var ab=pesAbas[pesAtiva];
   ab.tipo=t;ab.showUnit=false;
-  // Reset tabela if it doesn't match the new tipo
-  if(ab.tabId){var tipoTab=t==='Compra'?'compra':'venda';var found=false;for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].id==ab.tabId&&DB.tabelas[i].tipo===tipoTab){found=true;break;}}if(!found)ab.tabId=null;}
+  // Reset tabela se o tipo não combinar, e auto-seleciona a Padrão do novo tipo
+  var tipoTab=t==='Compra'?'compra':'venda';
+  var tabPadraoId=null;
+  for(var i=0;i<DB.tabelas.length;i++){
+    if(DB.tabelas[i].nome.toLowerCase()==='padrao'&&DB.tabelas[i].tipo===tipoTab){
+      tabPadraoId=DB.tabelas[i].id;break;
+    }
+  }
+  // Se havia uma tabela que não combina com o novo tipo, reseta
+  if(ab.tabId){var found=false;for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].id==ab.tabId&&DB.tabelas[i].tipo===tipoTab){found=true;break;}}if(!found)ab.tabId=tabPadraoId;}
+  // Se não havia tabela selecionada, auto-seleciona a Padrão
+  if(!ab.tabId)ab.tabId=tabPadraoId;
   savePesState();renderPesagem();
 }
 function setPesVw(v){pesAbas[pesAtiva].showUnit=v;savePesState();renderPesagem();}
@@ -2498,6 +2529,36 @@ function pgDash(){
   for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa')caixaFis=DB.contas[i].saldo;}
   var cxAb=caixaAberto();
 
+  // ── Movimentações do caixa do dia para o dashboard ──
+  var cxEntradas=0,cxSaidas=0,cxSangrias=0,cxReforcos=0,cxAtends=0;
+  var cxMovsHoje=[];
+  if(DB.caixaDia&&DB.caixaDia.movimentos){
+    var _cm=DB.caixaDia.movimentos;
+    cxAtends=_cm.length;
+    for(var _i=0;_i<_cm.length;_i++){
+      var _mv=_cm[_i];
+      cxEntradas+=_mv.venda||0;
+      cxSaidas+=_mv.compra||0;
+      cxMovsHoje.push(_mv);
+    }
+  }
+  if(DB.caixaDia&&DB.caixaDia.sangrias){
+    for(var _i=0;_i<DB.caixaDia.sangrias.length;_i++)cxSangrias+=DB.caixaDia.sangrias[_i].valor||0;
+  }
+  if(DB.caixaDia&&DB.caixaDia.reforcos){
+    for(var _i=0;_i<DB.caixaDia.reforcos.length;_i++)cxReforcos+=DB.caixaDia.reforcos[_i].valor||0;
+  }
+  // Totais financeiros do dia (de DB.movs com data de hoje)
+  var _hjStr=hj();
+  var cxEntDia=0,cxSaiDia=0;
+  for(var _i=0;_i<DB.movs.length;_i++){
+    var _m=DB.movs[_i];
+    if(_m.data===_hjStr){
+      if(_m.tipo==='entrada')cxEntDia+=_m.valor;
+      else cxSaiDia+=_m.valor;
+    }
+  }
+
   // ── Período selecionado ──
   var per=_dashPer;
   var perRes=_entrPeriodo(per);
@@ -2617,9 +2678,16 @@ function pgDash(){
     // Card caixa físico → Caixa do Dia
     +'<div class="card" style="'+dcc+'background:linear-gradient(135deg,var(--s1),rgba(34,197,94,0.04));border-color:rgba(34,197,94,0.15)" onclick="go(\&apos;caixa_dia\&apos;)" title="Ver Caixa do Dia" '+dca+'>'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
-    +'<div><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">Caixa Fisico <span style="color:var(--gr);opacity:.6">›</span></div>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">Caixa Fisico <span style="color:var(--gr);opacity:.6">›</span></div>'
     +'<div style="font-size:22px;font-weight:800;color:var(--gr);font-family:monospace;line-height:1">'+fR(caixaFis)+'</div>'
-    +'<div style="margin-top:4px">'+cxBadge+'</div></div>'
+    +'<div style="margin-top:4px">'+cxBadge+'</div>'
+    +(cxAb?'<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">'
+      +'<span style="font-size:10px;color:var(--gr);font-family:monospace">&#8599; '+fR(cxEntDia)+'</span>'
+      +'<span style="font-size:10px;color:var(--rd);font-family:monospace">&#8600; '+fR(cxSaiDia)+'</span>'
+      +(cxSangrias>0?'<span style="font-size:10px;color:var(--or);font-family:monospace">&#10548; '+fR(cxSangrias)+'</span>':'')
+      +(cxAtends>0?'<span style="font-size:10px;color:var(--mt)">'+cxAtends+' atend.</span>':'')
+      +'</div>':'')
+    +'</div>'
     +'<span style="font-size:22px;opacity:.4">&#128181;</span></div></div>'
 
     // Card coletas hoje → Agenda
@@ -2633,6 +2701,36 @@ function pgDash(){
 
     // Card Pesagens em Aberto (se houver)
     +_dashPendCard()
+
+    // ── Card Resumo Financeiro do Dia ──
+    +(cxAb||cxAtends>0||cxEntDia>0||cxSaiDia>0?(function(){
+      var _ultMovsH='';
+      var _ultMvs=[];
+      for(var _i=0;_i<DB.movs.length&&_ultMvs.length<5;_i++){if(DB.movs[_i].data===_hjStr)_ultMvs.push(DB.movs[_i]);}
+      if(_ultMvs.length){
+        for(var _i=0;_i<_ultMvs.length;_i++){
+          var _mv=_ultMvs[_i];var _e=_mv.tipo==='entrada';
+          _ultMovsH+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd)">'
+            +'<div style="width:3px;height:28px;background:'+(_e?'var(--gr)':'var(--rd)')+';border-radius:2px;flex-shrink:0"></div>'
+            +'<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_mv.desc+'</div>'
+            +'<div style="font-size:10px;color:var(--mt)">'+_mv.conta+' · '+(_mv.cat||'')+'</div></div>'
+            +'<div style="font-size:12px;font-weight:700;color:'+(_e?'var(--gr)':'var(--rd)')+';font-family:monospace;flex-shrink:0">'+(_e?'+':'-')+fR(_mv.valor)+'</div>'
+            +'</div>';
+        }
+      } else {
+        _ultMovsH='<div style="font-size:12px;color:var(--mt);padding:8px 0;text-align:center">Nenhuma movimentacao financeira hoje.</div>';
+      }
+      return '<div class="card" style="'+dcc+'" onclick="go(\&apos;financeiro\&apos;)" title="Ver Financeiro" '+dca+'>'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+        +'<div class="stl" style="margin-bottom:0"><div class="stb" style="background:var(--or)"></div><div class="stx">Financeiro Hoje <span style="color:var(--or);opacity:.6;font-size:10px">›</span></div></div>'
+        +'<div style="display:flex;gap:12px">'
+        +'<div style="text-align:right"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Entradas</div><div style="font-size:13px;font-weight:700;color:var(--gr);font-family:monospace">+'+fR(cxEntDia)+'</div></div>'
+        +'<div style="text-align:right"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Saidas</div><div style="font-size:13px;font-weight:700;color:var(--rd);font-family:monospace">-'+fR(cxSaiDia)+'</div></div>'
+        +'<div style="text-align:right"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Saldo</div><div style="font-size:13px;font-weight:700;color:'+(cxEntDia-cxSaiDia>=0?'var(--gr)':'var(--rd)')+';font-family:monospace">'+fR(cxEntDia-cxSaiDia)+'</div></div>'
+        +'</div></div>'
+        +_ultMovsH
+        +'</div>';
+    })():'')
 
     // Linha 1: Entradas por período (barras) + Evolução estoque (linha)
     +'<div class="g2">'
@@ -3094,16 +3192,18 @@ function salvarTodosPrecos(){
     var novoVV=parseFloat(inpVV.value)||0;
     var novoVC=parseFloat(inpVC.value)||0;
     var antigoVV=p.vV;
+    var antigoVC=p.vC;
     if(novoVV!==p.vV||novoVC!==p.vC){
       p.vV=novoVV;p.vC=novoVC;mudados++;
-      // Atualiza tabela Padrao se venda mudou
-      if(novoVV!==antigoVV){
-        for(var j=0;j<DB.tabelas.length;j++){
-          if(DB.tabelas[j].nome==='Padrao'&&DB.tabelas[j].tipo==='venda'){
-            var tab=DB.tabelas[j];var found=false;
-            for(var k=0;k<tab.itens.length;k++){if(tab.itens[k].pId===p.id){tab.itens[k].preco=novoVV;found=true;break;}}
-            if(!found)tab.itens.push({pId:p.id,preco:novoVV});
-            break;
+      // Atualiza Tabelas Padrão (mão dupla: Estoque→Tabela)
+      for(var j=0;j<DB.tabelas.length;j++){
+        if(DB.tabelas[j].nome.toLowerCase()==='padrao'){
+          var tab=DB.tabelas[j];var found=false;
+          var precoNovo=tab.tipo==='venda'?novoVV:novoVC;
+          var precoAntigo=tab.tipo==='venda'?antigoVV:antigoVC;
+          if(precoNovo!==precoAntigo){
+            for(var k=0;k<tab.itens.length;k++){if(tab.itens[k].pId===p.id){tab.itens[k].preco=precoNovo;found=true;break;}}
+            if(!found)tab.itens.push({pId:p.id,preco:precoNovo});
           }
         }
       }
@@ -3113,11 +3213,12 @@ function salvarTodosPrecos(){
   var st=document.getElementById('prec-status');
   var btn=document.getElementById('btn-salvar-precos');
   if(mudados>0){
-    if(st){st.style.display='block';st.style.color='var(--gr)';st.textContent='&#10003; '+mudados+' produto(s) atualizados! Tabela Padrao sincronizada.';}
-    if(btn){btn.textContent='&#10003; Salvo!';btn.style.background='var(--gr2)';}
+    if(st){st.style.display='block';st.style.color='var(--gr)';st.textContent='✓ '+mudados+' produto(s) atualizados! Tabelas Padrão sincronizadas.';}
+    if(btn){btn.textContent='✓ Salvo!';btn.style.background='var(--gr2)';}
   }else{
-    if(st){st.style.display='block';st.style.color='var(--mt)';st.textContent='Nenhuma alteracao detectada.';}
+    if(st){st.style.display='block';st.style.color='var(--mt)';st.textContent='Nenhuma alteração detectada.';}
   }
+  saveDB();
   setTimeout(function(){
     var s=document.getElementById('prec-status');if(s)s.style.display='none';
   },3000);
@@ -3196,7 +3297,27 @@ function mNovoProd(){
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveNP()">Cadastrar</button></div>'
     +'</div>',480);
 }
-function saveNP(){var n=document.getElementById('np-n').value.trim();if(!n){alert('Informe o nome!');return;}var ic=document.getElementById('np-ic-val').value||'📦';DB.produtos.push({id:nid(),nome:n,ic:ic,vV:parseFloat(document.getElementById('np-vv').value)||0,vC:parseFloat(document.getElementById('np-vc').value)||0,est:0,cat:document.getElementById('np-c').value});saveDB();closeM();go('estoque');}
+function saveNP(){
+  var n=document.getElementById('np-n').value.trim();
+  if(!n){alert('Informe o nome!');return;}
+  var ic=document.getElementById('np-ic-val').value||'📦';
+  var vV=parseFloat(document.getElementById('np-vv').value)||0;
+  var vC=parseFloat(document.getElementById('np-vc').value)||0;
+  var newProd={id:nid(),nome:n,ic:ic,vV:vV,vC:vC,est:0,cat:document.getElementById('np-c').value};
+  DB.produtos.push(newProd);
+  // Auto-adiciona à Tabela Padrão de venda e compra
+  for(var j=0;j<DB.tabelas.length;j++){
+    if(DB.tabelas[j].nome.toLowerCase()==='padrao'){
+      var tab=DB.tabelas[j];var found=false;
+      for(var k=0;k<tab.itens.length;k++){if(tab.itens[k].pId===newProd.id){found=true;break;}}
+      if(!found){
+        var precoAdd=tab.tipo==='venda'?vV:vC;
+        tab.itens.push({pId:newProd.id,preco:precoAdd});
+      }
+    }
+  }
+  saveDB();closeM();go('estoque');
+}
 function mEditProd(id){
   var p=gP(id);if(!p)return;
   var catO='';
@@ -3232,18 +3353,20 @@ function saveEditProd(id){
   var novoVV=parseFloat(document.getElementById('ep-vv').value)||0;
   var novoVC=parseFloat(document.getElementById('ep-vc').value)||0;
   var antigoVV=p.vV;
+  var antigoVC=p.vC;
   p.nome=novoNome;
   p.ic=document.getElementById('ep-ic-val').value||p.ic;
   p.cat=document.getElementById('ep-c').value;
   p.vV=novoVV;p.vC=novoVC;
-  // Atualiza tabela Padrao automaticamente se o preco de venda mudou
-  if(novoVV!==antigoVV){
-    for(var i=0;i<DB.tabelas.length;i++){
-      if(DB.tabelas[i].nome==='Padrao'&&DB.tabelas[i].tipo==='venda'){
-        var tab=DB.tabelas[i];var found=false;
-        for(var j=0;j<tab.itens.length;j++){if(tab.itens[j].pId===id){tab.itens[j].preco=novoVV;found=true;break;}}
-        if(!found)tab.itens.push({pId:id,preco:novoVV});
-        break;
+  // Atualiza tabela Padrao automaticamente (mão dupla: Estoque→Tabela)
+  for(var i=0;i<DB.tabelas.length;i++){
+    if(DB.tabelas[i].nome.toLowerCase()==='padrao'){
+      var tab=DB.tabelas[i];var found=false;
+      var precoNovo=tab.tipo==='venda'?novoVV:novoVC;
+      var precoAntigo=tab.tipo==='venda'?antigoVV:antigoVC;
+      if(precoNovo!==precoAntigo){
+        for(var j=0;j<tab.itens.length;j++){if(tab.itens[j].pId===id){tab.itens[j].preco=precoNovo;found=true;break;}}
+        if(!found)tab.itens.push({pId:id,preco:precoNovo});
       }
     }
   }
@@ -3990,19 +4113,47 @@ function _finContas(){
   var contH='';
   for(var i=0;i<DB.contas.length;i++){
     var c=DB.contas[i];
-    contH+='<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:var(--s2);border-radius:var(--r);margin-bottom:8px;border:1px solid var(--bd)">'
+    // Calcular entradas/saidas dessa conta via DB.movs
+    var cEnt=0,cSai=0,cMovs=[];
+    var _movsFilt=_filtrarMovsPeriodo(DB.movs);
+    for(var j=0;j<_movsFilt.length;j++){
+      if(_movsFilt[j].conta===c.nome){
+        if(_movsFilt[j].tipo==='entrada')cEnt+=_movsFilt[j].valor;
+        else cSai+=_movsFilt[j].valor;
+        if(cMovs.length<4)cMovs.push(_movsFilt[j]);
+      }
+    }
+    var cUltH='';
+    for(var k=0;k<cMovs.length;k++){
+      var mv=cMovs[k];var mEnt=mv.tipo==='entrada';
+      cUltH+='<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--bd)">'
+        +'<div style="flex:1;min-width:0"><div style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+mv.desc+'</div>'
+        +'<div style="font-size:10px;color:var(--mt)">'+mv.data+' · '+(mv.cat||'')+'</div></div>'
+        +'<span style="font-size:12px;font-weight:700;color:'+(mEnt?'var(--gr)':'var(--rd)')+';font-family:monospace;margin-left:8px;flex-shrink:0">'+(mEnt?'+':'-')+fR(mv.valor)+'</span>'
+        +'</div>';
+    }
+    contH+='<div style="background:var(--s2);border-radius:var(--r);margin-bottom:10px;border:1px solid var(--bd);overflow:hidden">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 13px;cursor:pointer" onclick="this.parentElement.querySelector(\'.cx-mov-list\').style.display=this.parentElement.querySelector(\'.cx-mov-list\').style.display===\'none\'?\'block\':\'none\'">'
       +'<div style="display:flex;gap:10px;align-items:center"><span style="font-size:22px">'+c.ic+'</span>'
-      +'<div><div style="font-size:13px;font-weight:600">'+c.nome+'</div><div style="font-size:11px;color:var(--mt)">'+c.tipo+'</div></div></div>'
+      +'<div><div style="font-size:13px;font-weight:600">'+c.nome+'</div>'
+      +'<div style="font-size:10px;color:var(--mt)">'+c.tipo+' &nbsp;·&nbsp; <span style="color:var(--gr)">+'+fR(cEnt)+'</span> <span style="color:var(--rd)">-'+fR(cSai)+'</span> <span style="color:var(--mt);font-size:9px">no periodo</span></div></div></div>'
       +'<div style="display:flex;align-items:center;gap:8px">'
-      +'<span style="font-size:16px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(c.saldo)+'</span>'
-      +'<button onclick="mEditConta('+c.id+')" style="background:none;border:none;color:var(--mt);font-size:15px;cursor:pointer;padding:2px 5px" title="Editar">&#9998;</button>'
-      +(DB.contas.length>1?'<button onclick="delConta('+c.id+')" style="background:none;border:none;color:var(--mt);font-size:13px;cursor:pointer;padding:2px 5px" title="Excluir">&#128465;</button>':'')
-      +'</div></div>';
+      +'<span style="font-size:16px;font-weight:700;color:'+(c.saldo>=0?'var(--gr)':'var(--rd)')+';font-family:monospace">'+fR(c.saldo)+'</span>'
+      +'<button onclick="event.stopPropagation();mEditConta('+c.id+')" style="background:none;border:none;color:var(--mt);font-size:15px;cursor:pointer;padding:2px 5px" title="Editar">&#9998;</button>'
+      +(DB.contas.length>1?'<button onclick="event.stopPropagation();delConta('+c.id+')" style="background:none;border:none;color:var(--mt);font-size:13px;cursor:pointer;padding:2px 5px" title="Excluir">&#128465;</button>':'')
+      +'<span style="font-size:11px;color:var(--mt)">&#9660;</span>'
+      +'</div></div>'
+      +'<div class="cx-mov-list" style="display:none;padding:0 13px 8px">'
+      +(cUltH||'<div style="font-size:11px;color:var(--mt);padding:8px 0;text-align:center">Nenhuma movimentacao no periodo.</div>')
+      +(cMovs.length>=4?'<div style="text-align:center;padding:4px 0"><button onclick="finTab(\&apos;movs\&apos;)" style="background:none;border:none;color:var(--bl);font-size:11px;cursor:pointer">ver todas as movimentacoes ›</button></div>':'')
+      +'</div>'
+      +'</div>';
   }
   return '<div class="fc">'
     +'<div class="card" style="text-align:center;background:var(--grb);border-color:rgba(34,197,94,.3)">'
     +'<div style="font-size:11px;color:var(--mt);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">Saldo Total</div>'
     +'<div style="font-size:28px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(sal)+'</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-top:4px">Clique em cada conta para ver as movimentacoes do periodo</div>'
     +'</div>'
     +'<div class="card">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
@@ -6033,21 +6184,22 @@ var _gTabs=[
 var _gPreview=false;
 
 function _gGetBasePrecos(){
-  // Retorna {pId, nome, ic, preco} para todos os produtos da base selecionada
+  // Retorna {pId, nome, ic, preco} SOMENTE para produtos da tabela base selecionada
+  // ou, se nenhuma selecionada, da Tabela Padrão de venda (Tabela Referência)
   var result=[];
+  var tabBase=null;
   if(_gBase){
-    var tab=null;for(var i=0;i<DB.tabelas.length;i++){if(String(DB.tabelas[i].id)===String(_gBase)){tab=DB.tabelas[i];break;}}
-    if(tab){
-      for(var j=0;j<tab.itens.length;j++){
-        var p=gP(tab.itens[j].pId);
-        if(p)result.push({pId:p.id,nome:p.nome,ic:p.ic,preco:tab.itens[j].preco});
-      }
-    }
+    for(var i=0;i<DB.tabelas.length;i++){if(String(DB.tabelas[i].id)===String(_gBase)){tabBase=DB.tabelas[i];break;}}
   } else {
-    // Manual: todos os produtos com vV
-    for(var i=0;i<DB.produtos.length;i++){
-      var p=DB.produtos[i];
-      if(p.vV>0)result.push({pId:p.id,nome:p.nome,ic:p.ic,preco:p.vV});
+    // Usa a Tabela Padrão de venda como referência
+    for(var i=0;i<DB.tabelas.length;i++){
+      if(DB.tabelas[i].nome.toLowerCase()==='padrao'&&DB.tabelas[i].tipo==='venda'){tabBase=DB.tabelas[i];break;}
+    }
+  }
+  if(tabBase){
+    for(var j=0;j<tabBase.itens.length;j++){
+      var p=gP(tabBase.itens[j].pId);
+      if(p&&tabBase.itens[j].preco>0)result.push({pId:p.id,nome:p.nome,ic:p.ic,preco:tabBase.itens[j].preco});
     }
   }
   return result;
@@ -6078,6 +6230,41 @@ function _gSetTipoVal(key,tv){for(var i=0;i<_gTabs.length;i++){if(_gTabs[i].key=
 function _gSetValGeral(key,v){for(var i=0;i<_gTabs.length;i++){if(_gTabs[i].key===key){_gTabs[i].valGeral=parseFloat(v)||0;break;}};}
 function _gSetProdVal(key,pId,campo,v){for(var i=0;i<_gTabs.length;i++){if(_gTabs[i].key===key){if(!_gTabs[i].porProd[pId])_gTabs[i].porProd[pId]={tipo:'pct',val:0};_gTabs[i].porProd[pId][campo]=(campo==='tipo'?v:(parseFloat(v)||0));break;}};}
 function _gShowPreview(){_gPreview=true;go('tabelas');}
+
+function _gAbrirPreviewModal(key){
+  var cfg=null;
+  for(var i=0;i<_gTabs.length;i++){if(_gTabs[i].key===key){cfg=_gTabs[i];break;}}
+  if(!cfg)return;
+  var base=window._gPreviewData?window._gPreviewData.base:_gGetBasePrecos();
+  var tIdx=_gTabs.indexOf(cfg);
+  var corMap={amarela:'#b45309',azul:'#1d4ed8',verde:'#15803d',preta:'#1e293b',dourada:'#a16207'};
+  var hexCor=corMap[cfg.key]||cfg.cor;
+  var rows='';
+  var totalItens=0;
+  for(var bi=0;bi<base.length;bi++){
+    var bpr=base[bi];
+    var pc=_gCalcPreco(tIdx,bpr.pId,bpr.preco);
+    if(pc<0)pc=0;
+    var pctLucro=bpr.preco>0?((bpr.preco-pc)/bpr.preco*100):0;
+    totalItens++;
+    rows+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--bg);border:1px solid rgba(255,255,255,.08);border-radius:7px;margin-bottom:5px">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<span style="font-size:18px">'+bpr.ic+'</span>'
+      +'<div>'
+      +'<div style="font-size:13px;font-weight:600;color:var(--tx)">'+bpr.nome+'</div>'
+      +'<div style="font-size:10px;color:var(--mt)">Base venda: '+fR(bpr.preco)+'/kg &middot; lucro '+pctLucro.toFixed(1)+'%</div>'
+      +'</div></div>'
+      +'<span style="font-size:14px;font-weight:700;color:#fff;font-family:monospace;background:'+hexCor+';padding:3px 9px;border-radius:6px">'+fR(pc)+'/kg</span>'
+      +'</div>';
+  }
+  openM(cfg.emoji+' Tabela '+cfg.nome+' — Preview completo',
+    '<div class="mf">'
+    +'<div style="height:4px;border-radius:3px;background:'+hexCor+';margin-bottom:10px"></div>'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:10px">'+totalItens+' produto(s) · ordenado pela Tabela Referência de Venda · valores calculados, ainda não gerado</div>'
+    +'<div style="max-height:55vh;overflow-y:auto;padding-right:2px">'+rows+'</div>'
+    +'<div class="brow" style="margin-top:12px"><button class="btnO bOgr" onclick="closeM()">Fechar</button></div>'
+    +'</div>',500);
+}
 
 function _gGerar(){
   var base=_gGetBasePrecos();
@@ -6139,6 +6326,55 @@ function buildGerarTabelas(){
     var isModoGeral=cfg.modo==='geral';
     var isTipoPct=cfg.tipoVal==='pct';
 
+    // Verifica se a tabela já existe no banco
+    var tabExistObj=null;
+    for(var k=0;k<DB.tabelas.length;k++){
+      if(DB.tabelas[k].nome.toLowerCase()===('tabela '+cfg.nome).toLowerCase()&&DB.tabelas[k].tipo==='compra'){
+        tabExistObj=DB.tabelas[k];break;
+      }
+    }
+    var jaExiste=tabExistObj!==null;
+
+    // ── Bloco "Valores Atuais" (antes x depois) quando tabela já existe ──
+    var atualBlock='';
+    if(jaExiste && isAtivo && base.length){
+      var atualRowsVis='';
+      var atualRowsHid='';
+      var ALIM=5;
+      for(var bi=0;bi<base.length;bi++){
+        var bprod=base[bi];
+        var precoAtual=null;
+        for(var ki=0;ki<tabExistObj.itens.length;ki++){if(tabExistObj.itens[ki].pId===bprod.pId){precoAtual=tabExistObj.itens[ki].preco;break;}}
+        var precoNovo=_gCalcPreco(ti,bprod.pId,bprod.preco);
+        if(precoNovo<0)precoNovo=0;
+        var diff=precoAtual!==null?precoNovo-precoAtual:null;
+        var diffColor=diff===null?'var(--mt)':diff>0?'#86efac':diff<0?'#fca5a5':'var(--mt)';
+        var pctAtual=precoAtual!==null&&bprod.preco>0?((1-(precoAtual/bprod.preco))*100):null;
+        var pctNovo=bprod.preco>0?((1-(precoNovo/bprod.preco))*100):null;
+        var rowH='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:6px;align-items:center;padding:5px 8px;background:rgba(0,0,0,.15);border-radius:6px">'
+          +'<span style="font-size:12px;color:var(--tx)">'+bprod.ic+' '+bprod.nome+'</span>'
+          +(precoAtual!==null?'<span style="font-size:11px;font-family:monospace;color:var(--mt)">Atual: R$ '+precoAtual.toLocaleString('pt-BR',{minimumFractionDigits:2})+(pctAtual!==null?' (−'+pctAtual.toFixed(1)+'%)':'')+'</span>':'<span style="font-size:11px;color:var(--mt)">— não estava</span>')
+          +'<span style="font-size:13px;color:var(--mt)">→</span>'
+          +'<span style="font-size:11px;font-family:monospace;color:#86efac">Novo: R$ '+precoNovo.toLocaleString('pt-BR',{minimumFractionDigits:2})+(pctNovo!==null?' (−'+pctNovo.toFixed(1)+'%)':'')+'</span>'
+          +(diff!==null?'<span style="font-size:11px;font-family:monospace;color:'+diffColor+';font-weight:700">'+(diff>=0?'+':'')+diff.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>':'<span></span>')
+          +'</div>';
+        if(bi<ALIM)atualRowsVis+=rowH;
+        else atualRowsHid+=rowH;
+      }
+      var expandId='atexp-'+cfg.key;
+      var expandBtn='';
+      if(base.length>ALIM){
+        expandBtn='<button id="btn-'+expandId+'" onclick="var e=document.getElementById(\''+expandId+'\');var b=document.getElementById(\'btn-'+expandId+'\');if(e.style.display===\'none\'){e.style.display=\'flex\';b.textContent=\'▲ Recolher\';}else{e.style.display=\'none\';b.textContent=\'▼ Ver todos os '+base.length+' produtos\';}" '
+          +'style="width:100%;margin-top:6px;background:rgba(255,255,255,.06);border:1px solid var(--bd);border-radius:6px;padding:6px;color:var(--mt);font-size:11px;font-weight:600;cursor:pointer">▼ Ver todos os '+base.length+' produtos</button>'
+          +'<div id="'+expandId+'" style="display:none;flex-direction:column;gap:4px;margin-top:4px">'+atualRowsHid+'</div>';
+      }
+      atualBlock='<div style="margin-top:10px;border-top:1px solid var(--bd);padding-top:10px">'
+        +'<div style="font-size:10px;color:var(--or);text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:6px">⚡ Tabela já existe — Comparação Antes × Depois</div>'
+        +'<div style="display:flex;flex-direction:column;gap:4px">'+atualRowsVis+'</div>'
+        +expandBtn
+        +'</div>';
+    }
+
     // Configuração por produto
     var prodRows='';
     if(!isModoGeral && base.length){
@@ -6148,8 +6384,12 @@ function buildGerarTabelas(){
         var ppconf=cfg.porProd[bprod.pId]||{tipo:'pct',val:0};
         var precoCalc=_gCalcPreco(ti,bprod.pId,bprod.preco);
         if(precoCalc<0)precoCalc=0;
+        // Preço atual na tabela existente (por produto)
+        var precoAtualProd=null;
+        if(jaExiste){for(var ki=0;ki<tabExistObj.itens.length;ki++){if(tabExistObj.itens[ki].pId===bprod.pId){precoAtualProd=tabExistObj.itens[ki].preco;break;}}}
+        var pctAtualProd=precoAtualProd!==null&&bprod.preco>0?((1-(precoAtualProd/bprod.preco))*100):null;
         prodRows+='<div style="display:grid;grid-template-columns:1fr 80px 90px auto;gap:5px;align-items:center;background:rgba(0,0,0,.2);padding:6px 8px;border-radius:7px">'
-          +'<span style="font-size:12px;color:var(--tx)">'+bprod.ic+' '+bprod.nome+'<br><span style="color:var(--mt);font-size:10px">Venda: R$ '+bprod.preco.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span></span>'
+          +'<span style="font-size:12px;color:var(--tx)">'+bprod.ic+' '+bprod.nome+'<br><span style="color:var(--mt);font-size:10px">Venda: R$ '+bprod.preco.toLocaleString('pt-BR',{minimumFractionDigits:2})+(jaExiste&&precoAtualProd!==null?' · Atual: R$ '+precoAtualProd.toLocaleString('pt-BR',{minimumFractionDigits:2})+(pctAtualProd!==null?' (−'+pctAtualProd.toFixed(1)+'%)':''):'')+'</span></span>'
           +'<select class="inp" style="padding:4px 6px;font-size:11px" onchange="_gSetProdVal(\''+cfg.key+'\','+bprod.pId+',\'tipo\',this.value)">'
           +'<option value="pct"'+(ppconf.tipo==='pct'?' selected':'')+'>%</option>'
           +'<option value="rs"'+(ppconf.tipo==='rs'?' selected':'')+'>R$</option>'
@@ -6158,7 +6398,7 @@ function buildGerarTabelas(){
           +'<span style="font-size:11px;font-family:monospace;color:#86efac;white-space:nowrap">= R$ '+precoCalc.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</span>'
           +'</div>';
       }
-      prodRows+='</div>';
+      prodRows+=atualBlock+'</div>';
     }
 
     // Lucro médio geral para preview
@@ -6175,7 +6415,7 @@ function buildGerarTabelas(){
     }
 
     tabCards+='<div style="background:var(--s2);border:2px solid '+(isAtivo?cfg.cor:'var(--bd)')+';border-radius:var(--r2);padding:12px;transition:border-color .2s,opacity .2s;opacity:'+(isAtivo?'1':'0.45')+'">'
-      // ── Cabeçalho: checkbox + nome + botões de modo ──
+      // ── Cabeçalho: checkbox + nome + badge "já existe" + botões de modo ──
       +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:'+(isAtivo?'12':'0')+'px;flex-wrap:wrap">'
       // Checkbox visual
       +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;flex-shrink:0" onclick="_gToggleTab(\&apos;'+cfg.key+'\&apos;)">'
@@ -6184,6 +6424,7 @@ function buildGerarTabelas(){
       +'</div>'
       +'<span style="font-size:14px;font-weight:700;color:'+(isAtivo?cfg.cor:'var(--mt)')+'">'+cfg.emoji+' Tabela '+cfg.nome+'</span>'
       +'</label>'
+      +(jaExiste?'<span style="font-size:10px;font-weight:700;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:var(--or);padding:2px 8px;border-radius:20px;flex-shrink:0">⚡ Já existe</span>':'')
       +(isAtivo?
         '<div style="display:flex;gap:5px;margin-left:auto">'
         +'<button onclick="_gSetModo(\&apos;'+cfg.key+'\&apos;,\&apos;geral\&apos;)" style="background:'+(isModoGeral?cfg.cor:'var(--bg)')+';border:1px solid '+(isModoGeral?cfg.cor:'var(--bd)')+';border-radius:6px;padding:3px 9px;color:'+(isModoGeral?'#fff':'var(--mt)')+';font-size:11px;cursor:pointer">Geral</button>'
@@ -6202,43 +6443,47 @@ function buildGerarTabelas(){
         +'<span style="font-size:13px;color:var(--mt)">'+(isTipoPct?'% de desconto':'R$ de desconto')+'</span>'
         +margemInfo
         +'</div></div>'
+        +atualBlock
       :prodRows):'')
       +'</div>';
   }
 
   var secTabs='<div class="card" style="padding:14px;margin-bottom:10px">'
     +'<div class="stl" style="margin-bottom:10px"><div class="stb" style="background:var(--or)"></div><div class="stx" style="color:var(--or)">2. Configurar Tabelas</div></div>'
-    +'<div class="al aly" style="margin-bottom:10px;font-size:12px">Ative as tabelas que deseja gerar e defina o desconto — em % do preço de venda ou valor fixo em R$/kg. Escolha configuração geral ou por produto.</div>'
+    +'<div class="al aly" style="margin-bottom:10px;font-size:12px">Ative as tabelas que deseja gerar/atualizar e defina o desconto — em % do preço de venda ou valor fixo em R$/kg. Tabelas marcadas com ⚡ já existem e serão atualizadas.</div>'
     +'<div style="display:flex;flex-direction:column;gap:8px">'+tabCards+'</div>'
     +'</div>';
 
-  // ── Seção 3: Preview ──
   var secPreview='';
+
+  // ── Preview tabular (ao clicar Preview) ──
+  var secPreviewTabular='';
   if(_gPreview && base.length){
-    var ativas=_gTabs.filter(function(t){return t.ativo;});
-    if(ativas.length){
+    var ativasT=_gTabs.filter(function(t){return t.ativo;});
+    if(ativasT.length){
       var theadCols='<th style="padding:7px 10px;text-align:left;font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--bd)">Produto</th>'
         +'<th style="padding:7px 10px;text-align:right;font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--bd)">Venda Base</th>';
-      for(var ai=0;ai<ativas.length;ai++){
-        theadCols+='<th style="padding:7px 10px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--bd);color:'+ativas[ai].cor+'">'+ativas[ai].emoji+' '+ativas[ai].nome+'</th>';
+      for(var ai=0;ai<ativasT.length;ai++){
+        theadCols+='<th style="padding:7px 10px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--bd);color:'+ativasT[ai].cor+'">'+ativasT[ai].emoji+' '+ativasT[ai].nome+'</th>';
       }
       var tbodyRows='';
-      // Totais para margem geral
-      var totalVenda=new Array(ativas.length).fill(0);
-      var totalCompra=new Array(ativas.length).fill(0);
-      var countRows=0;
-      for(var bi=0;bi<base.length;bi++){
-        var bpr=base[bi];
+      var totalVenda=new Array(ativasT.length).fill(0);
+      var totalCompra=new Array(ativasT.length).fill(0);
+      // Usa base ordenada pela Tabela Referência de Venda
+      var baseOrd2=base.slice();
+      var tabRefV2=null;for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].nome.toLowerCase()==='padrao'&&DB.tabelas[i].tipo==='venda'){tabRefV2=DB.tabelas[i];break;}}
+      if(tabRefV2&&tabRefV2.itens.length){var oRef2={};for(var ri=0;ri<tabRefV2.itens.length;ri++){oRef2[tabRefV2.itens[ri].pId]=ri;}baseOrd2.sort(function(a,b){var pA=oRef2[a.pId]!==undefined?oRef2[a.pId]:9999;var pB=oRef2[b.pId]!==undefined?oRef2[b.pId]:9999;return pA-pB;});}
+      for(var bi=0;bi<baseOrd2.length;bi++){
+        var bpr=baseOrd2[bi];
         var rowCols='<td style="padding:7px 10px;font-size:12px;border-bottom:1px solid var(--bd)">'+bpr.ic+' '+bpr.nome+'</td>'
           +'<td style="padding:7px 10px;text-align:right;font-family:monospace;font-size:12px;border-bottom:1px solid var(--bd);font-weight:600">R$ '+bpr.preco.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</td>';
-        for(var ai2=0;ai2<ativas.length;ai2++){
-          var tIdx=_gTabs.indexOf(ativas[ai2]);
+        for(var ai2=0;ai2<ativasT.length;ai2++){
+          var tIdx=_gTabs.indexOf(ativasT[ai2]);
           var pc=_gCalcPreco(tIdx,bpr.pId,bpr.preco);
           if(pc<0)pc=0;
           var pct2=bpr.preco>0?((bpr.preco-pc)/bpr.preco*100):0;
           totalVenda[ai2]+=bpr.preco;
           totalCompra[ai2]+=pc;
-          countRows++;
           rowCols+='<td style="padding:7px 10px;text-align:right;font-family:monospace;font-size:12px;border-bottom:1px solid var(--bd)">'
             +'<div style="font-weight:700">R$ '+pc.toLocaleString('pt-BR',{minimumFractionDigits:2})+'</div>'
             +'<div style="font-size:10px;color:#86efac">'+pct2.toFixed(1)+'% lucro</div>'
@@ -6246,15 +6491,13 @@ function buildGerarTabelas(){
         }
         tbodyRows+='<tr>'+rowCols+'</tr>';
       }
-      // Linha de totais/margem geral
-      var tfootCols='<td style="padding:7px 10px;font-size:11px;font-weight:700;color:var(--or)">MARGEM GERAL</td>'
-        +'<td></td>';
-      for(var ai3=0;ai3<ativas.length;ai3++){
+      var tfootCols='<td style="padding:7px 10px;font-size:11px;font-weight:700;color:var(--or)">MARGEM GERAL</td><td></td>';
+      for(var ai3=0;ai3<ativasT.length;ai3++){
         var mgPct=totalVenda[ai3]>0?((totalVenda[ai3]-totalCompra[ai3])/totalVenda[ai3]*100):0;
         tfootCols+='<td style="padding:7px 10px;text-align:right;font-size:12px;font-weight:700;font-family:monospace;color:#86efac">'+mgPct.toFixed(1)+'%</td>';
       }
-      secPreview='<div class="card" style="padding:14px;margin-bottom:10px;overflow-x:auto">'
-        +'<div class="stl" style="margin-bottom:10px"><div class="stb" style="background:var(--gr)"></div><div class="stx" style="color:var(--gr)">Preview — Preços Calculados</div></div>'
+      secPreviewTabular='<div class="card" style="padding:14px;margin-bottom:10px;overflow-x:auto">'
+        +'<div class="stl" style="margin-bottom:10px"><div class="stb" style="background:var(--bl)"></div><div class="stx" style="color:var(--bl)">Preview Detalhado</div></div>'
         +'<table style="width:100%;border-collapse:collapse;min-width:500px">'
         +'<thead><tr>'+theadCols+'</tr></thead>'
         +'<tbody>'+tbodyRows+'</tbody>'
@@ -6267,11 +6510,11 @@ function buildGerarTabelas(){
   // ── Botões ──
   var nAtivas=_gTabs.filter(function(t){return t.ativo;}).length;
   var secBtns='<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:10px">'
-    +'<button class="btnO bOgr" onclick="_gShowPreview()" '+(base.length&&nAtivas?'':'disabled style="opacity:.4;cursor:default"')+'>&#128065; Preview</button>'
+    +'<button class="btnO bOgr" onclick="_gShowPreview()" '+(base.length&&nAtivas?'':'disabled style="opacity:.4;cursor:default"')+'>&#128065; Preview Detalhado</button>'
     +'<button class="btn" style="background:var(--or);color:#000;font-weight:700" onclick="_gGerar()" '+(base.length&&nAtivas?'':'disabled style="opacity:.4;cursor:default"')+'>&#9889; Gerar '+nAtivas+' Tabela'+(nAtivas!==1?'s':'')+'</button>'
     +'</div>';
 
-  return secBase+secTabs+secPreview+secBtns;
+  return secBase+secTabs+secPreview+secPreviewTabular+secBtns;
 }
 
 var cmpTabA=null,cmpTabB=null;
@@ -6414,7 +6657,15 @@ function saveCmpPreco(lado,prodId,itemIdx){
   } else {
     tab.itens.push({pId:prodId,preco:novoPreco});
   }
-  closeM();go('tabelas');
+  // Two-way binding: se for Tabela Padrão, atualiza produto
+  if(tab.nome.toLowerCase()==='padrao'){
+    var p=gP(prodId);
+    if(p){
+      if(tab.tipo==='venda')p.vV=novoPreco;
+      else if(tab.tipo==='compra')p.vC=novoPreco;
+    }
+  }
+  saveDB();closeM();go('tabelas');
 }
 
 function delCmpPreco(lado,prodId,itemIdx){
@@ -6924,7 +7175,7 @@ function pgTabs(){
     +'<button class="tabbtn'+(tabFiltro==='compra'?' on':'')+'" onclick="swTabF(\&apos;compra\&apos;)">&#128229; Compra ('+nC+')</button>'
     +'<button class="tabbtn'+(tabFiltro==='concorrentes'?' on':'')+'" onclick="swTabF(\&apos;concorrentes\&apos;)" style="'+(tabFiltro==='concorrentes'?'border-color:var(--pu);color:var(--pu)':'border-color:transparent;color:var(--mt)')+'">&#128373; Concorrentes ('+(DB.concorrentes?DB.concorrentes.length:0)+')</button>'
     +'<button class="tabbtn'+(tabFiltro==='comparacao'?' on':'')+'" onclick="swTabF(\&apos;comparacao\&apos;)" style="margin-left:auto;'+(tabFiltro==='comparacao'?'border-color:var(--bl);color:var(--bl)':'border-color:transparent;color:var(--mt)')+'">&#9878; Comparar</button>'
-    +'<button class="tabbtn'+(tabFiltro==='gerar'?' on':'')+'" onclick="swTabF(\&apos;gerar\&apos;)" style="'+(tabFiltro==='gerar'?'border-color:var(--or);color:var(--or)':'border-color:transparent;color:var(--mt)')+'">&#9889; Gerar Compra</button>'
+    +'<button class="tabbtn'+(tabFiltro==='gerar'?' on':'')+'" onclick="swTabF(\&apos;gerar\&apos;)" style="'+(tabFiltro==='gerar'?'border-color:var(--or);color:var(--or)':'border-color:transparent;color:var(--mt)')+'">&#9889; Gerar Tabelas</button>'
     +'</div>';
   var header='<div class="fc"><div class="ptop"><div><div class="pl">Precos</div><div class="pt">Tabelas de Preco</div></div><div style="display:flex;gap:8px"><button class="btnO" style="border:1px solid var(--pu);color:var(--pu)" onclick="mImportarTabela()">&#128229; Importar</button><button class="btn" onclick="mNovaTab()">+ Nova</button></div></div>'+tabsBar;
   if(tabFiltro==='comparacao'){return header+buildComparacao()+'</div>';}
@@ -6939,10 +7190,18 @@ function pgTabs(){
     var isPadrao=t.nome.toLowerCase()==='padrao';
     var cls=[];for(var j=0;j<DB.clientes.length;j++){if(DB.clientes[j].tabId===t.id)cls.push(DB.clientes[j].nome);}
     var itH='';
-    var tabPad=null;for(var k=0;k<DB.tabelas.length;k++){if(DB.tabelas[k].nome.toLowerCase()==='padrao'&&DB.tabelas[k].tipo===t.tipo){tabPad=DB.tabelas[k];break;}}
+    var tabPad=null;for(var kp=0;kp<DB.tabelas.length;kp++){if(DB.tabelas[kp].nome.toLowerCase()==='padrao'&&DB.tabelas[kp].tipo===t.tipo){tabPad=DB.tabelas[kp];break;}}
+    // Ordena itens da tabela pela Tabela Referência de Venda
+    var tabRefCard=null;for(var kr=0;kr<DB.tabelas.length;kr++){if(DB.tabelas[kr].nome.toLowerCase()==='padrao'&&DB.tabelas[kr].tipo==='venda'){tabRefCard=DB.tabelas[kr];break;}}
+    var ordemCard={};if(tabRefCard){for(var ri=0;ri<tabRefCard.itens.length;ri++){ordemCard[tabRefCard.itens[ri].pId]=ri;}}
+    var itensOrdenados=t.itens.slice().sort(function(a,b){
+      var pa=ordemCard[a.pId]!==undefined?ordemCard[a.pId]:9999;
+      var pb=ordemCard[b.pId]!==undefined?ordemCard[b.pId]:9999;
+      return pa-pb;
+    });
     var itensVisiveis=0;
-    for(var j=0;j<t.itens.length;j++){
-      var it=t.itens[j];var p=gP(it.pId);if(!p)continue;
+    for(var j=0;j<itensOrdenados.length;j++){
+      var it=itensOrdenados[j];var p=gP(it.pId);if(!p)continue;
       if(itensVisiveis>=5)break;
       itensVisiveis++;
       var padPreco=null;
@@ -6983,11 +7242,11 @@ function mVerTab(idx){
   var cor=getTabCor(t);
   var isPadrao=t.nome.toLowerCase()==='padrao';
   var tabPad=null;
-  for(var k=0;k<DB.tabelas.length;k++){if(DB.tabelas[k].nome.toLowerCase()==='padrao'&&DB.tabelas[k].tipo===t.tipo){tabPad=DB.tabelas[k];break;}}
+  for(var kp=0;kp<DB.tabelas.length;kp++){if(DB.tabelas[kp].nome.toLowerCase()==='padrao'&&DB.tabelas[kp].tipo===t.tipo){tabPad=DB.tabelas[kp];break;}}
 
   function getItemIdx(pId){for(var i=0;i<t.itens.length;i++){if(t.itens[i].pId===pId)return i;}return -1;}
 
-  // Separa produtos inclusos e não inclusos, ambos em ordem alfabética
+  // Separa produtos inclusos e não inclusos, ordenados pela Tabela Referência de Venda
   var produtosInclusos=[];
   var produtosFora=[];
   for(var j=0;j<DB.produtos.length;j++){
@@ -6995,7 +7254,16 @@ function mVerTab(idx){
     if(getItemIdx(p.id)>=0) produtosInclusos.push(p);
     else produtosFora.push(p);
   }
-  produtosInclusos.sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+  // Ordena pela Tabela Padrão de venda (Tabela Referência)
+  var tabRefOrd=null;
+  for(var kr=0;kr<DB.tabelas.length;kr++){if(DB.tabelas[kr].nome.toLowerCase()==='padrao'&&DB.tabelas[kr].tipo==='venda'){tabRefOrd=DB.tabelas[kr];break;}}
+  var ordemRefMap={};
+  if(tabRefOrd){for(var ri=0;ri<tabRefOrd.itens.length;ri++){ordemRefMap[tabRefOrd.itens[ri].pId]=ri;}}
+  produtosInclusos.sort(function(a,b){
+    var pa=ordemRefMap[a.id]!==undefined?ordemRefMap[a.id]:9999;
+    var pb=ordemRefMap[b.id]!==undefined?ordemRefMap[b.id]:9999;
+    return pa-pb;
+  });
   produtosFora.sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
 
   // Linhas dos produtos INCLUSOS
@@ -7055,6 +7323,7 @@ function mVerTab(idx){
   openM('Materiais – '+t.nome,
     '<div class="mf">'
     +'<div style="height:5px;border-radius:4px;background:'+cor.hex+';margin-bottom:8px"></div>'
+    +(isPadrao?'<div class="al alg" style="margin-bottom:10px;font-size:12px">⚡ <strong>Tabela Padrão</strong> — sincronização em mão dupla: editar o preço aqui atualiza automaticamente o cadastro de Estoque.</div>':'')
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
     +'<span style="font-size:12px;color:var(--mt)"><b style="color:var(--gr)">'+emTabela+' produto(s) inclusos</b>'+(produtosFora.length>0?' &nbsp;·&nbsp; '+produtosFora.length+' fora':' &nbsp;·&nbsp; todos adicionados')+'</span>'
     +'<button onclick="closeM();mEditTab('+idx+')" style="background:var(--s3);border:1px solid var(--bd);color:var(--mt);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;flex-shrink:0">⚙️ Editar tabela</button>'
@@ -7102,7 +7371,23 @@ function addTabItemFora(tIdx,pId){
 
 function updTabItemByPId(tIdx,pId,val){
   var t=DB.tabelas[tIdx];
-  for(var i=0;i<t.itens.length;i++){if(t.itens[i].pId===pId){t.itens[i].preco=parseFloat(val)||0;saveDB();go('tabelas');return;}}
+  var novoPreco=parseFloat(val)||0;
+  for(var i=0;i<t.itens.length;i++){
+    if(t.itens[i].pId===pId){
+      t.itens[i].preco=novoPreco;
+      // Two-way binding: se for a Tabela Padrão de venda, atualiza vV no produto
+      if(t.nome.toLowerCase()==='padrao'&&t.tipo==='venda'){
+        var p=gP(pId);
+        if(p){p.vV=novoPreco;}
+      }
+      // Two-way binding: se for a Tabela Padrão de compra, atualiza vC no produto
+      if(t.nome.toLowerCase()==='padrao'&&t.tipo==='compra'){
+        var p=gP(pId);
+        if(p){p.vC=novoPreco;}
+      }
+      saveDB();go('tabelas');return;
+    }
+  }
 }
 
 function toggleTabItem(tIdx,pId){
