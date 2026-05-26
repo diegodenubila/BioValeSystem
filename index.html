@@ -594,6 +594,7 @@ function go(pid){
     estoque_vis:pgEstVis,revenda:pgRevenda,financeiro:pgFin,agenda:pgAgenda,
     funcionarios:pgFuncs,clientes:pgClis,tabelas:pgTabs,usuarios:pgUsers,configuracoes:pgConfig};
   var _phtml=(m[pid]||function(){return '<p>Pagina nao encontrada</p>';})();document.getElementById('ct').innerHTML=_breadcrumb(pid)+_phtml;
+  if(pid==='dashboard')setTimeout(function(){_dashCharts();},80);
   if(pid==='pesagem')renderPesagem();
   if(pid==='caixa_dia')renderCaixaDia();
   if(pid==='financeiro')setTimeout(function(){var b=document.querySelectorAll('.fin-periodo button');var o=['mes','ano','tudo'];for(var i=0;i<b.length;i++)b[i].classList.toggle('on',o[i]===_finPeriodo);},0);
@@ -1544,8 +1545,8 @@ function _finalizarPesagem(){
       for(var j=0;j<DB.revenda.length;j++){
         if(DB.revenda[j].id===it.uid){
           DB.revenda[j].status='Vendido';
-          var estPId=DB.revenda[j].estProdId;
-          if(estPId){var ep=gP(estPId);if(ep)ep.est=+(ep.est-DB.revenda[j].peso).toFixed(2);}
+          // Estoque já foi abatido no cadastro da revenda (saveRev)
+          // Não abater novamente aqui
           break;
         }
       }
@@ -2805,8 +2806,7 @@ function pgDash(){
 
     +'</div>';
 
-  // Renderiza gráficos após inserir no DOM
-  setTimeout(function(){_dashCharts();},60);
+  // Renderiza gráficos após inserir no DOM (chamado pelo go())
   return html;
 }
 
@@ -3711,7 +3711,14 @@ function mDelRev(id){
 }
 function confDelRev(id){
   var idx=-1;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){idx=i;break;}}
-  if(idx>=0)DB.revenda.splice(idx,1);
+  if(idx>=0){
+    var it=DB.revenda[idx];
+    // Devolve ao estoque se ainda estava Disponível (não vendido)
+    if(it.status==='Disponivel'&&it.estProdId&&it.peso>0){
+      var ep=gP(it.estProdId);if(ep)ep.est=+(ep.est+it.peso).toFixed(2);
+    }
+    DB.revenda.splice(idx,1);
+  }
   saveDB();closeM();go('revenda');
 }
 function mVU(id){
@@ -3765,10 +3772,13 @@ function mNovoRev(){
 function saveRev(){
   var n=document.getElementById('nr-p').value.trim();if(!n)return;
   var pIdSel=parseInt(document.getElementById('nr-estprod').value)||null;
+  var pesoRev=parseFloat(document.getElementById('nr-kg').value)||0;
   var aprovados=[];
   var cbs=document.querySelectorAll('#nr-cl-wrap input[type=checkbox]');
   for(var i=0;i<cbs.length;i++){if(cbs[i].checked)aprovados.push(cbs[i].value);}
-  DB.revenda.push({id:nid(),prod:n,desc:(document.getElementById('nr-desc').value||'').trim(),peso:parseFloat(document.getElementById('nr-kg').value)||0,cond:document.getElementById('nr-c').value,preco:parseFloat(document.getElementById('nr-pr').value)||0,status:'Disponivel',cat:document.getElementById('nr-cat').value,estProdId:pIdSel,testesAprovados:aprovados});
+  DB.revenda.push({id:nid(),prod:n,desc:(document.getElementById('nr-desc').value||'').trim(),peso:pesoRev,cond:document.getElementById('nr-c').value,preco:parseFloat(document.getElementById('nr-pr').value)||0,status:'Disponivel',cat:document.getElementById('nr-cat').value,estProdId:pIdSel,testesAprovados:aprovados});
+  // Abate do estoque ao cadastrar na revenda (produto saiu do estoque)
+  if(pIdSel&&pesoRev>0){var ep=gP(pIdSel);if(ep)ep.est=+(ep.est-pesoRev).toFixed(2);}
   saveDB();closeM();go('revenda');
 }
 
