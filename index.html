@@ -135,6 +135,7 @@ select option{background:var(--s1)}.H{display:none!important}
 .prod-card{display:flex;align-items:center;gap:11px;padding:10px 12px;background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);cursor:pointer;transition:all .15s}
 .prod-card:hover{background:var(--s3);border-color:var(--gr)}
 .prod-card:active{transform:scale(.98)}
+.prod-card.pdd-focus{background:var(--s3);border-color:var(--gr);outline:2px solid var(--gr);outline-offset:-1px}
 .cb{display:grid;grid-template-columns:1fr 340px;gap:14px}
 .pgto-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .pgto-itm{background:var(--s2);border:2px solid var(--bd);border-radius:var(--r);padding:10px 8px;text-align:center;cursor:pointer}
@@ -204,6 +205,7 @@ select option{background:var(--s1)}.H{display:none!important}
 #bv-sync-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
 #bv-sync-badge.saving #bv-sync-dot{animation:bv-pulse .8s ease-in-out infinite}
 @keyframes bv-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes bvPulse{0%,100%{opacity:1}50%{opacity:.3}}
 @media(max-width:768px){#bv-sync-badge{bottom:66px}}
 </style>
 </head><body>
@@ -257,7 +259,7 @@ var USERS=[
 ];
 var PNOME={adm:'Administrador',caixa:'Caixa',motorista:'Motorista',operador:'Operador'};
 var PPAGES={
-  adm:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','configuracoes'],
+  adm:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','mercado','configuracoes'],
   caixa:['caixa_dia','pesagem','pendencias','estoque_vis'],
   motorista:['agenda'],
   operador:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','funcionarios','clientes','tabelas'],
@@ -275,6 +277,7 @@ var ALLPAGES=[
   {id:'funcionarios',label:'Funcionarios',icon:'&#128119;'},
   {id:'clientes',    label:'Clientes',    icon:'&#127970;'},
   {id:'tabelas',     label:'Tabelas',     icon:'&#128203;'},
+  {id:'mercado',       label:'Mercado',      icon:'&#128200;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
 var DB={
@@ -580,7 +583,7 @@ function setNav(pid){
   }
 }
 
-var _LABELS={dashboard:'Dashboard',pesagem:'Pesagem',pendencias:'Em Aberto',caixa_dia:'Caixa',estoque:'Estoque',estoque_vis:'Estoque',revenda:'Revenda',financeiro:'Financeiro',agenda:'Agenda',funcionarios:'Funcionarios',clientes:'Clientes',tabelas:'Tabelas',configuracoes:'Configuracoes'};
+var _LABELS={dashboard:'Dashboard',pesagem:'Pesagem',pendencias:'Em Aberto',caixa_dia:'Caixa',estoque:'Estoque',estoque_vis:'Estoque',revenda:'Revenda',financeiro:'Financeiro',agenda:'Agenda',funcionarios:'Funcionarios',clientes:'Clientes',tabelas:'Tabelas',mercado:'Mercado',configuracoes:'Configuracoes'};
 function _breadcrumb(pid){
   var lbl=_LABELS[pid]||pid;
   return '<div class="breadcrumb">&#127968; Inicio <span class="sep">&#8250;</span> <span>'+lbl+'</span></div>';
@@ -590,9 +593,10 @@ function go(pid){
   pgAtiva=pid;setNav(pid);closeSb();
   var m={dashboard:pgDash,pesagem:pgPesagem,pendencias:pgPendencias,caixa_dia:pgCaixaDia,estoque:pgEstoque,
     estoque_vis:pgEstVis,revenda:pgRevenda,financeiro:pgFin,agenda:pgAgenda,
-    funcionarios:pgFuncs,clientes:pgClis,tabelas:pgTabs,usuarios:pgUsers,configuracoes:pgConfig};
+    funcionarios:pgFuncs,clientes:pgClis,tabelas:pgTabs,mercado:pgMercado,usuarios:pgUsers,configuracoes:pgConfig};
   var _phtml=(m[pid]||function(){return '<p>Pagina nao encontrada</p>';})();document.getElementById('ct').innerHTML=_breadcrumb(pid)+_phtml;
-  if(pid==='dashboard')setTimeout(function(){_dashCharts();},80);
+  if(pid==='dashboard')setTimeout(function(){_dashCharts();if(CU&&CU.perfil==='adm')_mktFetchWidget();},80);
+  if(pid==='mercado')setTimeout(function(){_mktFetch();},80);
   if(pid==='pesagem')renderPesagem();
   if(pid==='caixa_dia')renderCaixaDia();
   if(pid==='financeiro')setTimeout(function(){var b=document.querySelectorAll('.fin-periodo button');var o=['mes','ano','tudo'];for(var i=0;i<b.length;i++)b[i].classList.toggle('on',o[i]===_finPeriodo);},0);
@@ -956,7 +960,7 @@ function renderPesagem(){
     +'<div class="card" style="padding:13px">'
     +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:11px">'+tbH+'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>Cliente/Forn.</label><select class="inp" id="pes-cli" onchange="setPesCli(this.value)">'+cliO+'</select></div>'
+    +'<div class="fld"><label>Cliente/Forn.</label><div style="display:flex;gap:6px"><select class="inp" id="pes-cli" onchange="setPesCli(this.value)" style="flex:1">'+cliO+'</select><button class="btn" onclick="quickNovoCli()" title="Cadastrar novo cliente/fornecedor" style="padding:0 11px;font-size:18px;flex-shrink:0">+</button></div></div>'
     +'<div class="fld"><label>Tabela de Precos</label><select class="inp" id="pes-tab" onchange="setPesTab(this.value)">'+tabO+'</select></div>'
     +'</div></div>'
     +'<div class="card" style="padding:13px">'
@@ -986,6 +990,38 @@ function setPesTipo(t){
   savePesState();renderPesagem();
 }
 function setPesVw(v){pesAbas[pesAtiva].showUnit=v;savePesState();renderPesagem();}
+function quickNovoCli(){
+  var tipoAtual=pesAbas[pesAtiva].tipo==='Venda'?'venda':'compra';
+  var tabOpts='<option value="">-- Nenhuma (Padrão) --</option>';
+  for(var i=0;i<DB.tabelas.length;i++){
+    var t=DB.tabelas[i];
+    if(t.tipo===tipoAtual)tabOpts+='<option value="'+t.id+'">'+t.nome+'</option>';
+  }
+  openM('+ Cadastro Rápido','<div class="mf">'
+    +'<div class="fld"><label>Nome *</label><input class="inp" id="qc-nome" placeholder="Nome completo ou empresa" autocomplete="off"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Telefone</label><input class="inp" id="qc-tel" placeholder="(00) 00000-0000" inputmode="tel"></div>'
+    +'<div class="fld"><label>Tipo</label><select class="inp" id="qc-tipo"><option value="cliente">Cliente</option><option value="fornecedor">Fornecedor</option></select></div>'
+    +'</div>'
+    +'<div class="fld"><label>Tabela de Preços</label><select class="inp" id="qc-tab">'+tabOpts+'</select></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
+    +'<button class="btn" onclick="quickSalvarCli()">Salvar e Selecionar</button></div></div>',400);
+  setTimeout(function(){var n=document.getElementById('qc-nome');if(n)n.focus();},80);
+}
+function quickSalvarCli(){
+  var nome=(document.getElementById('qc-nome').value||'').trim();
+  if(!nome){alert('Informe o nome!');return;}
+  var tipo=document.getElementById('qc-tipo').value;
+  var tel=document.getElementById('qc-tel').value||'';
+  var tabEl=document.getElementById('qc-tab');
+  var tabId=tabEl&&tabEl.value?tabEl.value:null;
+  var novo={id:nid(),tipo:tipo,nome:nome,tel:tel,email:'',cnpj:'',end:'',tabId:tabId,obs:''};
+  DB.clientes.push(novo);
+  closeM();autoSave();
+  pesAbas[pesAtiva].cliId=novo.id;
+  if(tabId)pesAbas[pesAtiva].tabId=tabId;
+  savePesState();renderPesagem();
+}
 function setPesCli(v){pesAbas[pesAtiva].cliId=v;if(v){for(var i=0;i<DB.clientes.length;i++){if(DB.clientes[i].id==v&&DB.clientes[i].tabId){pesAbas[pesAtiva].tabId=DB.clientes[i].tabId;break;}}}savePesState();renderPesagem();}
 function setPesTab(v){pesAbas[pesAtiva].tabId=v?parseFloat(v):null;savePesState();renderPesagem();}
 function reaplicarTabela(){
@@ -1044,13 +1080,35 @@ function updITara(i,v){
 function updIPLiq(i,v){pesAbas[pesAtiva].itens[i].pesoLiquido=parseFloat(v)||0;savePesState();renderPesagem();}
 function updIPr(i,v){pesAbas[pesAtiva].itens[i].preco=parseFloat(v)||0;savePesState();renderPesagem();}
 function delIP(i){pesAbas[pesAtiva].itens.splice(i,1);savePesState();renderPesagem();}
+var _pddFocusIdx=-1;
 function filtrarProd(){
   var q=(document.getElementById('prod-search').value||'').toLowerCase();
   var cards=document.querySelectorAll('#prod-cards-list .prod-card');
+  _pddFocusIdx=-1;
   for(var i=0;i<cards.length;i++){
     var nome=cards[i].getAttribute('data-nome')||'';
     cards[i].style.display=(q===''||nome.indexOf(q)>=0)?'flex':'none';
+    cards[i].classList.remove('pdd-focus');
   }
+}
+function _pddGetVisible(listId){
+  var cards=document.querySelectorAll('#'+listId+' .prod-card');
+  var vis=[];for(var i=0;i<cards.length;i++){if(cards[i].style.display!=='none')vis.push(cards[i]);}
+  return vis;
+}
+function _pddNavigate(listId,dir){
+  var vis=_pddGetVisible(listId);
+  if(!vis.length)return;
+  vis.forEach(function(c){c.classList.remove('pdd-focus');});
+  _pddFocusIdx=Math.max(0,Math.min(vis.length-1,_pddFocusIdx+dir));
+  vis[_pddFocusIdx].classList.add('pdd-focus');
+  vis[_pddFocusIdx].scrollIntoView({block:'nearest'});
+}
+function _pddSelectFocused(listId){
+  var vis=_pddGetVisible(listId);
+  if(_pddFocusIdx>=0&&_pddFocusIdx<vis.length){vis[_pddFocusIdx].click();return true;}
+  if(vis.length===1){vis[0].click();return true;}
+  return false;
 }
 function togglePdd(){
   var ab=pesAbas[pesAtiva];
@@ -1061,7 +1119,19 @@ function togglePdd(){
   var panel=pdd.querySelector('.pdd-panel');
   if(trigger)trigger.classList.toggle('open',ab.pddOpen);
   if(panel)panel.classList.toggle('open',ab.pddOpen);
-  if(ab.pddOpen){setTimeout(function(){var s=document.getElementById('prod-search');if(s)s.focus();},50);}
+  if(ab.pddOpen){setTimeout(function(){
+    var s=document.getElementById('prod-search');
+    if(s){
+      s.focus();
+      _pddFocusIdx=-1;
+      s.onkeydown=function(e){
+        if(e.key==='ArrowDown'){e.preventDefault();_pddNavigate('prod-cards-list',1);}
+        else if(e.key==='ArrowUp'){e.preventDefault();_pddNavigate('prod-cards-list',-1);}
+        else if(e.key==='Enter'){e.preventDefault();_pddSelectFocused('prod-cards-list');}
+        else if(e.key==='Escape'){closePdd();}
+      };
+    }
+  },50);}
 }
 function closePdd(){
   var ab=pesAbas[pesAtiva];
@@ -1086,7 +1156,19 @@ function togglePddUnit(){
   var panel=pdd.querySelector('.pdd-panel');
   if(trigger)trigger.classList.toggle('open',ab.pddUnitOpen);
   if(panel)panel.classList.toggle('open',ab.pddUnitOpen);
-  if(ab.pddUnitOpen){setTimeout(function(){var s=document.getElementById('unit-search');if(s)s.focus();},50);}
+  if(ab.pddUnitOpen){setTimeout(function(){
+    var s=document.getElementById('unit-search');
+    if(s){
+      s.focus();
+      _pddFocusIdx=-1;
+      s.onkeydown=function(e){
+        if(e.key==='ArrowDown'){e.preventDefault();_pddNavigate('unit-cards-list',1);}
+        else if(e.key==='ArrowUp'){e.preventDefault();_pddNavigate('unit-cards-list',-1);}
+        else if(e.key==='Enter'){e.preventDefault();_pddSelectFocused('unit-cards-list');}
+        else if(e.key==='Escape'){closePddUnit();}
+      };
+    }
+  },50);}
 }
 function closePddUnit(){
   var ab=pesAbas[pesAtiva];
@@ -1113,13 +1195,13 @@ function selProd(prodId){
   var warn=(ab.tipo==='Venda'&&prod.est===0)?'<div class="al alr" style="margin-bottom:4px">Estoque zerado. Sera possivel transferir.</div>':'';
   openM(prod.ic+' '+prod.nome,'<div class="mf">'+warn
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>Peso kg</label><input class="inp" type="number" inputmode="decimal" id="ai-kg" placeholder="0.000" step="0.001" style="font-size:18px;text-align:center;font-family:monospace"></div>'
-    +'<div class="fld"><label>Preco R$/kg</label><input class="inp" type="number" inputmode="decimal" id="ai-pr" value="'+preco+'" step="0.01" style="font-size:18px;text-align:center;font-family:monospace"></div></div>'
-    +'<div class="fld"><label>Tara (kg)</label><input class="inp" type="number" inputmode="decimal" id="ai-tara" placeholder="0.000" step="0.001" value="0" style="font-family:monospace"></div>'
+    +'<div class="fld"><label>Peso kg</label><input class="inp" type="number" inputmode="decimal" enterkeyhint="done" id="ai-kg" placeholder="0.000" step="0.001" tabindex="1" style="font-size:18px;text-align:center;font-family:monospace"></div>'
+    +'<div class="fld"><label>Preco R$/kg</label><input class="inp" type="number" inputmode="decimal" enterkeyhint="done" id="ai-pr" value="'+preco+'" step="0.01" tabindex="2" style="font-size:18px;text-align:center;font-family:monospace"></div></div>'
+    +'<div class="fld"><label>Tara (kg)</label><input class="inp" type="number" inputmode="decimal" id="ai-tara" placeholder="0.000" step="0.001" value="0" tabindex="-1" style="font-family:monospace"></div>'
     +'<div class="fld"><label>Desconto de Impureza</label>'
     +'<div style="display:grid;grid-template-columns:1fr auto;gap:6px">'
-    +'<input class="inp" type="number" inputmode="decimal" id="ai-desc" placeholder="0" step="0.001" value="0" style="font-family:monospace">'
-    +'<select class="inp" id="ai-desc-tipo" style="width:70px;padding:9px 6px">'
+    +'<input class="inp" type="number" inputmode="decimal" id="ai-desc" placeholder="0" step="0.001" value="0" tabindex="-1" style="font-family:monospace">'
+    +'<select class="inp" id="ai-desc-tipo" style="width:70px;padding:9px 6px" tabindex="-1">'
     +'<option value="kg">kg</option>'
     +'<option value="%">%</option>'
     +'</select></div></div>'
@@ -1127,8 +1209,8 @@ function selProd(prodId){
     +'<span>Peso Liquido = </span><strong id="ai-liq-txt" style="color:var(--gr);font-family:monospace">0,000 kg</strong>'
     +'</div>'
     +'<div class="al alg" style="display:flex;justify-content:space-between"><span>Total estimado</span><strong id="ai-tv" style="font-family:monospace">'+fR(0)+'</strong></div>'
-    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="confAddP('+prodId+')">+ Adicionar</button></div></div>',460);
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()" tabindex="-1">Cancelar</button>'
+    +'<button class="btn" onclick="confAddP('+prodId+')" tabindex="3" id="ai-add-btn">+ Adicionar</button></div></div>',460);
   setTimeout(function(){
     var kg=document.getElementById('ai-kg');
     var pr=document.getElementById('ai-pr');
@@ -1149,10 +1231,26 @@ function selProd(prodId){
       if(tv)tv.textContent=fR(liq*pre);
       return liq;
     }
-    if(kg){kg.focus();kg.addEventListener('input',calcLiq);}
-    if(pr)pr.addEventListener('input',calcLiq);
-    if(tara)tara.addEventListener('input',calcLiq);
-    if(desc)desc.addEventListener('input',calcLiq);
+    // Select-all ao focar (elimina necessidade de apagar o 0)
+    function selAll(e){var el=e.target;setTimeout(function(){el.select();},0);}
+    [kg,pr,tara,desc].forEach(function(el){if(el){el.addEventListener('focus',selAll);}});
+    // Enter avança: peso → preço → Adicionar (tara/desconto opcionais via Tab ou toque)
+    function enterAvanca(proximo){
+      return function(e){
+        if(e.key==='Enter'||e.keyCode===13){
+          e.preventDefault();
+          if(proximo){proximo.focus();}
+          else{
+            var btnAdd=document.querySelector('.mov .btn[onclick^="confAddP"]');
+            if(btnAdd)btnAdd.click();
+          }
+        }
+      };
+    }
+    if(kg){kg.focus();setTimeout(function(){kg.select();},50);kg.addEventListener('input',calcLiq);kg.addEventListener('keydown',function(e){if(e.key==='Enter'||e.keyCode===13){e.preventDefault();e.stopPropagation();if(pr){pr.focus();setTimeout(function(){pr.select();},0);}}});}
+    if(tara){tara.addEventListener('input',calcLiq);}
+    if(desc){desc.addEventListener('input',calcLiq);}
+    if(pr){pr.addEventListener('input',calcLiq);pr.addEventListener('keydown',function(e){if(e.key==='Enter'||e.keyCode===13){e.preventDefault();e.stopPropagation();var btnAdd=document.querySelector('.mov .btn[onclick^="confAddP"]');if(btnAdd)btnAdd.click();}});}
     if(descTipo)descTipo.addEventListener('change',calcLiq);
   },80);
 }
@@ -1943,8 +2041,13 @@ function _buildHistHtml(){
     var hCompras=hMovs.reduce(function(a,m){return a+(m.compra||0);},0);
     var hPeso=hc.pesoTotal||0;
     var hSaldo=hc.saldoFinal||0;
+    var hContado=hc.saldoContado!=null?hc.saldoContado:hSaldo;
     var hDif=hc.diferenca||0;
-    var difColor=Math.abs(hDif)<0.01?'var(--gr)':hDif<0?'var(--rd)':'var(--or)';
+    var hasDif=Math.abs(hDif)>0.01;
+    var difColor=!hasDif?'var(--gr)':hDif<0?'var(--rd)':'var(--or)';
+    // No histórico: exibe valor contado (real) quando há diferença
+    var displaySaldo=hasDif?hContado:hSaldo;
+    var saldoColor=hasDif?'var(--or)':'var(--gr)';
     h+='<div style="border-bottom:1px solid var(--bd)">'
       +'<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer" onclick="toggleHistCaixa('+hi+')">'
       +'<div style="flex:1">'
@@ -1958,8 +2061,8 @@ function _buildHistHtml(){
       +'<span style="color:var(--rd)">Compras: '+fR(hCompras)+'</span>'
       +'</div></div>'
       +'<div style="text-align:right;flex-shrink:0">'
-      +'<div style="font-size:14px;font-weight:700;font-family:monospace;color:var(--gr)">'+fR(hSaldo)+'</div>'
-      +(Math.abs(hDif)>0.01?'<div style="font-size:11px;color:'+difColor+'">'+(hDif>0?'+':'')+fR(hDif)+'</div>':'')
+      +'<div style="font-size:14px;font-weight:700;font-family:monospace;color:'+saldoColor+'">'+fR(displaySaldo)+'</div>'
+      +(hasDif?'<div style="font-size:11px;color:'+difColor+'">'+(hDif>0?'+':'')+fR(hDif)+'</div>':'')
       +'</div>'
       +'<div style="font-size:18px;color:var(--mt)" id="hc-arr-'+hi+'">&#8964;</div>'
       +'</div>'
@@ -1980,11 +2083,15 @@ function renderCaixaDia(){
   var histH=_buildHistHtml();
   if(!aberto){
     var ontem=DB.caixaOntem;
+    // Se houve diferença no fechamento, usa o valor contado (real) como base de abertura
+    var _hasDif=ontem&&Math.abs(ontem.diferenca||0)>0.01;
+    var _valBase=ontem?(_hasDif&&ontem.saldoContado!=null?ontem.saldoContado:ontem.saldoFinal):0;
     var ontemB=ontem?'<div class="card" style="padding:13px"><div class="stl"><div class="stb"></div><div class="stx">Ultimo Fechamento</div></div>'
-      +'<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span style="color:var(--mt)">Saldo fechamento</span><span style="font-weight:700;color:var(--gr);font-family:monospace">'+fR(ontem.saldoFinal)+'</span></div>'
-      +(Math.abs(ontem.diferenca||0)>0.01?'<div style="font-size:12px;color:var(--or)">Diferenca: '+fR(ontem.diferenca)+'</div>':'')
+      +'<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span style="color:var(--mt)">Saldo esperado</span><span style="font-weight:700;color:var(--gr);font-family:monospace">'+fR(ontem.saldoFinal)+'</span></div>'
+      +(_hasDif?'<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span style="color:var(--mt)">Valor contado</span><span style="font-weight:700;color:var(--or);font-family:monospace">'+fR(ontem.saldoContado)+'</span></div>':'')
+      +(_hasDif?'<div style="font-size:12px;padding:6px 9px;border-radius:6px;background:var(--orb);color:var(--or);margin-top:4px">&#9888; Diferenca de '+fR(ontem.diferenca)+' no fechamento &mdash; campo corrigido com o valor contado</div>':'')
       +'</div>':'';
-    var ontemV=ontem?'value="'+ontem.saldoFinal+'"':'';
+    var ontemV=ontem?'value="'+_valBase+'"':'';
     var ontemD=ontem?'<div id="cx-dif" style="margin-bottom:10px"></div>':'';
     cc.innerHTML='<div class="fc" style="max-width:520px;margin:0 auto">'
       +'<div><div class="pl">Caixa</div><div class="pt">Abertura do Caixa &mdash; '+hoje_+'</div></div>'
@@ -1998,7 +2105,22 @@ function renderCaixaDia(){
       +ontemD
       +'<button class="btn" style="width:100%;padding:13px;font-size:14px" onclick="abrirCaixa()">&#128994; Abrir Caixa do Dia</button></div>'
       +histH+'</div>';
-    if(ontem){var inp=document.getElementById('cx-ab');if(inp)inp.addEventListener('input',function(){var v=parseFloat(inp.value)||0,esp=ontem.saldoFinal,dif=+(v-esp).toFixed(2);var el=document.getElementById('cx-dif');if(!el)return;if(Math.abs(dif)<0.01)el.innerHTML='<div class="al alg">&#10003; Confere com ultimo fechamento.</div>';else if(dif<0)el.innerHTML='<div class="al alr">Falta '+fR(Math.abs(dif))+'</div>';else el.innerHTML='<div class="al aly">Sobra '+fR(dif)+'</div>';});}
+    if(ontem){
+      // Mostra diferença em tempo real comparando com saldo esperado (saldoFinal)
+      var inp=document.getElementById('cx-ab');
+      // Dispara o listener uma vez para mostrar o estado inicial do campo corrigido
+      if(inp){
+        inp.addEventListener('input',function(){
+          var v=parseFloat(inp.value)||0,esp=ontem.saldoFinal,dif=+(v-esp).toFixed(2);
+          var el=document.getElementById('cx-dif');if(!el)return;
+          if(Math.abs(dif)<0.01)el.innerHTML='<div class="al alg">&#10003; Confere com ultimo fechamento.</div>';
+          else if(dif<0)el.innerHTML='<div class="al alr">Falta '+fR(Math.abs(dif))+' em relacao ao esperado</div>';
+          else el.innerHTML='<div class="al aly">Sobra '+fR(dif)+' em relacao ao esperado</div>';
+        });
+        // Dispara imediatamente para refletir o valor já preenchido
+        inp.dispatchEvent(new Event('input'));
+      }
+    }
     return;
   }
   var cd=DB.caixaDia;var movsDia=cd.movimentos||[];
@@ -2009,6 +2131,35 @@ function renderCaixaDia(){
   var sang=0;if(cd.sangrias)for(var i=0;i<cd.sangrias.length;i++)sang+=cd.sangrias[i].valor;
   var refor=0;if(cd.reforcos)for(var i=0;i<cd.reforcos.length;i++)refor+=cd.reforcos[i].valor;
   var extras='';if(sang>0)extras+=sc('&#128182;','Sangrias',fR(sang),'Retiradas','var(--rd)');if(refor>0)extras+=sc('&#128176;','Reforcos',fR(refor),'Adicoes','var(--bl)');
+
+  // ── Despesas do dia ──
+  var _hjStr3=hj();var _despDia=[];var _totDesp=0;
+  for(var i=0;i<DB.movs.length;i++){
+    var _mv=DB.movs[i];
+    if(_mv.tipo==='saida'&&_mv.data===_hjStr3&&(!_mv.desc||_mv.desc.indexOf('#')<0)){
+      _despDia.push(_mv);_totDesp+=_mv.valor;
+    }
+  }
+  var despCard='';
+  if(_despDia.length){
+    var _despRows='';
+    for(var i=0;i<_despDia.length;i++){
+      var _d=_despDia[i];
+      _despRows+='<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bd)">'
+        +'<div style="width:3px;height:32px;border-radius:2px;background:var(--rd);flex-shrink:0"></div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:13px;font-weight:600;color:var(--tx)">'+_d.desc+'</div>'
+        +'<div style="font-size:10px;color:var(--mt)">'+(_d.cat||'—')+' &middot; '+(_d.conta||'Caixa')+'</div>'
+        +'</div>'
+        +'<span style="font-size:14px;font-weight:700;font-family:monospace;color:var(--rd)">-'+fR(_d.valor)+'</span>'
+        +'</div>';
+    }
+    despCard='<div class="card" style="padding:0;overflow:hidden">'
+      +'<div style="padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between">'
+      +'<div class="stl" style="margin-bottom:0"><div class="stb" style="background:var(--rd)"></div><div class="stx">Despesas do Dia ('+_despDia.length+')</div></div>'
+      +'<span style="font-size:13px;font-weight:700;font-family:monospace;color:var(--rd)">-'+fR(_totDesp)+'</span>'
+      +'</div>'+_despRows+'</div>';
+  }
   var movsH='';
   if(!movsDia.length)movsH='<div style="padding:20px;text-align:center;color:var(--mt)">Nenhum atendimento hoje.</div>';
   else{var cards='';for(var i=0;i<movsDia.length;i++)cards+=_renderAtendRow(movsDia[i],null);movsH='<div>'+cards+'</div>';}
@@ -2028,8 +2179,10 @@ function renderCaixaDia(){
     +sc('&#9878;','Peso Total',fKg(pesoTotal)+' kg','pesagens','var(--bl)')
     +'</div>'
     +sc('&#128176;','Saldo Caixa',fR(saldoAt),'Estimado','var(--gr)')
+    +(_totDesp>0?sc('&#127869;','Despesas',fR(_totDesp),_despDia.length+' lancamento(s)','var(--or)'):'')
     +(extras?'<div class="g2">'+extras+'</div>':'')
     +'<div class="card" style="padding:0;overflow:hidden"><div style="padding:13px 16px;border-bottom:1px solid var(--bd)"><div class="stl" style="margin-bottom:0"><div class="stb"></div><div class="stx">Atendimentos ('+movsDia.length+')</div></div></div>'+movsH+'</div>'
+    +despCard
     +histH+'</div>';
 }
 function toggleHistCaixa(i){
@@ -2236,19 +2389,65 @@ function confDespesaRapida(){
 }
 
 function mConfigCaixa(){
+  function _catRowsCaixa(){
+    var arr=DB.cats.saida;var h='';
+    for(var i=0;i<arr.length;i++){
+      var c=arr[i];
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border-radius:8px;margin-bottom:5px;border-left:3px solid '+c.cor+'">'
+        +'<div style="width:10px;height:10px;border-radius:50%;background:'+c.cor+';flex-shrink:0"></div>'
+        +'<span style="flex:1;font-size:13px;color:var(--tx)">'+c.nome+'</span>'
+        +'<button onclick="mEditCat('+c.id+',\'saida\')" style="background:none;border:none;color:var(--mt);font-size:14px;cursor:pointer;padding:2px 6px">&#9998;</button>'
+        +'<button onclick="_cfgCxDelCat('+c.id+')" style="background:none;border:none;color:var(--mt);font-size:13px;cursor:pointer;padding:2px 6px">&#128465;</button>'
+        +'</div>';
+    }
+    if(!arr.length)h='<div style="text-align:center;padding:12px;color:var(--mt);font-size:12px">Nenhuma categoria.</div>';
+    return h;
+  }
   var html='<div class="mf">'
-    +'<div class="al alb" style="margin-bottom:2px">Configure os motivos de Sangria e Reforco.</div>'
-    +'<div class="stl"><div class="stb" style="background:var(--rd)"></div><div class="stx">Motivos de Sangria</div></div>'
+    // ── Categorias de Despesa ──
+    +'<div class="stl"><div class="stb" style="background:var(--rd)"></div><div class="stx">&#127869; Categorias de Despesa</div></div>'
+    +'<div id="cfg-cats-desp">'+_catRowsCaixa()+'</div>'
+    +'<button onclick="mNovaCatCaixa()" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;margin-bottom:4px">+ Nova Categoria</button>'
+    // ── Motivos de Sangria ──
+    +'<div class="stl" style="margin-top:10px"><div class="stb" style="background:var(--rd)"></div><div class="stx">&#128182; Motivos de Sangria</div></div>'
     +_buildCfgMotivos(CFG.motivosSangria,'sangria')
-    +'<button onclick="cfgMotAdd(\'sangria\')" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600">+ Adicionar Motivo</button>'
-    +'<div class="stl" style="margin-top:6px"><div class="stb" style="background:var(--bl)"></div><div class="stx">Motivos de Reforco</div></div>'
+    +'<button onclick="cfgMotAdd(\'sangria\')" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;margin-bottom:4px">+ Adicionar Motivo</button>'
+    // ── Motivos de Reforço ──
+    +'<div class="stl" style="margin-top:10px"><div class="stb" style="background:var(--bl)"></div><div class="stx">&#128176; Motivos de Refor&#231;o</div></div>'
     +_buildCfgMotivos(CFG.motivosReforco,'reforco')
-    +'<button onclick="cfgMotAdd(\'reforco\')" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600">+ Adicionar Motivo</button>'
-    +'<div class="stl" style="margin-top:6px"><div class="stb"></div><div class="stx">Saldo Abertura Padrao</div></div>'
-    +'<div class="fld"><label>Valor padrao R$</label><input class="inp" type="number" inputmode="decimal" id="cfg-saldo-pad" value="'+(CFG.saldoAberturaPadrao||0)+'" placeholder="0,00"></div>'
+    +'<button onclick="cfgMotAdd(\'reforco\')" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;margin-bottom:4px">+ Adicionar Motivo</button>'
+    // ── Saldo Padrão ──
+    +'<div class="stl" style="margin-top:10px"><div class="stb"></div><div class="stx">&#128181; Saldo Padr&#227;o de Abertura</div></div>'
+    +'<div class="fld"><label>Valor padr&#227;o R$</label><input class="inp" type="number" inputmode="decimal" id="cfg-saldo-pad" value="'+(CFG.saldoAberturaPadrao||0)+'" placeholder="0,00"></div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Fechar</button><button class="btn" onclick="cfgMotSalvar()">Salvar</button></div>'
     +'</div>';
-  openM('Configuracoes do Caixa', html, 500);
+  openM('&#9881; Configura&#231;&#245;es do Caixa', html, 480);
+}
+
+function mNovaCatCaixa(){
+  var defCor='#ef4444';
+  openM('Nova Categoria de Despesa',
+    '<div class="mf">'
+    +'<div class="fld"><label>Nome *</label><input class="inp" id="cat-n" placeholder="Ex: Alimenta&#231;&#227;o, Aluguel..."></div>'
+    +'<input type="hidden" id="cat-cor" value="'+defCor+'">'
+    +'<div class="fld"><label>Cor</label>'+_buildColorPicker(defCor)+'</div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="mConfigCaixa()">Voltar</button>'
+    +'<button class="btn btn-rd" onclick="_cfgCxSaveCat()">Criar</button>'
+    +'</div></div>',420);
+}
+function _cfgCxSaveCat(){
+  var n=(document.getElementById('cat-n').value||'').trim();
+  var cor=document.getElementById('cat-cor').value||'#ef4444';
+  if(!n){alert('Informe o nome!');return;}
+  DB.cats.saida.push({id:nid(),nome:n,cor:cor});
+  autoSave();mConfigCaixa();
+}
+function _cfgCxDelCat(id){
+  var nome='';for(var i=0;i<DB.cats.saida.length;i++){if(DB.cats.saida[i].id===id){nome=DB.cats.saida[i].nome;break;}}
+  confirmar('Excluir a categoria <b>'+nome+'</b>?',function(){
+    for(var i=0;i<DB.cats.saida.length;i++){if(DB.cats.saida[i].id===id){DB.cats.saida.splice(i,1);break;}}
+    autoSave();mConfigCaixa();
+  });
 }
 function _buildCfgMotivos(lista,tipo){
   var h='<div id="cfg-mot-'+tipo+'" style="display:flex;flex-direction:column;gap:5px">';
@@ -2357,7 +2556,7 @@ function _dashCharts(){
     c.width=c.offsetWidth||320;c.height=160;
     var pers=['hoje','semana','mes','trim','sem','ano'];
     var nms=['Hj','7d','Mês','Trim','Sem','Ano'];
-    var vals=[];for(var i=0;i<pers.length;i++)vals.push(_entrPeriodo(pers[i]).kg);
+    var vals=[];for(var i=0;i<pers.length;i++)vals.push(_entrPeriodo(pers[i]).val);
     var max=Math.max.apply(null,vals)||1;
     var W=c.width,H=c.height,pad=10,bw=Math.floor((W-pad*2)/pers.length)-6,gap=6;
     ctx.clearRect(0,0,W,H);
@@ -2379,7 +2578,7 @@ function _dashCharts(){
       ctx.fillStyle=on?'#22c55e':'#7a90b0';ctx.font='bold 9px sans-serif';ctx.textAlign='center';
       ctx.fillText(nms[i],x+bw/2,H-1);
       // value
-      if(vals[i]>0){ctx.fillStyle=on?'#22c55e':'#4a6080';ctx.font='bold 9px monospace';ctx.fillText(vals[i].toFixed(0)+'kg',x+bw/2,y-3);}
+      if(vals[i]>0){var _lbl=vals[i]>=1000?'R$'+(vals[i]/1000).toFixed(1)+'k':'R$'+vals[i].toFixed(0);ctx.fillStyle=on?'#22c55e':'#4a6080';ctx.font='bold 9px monospace';ctx.fillText(_lbl,x+bw/2,y-3);}
     }
   })();
 
@@ -2573,20 +2772,56 @@ function pgDash(){
   var pesoColHoje=0;for(var i=0;i<colHoje.length;i++)pesoColHoje+=colHoje[i].peso||0;
   var pesoColSem=0;for(var i=0;i<colSemana.length;i++)pesoColSem+=colSemana[i].peso||0;
 
-  // ── Estoque barras ──
+  // ── Estoque barras + entradas por período ──
   var max=0.1;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].est>max)max=DB.produtos[i].est;}
-  var estH='';var _estMax=5;
-  for(var i=0;i<DB.produtos.length&&i<_estMax;i++){
-    var p=DB.produtos[i];var ec=p.est===0?'var(--rd)':'var(--gr)';
-    estH+='<div style="margin-bottom:10px">'
-      +'<div style="display:flex;justify-content:space-between;margin-bottom:3px">'
-      +'<span style="font-size:12px">'+p.ic+' '+p.nome+'</span>'
-      +'<div style="text-align:right"><span style="font-size:12px;font-weight:700;color:'+ec+';font-family:monospace">'+fKg(p.est)+'kg</span>'
-      +(p.est>0?'<span style="font-size:10px;color:var(--mt);margin-left:4px">'+fR(p.est*p.vV)+'</span>':'')+'</div></div>'
-      +'<div class="bw"><div class="bf" style="width:'+Math.round((p.est/max)*100)+'%;background:'+(p.est===0?'var(--rd)':'linear-gradient(90deg,var(--gr2),var(--gr))')+'"></div></div>'
-      +'</div>';
+
+  // calcular entradas por produto para cada período
+  var _agora2=new Date();
+  var _entProd={dia:{},semana:{},mes:{}};
+  for(var _ei=0;_ei<DB.entradas.length;_ei++){
+    var _ee=DB.entradas[_ei];var _dd=_parseDataBR(_ee.data);if(!_dd||!_ee.pId)continue;
+    var _esDia=(_dd.getDate()===_agora2.getDate()&&_dd.getMonth()===_agora2.getMonth()&&_dd.getFullYear()===_agora2.getFullYear());
+    var _esSem=(Math.floor((_agora2-_dd)/(864e5))>=0&&Math.floor((_agora2-_dd)/(864e5))<7);
+    var _esMes=(_dd.getMonth()===_agora2.getMonth()&&_dd.getFullYear()===_agora2.getFullYear());
+    if(_esDia)_entProd.dia[_ee.pId]=(_entProd.dia[_ee.pId]||0)+_ee.peso;
+    if(_esSem)_entProd.semana[_ee.pId]=(_entProd.semana[_ee.pId]||0)+_ee.peso;
+    if(_esMes)_entProd.mes[_ee.pId]=(_entProd.mes[_ee.pId]||0)+_ee.peso;
   }
-  if(DB.produtos.length>_estMax){estH+='<div style="text-align:center;padding:4px 0 2px;font-size:11px;color:var(--gr);font-weight:600;opacity:.8">+ '+(DB.produtos.length-_estMax)+' materiais — clique para ver todos ›</div>';}
+
+  function _buildEstH(modo){
+    var _prods=DB.produtos.slice();var _max2=0.1;
+    if(modo==='estoque'){
+      for(var _bi=0;_bi<_prods.length;_bi++){if(_prods[_bi].est>_max2)_max2=_prods[_bi].est;}
+    } else {
+      var _src=_entProd[modo]||{};
+      _prods.sort(function(a,b){return (_src[b.id]||0)-(_src[a.id]||0);});
+      for(var _bi=0;_bi<_prods.length;_bi++){var _bv=_src[_prods[_bi].id]||0;if(_bv>_max2)_max2=_bv;}
+    }
+    var _bh='';var _shown=0;
+    for(var _bi=0;_bi<_prods.length&&_shown<5;_bi++){
+      var _bp=_prods[_bi];
+      var _bval=modo==='estoque'?_bp.est:(_entProd[modo][_bp.id]||0);
+      if(modo!=='estoque'&&_bval===0)continue;
+      var _bcor=modo==='estoque'?(_bp.est===0?'var(--rd)':'var(--gr)'):'#3b82f6';
+      var _bsub=modo==='estoque'&&_bp.est>0?fR(_bp.est*_bp.vV):'';
+      _bh+='<div style="margin-bottom:10px">'
+        +'<div style="display:flex;justify-content:space-between;margin-bottom:3px">'
+        +'<span style="font-size:12px">'+_bp.ic+' '+_bp.nome+'</span>'
+        +'<div style="text-align:right"><span style="font-size:12px;font-weight:700;color:'+_bcor+';font-family:monospace">'+fKg(_bval)+'kg</span>'
+        +(_bsub?'<span style="font-size:10px;color:var(--mt);margin-left:4px">'+_bsub+'</span>':'')+'</div></div>'
+        +'<div class="bw"><div class="bf" style="width:'+Math.round((_bval/_max2)*100)+'%;background:'+(modo==='estoque'&&_bval===0?'var(--rd)':modo==='estoque'?'linear-gradient(90deg,var(--gr2),var(--gr))':'linear-gradient(90deg,#3b82f6,#60a5fa)')+'"></div></div>'
+        +'</div>';
+      _shown++;
+    }
+    if(!_shown)_bh='<div style="text-align:center;padding:20px;color:var(--mt);font-size:12px">Nenhuma entrada neste per\u00edodo.</div>';
+    else if(DB.produtos.length>5&&modo==='estoque')_bh+='<div style="text-align:center;padding:4px 0 2px;font-size:11px;color:var(--gr);font-weight:600;opacity:.8">+ '+(DB.produtos.length-5)+' materiais \u2014 clique para ver todos \u203a</div>';
+    return _bh;
+  }
+
+  var estH=_buildEstH('estoque');
+  var estHDia=_buildEstH('dia');
+  var estHSem=_buildEstH('semana');
+  var estHMes=_buildEstH('mes');
 
   // ── Últimas entradas ──
   var entrH='';var ec2=0;
@@ -2698,6 +2933,79 @@ function pgDash(){
     +'<span style="font-size:22px;opacity:.4">&#128197;</span></div></div>'
     +'</div>'
 
+    // ── Alerta: Contas a Vencer ──
+    +(function(){
+      var _hoje=new Date();
+      var _diaHoje=_hoje.getDate();
+      var _vencendo=[],_atrasadas=[];
+      var _ma=_mesAtual();
+      for(var _i=0;_i<DB.contasFixas.length;_i++){
+        var _cf=DB.contasFixas[_i];
+        var _st=_cfStatusMes(_cf);
+        if(_st==='Pago')continue;
+        var _vd=parseInt(_cf.venc)||1;
+        var _vl=_cfValorMes(_cf);
+        var _diasAteVenc=_vd-_diaHoje;
+        if(_diasAteVenc<0)_atrasadas.push({nome:_cf.nome,ic:_cf.ic||'📋',venc:_vd,valor:_vl,id:_cf.id,dias:Math.abs(_diasAteVenc)});
+        else if(_diasAteVenc<=5)_vencendo.push({nome:_cf.nome,ic:_cf.ic||'📋',venc:_vd,valor:_vl,id:_cf.id,dias:_diasAteVenc});
+      }
+      var _total=_atrasadas.length+_vencendo.length;
+      if(!_total)return'';
+      var _itens='';
+      for(var _i=0;_i<_atrasadas.length;_i++){
+        var _a=_atrasadas[_i];
+        _itens+='<div onclick="go(\'financeiro\')" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(239,68,68,0.15);cursor:pointer">'
+          +'<span style="font-size:15px">'+_a.ic+'</span>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:var(--tx)">'+_a.nome+'</div>'
+          +'<div style="font-size:10px;color:#ef4444">Venceu dia '+_a.venc+' &middot; '+_a.dias+' dia'+(+_a.dias!==1?'s':'')+' atrás</div></div>'
+          +(_a.valor>0?'<span style="font-size:12px;font-weight:700;font-family:monospace;color:#ef4444">'+fR(_a.valor)+'</span>':'<span style="font-size:10px;color:var(--or)">sem valor</span>')
+          +'</div>';
+      }
+      for(var _i=0;_i<_vencendo.length;_i++){
+        var _v=_vencendo[_i];
+        var _cor=_v.dias===0?'#ef4444':_v.dias<=2?'#f97316':'#f59e0b';
+        var _label=_v.dias===0?'Vence hoje!':_v.dias===1?'Vence amanhã':'Vence em '+_v.dias+' dias (dia '+_v.venc+')';
+        _itens+='<div onclick="go(\'financeiro\')" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(245,158,11,0.15);cursor:pointer">'
+          +'<span style="font-size:15px">'+_v.ic+'</span>'
+          +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:var(--tx)">'+_v.nome+'</div>'
+          +'<div style="font-size:10px;color:'+_cor+'">'+_label+'</div></div>'
+          +(_v.valor>0?'<span style="font-size:12px;font-weight:700;font-family:monospace;color:'+_cor+'">'+fR(_v.valor)+'</span>':'<span style="font-size:10px;color:var(--or)">sem valor</span>')
+          +'</div>';
+      }
+      var _titulo=_atrasadas.length>0&&_vencendo.length>0
+        ?(_atrasadas.length+' atrasada'+(_atrasadas.length>1?'s':'')+' · '+_vencendo.length+' a vencer')
+        :_atrasadas.length>0?(_atrasadas.length+' conta'+(_atrasadas.length>1?'s':'')+' atrasada'+(_atrasadas.length>1?'s':''))
+        :(_vencendo.length+' conta'+(_vencendo.length>1?'s':'')+' a vencer');
+      var _bordaCor=_atrasadas.length>0?'rgba(239,68,68,0.25)':'rgba(245,158,11,0.25)';
+      var _bgGrad=_atrasadas.length>0?'rgba(239,68,68,0.06)':'rgba(245,158,11,0.06)';
+      var _icCor=_atrasadas.length>0?'#ef4444':'#f59e0b';
+      return '<div class="card" style="border-color:'+_bordaCor+';background:linear-gradient(135deg,var(--s1),'+_bgGrad+')">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+        +'<div class="stl" style="margin-bottom:0">'
+        +'<div class="stb" style="background:'+_icCor+'"></div>'
+        +'<div class="stx" style="color:'+_icCor+'">&#9888; Contas a Pagar</div></div>'
+        +'<span style="font-size:11px;color:var(--mt)">'+_titulo+'</span></div>'
+        +_itens
+        +'<button onclick="go(\'financeiro\')" style="margin-top:10px;width:100%;padding:8px;border:none;border-radius:8px;background:'+_icCor+'18;color:'+_icCor+';font-size:12px;font-weight:600;cursor:pointer">Ver todas as contas ›</button>'
+        +'</div>';
+    })()
+
+    // ── Widget Mercado (só adm) ──
+    +(CU&&CU.perfil==='adm'?'<div class="card" style="'+dcc+'background:linear-gradient(135deg,var(--s1),rgba(200,168,75,0.06));border-color:rgba(200,168,75,0.2);cursor:pointer" onclick="go(\'mercado\')" title="Ver Mercado" '+dca+'>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+    +'<div class="stl" style="margin-bottom:0"><div class="stb" style="background:#C8A84B"></div><div class="stx" style="color:#C8A84B">Mercado de Materiais <span style="opacity:.6;font-size:10px">›</span></div></div>'
+    +'<div style="display:flex;align-items:center;gap:6px"><span id="mkt-dot" style="width:7px;height:7px;border-radius:50%;background:#6b7280;display:inline-block"></span>'
+    +'<span id="mkt-status" style="font-size:10px;color:var(--mt)">Carregando...</span>'
+    +'<button onclick="event.stopPropagation();_mktFetchWidget()" style="background:none;border:none;color:var(--mt);font-size:14px;cursor:pointer;padding:2px 4px" title="Atualizar">&#8635;</button></div></div>'
+    +'<div id="mkt-widget-prices" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">'
+    +'<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Cobre</div><div id="mkt-w-copper" style="font-size:13px;font-weight:700;color:#B87333;font-family:monospace">—</div><div id="mkt-w-copper-u" style="font-size:9px;color:var(--mt)">R$/kg</div></div>'
+    +'<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Alumínio</div><div id="mkt-w-aluminum" style="font-size:13px;font-weight:700;color:#A8C4D4;font-family:monospace">—</div><div id="mkt-w-aluminum-u" style="font-size:9px;color:var(--mt)">R$/kg</div></div>'
+    +'<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Latão</div><div id="mkt-w-brass" style="font-size:13px;font-weight:700;color:#C8A84B;font-family:monospace">—</div><div id="mkt-w-brass-u" style="font-size:9px;color:var(--mt)">R$/kg</div></div>'
+    +'<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Ouro</div><div id="mkt-w-gold" style="font-size:13px;font-weight:700;color:#D4AF37;font-family:monospace">—</div><div id="mkt-w-gold-u" style="font-size:9px;color:var(--mt)">R$/g</div></div>'
+    +'<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Prata</div><div id="mkt-w-silver" style="font-size:13px;font-weight:700;color:#C0C0C0;font-family:monospace">—</div><div id="mkt-w-silver-u" style="font-size:9px;color:var(--mt)">R$/g</div></div>'
+    +'<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Lítio</div><div id="mkt-w-lithium" style="font-size:13px;font-weight:700;color:#B0E0FF;font-family:monospace">—</div><div id="mkt-w-lithium-u" style="font-size:9px;color:var(--mt)">R$/kg</div></div>'
+    +'</div></div>':'')
+
     // Card Pesagens em Aberto (se houver)
     +_dashPendCard()
 
@@ -2734,12 +3042,17 @@ function pgDash(){
     // Linha 1: Entradas por período (barras) + Evolução estoque (linha)
     +'<div class="g2">'
 
-    // Gráfico barras
-    +'<div class="card"><div class="stl"><div class="stb"></div><div class="stx">Entradas por Periodo</div></div>'
+    // Gráfico receita
+    +'<div class="card"><div class="stl"><div class="stb" style="background:var(--gr)"></div><div class="stx">Receita por Período</div></div>'
     +perTabH
     +'<div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">'
-    +'<div><div style="font-size:24px;font-weight:800;color:var(--gr);font-family:monospace;line-height:1">'+fKg(perRes.kg)+'<span style="font-size:13px">kg</span></div>'
-    +(perRes.val>0?'<div style="font-size:11px;color:var(--mt)">'+fR(perRes.val)+' em compras</div>':'<div style="font-size:11px;color:var(--mt)">Coletas/doações</div>')+'</div>'
+    +'<div>'
+    +(perRes.val>0
+      ?'<div style="font-size:24px;font-weight:800;color:var(--gr);font-family:monospace;line-height:1">'+fR(perRes.val)+'</div>'
+       +'<div style="font-size:11px;color:var(--mt)">'+fKg(perRes.kg)+'kg recebido</div>'
+      :'<div style="font-size:20px;font-weight:800;color:var(--mt);font-family:monospace;line-height:1">R$ 0,00</div>'
+       +'<div style="font-size:11px;color:var(--mt)">sem compras no período</div>')
+    +'</div>'
     +'</div>'
     +'<canvas id="ch-barras" style="width:100%;height:130px;display:block"></canvas>'
     +'</div>'
@@ -2755,10 +3068,22 @@ function pgDash(){
     // Linha 2: Estoque material + pizza tipos
     +'<div class="g2">'
 
-    // Estoque por material → Estoque
-    +'<div class="card" style="'+dcc+'" onclick="go(\&apos;estoque\&apos;)" title="Ver Estoque" '+dca+'>'
-    +'<div class="stl"><div class="stb"></div><div class="stx">Estoque por Material <span style="color:var(--gr);opacity:.6;font-size:10px">›</span></div></div>'
-    +estH+'</div>'
+    // Estoque por material com abas
+    +'<div class="card">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+    +'<div class="stl" style="margin-bottom:0"><div class="stb"></div><div class="stx">Materiais</div></div>'
+    +'<div style="display:flex;gap:0;background:var(--bg);border:1px solid var(--bd);border-radius:20px;overflow:hidden">'
+    +'<button id="est-tab-est" onclick="_estTab(\'estoque\')" style="padding:3px 10px;font-size:10px;border:none;border-radius:20px;background:var(--gr);color:#fff;font-weight:700;cursor:pointer">Estoque</button>'
+    +'<button id="est-tab-dia" onclick="_estTab(\'dia\')" style="padding:3px 10px;font-size:10px;border:none;border-radius:0;background:transparent;color:var(--mt);cursor:pointer">Hoje</button>'
+    +'<button id="est-tab-sem" onclick="_estTab(\'semana\')" style="padding:3px 10px;font-size:10px;border:none;border-radius:0;background:transparent;color:var(--mt);cursor:pointer">7 dias</button>'
+    +'<button id="est-tab-mes" onclick="_estTab(\'mes\')" style="padding:3px 10px;font-size:10px;border:none;border-radius:20px;background:transparent;color:var(--mt);cursor:pointer">Mês</button>'
+    +'</div></div>'
+    +'<div id="est-panel-estoque">'+estH+'</div>'
+    +'<div id="est-panel-dia" style="display:none">'+estHDia+'</div>'
+    +'<div id="est-panel-semana" style="display:none">'+estHSem+'</div>'
+    +'<div id="est-panel-mes" style="display:none">'+estHMes+'</div>'
+    +'<button onclick="go(\'estoque\')" style="margin-top:6px;width:100%;padding:6px;border:none;border-radius:8px;background:var(--s2);color:var(--gr);font-size:11px;font-weight:600;cursor:pointer">Ver estoque completo ›</button>'
+    +'</div>'
 
     // Pizza tipos de entrada
     +'<div class="card"><div class="stl"><div class="stb"></div><div class="stx">Tipos de Entrada</div></div>'
@@ -2806,6 +3131,209 @@ function pgDash(){
 
   // Renderiza gráficos após inserir no DOM (chamado pelo go())
   return html;
+}
+
+// ════════════════════════════════════════════════════════════
+// ── MÓDULO MERCADO (apenas adm) ──────────────────────────
+// ════════════════════════════════════════════════════════════
+var _mktPrices={gold:742,silver:13.65,copper:71.3,palladium:240,platinum:334.2,aluminum:17.89,lithium:116.8,rareearth:1.20,brass:28.42};
+var _mktStatus='idle'; // 'idle' | 'loading' | 'live' | 'fallback'
+var _mktUpdAt='—';
+var _mktBrl=5.15;
+var _mktExpandido=null;
+
+var _mktMetals=[
+  {id:'gold',    nome:'Ouro',        sym:'Au',  unit:'g',   cor:'#D4AF37', chg:1.8},
+  {id:'silver',  nome:'Prata',       sym:'Ag',  unit:'g',   cor:'#C0C0C0', chg:2.4},
+  {id:'copper',  nome:'Cobre',       sym:'Cu',  unit:'kg',  cor:'#B87333', chg:4.6},
+  {id:'palladium',nome:'Paládio',    sym:'Pd',  unit:'g',   cor:'#8B8FA8', chg:-1.2},
+  {id:'platinum',nome:'Platina',     sym:'Pt',  unit:'g',   cor:'#E5E4E2', chg:0.9},
+  {id:'aluminum',nome:'Alumínio',    sym:'Al',  unit:'kg',  cor:'#A8C4D4', chg:3.1},
+  {id:'lithium', nome:'Lítio',       sym:'Li',  unit:'kg',  cor:'#B0E0FF', chg:5.2},
+  {id:'rareearth',nome:'Terras Raras',sym:'TR', unit:'g',   cor:'#7CB87C', chg:6.4},
+  {id:'brass',   nome:'Latão',       sym:'Cu+Zn',unit:'kg', cor:'#C8A84B', chg:4.1}
+];
+
+var _mktForecasts=[
+  {id:'gold',    nome:'Ouro',       cor:'#D4AF37',ref:'US$ 4.712 / oz',status:'Excelente',statusCor:'#D4AF37',var:'+60% no ano',fatores:['Compras recordes dos bancos centrais','Tensões globais elevam demanda por proteção'],riscos:['Acordo de paz pode pressionar queda','Alta dos juros nos EUA seria negativo'],nota:'Momento favorável para segurar estoque físico ou aguardar valorização que pode render mais 10-14%.'},
+  {id:'copper',  nome:'Cobre',      cor:'#B87333',ref:'US$ 6,60 / lb',status:'Recorde',statusCor:'#E28743',var:'Histórico',fatores:['NOVO RECORDE: Máxima operacional atingida hoje','Demanda massiva de IA, Chips e Data Centers'],riscos:['Acordos no Oriente Médio podem normalizar oferta','Volatilidade por tarifas comerciais'],nota:'COBRE EM RECORDE. Melhor momento histórico para negociar sucatas, fios e placas de circuito.'},
+  {id:'silver',  nome:'Prata',      cor:'#C0C0C0',ref:'US$ 34,20 / oz',status:'Favorável',statusCor:'#A0A0A0',var:'+28% no ano',fatores:['Alta acompanhando rali do ouro','Demanda industrial crescente (painéis solares)'],riscos:['Mais volátil que o ouro','Menor liquidez imediata no varejo'],nota:'Placas eletrônicas contêm prata significativa. Alta favorece reciclagem em lote.'},
+  {id:'palladium',nome:'Paládio',   cor:'#8B8FA8',ref:'US$ 980 / oz',status:'Alerta',statusCor:'#F87171',var:'-12% no ano',fatores:['Oferta restrita (Rússia e África do Sul)','Tensões geopolíticas sustentam mínimos'],riscos:['Queda prevista no curto prazo','Substituição por platina em catalisadores'],nota:'⚠️ Tendência de queda estrutural. Considere liquidar estoque remanescente agora.'},
+  {id:'platinum',nome:'Platina',    cor:'#E5E4E2',ref:'US$ 1.120 / oz',status:'Alta Hist.',statusCor:'#E5E4E2',var:'+18% no ano',fatores:['Alta histórica consistente','Mercado com déficit de oferta contínuo'],riscos:['Alta de juros globais pode reduzir demanda industrial'],nota:'Platina em alta histórica consistente. Excelente momento para manter estoque operacional.'},
+  {id:'aluminum',nome:'Alumínio',   cor:'#A8C4D4',ref:'US$ 2.950 / t',status:'Pico',statusCor:'#A8C4D4',var:'+44% no ano',fatores:['Crise de logística no Oriente Médio','Forte demanda automotiva global'],riscos:['Normalização da oferta reduziria pressão imediatamente'],nota:'Alumínio perto do recorde de 4 anos. Momento excelente para negociar lotes de fundição.'},
+  {id:'lithium', nome:'Lítio',      cor:'#B0E0FF',ref:'US$ 14.200 / t',status:'Boom',statusCor:'#60A5FA',var:'+50% no ano',fatores:['Demanda de sistemas de armazenamento para data centers de IA','Infraestrutura de recarga em expansão'],riscos:['Estoques altos na China podem frear altas','Oferta australiana crescendo'],nota:'Baterias de celulares e notebooks têm lítio concentrado. Alta de +50% torna a reciclagem muito lucrativa.'},
+  {id:'rareearth',nome:'Terras Raras',cor:'#7CB87C',ref:'Preço sob consulta',status:'Restrito',statusCor:'#34D399',var:'+64% no ano',fatores:['China restringiu cotas de exportação','Demanda explosiva de ímãs para VEs'],riscos:['Aumento de plantas de refino fora da China','Substituição tecnológica no longo prazo'],nota:'Ímãs internos de eletrônicos pesados valem muito. Momento estratégico para comercialização rápida.'},
+  {id:'brass',   nome:'Latão',      cor:'#C8A84B',ref:'Cálculo proporcional',status:'Acompanha',statusCor:'#C8A84B',var:'+32% no ano',fatores:['Rali do cobre puxa diretamente o latão','Demanda em alta para conectores eletrônicos'],riscos:['Volatilidade inerente do cobre bruto afeta margens'],nota:'Latão em forte escalada com o cobre. Excelente indicador para separação e processamento de ligas metálicas.'}
+];
+
+var _mktAlerts=[
+  {id:'copper',   cor:'#B87333',metal:'Cobre',     msg:'NOVO RECORDE US$ 6,60/lb. Negociar agora.'},
+  {id:'lithium',  cor:'#B0E0FF',metal:'Lítio',     msg:'+50% no ano. Baterias valem muito.'},
+  {id:'aluminum', cor:'#A8C4D4',metal:'Alumínio',  msg:'+44% no ano. Alta por crise no O. Médio.'},
+  {id:'rareearth',cor:'#7CB87C',metal:'T. Raras',  msg:'+64% no ano. Ímãs valem muito.'},
+  {id:'gold',     cor:'#D4AF37',metal:'Ouro',      msg:'US$ 4.712/oz. Cotação favorável para venda.'},
+  {id:'palladium',cor:'#8B8FA8',metal:'Paládio',   msg:'Tendência de queda. Venda já.'}
+];
+
+async function _mktFetch(){
+  _mktStatus='loading';
+  _mktRenderPage();
+  var OZ=31.1035;
+  var brl=5.15;
+  try{
+    var rc=await fetch('https://api.frankfurter.app/latest?from=USD&to=BRL');
+    var dc=await rc.json();
+    if(dc&&dc.rates&&dc.rates.BRL)brl=dc.rates.BRL;
+    _mktBrl=brl;
+  }catch(e){}
+  try{
+    var p=Object.assign({},_mktPrices);
+    var rm=await fetch('https://api.metals.live/v1/spot/gold,silver,platinum,copper');
+    var arr=await rm.json();
+    var m={};arr.forEach(function(o){Object.assign(m,o);});
+    if(m.gold)p.gold=(m.gold/OZ)*brl;
+    if(m.silver)p.silver=(m.silver/OZ)*brl;
+    if(m.platinum)p.platinum=(m.platinum/OZ)*brl;
+    if(m.palladium)p.palladium=(m.palladium/OZ)*brl;
+    if(m.copper)p.copper=(m.copper/OZ)*1000*brl;
+    if(m.aluminum)p.aluminum=(m.aluminum/OZ)*1000*brl;
+    p.brass=p.copper*0.40;
+    p.rareearth=(244.9/1000)*brl;
+    p.lithium=(173000/7.25/1000)*brl;
+    _mktPrices=p;
+    var n=new Date();
+    _mktUpdAt=n.toLocaleDateString('pt-BR')+' às '+n.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    _mktStatus='live';
+  }catch(e){
+    var n=new Date();
+    _mktUpdAt=n.toLocaleDateString('pt-BR')+' (Modo Offline)';
+    _mktStatus='fallback';
+  }
+  _mktRenderPage();
+  _mktUpdateWidget();
+}
+
+function _mktFetchWidget(){
+  _mktFetch();
+}
+
+function _mktUpdateWidget(){
+  var ids=['copper','aluminum','brass','gold','silver','lithium'];
+  for(var i=0;i<ids.length;i++){
+    var el=document.getElementById('mkt-w-'+ids[i]);
+    if(el)el.textContent='R$ '+(_mktPrices[ids[i]]||0).toFixed(2);
+  }
+  var dot=document.getElementById('mkt-dot');
+  var sta=document.getElementById('mkt-status');
+  if(dot){dot.style.background=_mktStatus==='live'?'#22c55e':_mktStatus==='fallback'?'#ef4444':'#f59e0b';}
+  if(sta){sta.textContent=_mktStatus==='live'?'Ao vivo · '+_mktUpdAt:_mktStatus==='fallback'?'Offline':'Carregando...';}
+}
+
+function _mktToggle(id){
+  _mktExpandido=(_mktExpandido===id?null:id);
+  _mktRenderPage();
+}
+
+function _mktRenderPage(){
+  var el=document.getElementById('pg-mercado-inner');
+  if(!el)return;
+
+  var dotCor=_mktStatus==='live'?'#22c55e':_mktStatus==='fallback'?'#ef4444':'#f59e0b';
+  var dotAnim=_mktStatus==='loading'?'animation:bvPulse .8s ease-in-out infinite':'';
+  var staLabel=_mktStatus==='live'?'Ao vivo: '+_mktUpdAt:_mktStatus==='loading'?'Buscando cotações...':'Modo Offline (Fallback)';
+
+  // ── Status bar ──
+  var h='<div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px">'
+    +'<div><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Status do Mercado</div>'
+    +'<div style="display:flex;align-items:center;gap:7px">'
+    +'<span style="width:8px;height:8px;border-radius:50%;background:'+dotCor+';display:inline-block;'+dotAnim+'"></span>'
+    +'<span style="font-size:12px;color:var(--tx)">'+staLabel+'</span></div></div>'
+    +'<button onclick="_mktFetch()" style="background:none;border:none;color:var(--mt);font-size:18px;cursor:pointer;padding:4px" title="Atualizar">&#8635;</button>'
+    +'</div>';
+
+  // ── Alertas estratégicos ──
+  h+='<div class="card"><div class="stl"><div class="stb" style="background:#C8A84B"></div><div class="stx" style="color:#C8A84B">Alertas Estratégicos</div></div>';
+  for(var i=0;i<_mktAlerts.length;i++){
+    var al=_mktAlerts[i];
+    h+='<div onclick="_mktToggle(\''+al.id+'\')" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bd);cursor:pointer">'
+      +'<div style="width:8px;height:8px;border-radius:50%;background:'+al.cor+';flex-shrink:0"></div>'
+      +'<div style="flex:1;min-width:0"><span style="font-size:12px;font-weight:700;color:'+al.cor+'">'+al.metal+'</span>'
+      +'<span style="font-size:12px;color:var(--mt);margin-left:6px">'+al.msg+'</span></div>'
+      +'<span style="color:var(--mt);font-size:12px">'+(_mktExpandido===al.id?'▲':'▼')+'</span></div>';
+  }
+  h+='</div>';
+
+  // ── Cotações do dia ──
+  h+='<div class="card"><div class="stl"><div class="stb"></div><div class="stx">Cotações do Dia</div></div>';
+  for(var i=0;i<_mktMetals.length;i++){
+    var mt=_mktMetals[i];var pr=(_mktPrices[mt.id]||0);
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bd)">'
+      +'<div style="width:36px;height:36px;border-radius:9px;background:'+mt.cor+'18;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700;color:'+mt.cor+'">'+mt.sym+'</div>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--tx)">'+mt.nome+'</div>'
+      +'<div style="font-size:10px;color:var(--mt)">'+mt.sym+' (R$/'+mt.unit+')</div></div>'
+      +'<div style="text-align:right">'
+      +'<div style="font-size:14px;font-weight:800;color:'+mt.cor+';font-family:monospace">R$ '+pr.toFixed(2)+'</div>'
+      +'<div style="font-size:11px;font-weight:700;color:'+(mt.chg>=0?'#22c55e':'#ef4444')+'">'+(mt.chg>=0?'▲ +':'▼ ')+mt.chg.toFixed(2)+'%</div>'
+      +'</div></div>';
+  }
+  h+='</div>';
+
+  // ── Previsões / Análise de Mercado ──
+  h+='<div class="card"><div class="stl"><div class="stb" style="background:#C8A84B"></div><div class="stx" style="color:#C8A84B">Análise de Mercado 2026</div></div>'
+    +'<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#D0F0D8;line-height:1.6">'
+    +'<strong style="color:#22c55e;font-size:10px;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px">Visão Macro Estratégica</strong>'
+    +'Cobre em recorde histórico. Ouro +60% no ano. Lítio +50%. Momento extremamente favorável para liquidação de estoques e reciclagem industrial de placas e baterias.</div>';
+  for(var i=0;i<_mktForecasts.length;i++){
+    var fc=_mktForecasts[i];var open=_mktExpandido===fc.id;
+    h+='<div style="border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:8px">'
+      +'<div onclick="_mktToggle(\''+fc.id+'\')" style="display:flex;align-items:center;justify-content:space-between;padding:12px;cursor:pointer;background:var(--s2)">'
+      +'<div style="display:flex;align-items:center;gap:10px">'
+      +'<div style="width:36px;height:36px;border-radius:9px;background:'+fc.cor+'18;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px">💱</div>'
+      +'<div><div style="font-size:13px;font-weight:700;color:var(--tx)">'+fc.nome+'</div>'
+      +'<div style="font-size:10px;color:var(--mt)">'+fc.ref+'</div></div></div>'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<div style="text-align:right"><span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:'+fc.cor+'28;color:'+fc.cor+';text-transform:uppercase;display:block;margin-bottom:2px">'+fc.status+'</span>'
+      +'<span style="font-size:12px;font-weight:700;color:'+(fc.var.startsWith('-')?'#ef4444':'#22c55e')+'">'+fc.var+'</span></div>'
+      +'<span style="color:var(--mt)">'+( open?'▲':'▼')+'</span>'
+      +'</div></div>';
+    if(open){
+      h+='<div style="padding:12px;background:var(--bg);border-top:1px solid var(--bd)">'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+        +'<div style="padding:10px;background:var(--s2);border:1px solid var(--bd);border-radius:8px"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Cotação Local</div><div style="font-size:15px;font-weight:700;color:'+fc.cor+';font-family:monospace;margin-top:2px">R$ '+(_mktPrices[fc.id]||0).toFixed(2)+'</div></div>'
+        +'<div style="padding:10px;background:var(--s2);border:1px solid var(--bd);border-radius:8px"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Tendência</div><div style="font-size:13px;font-weight:700;margin-top:4px;color:'+(fc.var.startsWith('-')?'#ef4444':'#22c55e')+'">'+(fc.var.startsWith('-')?'▼ Queda':'▲ Alta')+'</div></div></div>'
+        +'<div style="margin-bottom:8px"><div style="font-size:10px;color:#22c55e;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Fatores de Impulso</div>';
+      for(var j=0;j<fc.fatores.length;j++)h+='<div style="font-size:12px;color:var(--tx);display:flex;gap:6px;margin-bottom:4px"><span style="color:#22c55e;flex-shrink:0">•</span>'+fc.fatores[j]+'</div>';
+      h+='</div><div style="margin-bottom:8px"><div style="font-size:10px;color:#ef4444;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Riscos de Baixa</div>';
+      for(var j=0;j<fc.riscos.length;j++)h+='<div style="font-size:12px;color:var(--tx);display:flex;gap:6px;margin-bottom:4px"><span style="color:#ef4444;flex-shrink:0">•</span>'+fc.riscos[j]+'</div>';
+      h+='</div><div style="padding:10px;border-radius:8px;font-size:12px;font-weight:500;line-height:1.6;background:'+fc.cor+'12;color:'+fc.cor+'">ℹ '+fc.nota+'</div>'
+        +'</div>';
+    }
+    h+='</div>';
+  }
+  h+='</div>';
+
+  el.innerHTML=h;
+}
+
+function pgMercado(){
+  setTimeout(function(){_mktFetch();},60);
+  return '<div class="fc" id="pg-mercado-inner"><div style="text-align:center;padding:40px;color:var(--mt)">Carregando cotações...</div></div>';
+}
+
+function _estTab(modo){
+  var tabs={estoque:'est-tab-est',dia:'est-tab-dia',semana:'est-tab-sem',mes:'est-tab-mes'};
+  var panels=['estoque','dia','semana','mes'];
+  var cores={estoque:'var(--gr)',dia:'#3b82f6',semana:'#3b82f6',mes:'#3b82f6'};
+  for(var k in tabs){
+    var btn=document.getElementById(tabs[k]);
+    var pan=document.getElementById('est-panel-'+k);
+    if(!btn||!pan)continue;
+    var on=(k===modo);
+    btn.style.background=on?cores[k]:'transparent';
+    btn.style.color=on?'#fff':'var(--mt)';
+    btn.style.fontWeight=on?'700':'400';
+    pan.style.display=on?'':'none';
+  }
 }
 
 // ── Swipe coletas card ─────────────────────────────────────
@@ -5161,28 +5689,43 @@ function pgAgenda(){
 
   // ── VISÃO DIA (hoje) ────────────────────────────────
   function buildDia(){
-    var horas=['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00'];
-    var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
-    html+='<span style="font-size:13px;font-weight:700">📅 Hoje — '+hjStr+'</span></div>';
-    html+='<div class="card"><div style="display:grid;grid-template-columns:52px 1fr">';
+    var diaRef=agDiaFiltro||hjStr;
+    var dtRef=_parseDataBR(diaRef);
+    var isHjRef=_sameDay(dtRef,hoje);
+    var diasSemana=['Domingo','Segunda','Terca','Quarta','Quinta','Sexta','Sabado'];
+    var labelDia=(isHjRef?'🟢 Hoje — ':'')+diasSemana[dtRef.getDay()]+', '+diaRef;
+    var horas=['06:00','07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00'];
+    var horaAtual=hoje.getHours();
+    var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px">';
+    html+='<button onclick="agNavDia(-1)" style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:6px 16px;color:var(--tx);font-size:18px;flex-shrink:0">&#8249;</button>';
+    html+='<div style="text-align:center;flex:1"><div style="font-size:14px;font-weight:800">'+labelDia+'</div></div>';
+    html+='<button onclick="agNavDia(1)" style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:6px 16px;color:var(--tx);font-size:18px;flex-shrink:0">&#8250;</button>';
+    html+='</div>';
+    var colsDia=DB.coletas.filter(function(c){return c.data===diaRef;}).sort(function(a,b){return (a.hora||'99:99').localeCompare(b.hora||'99:99');});
+    if(!colsDia.length){
+      html+='<div class="card" style="text-align:center;padding:40px;color:var(--mt)">';
+      html+='<div style="font-size:32px;margin-bottom:10px">📭</div>';
+      html+='<div style="font-weight:700;margin-bottom:4px">Nenhuma coleta neste dia</div>';
+      html+='<div style="font-size:12px">Use as setas para navegar entre os dias</div></div>';
+      return html;
+    }
+    html+='<div class="card" style="padding:0;overflow:hidden"><div style="display:grid;grid-template-columns:52px 1fr">';
     for(var i=0;i<horas.length;i++){
-      var col=null;for(var j=0;j<DB.coletas.length;j++){if(DB.coletas[j].hora===horas[i]&&DB.coletas[j].data===hjStr){col=DB.coletas[j];break;}}
-      var isNow=(hoje.getHours()===parseInt(horas[i]))&&col;
-      html+='<div style="padding:9px 6px 9px 0;font-size:11px;color:var(--ft);border-right:2px solid var(--bd);text-align:right">'+horas[i]+'</div>';
-      html+='<div style="padding:5px 0 5px 11px;border-bottom:1px solid var(--bd);min-height:44px">';
-      if(col){var cor=stCorCol(col.status);html+='<div style="background:'+cor+'18;border:1px solid '+cor+'40;border-radius:7px;padding:5px 9px;cursor:pointer" onclick="agFiltrarDia(\''+col.data+'\')">'+
-        '<div style="font-size:12px;font-weight:700;color:'+cor+'">'+stIcCol(col.status)+' '+col.cli+'</div>'+
-        '<div style="font-size:10px;color:var(--mt)">'+col.peso+'kg · '+col.mat+'</div></div>';}
+      var horaNum=parseInt(horas[i]);
+      var colHora=null;
+      for(var j=0;j<DB.coletas.length;j++){if(DB.coletas[j].hora&&DB.coletas[j].hora.substring(0,5)===horas[i]&&DB.coletas[j].data===diaRef){colHora=DB.coletas[j];break;}}
+      var isNow=isHjRef&&horaNum===horaAtual;
+      html+='<div style="padding:9px 6px 9px 0;font-size:11px;color:'+(isNow?'var(--gr)':'var(--ft)')+';border-right:2px solid '+(isNow?'var(--gr)':'var(--bd)')+';text-align:right;font-weight:'+(isNow?700:400)+'">'+horas[i]+'</div>';
+      html+='<div style="padding:5px 0 5px 11px;border-bottom:1px solid var(--bd);min-height:44px;background:'+(isNow?'rgba(34,197,94,0.04)':'transparent')+'">';
+      if(colHora){var cor=stCorCol(colHora.status);html+='<div style="background:'+cor+'18;border:1px solid '+cor+'40;border-radius:7px;padding:6px 10px">'+
+        '<div style="font-size:12px;font-weight:700;color:'+cor+'">'+stIcCol(colHora.status)+' '+colHora.cli+'</div>'+
+        '<div style="font-size:10px;color:var(--mt);margin-top:2px">'+colHora.peso+'kg &middot; '+colHora.mat+' &middot; &#128667; '+colHora.mot+'</div></div>';}
       html+='</div>';
     }
     html+='</div></div>';
-    // listagem detalhada do dia
-    var colHoje=DB.coletas.filter(function(c){return c.data===hjStr;}).sort(function(a,b){return (a.hora||'99:99').localeCompare(b.hora||'99:99');});
-    if(colHoje.length){
-      html+='<div style="margin-top:14px">';
-      for(var i=0;i<colHoje.length;i++)html+=_cardColeta(colHoje[i]);
-      html+='</div>';
-    }
+    html+='<div style="margin-top:14px">';
+    for(var i=0;i<colsDia.length;i++)html+=_cardColeta(colsDia[i]);
+    html+='</div>';
     return html;
   }
 
@@ -5223,16 +5766,22 @@ function pgAgenda(){
 }
 
 var agDiaFiltro=null;
-function swAg(v){agVw=v;agDiaFiltro=null;go('agenda');}
+function swAg(v){agVw=v;if(v==='dia'){var h=_today();agDiaFiltro=_fmtDataBR(h);}else{agDiaFiltro=null;}go('agenda');}
 function agNavSem(d){agSemRef=_addDays(agSemRef,d*7);go('agenda');}
 function agNavMes(d){
   var m=agMesRef.month+d;var y=agMesRef.year;
   if(m>11){m=0;y++;}if(m<0){m=11;y--;}
   agMesRef={year:y,month:m};go('agenda');
 }
+function agNavDia(d){
+  var dt=_parseDataBR(agDiaFiltro);
+  dt.setDate(dt.getDate()+d);
+  agDiaFiltro=_fmtDataBR(dt);
+  go('agenda');
+}
 function agFiltrarDia(dStr){
   agDiaFiltro=dStr;
-  if(agVw!=='mes')agVw='lista';
+  agVw='dia';
   go('agenda');
 }
 function updCol(id,s){for(var i=0;i<DB.coletas.length;i++){if(DB.coletas[i].id===id){DB.coletas[i].status=s;break;}}saveDB();go('agenda');}
@@ -7881,7 +8430,7 @@ function delUser(uid){
 // ── Gestão de Funções ──────────────────────────────────────────
 // Base roles stored separately so we can edit them
 var BASE_ROLES=[
-  {id:'adm',     nome:'Administrador',pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','configuracoes']},
+  {id:'adm',     nome:'Administrador',pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','mercado','configuracoes']},
   {id:'caixa',   nome:'Caixa',         pages:['caixa_dia','pesagem','pendencias','estoque_vis']},
   {id:'motorista',nome:'Motorista',    pages:['agenda']},
   {id:'operador', nome:'Operador',     pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','funcionarios','clientes','tabelas']},
