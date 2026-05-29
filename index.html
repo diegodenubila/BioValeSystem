@@ -1321,12 +1321,7 @@ function confAddU(uid){
   var rv=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===uid){rv=DB.revenda[i];break;}}if(!rv)return;
   pesAbas[pesAtiva].itens.push({prodId:null,uid:uid,ic:'&#127991;',nome:rv.prod,peso:rv.peso,preco:rv.preco,tipo:'Venda',uni:true});
   closeM();savePesState();renderPesagem();
-  setTimeout(function(){
-    var ab2=pesAbas[pesAtiva];ab2.pddOpen=true;
-    var panel=document.getElementById('pdd-mat');
-    if(panel){var t=panel.querySelector('.pdd-trigger');var p=panel.querySelector('.pdd-panel');if(t)t.classList.add('open');if(p)p.classList.add('open');}
-    var s=document.getElementById('prod-search');if(s){s.value='';filtrarProd();s.focus();}
-  },150);
+  setTimeout(_reabrirBuscaProd,150);
 }
 function confAddP(prodId){
   var ab=pesAbas[pesAtiva];var prod=gP(prodId);
@@ -1353,20 +1348,7 @@ function confAddP(prodId){
   var tabN='Padrao';if(ab.tabId){for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].id==ab.tabId){tabN=DB.tabelas[i].nome;break;}}}
   ab.itens.push({prodId:prodId,ic:prod.ic,nome:prod.nome,peso:peso,tara:tara,desconto:descVal,descontoTipo:descTipo,pesoLiquido:pesoLiquido,preco:preco,tipo:ab.tipo,uni:false,tabN:tabN});
   closeM();savePesState();renderPesagem();
-  // Reabre busca automaticamente para o próximo item
-  setTimeout(function(){
-    var ab2=pesAbas[pesAtiva];
-    ab2.pddOpen=true;
-    var panel=document.getElementById('pdd-mat');
-    if(panel){
-      var trigger=panel.querySelector('.pdd-trigger');
-      var pnl=panel.querySelector('.pdd-panel');
-      if(trigger)trigger.classList.add('open');
-      if(pnl)pnl.classList.add('open');
-    }
-    var s=document.getElementById('prod-search');
-    if(s){s.value='';filtrarProd();s.focus();}
-  },150);
+  setTimeout(_reabrirBuscaProd,150);
 }
 function confTransfP(prodId,peso,preco){
   var oriNome=document.getElementById('ori-d').value,oriPeso=parseFloat(document.getElementById('ori-p').value)||0;
@@ -1379,12 +1361,7 @@ function confTransfP(prodId,peso,preco){
   if(ab.tabId){for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].id==ab.tabId){tabN=DB.tabelas[i].nome;break;}}}
   ab.itens.push({prodId:prodId,ic:pDest.ic,nome:pDest.nome,peso:peso,preco:preco,tipo:ab.tipo,uni:false,tabN:tabN});
   closeM();savePesState();renderPesagem();
-  setTimeout(function(){
-    var ab2=pesAbas[pesAtiva];ab2.pddOpen=true;
-    var panel=document.getElementById('pdd-mat');
-    if(panel){var t=panel.querySelector('.pdd-trigger');var p=panel.querySelector('.pdd-panel');if(t)t.classList.add('open');if(p)p.classList.add('open');}
-    var s=document.getElementById('prod-search');if(s){s.value='';filtrarProd();s.focus();}
-  },150);
+  setTimeout(_reabrirBuscaProd,150);
 }
 // ── FINALIZACAO DUAL (Recebimento + Pagamento separados) ──────
 function mFinPes(){
@@ -3191,6 +3168,8 @@ function pgDash(){
       var _ma=_mesAtual();
       for(var _i=0;_i<DB.contasFixas.length;_i++){
         var _cf=DB.contasFixas[_i];
+        // Só verifica contas que já estão ativas no mês atual
+        if(!_cfAtivaNoMes(_cf,_ma))continue;
         var _st=_cfStatusMes(_cf);
         if(_st==='Pago')continue;
         var _vd=parseInt(_cf.venc)||1;
@@ -4773,7 +4752,21 @@ function mVerUnidades(nomeBase){
   }
   openM('&#127991; '+nomeBase+' ('+unidades.length+' unidades)','<div class="card" style="padding:0;overflow:hidden">'+rows+'</div>',500);
 }
-function setRevCat(c){revCatFiltro=c;go('revenda');}
+function _reabrirBuscaProd(){
+  var ab2=pesAbas[pesAtiva];ab2.pddOpen=true;
+  var panel=document.getElementById('pdd-mat');
+  if(panel){var t=panel.querySelector('.pdd-trigger');var p=panel.querySelector('.pdd-panel');if(t)t.classList.add('open');if(p)p.classList.add('open');}
+  var s=document.getElementById('prod-search');
+  if(s){s.value='';filtrarProd();setTimeout(function(){
+    s.focus();_pddFocusIdx=-1;
+    s.onkeydown=function(e){
+      if(e.key==='ArrowDown'){e.preventDefault();_pddNavigate('prod-cards-list',1);}
+      else if(e.key==='ArrowUp'){e.preventDefault();_pddNavigate('prod-cards-list',-1);}
+      else if(e.key==='Enter'){e.preventDefault();_pddSelectFocused('prod-cards-list');}
+      else if(e.key==='Escape'){closePdd();}
+    };
+  },150);}
+}
 function setRevCond(c){revCondFiltro=c;go('revenda');}
 var revTabView='lista';
 function _buildRevVendidos(){
