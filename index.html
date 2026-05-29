@@ -1760,8 +1760,8 @@ function _finalizarPesagem(){
       for(var j=0;j<DB.revenda.length;j++){
         if(DB.revenda[j].id===it.uid){
           DB.revenda[j].status='Vendido';
-          // Estoque já foi abatido no cadastro da revenda (saveRev)
-          // Não abater novamente aqui
+          DB.revenda[j].dataVenda=hj();
+          DB.revenda[j].precoVenda=it.preco||DB.revenda[j].preco||0;
           break;
         }
       }
@@ -3772,7 +3772,19 @@ var _estOrdemDir=1; // 1=asc -1=desc
 function _swEstOrdem(o){if(_estOrdem===o)_estOrdemDir*=-1;else{_estOrdem=o;_estOrdemDir=1;}go('estoque');}
 
 function _swEstFiltro(nome){_estFiltro=nome;go('estoque');}
-function _onEstBusca(v){_estBusca=v;go('estoque');}
+function _onEstBusca(v){
+  _estBusca=v;
+  // Atualiza só os cards/lista sem re-renderizar a página toda
+  var ct=document.getElementById('est-produtos-ct');
+  if(ct){
+    ct.innerHTML=_buildEstProdutos();
+    // Mantém o foco no campo
+    var inp=document.getElementById('est-busca');
+    if(inp){var pos=inp.value.length;inp.setSelectionRange(pos,pos);}
+  } else {
+    go('estoque');
+  }
+}
 
 // ── Gerenciamento de Filtros/Categorias de Material ──────────
 function mGerenciarFiltros(){
@@ -4084,12 +4096,13 @@ function pgEstoque(){
       +'<div style="display:flex;justify-content:flex-end;gap:5px;margin-bottom:10px">'
       +'<button onclick="swEVista(\'card\')" style="border:1px solid '+(eVista==='card'?'var(--gr)':'var(--bd)')+';background:'+(eVista==='card'?'var(--grb)':'transparent')+';color:'+(eVista==='card'?'var(--gr)':'var(--mt)')+';border-radius:7px;padding:5px 11px;font-size:15px;cursor:pointer" title="Cards">&#9783;</button>'
       +'<button onclick="swEVista(\'lista\')" style="border:1px solid '+(eVista==='lista'?'var(--gr)':'var(--bd)')+';background:'+(eVista==='lista'?'var(--grb)':'transparent')+';color:'+(eVista==='lista'?'var(--gr)':'var(--mt)')+';border-radius:7px;padding:5px 11px;font-size:15px;cursor:pointer" title="Lista">&#9776;</button>'
-      +'</div>':'')
-    +(eTab==='p'?(eVista==='lista'?lista:'<div class="g3">'+cards+'</div>')
-      :eTab==='e'?entradasH
+      +'</div>'
+      +'<div id="est-produtos-ct">'+(eVista==='lista'?lista:'<div class="g3">'+cards+'</div>')+'</div>'
+      :'')
+    +(eTab==='e'?entradasH
       :eTab==='t'?'<div class="card" style="padding:0;overflow:hidden">'+(rows||'<div style="padding:20px;text-align:center;color:var(--mt)">Nenhuma transferencia registrada.</div>')+'</div>'
       :eTab==='rel'?_buildEstRelatorio()
-      :precosH)
+      :eTab==='pr'?precosH:'')
     +'</div>';
 }
 var _precMudados={};
@@ -4170,6 +4183,59 @@ function pgEstVis(){
   var max=0.1;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].est>max)max=DB.produtos[i].est;}
   var cards='';for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];var ec=p.est===0?'var(--rd)':'var(--gr)';cards+='<div class="card"><div style="font-size:23px;margin-bottom:7px">'+p.ic+'</div><div style="font-size:14px;font-weight:700">'+p.nome+'</div><div style="font-size:22px;font-weight:800;color:'+ec+';font-family:monospace;margin:5px 0">'+fKg(p.est)+' kg</div><div class="bw"><div class="bf" style="width:'+Math.round((p.est/max)*100)+'%;background:'+(p.est===0?'var(--rd)':'linear-gradient(90deg,var(--gr2),var(--gr))')+'"></div></div></div>';}
   return '<div class="fc"><div><div class="pl">Materiais</div><div class="pt">Consulta de Estoque</div></div><div class="g3">'+cards+'</div></div>';
+}
+function _buildEstProdutos(){
+  var max=0.1;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].est>max)max=DB.produtos[i].est;}
+  var prodsFiltrados=DB.produtos.filter(function(p){
+    var matchBusca=!_estBusca||p.nome.toLowerCase().indexOf(_estBusca.toLowerCase())>=0;
+    var matchFiltro=_estFiltro==='Todos'||p.cat===_estFiltro;
+    return matchBusca&&matchFiltro;
+  }).slice().sort(function(a,b){
+    var v=0;
+    if(_estOrdem==='nome') v=a.nome.localeCompare(b.nome,'pt-BR');
+    else if(_estOrdem==='preco') v=a.vV-b.vV;
+    else if(_estOrdem==='cat') v=(a.cat||'').localeCompare(b.cat||'','pt-BR');
+    else if(_estOrdem==='est') v=a.est-b.est;
+    else v=a.id-b.id;
+    return v*_estOrdemDir;
+  });
+  var cards='',lista='<div class="card" style="padding:0;overflow:hidden"><table class="tbl" style="width:100%"><thead><tr><th>Material</th><th style="text-align:right">Estoque</th><th style="text-align:right">Venda</th><th style="text-align:right">Compra</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody>';
+  for(var i=0;i<prodsFiltrados.length;i++){
+    var p=prodsFiltrados[i];
+    var ec=p.est<0?'var(--rd)':p.est===0?'var(--mt)':'var(--gr)';
+    var fcor=(DB.filtrosMat.find(function(f){return f.nome===p.cat;})||{cor:'#6b7280'}).cor;
+    var bw=Math.min(100,Math.round((p.est/max)*100));
+    cards+='<div class="card" style="position:relative;cursor:pointer" onclick="mEditProd('+p.id+')">'
+      +'<div style="font-size:23px;margin-bottom:7px">'+p.ic+'</div>'
+      +'<div style="font-size:14px;font-weight:700;margin-bottom:3px">'+p.nome+'</div>'
+      +'<span style="display:inline-block;margin-bottom:6px;padding:1px 7px;border-radius:10px;font-size:9px;font-weight:700;color:'+fcor+';background:'+fcor+'22;border:1px solid '+fcor+'44">'+p.cat+'</span>'
+      +'<div style="font-size:22px;font-weight:800;color:'+ec+';font-family:monospace;margin:3px 0">'+fKg(p.est)+'<span style="font-size:12px;font-weight:400"> kg</span></div>'
+      +'<div class="bw" style="margin-bottom:8px"><div class="bf" style="width:'+bw+'%;background:'+(p.est<=0?'var(--rd)':'linear-gradient(90deg,var(--gr2),var(--gr))')+';"></div></div>'
+      +'<div style="font-size:11px;color:var(--mt);margin-bottom:8px">Venda: <strong>'+fR(p.vV)+'/kg</strong> &nbsp; Compra: <strong>'+fR(p.vC)+'/kg</strong></div>'
+      +'<div style="display:flex;gap:6px;margin-top:4px">'
+      +'<button class="btn" style="flex:1;font-size:12px;padding:6px" onclick="event.stopPropagation();mTransfPre('+p.id+')">Transferir</button>'
+      +'<button class="btnO bOb" style="font-size:12px;padding:6px 10px" onclick="event.stopPropagation();mEditProd('+p.id+')" title="Editar">&#9998;</button>'
+      +'<button class="btnO bOr" style="font-size:12px;padding:6px 10px" onclick="event.stopPropagation();mDelProd('+p.id+')" title="Excluir">&#128465;</button>'
+      +'</div></div>';
+    lista+='<tr style="border-bottom:1px solid var(--bd)">'
+      +'<td style="padding:9px 12px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">'+p.ic+'</span><div><div style="font-size:13px;font-weight:700">'+p.nome+'</div><span style="display:inline-block;margin-top:2px;padding:1px 6px;border-radius:10px;font-size:9px;font-weight:600;color:'+fcor+';background:'+fcor+'22;border:1px solid '+fcor+'44;letter-spacing:.3px">'+p.cat+'</span></div></div></td>'
+      +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-weight:700;color:'+ec+'">'+fKg(p.est)+' kg</td>'
+      +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-size:12px;color:var(--gr)">'+fR(p.vV)+'/kg</td>'
+      +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-size:12px;color:var(--bl)">'+fR(p.vC)+'/kg</td>'
+      +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-size:12px;color:var(--or)">'+fR(p.est*p.vV)+'</td>'
+      +'<td style="padding:9px 12px;text-align:right">'
+      +'<div style="display:flex;gap:4px;justify-content:flex-end">'
+      +'<button class="bsm" style="background:var(--s2);border:1px solid var(--bd);color:var(--mt);padding:3px 7px" onclick="mTransfPre('+p.id+')" title="Transferir">&#8646;</button>'
+      +'<button class="bsm" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);padding:3px 7px" onclick="mEditProd('+p.id+')" title="Editar">&#9998;</button>'
+      +'<button class="bsm" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);padding:3px 7px" onclick="mDelProd('+p.id+')" title="Excluir">&#128465;</button>'
+      +'</div></td></tr>';
+  }
+  if(!prodsFiltrados.length){
+    cards='<div class="card" style="text-align:center;padding:30px;color:var(--mt)">&#128269; Nenhum material encontrado.</div>';
+    lista+='<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--mt)">Nenhum material encontrado.</td></tr>';
+  }
+  lista+='</tbody></table></div>';
+  return eVista==='lista'?lista:'<div class="g3">'+cards+'</div>';
 }
 function swET(t){eTab=t;go('estoque');}
 
@@ -4626,7 +4692,7 @@ function pgRevenda(){
       +'<span style="font-size:19px;font-weight:700;color:var(--gr)">'+fR(p0.preco)+'</span>'
       +'<div style="display:flex;gap:5px" onclick="event.stopPropagation()">'
       +'<button class="btn" style="font-size:12px;padding:6px 11px" onclick="mVU('+p0.id+')">Vender</button>'
-      +(qtd>1?'<button class="btnO bOb" style="font-size:12px;padding:5px 9px" title="Ver todas as unidades" onclick="mVerUnidades(\''+(p0.nomeBase||'').replace(/'/g,"\\'")+'\')" >&#128203; '+qtd+'</button>':'')
+      +(qtd>1?'<button class="btnO bOb" style="font-size:12px;padding:5px 9px" title="Ver todas as unidades" onclick="mVerUnidadesPorIds('+grp.items.map(function(x){return x.id;}).join(',')+')">&#128203; '+qtd+'</button>':'')
       +'<button class="btnO bOr" style="font-size:12px;padding:5px 9px;min-height:30px" title="Excluir" onclick="mDelRev('+p0.id+')">&#128465;</button>'
       +'</div></div></div>';
   }
@@ -4665,6 +4731,25 @@ function pgRevenda(){
     +(revTabAtiva==='lista'?catBar+condBar+'<div class="g2">'+cards+'</div>':_buildRevVendidos())
     +'</div>';
 }
+function mVerUnidadesPorIds(){
+  var ids=Array.prototype.slice.call(arguments);
+  var unidades=DB.revenda.filter(function(p){return ids.indexOf(p.id)>=0&&p.status==='Disponivel';});
+  var titulo=unidades.length?((unidades[0].prod||'Produto')+' ('+unidades.length+' unidades)'):'Unidades';
+  var rows='';
+  for(var i=0;i<unidades.length;i++){
+    var p=unidades[i];
+    rows+='<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--bd)">'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:600">'+(p.prod||'Produto')+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+(p.cond||'')+(p.desc?' &middot; '+p.desc.slice(0,40):'')+'</div></div>'
+      +'<div style="display:flex;gap:6px;align-items:center">'
+      +'<span style="font-size:13px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(p.preco)+'</span>'
+      +'<button class="btn" style="font-size:11px;padding:4px 10px" onclick="closeM();mVU('+p.id+')">Vender</button>'
+      +'<button class="btnO bOb" style="font-size:11px;padding:4px 8px" onclick="closeM();mEditRev('+p.id+')">&#9998;</button>'
+      +'</div></div>';
+  }
+  if(!rows)rows='<div style="padding:20px;text-align:center;color:var(--mt)">Nenhuma unidade disponivel.</div>';
+  openM('&#127991; '+titulo,'<div class="card" style="padding:0;overflow:hidden">'+rows+'</div>',500);
+}
 function mVerUnidades(nomeBase){
   var unidades=DB.revenda.filter(function(p){
     var nb=(p.prod||p.nome||'').replace(/ #\d+$/,'');
@@ -4696,7 +4781,9 @@ function _buildRevVendidos(){
   var perBar=_buildPerBar(per,'revRel','','','swRevRelPer');
   var vendidos=DB.revenda.filter(function(p){
     if(p.status==='Disponivel')return false;
-    return _perFiltro(p.dataVenda||'',per,_revRelD1,_revRelD2);
+    var data=p.dataVenda||'';
+    if(!data)return per==='tudo'; // sem data, só mostra em "Todos"
+    return _perFiltro(data,per,_revRelD1,_revRelD2);
   });
   var totalVend=0;for(var i=0;i<vendidos.length;i++)totalVend+=vendidos[i].precoVenda||vendidos[i].preco||0;
   var resumo='<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">'
