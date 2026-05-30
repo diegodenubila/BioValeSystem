@@ -4691,6 +4691,7 @@ function pgRevenda(){
       +'<button class="btn" style="font-size:12px;padding:6px 11px" onclick="mVU('+p0.id+')">Vender</button>'
       +(qtd>1?'<button class="btnO bOb" style="font-size:12px;padding:5px 9px" title="Ver todas as unidades" onclick="mVerUnidadesPorIds('+grp.items.map(function(x){return x.id;}).join(',')+')">&#128203; '+qtd+'</button>':'')
       +'<button class="btnO" style="font-size:12px;padding:5px 9px;border:1px solid var(--gr);color:var(--gr)" title="Adicionar unidade" onclick="mAddUnidade('+p0.id+')">+</button>'
+      +'<button class="btnO bOb" style="font-size:12px;padding:5px 9px" title="Imprimir etiqueta" onclick="imprimirEtiqueta('+p0.id+')">&#128424;</button>'
       +'<button class="btnO bOr" style="font-size:12px;padding:5px 9px;min-height:30px" title="Excluir" onclick="mDelRev('+p0.id+')">&#128465;</button>'
       +'</div></div></div>';
   }
@@ -4958,14 +4959,14 @@ function imprimirEtiqueta(id){
   if(!p)return;
   var cod=_revCodigo(p.id);var bars=_gerarCode128(cod);
   var nomeEmp=(CFG.empresa&&CFG.empresa.nome)||'BioVale';
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Etiqueta</title>'
+  var conteudo='<!DOCTYPE html><html><head><meta charset="UTF-8">'
     +'<style>*{margin:0;padding:0;box-sizing:border-box}@page{size:80mm auto;margin:3mm}body{font-family:"Courier New",monospace;width:74mm;background:#fff;color:#000;padding:2mm}'
     +'.emp{font-size:10px;font-weight:700;text-align:center;margin-bottom:2px}'
     +'.nome{font-size:13px;font-weight:800;text-align:center;margin:4px 0;line-height:1.3}'
     +'.info{font-size:9px;text-align:center;color:#555;margin:2px 0}'
     +'.preco{font-size:22px;font-weight:900;text-align:center;margin:6px 0}'
     +'.bc{text-align:center;margin:4px 0}'
-    +'.cod{font-size:9px;text-align:center;letter-spacing:3px;margin-top:2px;font-family:monospace}'
+    +'.cod{font-size:9px;text-align:center;letter-spacing:3px;margin-top:2px}'
     +'.ln{border-top:1px dashed #aaa;margin:4px 0}'
     +'</style></head><body>'
     +'<div class="emp">'+nomeEmp+'</div>'
@@ -4977,10 +4978,29 @@ function imprimirEtiqueta(id){
     +'<div class="bc">'+bars+'</div>'
     +'<div class="cod">'+cod+'</div>'
     +'<div class="ln"></div>'
-    +'<script>window.onload=function(){window.print();}<\/script>'
     +'</body></html>';
-  var nw=window.open('','_blank','width=320,height=500');
-  nw.document.write(html);nw.document.close();
+
+  // Usa iframe dentro de modal para evitar bloqueio de popup no celular
+  var html='<div style="text-align:center;margin-bottom:10px">'
+    +'<iframe id="etq-frame" style="width:100%;height:320px;border:1px solid var(--bd);border-radius:var(--r);background:#fff"></iframe>'
+    +'</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px;text-align:center">Código: <strong style="font-family:monospace">'+cod+'</strong></div>'
+    +'<div class="brow">'
+    +'<button class="btnO bOgr" onclick="closeM()">Fechar</button>'
+    +'<button class="btn" onclick="document.getElementById(\'etq-frame\').contentWindow.print()">&#128424; Imprimir</button>'
+    +'</div>';
+
+  openM('&#128424; Etiqueta — '+p.prod, html, 440);
+
+  // Carrega o conteúdo no iframe após o modal abrir
+  setTimeout(function(){
+    var frame=document.getElementById('etq-frame');
+    if(frame){
+      frame.contentDocument.open();
+      frame.contentDocument.write(conteudo);
+      frame.contentDocument.close();
+    }
+  },100);
 }
 function setRevCond(c){revCondFiltro=c;go('revenda');}
 var revTabView='lista';
