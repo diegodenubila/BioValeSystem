@@ -5461,6 +5461,33 @@ function _finResumo(){
     +ticketH+rankH+matH+'</div>';
 }
 
+function _somaComprasAh(ah,total){
+  var itens=ah.itens||ah.itensList||[];
+  for(var j=0;j<itens.length;j++)total[0]+=_itVal(itens[j]);
+}
+function _fillMesRel(ah,data,meses){
+  var dp=(data||'').split('/');if(dp.length<3)return;
+  var ahM=parseInt(dp[1])-1,ahY=parseInt(dp[2]);
+  for(var m=0;m<meses.length;m++){
+    if(meses[m].month===ahM&&meses[m].year===ahY){
+      if(ah.tipo==='Compra')meses[m].comp+=_mvTotal(ah);
+      else if(ah.tipo==='Venda')meses[m].vend+=_mvTotal(ah);
+    }
+  }
+}
+function _dreRow(label,val,sub,bold,cor,indent){
+  var c=cor||(val>=0?'var(--gr)':'var(--rd)');
+  var fs=bold?'14px':'12px';var fw=bold?'700':'400';
+  var bg=bold?'background:var(--s2);border-radius:8px;':'';
+  var pd=indent?'padding-left:18px':'';
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;margin-bottom:2px;'+bg+pd+'">'
+    +'<div><div style="font-size:'+fs+';font-weight:'+fw+';color:var(--tx)">'+label+'</div>'
+    +(sub?'<div style="font-size:10px;color:var(--mt)">'+sub+'</div>':'')
+    +'</div><span style="font-size:'+fs+';font-weight:700;color:'+c+';font-family:monospace">'+fR(val)+'</span></div>';
+}
+function _dreSection(title){
+  return '<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:2px;padding:10px 10px 4px;border-top:1px solid var(--bd);font-weight:700">'+title+'</div>';
+}
 function _finRelatorio(){
   var _movs=_filtrarMovsPeriodo(DB.movs);
   var catCores={};
@@ -5478,24 +5505,22 @@ function _finRelatorio(){
   }
 
   // Calcula compras do período via caixasHist + atendHist
-  var comprasPeríodo=0;
-  function _somaComprasAh(ah){
-    var itens=ah.itens||ah.itensList||[];
-    for(var j=0;j<itens.length;j++)comprasPeríodo+=_itVal(itens[j]);
-  }
-  for(var i=0;i<atendHist.length;i++){if(atendHist[i].tipo==='Compra')_somaComprasAh(atendHist[i]);}
+  var comprasPeriodo=0;
+  var _cpArr=[0];
+  for(var i=0;i<atendHist.length;i++){if(atendHist[i].tipo==='Compra')_somaComprasAh(atendHist[i],_cpArr);}
   if(DB.caixasHist){
     for(var i=0;i<DB.caixasHist.length;i++){
       var cx=DB.caixasHist[i];
       if(!_filtrarPorPeriodo(cx.data||''))continue;
       var mvs=cx.movimentos||[];
-      for(var j=0;j<mvs.length;j++){if(mvs[j].tipo==='Compra')_somaComprasAh({itens:mvs[j].itensList||[]});}
+      for(var j=0;j<mvs.length;j++){if(mvs[j].tipo==='Compra')_somaComprasAh({itens:mvs[j].itensList||[]},_cpArr);}
     }
   }
+  comprasPeriodo=_cpArr[0];
 
   // Vendas do período via atendHist + caixasHist
   var vendasPeriodo=0;
-  for(var i=0;i<atendHist.length;i++){if(atendHist[i].tipo==='Venda'){var t=_mvTotal(atendHist[i]);vendasPeriodo+=t;}}
+  for(var i=0;i<atendHist.length;i++){if(atendHist[i].tipo==='Venda')vendasPeriodo+=_mvTotal(atendHist[i]);}
   if(DB.caixasHist){
     for(var i=0;i<DB.caixasHist.length;i++){
       var cx=DB.caixasHist[i];
@@ -5508,7 +5533,7 @@ function _finRelatorio(){
   // DRE estruturado
   var outrasRec=totalRec-(recCats['Venda']||0);
   var receitaOp=vendasPeriodo;
-  var cmv=comprasPeríodo;
+  var cmv=comprasPeriodo;
   var recLiq=receitaOp-cmv;
   var margBruta=receitaOp>0?Math.round((recLiq/receitaOp)*100):0;
 
@@ -5525,53 +5550,35 @@ function _finRelatorio(){
     +'</div>';
 
   // Função para linha do DRE
-  function dreRow(label,val,sub,bold,cor,indent){
-    var c=cor||(val>=0?'var(--gr)':'var(--rd)');
-    var fs=bold?'14px':'12px';
-    var fw=bold?'700':'400';
-    var bg=bold?'background:var(--s2);border-radius:8px;':'';
-    var pd=indent?'padding-left:18px':'';
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;margin-bottom:2px;'+bg+pd+'">'
-      +'<div><div style="font-size:'+fs+';font-weight:'+fw+';color:var(--tx)">'+label+'</div>'
-      +(sub?'<div style="font-size:10px;color:var(--mt)">'+sub+'</div>':'')
-      +'</div>'
-      +'<span style="font-size:'+fs+';font-weight:700;color:'+c+';font-family:monospace">'+fR(val)+'</span>'
-      +'</div>';
-  }
-  function dreSection(title,cor){
-    return '<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:2px;padding:10px 10px 4px;border-top:1px solid var(--bd);font-weight:700">'+title+'</div>';
-  }
-
-  // Despesas por categoria para OPEX
   var opexRows='';
   var despKeys=Object.keys(despCats).sort(function(a,b){return despCats[b]-despCats[a];});
   for(var i=0;i<despKeys.length;i++){
     var k=despKeys[i];
     var cor2=catCores[k]||'#6b7280';
-    opexRows+=dreRow('• '+k,despCats[k],'','',cor2,true);
+    opexRows+=_dreRow('• '+k,despCats[k],'','',cor2,true);
   }
 
   var dreCard='<div class="card" style="padding:0;overflow:hidden">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--s2)">'
     +'<div class="stl" style="margin-bottom:0"><div class="stb"></div><div class="stx">Demonstrativo Financeiro (DRE)</div></div>'
     +'</div>'
-    +dreSection('RECEITA OPERACIONAL')
-    +dreRow('Vendas de Material',receitaOp,'','','var(--gr)')
-    +dreSection('OUTRAS RECEITAS')
-    +dreRow('Total Outras Receitas',outrasRec,'','','var(--gr)')
-    +dreSection('CUSTO OPERACIONAL (CMV)')
-    +dreRow('Compras de Material',-cmv,'','','var(--rd)')
+    +_dreSection('RECEITA OPERACIONAL')
+    +_dreRow('Vendas de Material',receitaOp,'','','var(--gr)')
+    +_dreSection('OUTRAS RECEITAS')
+    +_dreRow('Total Outras Receitas',outrasRec,'','','var(--gr)')
+    +_dreSection('CUSTO OPERACIONAL (CMV)')
+    +_dreRow('Compras de Material',-cmv,'','','var(--rd)')
     +'<div style="background:var(--grb);border:1px solid rgba(34,197,94,.2);border-radius:8px;margin:6px 8px;">'
-    +dreRow('= Receita Líquida',recLiq,'Margem Bruta: '+margBruta+'%',true)
+    +_dreRow('= Receita Líquida',recLiq,'Margem Bruta: '+margBruta+'%',true)
     +'</div>'
-    +dreSection('DESPESAS OPERACIONAIS (OPEX)')
+    +_dreSection('DESPESAS OPERACIONAIS (OPEX)')
     +opexRows
     +'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-top:1px solid var(--bd)">'
     +'<span style="font-size:11px;color:var(--mt)">Total Despesas</span>'
     +'<span style="font-size:12px;font-weight:700;color:var(--rd);font-family:monospace">-'+fR(despOp)+'</span>'
     +'</div>'
     +'<div style="background:'+(superavit?'var(--grb)':'var(--rdb)')+';border:1px solid '+(superavit?'rgba(34,197,94,.2)':'rgba(239,68,68,.2)')+';border-radius:8px;margin:6px 8px;">'
-    +dreRow('= Resultado do Período',resultado,superavit?'Superávit':'Déficit',true)
+    +_dreRow('= Resultado do Período',resultado,superavit?'Superávit':'Déficit',true)
     +'</div>'
     +'</div>';
 
@@ -5581,22 +5588,11 @@ function _finRelatorio(){
     var d=new Date(hoje2.getFullYear(),hoje2.getMonth()-m,1);
     meses.push({label:d.toLocaleString('pt-BR',{month:'short'}).replace('.',''),year:d.getFullYear(),month:d.getMonth(),comp:0,vend:0});
   }
-  // Preenche meses com dados
-  function _fillMes(ah,data){
-    var dp=(data||'').split('/');if(dp.length<3)return;
-    var ahM=parseInt(dp[1])-1,ahY=parseInt(dp[2]);
-    for(var m=0;m<meses.length;m++){
-      if(meses[m].month===ahM&&meses[m].year===ahY){
-        if(ah.tipo==='Compra')meses[m].comp+=_mvTotal(ah);
-        else if(ah.tipo==='Venda')meses[m].vend+=_mvTotal(ah);
-      }
-    }
-  }
-  for(var i=0;i<atendHist.length;i++) _fillMes(atendHist[i],hj());
+  for(var i=0;i<atendHist.length;i++) _fillMesRel(atendHist[i],hj(),meses);
   if(DB.caixasHist){
     for(var i=0;i<DB.caixasHist.length;i++){
       var cx=DB.caixasHist[i];var mvs=cx.movimentos||[];
-      for(var j=0;j<mvs.length;j++) _fillMes({tipo:mvs[j].tipo,itens:mvs[j].itensList||[],total:mvs[j].total||0},cx.data||'');
+      for(var j=0;j<mvs.length;j++) _fillMesRel({tipo:mvs[j].tipo,itens:mvs[j].itensList||[],total:mvs[j].total||0},cx.data||'',meses);
     }
   }
   var labelsJ=JSON.stringify(meses.map(function(m){return m.label;}));
@@ -7423,7 +7419,9 @@ function pgFuncs(){
           +'</div>'
           +'<div style="display:flex;align-items:center;gap:7px">'
           +'<span style="font-size:14px;font-weight:700;color:'+(pt.pago?'var(--mt)':'var(--gr)')+';font-family:monospace">'+fR(pt.val)+'</span>'
-          +(pt.pago?'<span class="tag tg">Pago</span>':'<button class="bsm bsmg" onclick="pgPt('+fSel+','+j+')">Pagar</button>')
+          +(pt.pago
+            ?'<span class="tag tg">Pago</span> <button onclick="desfazerPtPago('+fSel+','+j+')" style="background:none;border:none;color:var(--mt);font-size:11px;cursor:pointer;padding:0 2px" title="Desfazer pagamento">&#8629;</button>'
+            :'<button class="bsm bsmg" onclick="pgPt('+fSel+','+j+')">Pagar</button>')
           +'<button onclick="delPt('+fSel+','+j+')" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer">&#215;</button>'
           +'</div></div></div>';
       }
@@ -7571,6 +7569,7 @@ function pgFuncs(){
     +'<div class="ptop"><div><div class="pl">Equipe</div><div class="pt">Funcionarios e Ponto</div></div>'
     +'<div style="display:flex;gap:8px;align-items:center">'
     +(totalPendente>0?'<button class="btn btn-or" onclick="mLancarFolha()" style="font-size:12px;color:#000">&#128181; Folha: '+fR(totalPendente)+'</button>':'')
+    +(DB.movs.length&&DB.movs[0].cat==='Funcionarios'?'<button class="btnO bOr" onclick="desfazerFolha()" style="font-size:12px" title="Desfazer último pagamento de folha">&#8629; Desfazer</button>':'')
     +'<button class="btn" onclick="mNovoFunc()">+ Novo</button>'
     +'</div></div>'
     +'<div style="display:grid;grid-template-columns:'+(fSel!==null?'280px 1fr':'1fr')+';gap:14px">'
@@ -7582,6 +7581,23 @@ function pgFuncs(){
 function setFTab(t){fTab=t;go('funcionarios');}
 function selF(i){fSel=fSel===i?null:i;if(fSel===null)fTab='ponto';go('funcionarios');}
 function pgPt(fi,pi){DB.funcs[fi].pontos[pi].pago=true;_addMovFuncPagamento(fi,pi);saveDB();go('funcionarios');}
+function desfazerPtPago(fi,pi){
+  var f=DB.funcs[fi];var pt=f.pontos[pi];
+  if(!pt||!pt.pago)return;
+  if(!confirm('Desmarcar pagamento de '+pt.data+' ('+fR(pt.val)+')?'))return;
+  pt.pago=false;
+  // Remove o lançamento correspondente se existir
+  var desc='Pagto '+f.nome+' - '+pt.per+' '+pt.data;
+  for(var i=0;i<DB.movs.length;i++){
+    if(DB.movs[i].desc===desc&&DB.movs[i].valor===pt.val){
+      // Estorna na conta
+      for(var j=0;j<DB.contas.length;j++){if(DB.contas[j].nome===DB.movs[i].conta){DB.contas[j].saldo=+(DB.contas[j].saldo+pt.val).toFixed(2);break;}}
+      DB.movs.splice(i,1);break;
+    }
+  }
+  _auditLog('Ponto desfeito',f.nome+' — '+pt.data+' '+pt.per);
+  saveDB();go('funcionarios');
+}
 function delPt(fi,pi){confirmar('Excluir este registro de ponto?',function(){DB.funcs[fi].pontos.splice(pi,1);saveDB();go('funcionarios');});}
 function descAdiant(fi,ai){DB.funcs[fi].adiantamentos[ai].descontado=true;saveDB();go('funcionarios');}
 function delAdiant(fi,ai){confirmar('Excluir adiantamento?',function(){DB.funcs[fi].adiantamentos.splice(ai,1);saveDB();go('funcionarios');});}
@@ -7601,90 +7617,102 @@ function mNovoFunc(){
 }
 
 function mLancarFolha(){
-  // Monta resumo por funcionário
-  var itens=[];
-  var total=0;
-  for(var i=0;i<DB.funcs.length;i++){
-    var f=DB.funcs[i];
-    var pend=fPendente(f);
-    if(pend>0){itens.push({fi:i,nome:f.nome,val:pend});total+=pend;}
-  }
-  if(!itens.length){openM('Folha Semanal','<div style="padding:20px;text-align:center;color:var(--mt)">Nenhum valor pendente para pagar.</div>',400);return;}
+  var itens=[];var total=0;
+  for(var i=0;i<DB.funcs.length;i++){var f=DB.funcs[i];var pend=fPendente(f);if(pend>0){itens.push({fi:i,nome:f.nome,val:pend});total+=pend;}}
+  if(!itens.length){openM('Folha Semanal','<div style="padding:20px;text-align:center;color:var(--mt)">Nenhum valor pendente.</div>',400);return;}
 
-  // Semana atual
   var hoje=new Date();
-  var day=hoje.getDay();
-  var diffMon=hoje.getDate()-day+(day===0?-6:1);
-  var mon=new Date(hoje);mon.setDate(diffMon);
-  var sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  var day=hoje.getDay();var diffMon=hoje.getDate()-day+(day===0?-6:1);
+  var mon=new Date(hoje);mon.setDate(diffMon);var sun=new Date(mon);sun.setDate(mon.getDate()+6);
   var semLabel=mon.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' a '+sun.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
 
-  var contaOpts=DB.contas.map(function(c){return'<option value="'+c.nome+'">'+c.nome+'</option>';}).join('');
+  // Ordena contas: bancárias primeiro, depois caixa
+  var contasSorted=DB.contas.slice().sort(function(a,b){
+    if(a.tipo==='Dinheiro'&&b.tipo!=='Dinheiro')return 1;
+    if(a.tipo!=='Dinheiro'&&b.tipo==='Dinheiro')return -1;
+    return 0;
+  });
+  var contaOpts=contasSorted.map(function(c){return'<option value="'+c.nome+'">'+(c.tipo!=='Dinheiro'?'🏦 ':'')+c.nome+' ('+fR(c.saldo)+')</option>';}).join('');
 
   var rows='';
   for(var i=0;i<itens.length;i++){
-    rows+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)">'
+    rows+='<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd)">'
       +'<span style="font-size:13px;font-weight:600">'+itens[i].nome+'</span>'
       +'<span style="font-size:14px;font-weight:700;color:var(--or);font-family:monospace">'+fR(itens[i].val)+'</span>'
       +'</div>';
   }
 
-  var html='<div class="mf">'
+  openM('💵 Folha Semanal','<div class="mf">'
     +'<div style="background:var(--s2);border-radius:var(--r);padding:12px;margin-bottom:12px">'
     +'<div style="font-size:11px;color:var(--mt);margin-bottom:8px">Semana: <strong>'+semLabel+'</strong></div>'
     +rows
-    +'<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 0;font-weight:700">'
+    +'<div style="display:flex;justify-content:space-between;padding:10px 0 0;font-weight:700">'
     +'<span>Total da Folha</span>'
     +'<span style="font-size:18px;color:var(--rd);font-family:monospace">'+fR(total)+'</span>'
     +'</div></div>'
     +'<div class="fld"><label>Debitar da conta</label>'
-    +'<select class="inp" id="folha-conta">'+contaOpts+'</select></div>'
-    +'<div class="fld"><label>Observacao (opcional)</label>'
-    +'<input class="inp" id="folha-obs" placeholder="Ex: Folha semana '+semLabel+'" value="Folha '+semLabel+'"></div>'
-    +'<div class="brow">'
-    +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
+    +'<select class="inp" id="folha-conta">'+contaOpts+'</select>'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Contas bancárias aparecem primeiro</div></div>'
+    +'<div class="fld"><label>Observacao</label>'
+    +'<input class="inp" id="folha-obs" value="Folha '+semLabel+'"></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
     +'<button class="btn" onclick="confirmarFolha()">Pagar e Lançar</button>'
-    +'</div></div>';
-
-  openM('&#128181; Folha Semanal',html,480);
+    +'</div></div>',480);
 }
 
 function confirmarFolha(){
   var conta=document.getElementById('folha-conta').value;
   var obs=document.getElementById('folha-obs').value||'Folha Semanal';
-  var total=0;
-  var itens=[];
-  for(var i=0;i<DB.funcs.length;i++){
-    var f=DB.funcs[i];
-    var pend=fPendente(f);
-    if(pend>0){itens.push({fi:i,val:pend});total+=pend;}
-  }
+  var total=0;var itens=[];
+  for(var i=0;i<DB.funcs.length;i++){var f=DB.funcs[i];var pend=fPendente(f);if(pend>0){itens.push({fi:i,val:pend});total+=pend;}}
   if(!total)return;
-
-  // Marca todos os pontos não pagos como pagos
   for(var k=0;k<itens.length;k++){
     var f=DB.funcs[itens[k].fi];
-    for(var j=0;j<f.pontos.length;j++){
-      if(!f.pontos[j].pago){f.pontos[j].pago=true;}
-    }
-    // Marca adiantamentos como descontados
-    for(var j=0;j<(f.adiantamentos||[]).length;j++){
-      if(!f.adiantamentos[j].descontado)f.adiantamentos[j].descontado=true;
-    }
+    for(var j=0;j<f.pontos.length;j++){if(!f.pontos[j].pago)f.pontos[j].pago=true;}
+    for(var j=0;j<(f.adiantamentos||[]).length;j++){if(!f.adiantamentos[j].descontado)f.adiantamentos[j].descontado=true;}
   }
-
-  // Lança no financeiro como saída
-  DB.movs.unshift({id:nid(),data:hj(),desc:obs,tipo:'saida',cat:'Funcionarios',valor:total,conta:conta});
-
-  // Debita da conta
-  for(var i=0;i<DB.contas.length;i++){
-    if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo-total).toFixed(2);break;}
-  }
-
-  // Atualiza badge de notificações
+  var movId=nid();
+  DB.movs.unshift({id:movId,data:hj(),desc:obs,tipo:'saida',cat:'Funcionarios',valor:total,conta:conta});
+  for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo-total).toFixed(2);break;}}
+  _auditLog('Folha paga','Total: '+fR(total)+' | Conta: '+conta);
   setTimeout(_atualizarBadgeNotif,100);
-
   closeM();saveDB();go('funcionarios');
+}
+
+function desfazerFolha(){
+  // Encontra o último lançamento de Funcionarios
+  var idx=-1;
+  for(var i=0;i<DB.movs.length;i++){
+    if(DB.movs[i].cat==='Funcionarios'&&DB.movs[i].tipo==='saida'){idx=i;break;}
+  }
+  if(idx<0){alert('Nenhum pagamento de folha encontrado.');return;}
+  var mv=DB.movs[idx];
+  if(!confirm('Desfazer pagamento "'+mv.desc+'" de '+fR(mv.valor)+'?\n\nIsso vai desmarcar TODOS os pontos pagos nesse lançamento.'))return;
+
+  // Estorna na conta
+  for(var i=0;i<DB.contas.length;i++){
+    if(DB.contas[i].nome===mv.conta){DB.contas[i].saldo=+(DB.contas[i].saldo+mv.valor).toFixed(2);break;}
+  }
+  // Remove o lançamento
+  DB.movs.splice(idx,1);
+
+  // Desmarca TODOS os pontos pagos de todos os funcionários
+  // (o lançamento de folha marca todos de uma vez)
+  for(var i=0;i<DB.funcs.length;i++){
+    var f=DB.funcs[i];
+    for(var j=0;j<f.pontos.length;j++){
+      if(f.pontos[j].pago){
+        f.pontos[j].pago=false;
+      }
+    }
+    // Desmarca adiantamentos descontados
+    for(var j=0;j<(f.adiantamentos||[]).length;j++){
+      if(f.adiantamentos[j].descontado)f.adiantamentos[j].descontado=false;
+    }
+  }
+
+  _auditLog('Folha desfeita','Valor estornado: '+fR(mv.valor));
+  saveDB();go('funcionarios');
 }
 
 function mNovoFunc(){
