@@ -270,10 +270,10 @@ var USERS=[
 ];
 var PNOME={adm:'Administrador',caixa:'Caixa',motorista:'Motorista',operador:'Operador'};
 var PPAGES={
-  adm:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','mercado','configuracoes'],
-  caixa:['caixa_dia','pesagem','pendencias','estoque_vis'],
-  motorista:['agenda'],
-  operador:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','funcionarios','clientes','tabelas'],
+  adm:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','mercado','classificador','configuracoes'],
+  caixa:['caixa_dia','pesagem','pendencias','estoque_vis','classificador'],
+  motorista:['agenda','classificador'],
+  operador:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','funcionarios','clientes','tabelas','classificador'],
 };
 var ALLPAGES=[
   {id:'dashboard',   label:'Dashboard',   icon:'&#8862;'},
@@ -289,9 +289,10 @@ var ALLPAGES=[
   {id:'clientes',    label:'Clientes',    icon:'&#127970;'},
   {id:'tabelas',     label:'Tabelas',     icon:'&#128203;'},
   {id:'mercado',       label:'Mercado',      icon:'&#128200;'},
+  {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.4.3';
+var APP_VERSION='5.5.0';
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[],
@@ -492,6 +493,7 @@ var _MS_GROUPS=[
   {label:'Agenda',    icon:'📅', ids:['agenda']},
   {label:'Pessoas',   icon:'👥', ids:['funcionarios','clientes']},
   {label:'Tabelas',   icon:'📋', ids:['tabelas']},
+  {label:'PCB',       icon:'♻', ids:['classificador']},
 ];
 function buildSidebar(){
   var r=getRoleById(CU.perfil);
@@ -620,7 +622,7 @@ function setNav(pid){
   }
 }
 
-var _LABELS={dashboard:'Dashboard',pesagem:'Pesagem',pendencias:'Em Aberto',caixa_dia:'Caixa',estoque:'Estoque',estoque_vis:'Estoque',revenda:'Revenda',financeiro:'Financeiro',agenda:'Agenda',funcionarios:'Funcionarios',clientes:'Clientes',tabelas:'Tabelas',mercado:'Mercado',configuracoes:'Configuracoes'};
+var _LABELS={dashboard:'Dashboard',pesagem:'Pesagem',pendencias:'Em Aberto',caixa_dia:'Caixa',estoque:'Estoque',estoque_vis:'Estoque',revenda:'Revenda',financeiro:'Financeiro',agenda:'Agenda',funcionarios:'Funcionarios',clientes:'Clientes',tabelas:'Tabelas',mercado:'Mercado',classificador:'Classificador PCB',configuracoes:'Configuracoes'};
 function _breadcrumb(pid){
   var lbl=_LABELS[pid]||pid;
   return '<div class="breadcrumb">&#127968; Inicio <span class="sep">&#8250;</span> <span>'+lbl+'</span></div>';
@@ -632,10 +634,11 @@ function go(pid){
   if(DB&&DB.revenda){for(var _ri=0;_ri<DB.revenda.length;_ri++){if(!DB.revenda[_ri].prod)DB.revenda[_ri].prod=DB.revenda[_ri].nome||'Produto';}}
   var m={dashboard:pgDash,pesagem:pgPesagem,pendencias:pgPendencias,caixa_dia:pgCaixaDia,estoque:pgEstoque,
     estoque_vis:pgEstVis,revenda:pgRevenda,financeiro:pgFin,agenda:pgAgenda,
-    funcionarios:pgFuncs,clientes:pgClis,tabelas:pgTabs,mercado:pgMercado,usuarios:pgUsers,configuracoes:pgConfig};
+    funcionarios:pgFuncs,clientes:pgClis,tabelas:pgTabs,mercado:pgMercado,classificador:pgClassificador,usuarios:pgUsers,configuracoes:pgConfig};
   var _phtml=(m[pid]||function(){return '<p>Pagina nao encontrada</p>';})();document.getElementById('ct').innerHTML=_breadcrumb(pid)+_phtml;
   if(pid==='dashboard')setTimeout(function(){_dashCharts();if(CU&&CU.perfil==='adm')_mktFetchWidget();},80);
   if(pid==='mercado')setTimeout(function(){_mktFetch();},80);
+  if(pid==='classificador')setTimeout(function(){_pclInit();},80);
   if(pid==='pesagem')renderPesagem();
   if(pid==='caixa_dia')renderCaixaDia();
   if(pid==='financeiro')setTimeout(function(){var b=document.querySelectorAll('.fin-periodo button');var o=['mes','ano','tudo'];for(var i=0;i<b.length;i++)b[i].classList.toggle('on',o[i]===_finPeriodo);},0);
@@ -7175,21 +7178,46 @@ function pgAgenda(){
   // ── CARD coleta ─────────────────────────────────────
   function _cardColeta(col){
     var cor=stCorCol(col.status);
-    return '<div class="card" style="margin-bottom:9px;border-left:3px solid '+cor+';border-color:'+cor+'30">'+
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:9px">'+
-      '<div style="display:flex;gap:11px">'+
-      '<div style="background:var(--s2);border-radius:7px;padding:7px 9px;text-align:center;min-width:46px;flex-shrink:0">'+
-      '<div style="font-size:14px;font-weight:800;color:var(--gr);font-family:monospace">'+(col.hora?col.hora.split(':')[0]:'--')+'</div>'+
-      '<div style="font-size:10px;color:var(--mt)">:'+(col.hora?col.hora.split(':')[1]:'00')+'h</div></div>'+
-      '<div><div style="font-size:13px;font-weight:700">'+col.cli+'</div>'+
-      '<div style="font-size:11px;color:var(--mt);margin-top:2px">'+col.end+'</div>'+
-      '<div style="font-size:11px;color:var(--mt)">'+col.mat+' · ~'+col.peso+'kg</div>'+
-      (col.obs?'<div style="font-size:11px;color:var(--or);margin-top:2px">⚠️ '+col.obs+'</div>':'')+'</div></div>'+
-      '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">'+
-      stBadge(col.status)+
-      '<div style="font-size:11px;color:var(--mt)">🚛 '+col.mot+'</div>'+
-      '<div style="font-size:11px;color:var(--bl)">📞 '+col.tel+'</div></div></div>'+
-      stAcoes(col)+'</div>';
+    var perIco=col.periodo==='Manha'?'🌅':'🌇';
+    return '<div class="card" style="margin-bottom:9px;border-left:3px solid '+cor+'">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:9px">'
+      +'<div style="display:flex;gap:11px">'
+      +'<div style="background:var(--s2);border-radius:7px;padding:7px 9px;text-align:center;min-width:46px;flex-shrink:0">'
+      +'<div style="font-size:14px;font-weight:800;color:var(--gr);font-family:monospace">'+(col.hora?col.hora.split(':')[0]:'--')+'</div>'
+      +'<div style="font-size:10px;color:var(--mt)">:'+(col.hora?col.hora.split(':')[1]:'00')+'h</div></div>'
+      +'<div><div style="font-size:13px;font-weight:700">'+col.cli+'</div>'
+      +(col.bairro?'<div style="font-size:11px;font-weight:600;color:var(--bl);margin-top:2px">📍 '+col.bairro+' &nbsp;'+perIco+' '+col.periodo+'</div>':'')
+      +'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+col.end+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+col.mat+' · ~'+col.peso+'kg</div>'
+      +(col.obs?'<div style="font-size:11px;color:var(--or);margin-top:2px">⚠️ '+col.obs+'</div>':'')
+      +'</div></div>'
+      +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">'
+      +stBadge(col.status)
+      +'<div style="font-size:11px;color:var(--mt)">🚛 '+col.mot+'</div>'
+      +'<div style="font-size:11px;color:var(--bl)">📞 '+col.tel+'</div></div></div>'
+      +stAcoes(col)+'</div>';
+  }
+
+  // Agrupa coletas por periodo e bairro para exibição
+  function _renderColetasDia(colDia){
+    var html='';
+    var periodos=['Manha','Tarde'];
+    var perIcos={Manha:'🌅',Tarde:'🌇'};
+    var perLabels={Manha:'Manhã',Tarde:'Tarde'};
+    for(var p=0;p<periodos.length;p++){
+      var per=periodos[p];
+      var colPer=colDia.filter(function(c){return (c.periodo||'Manha')===per;});
+      if(!colPer.length)continue;
+      var bairro=colPer[0].bairro||'';
+      var lotado=colPer.length>=3;
+      html+='<div style="margin:8px 0 4px;display:flex;align-items:center;gap:8px">'
+        +'<span style="font-size:12px;font-weight:700;color:var(--tx)">'+perIcos[per]+' '+perLabels[per]+'</span>'
+        +(bairro?'<span style="font-size:11px;color:var(--bl);font-weight:600">📍 '+bairro+'</span>':'')
+        +'<span style="font-size:10px;padding:1px 8px;border-radius:20px;font-weight:700;background:'+(lotado?'var(--rdb)':'var(--grb)')+';color:'+(lotado?'var(--rd)':'var(--gr)')+'">'+colPer.length+'/3'+(lotado?' 🔴 Lotado':' ✓')+'</span>'
+        +'</div>';
+      for(var i=0;i<colPer.length;i++)html+=_cardColeta(colPer[i]);
+    }
+    return html;
   }
 
   // ── VISÃO SEMANAL ───────────────────────────────────
@@ -7249,7 +7277,7 @@ function pgAgenda(){
         var isHj=_sameDay(dia,hoje);
         var diasSemana=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
         html+='<div style="display:flex;align-items:center;gap:8px;margin:10px 0 7px"><div style="height:1px;flex:1;background:var(--bd)"></div><span style="font-size:10px;color:'+(isHj?'var(--gr)':'var(--mt)')+';font-weight:700;text-transform:uppercase;letter-spacing:2px;white-space:nowrap">'+(isHj?'🟢 HOJE — ':'')+diasSemana[dia.getDay()]+' '+dia.getDate()+'</span><div style="height:1px;flex:1;background:var(--bd)"></div></div>';
-        for(var i=0;i<colDia.length;i++)html+=_cardColeta(colDia[i]);
+        html+=_renderColetasDia(colDia);
       }
     }
     if(!temColeta)html+='<div style="text-align:center;padding:24px;color:var(--mt);font-size:13px">Nenhuma coleta nesta semana</div>';
@@ -7433,32 +7461,85 @@ function _buildColForm(c){
   var mO='';for(var i=0;i<DB.funcs.length;i++){if(DB.funcs[i].cargo==='Motorista')mO+='<option'+(c&&c.mot===DB.funcs[i].nome?' selected':'')+'>'+DB.funcs[i].nome+'</option>';}
   var statusO='';var stats=['Agendada','Confirmada','Em Rota','Coletada','Pendente','Cancelada'];for(var i=0;i<stats.length;i++)statusO+='<option'+(c&&c.status===stats[i]?' selected':'')+'>'+stats[i]+'</option>';
   var daVal='';if(c&&c.data){try{var pts=c.data.split('/');daVal=pts[2]+'-'+pts[1]+'-'+pts[0];}catch(e){}}
+  var perO='<option value="Manha"'+(c&&c.periodo==='Manha'?' selected':'')+'>🌅 Manhã (até 12h)</option>'
+    +'<option value="Tarde"'+(c&&c.periodo==='Tarde'?' selected':'')+'>🌇 Tarde (após 12h)</option>';
+  // Bairros já usados para sugestão
+  var bairrosUsados=[...new Set(DB.coletas.map(function(col){return col.bairro||'';}).filter(Boolean))];
+  var bairroSugest=bairrosUsados.length?'<datalist id="bairros-list">'+bairrosUsados.map(function(b){return'<option value="'+b+'">';}).join('')+'</datalist>':'';
   return '<div class="mf">'
     +'<div class="fld"><label>Cliente *</label><input class="inp" id="nc-cl" value="'+(c?c.cli:'')+'"></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Telefone</label><input class="inp" id="nc-te" value="'+(c&&c.tel?c.tel:'')+'" placeholder="(11) 99999-0000"></div>'
     +'<div class="fld"><label>Status</label><select class="inp" id="nc-st">'+statusO+'</select></div>'
     +'</div>'
+    +bairroSugest
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Bairro *</label><input class="inp" id="nc-bairro" list="bairros-list" value="'+(c&&c.bairro?c.bairro:'')+'" placeholder="Ex: Centro, Bethania..." oninput="verificarVagaBairro()"></div>'
+    +'<div class="fld"><label>Periodo *</label><select class="inp" id="nc-per" onchange="verificarVagaBairro()">'+perO+'</select></div>'
+    +'</div>'
+    +'<div id="nc-vaga-info" style="margin-top:-8px;margin-bottom:8px;font-size:11px"></div>'
     +'<div class="fld"><label>Endereco</label><input class="inp" id="nc-en" value="'+(c&&c.end?c.end:'')+'"></div>'
     +'<div class="fld"><label>Material</label><input class="inp" id="nc-ma" value="'+(c&&c.mat?c.mat:'')+'"></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>Data *</label><input class="inp" type="date" id="nc-da" value="'+daVal+'"></div>'
+    +'<div class="fld"><label>Data *</label><input class="inp" type="date" id="nc-da" value="'+daVal+'" onchange="verificarVagaBairro()"></div>'
     +'<div class="fld"><label>Horario</label><input class="inp" type="time" id="nc-ho" value="'+(c&&c.hora?c.hora:'')+'"></div>'
     +'<div class="fld"><label>Peso est. kg</label><input class="inp" type="number" inputmode="decimal" id="nc-pe" value="'+(c&&c.peso?c.peso:'')+'"></div>'
     +'</div>'
     +'<div class="fld"><label>Motorista</label><select class="inp" id="nc-mo">'+mO+'</select></div>'
     +'<div class="fld"><label>Obs</label><textarea class="inp" id="nc-ob" rows="2">'+(c&&c.obs?c.obs:'')+'</textarea></div>';
 }
+
+function verificarVagaBairro(editId){
+  var bairro=(document.getElementById('nc-bairro')||{}).value||'';
+  var per=(document.getElementById('nc-per')||{}).value||'';
+  var daRaw=(document.getElementById('nc-da')||{}).value||'';
+  var info=document.getElementById('nc-vaga-info');
+  if(!info)return;
+  if(!bairro||!daRaw){info.innerHTML='';return;}
+  var data=new Date(daRaw+'T00:00').toLocaleDateString('pt-BR');
+  // Conta coletas nesse bairro/periodo/data (excluindo a que está sendo editada)
+  var coletasNoBairro=DB.coletas.filter(function(c){
+    return c.data===data&&(c.bairro||'').toLowerCase()===bairro.toLowerCase()&&c.periodo===per&&(!editId||c.id!==editId);
+  });
+  // Verifica se tem outro bairro no mesmo periodo/data
+  var outroBairro=DB.coletas.filter(function(c){
+    return c.data===data&&c.periodo===per&&(c.bairro||'').toLowerCase()!==bairro.toLowerCase()&&(!editId||c.id!==editId);
+  });
+  if(outroBairro.length>0){
+    info.innerHTML='<div style="color:var(--rd);background:var(--rdb);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:6px 10px">⚠️ Já tem coleta em <strong>'+outroBairro[0].bairro+'</strong> neste período. Troque o bairro ou o período.</div>';
+    return;
+  }
+  var vagas=3-coletasNoBairro.length;
+  if(vagas<=0){
+    info.innerHTML='<div style="color:var(--rd);background:var(--rdb);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:6px 10px">🚫 Lotado! 3/3 coletas no período da '+per.toLowerCase()+' em '+bairro+'. Escolha outro dia ou período.</div>';
+  } else if(coletasNoBairro.length>0){
+    info.innerHTML='<div style="color:var(--or);background:var(--orb);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:6px 10px">📦 '+coletasNoBairro.length+'/3 — ainda tem <strong>'+vagas+' vaga(s)</strong> no período da '+per.toLowerCase()+' em '+bairro+'.</div>';
+  } else {
+    info.innerHTML='<div style="color:var(--gr);background:var(--grb);border:1px solid rgba(34,197,94,.3);border-radius:6px;padding:6px 10px">✓ Bairro livre neste período! 0/3 coletas.</div>';
+  }
+}
+
 function mNovaCol(){
   openM('Nova Coleta',
     _buildColForm(null)
-    +'<div class="al alb">Notificacao enviada ao motorista ao salvar.</div>'
-    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveCol()">Agendar</button></div></div>',540);
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveCol()">Agendar</button></div></div>',560);
 }
+
 function saveCol(){
-  var cl=document.getElementById('nc-cl').value.trim(),da=document.getElementById('nc-da').value;
+  var cl=document.getElementById('nc-cl').value.trim();
+  var da=document.getElementById('nc-da').value;
+  var bairro=(document.getElementById('nc-bairro').value||'').trim();
+  var per=document.getElementById('nc-per').value;
   if(!cl||!da){alert('Preencha cliente e data!');return;}
-  DB.coletas.push({id:nid(),data:new Date(da+'T00:00').toLocaleDateString('pt-BR'),hora:document.getElementById('nc-ho').value,cli:cl,tel:document.getElementById('nc-te').value,end:document.getElementById('nc-en').value,peso:parseFloat(document.getElementById('nc-pe').value)||0,mat:document.getElementById('nc-ma').value,mot:document.getElementById('nc-mo').value,status:document.getElementById('nc-st')?document.getElementById('nc-st').value:'Agendada',obs:document.getElementById('nc-ob').value});
+  if(!bairro){alert('Informe o bairro!');return;}
+  var data=new Date(da+'T00:00').toLocaleDateString('pt-BR');
+  // Valida limite de 3 por bairro/periodo
+  var coletasNoBairro=DB.coletas.filter(function(c){return c.data===data&&(c.bairro||'').toLowerCase()===bairro.toLowerCase()&&c.periodo===per;});
+  if(coletasNoBairro.length>=3){alert('Lotado! Já tem 3 coletas no período da '+per.toLowerCase()+' em '+bairro+' neste dia.');return;}
+  // Valida bairro único por periodo
+  var outroBairro=DB.coletas.filter(function(c){return c.data===data&&c.periodo===per&&(c.bairro||'').toLowerCase()!==bairro.toLowerCase();});
+  if(outroBairro.length>0){alert('Já tem coleta no bairro '+outroBairro[0].bairro+' neste período. Cada período tem um bairro só.');return;}
+  DB.coletas.push({id:nid(),data:data,hora:document.getElementById('nc-ho').value,cli:cl,tel:document.getElementById('nc-te').value,bairro:bairro,periodo:per,end:document.getElementById('nc-en').value,peso:parseFloat(document.getElementById('nc-pe').value)||0,mat:document.getElementById('nc-ma').value,mot:document.getElementById('nc-mo').value,status:document.getElementById('nc-st')?document.getElementById('nc-st').value:'Agendada',obs:document.getElementById('nc-ob').value});
   saveDB();closeM();go('agenda');
 }
 function mEditCol(id){
@@ -7474,12 +7555,21 @@ function mEditCol(id){
 }
 function saveEditCol(id){
   var cl=document.getElementById('nc-cl').value.trim(),da=document.getElementById('nc-da').value;
+  var bairro=(document.getElementById('nc-bairro').value||'').trim();
+  var per=document.getElementById('nc-per').value;
   if(!cl||!da){alert('Preencha cliente e data!');return;}
+  if(!bairro){alert('Informe o bairro!');return;}
+  var data=new Date(da+'T00:00').toLocaleDateString('pt-BR');
+  // Valida limite (excluindo o próprio)
+  var coletasNoBairro=DB.coletas.filter(function(c){return c.id!==id&&c.data===data&&(c.bairro||'').toLowerCase()===bairro.toLowerCase()&&c.periodo===per;});
+  if(coletasNoBairro.length>=3){alert('Lotado! Já tem 3 coletas neste período e bairro.');return;}
+  var outroBairro=DB.coletas.filter(function(c){return c.id!==id&&c.data===data&&c.periodo===per&&(c.bairro||'').toLowerCase()!==bairro.toLowerCase();});
+  if(outroBairro.length>0){alert('Já tem coleta no bairro '+outroBairro[0].bairro+' neste período.');return;}
   for(var i=0;i<DB.coletas.length;i++){
     if(DB.coletas[i].id===id){
       DB.coletas[i].cli=cl;DB.coletas[i].tel=document.getElementById('nc-te').value;
-      DB.coletas[i].data=new Date(da+'T00:00').toLocaleDateString('pt-BR');
-      DB.coletas[i].hora=document.getElementById('nc-ho').value;
+      DB.coletas[i].data=data;DB.coletas[i].hora=document.getElementById('nc-ho').value;
+      DB.coletas[i].bairro=bairro;DB.coletas[i].periodo=per;
       DB.coletas[i].end=document.getElementById('nc-en').value;
       DB.coletas[i].peso=parseFloat(document.getElementById('nc-pe').value)||0;
       DB.coletas[i].mat=document.getElementById('nc-ma').value;
@@ -8346,7 +8436,14 @@ function mHistCli(idx){
   }
 
   // 1. atendHist atual
-  for(var i=0;i<atendHist.length;i++) _processAh(atendHist[i], null);
+  var _processados={};// evita duplicar mesmo pedido
+  for(var i=0;i<atendHist.length;i++){
+    var ah=atendHist[i];
+    var key=(ah.num||'')+'-'+(ah.hora||'');
+    if(_processados[key])continue;
+    _processados[key]=true;
+    _processAh(ah, null);
+  }
 
   // 2. DB.caixasHist permanente
   if(DB.caixasHist){
@@ -8355,22 +8452,20 @@ function mHistCli(idx){
       var movs=cx.movimentos||[];
       for(var j=0;j<movs.length;j++){
         var mv=movs[j];
+        var key2=(mv.num||'')+'-'+(cx.data||'');
+        if(_processados[key2])continue;
+        _processados[key2]=true;
         var fakeAh={tipo:mv.tipo,cliId:mv.cliId,label:mv.label,num:mv.num,itens:mv.itensList||[],total:mv.total||0};
         _processAh(fakeAh, cx.data||'—');
       }
     }
   }
 
-  // 3. Legado
+  // 3. Legado — só DB.entradas (não usar DB.movs pois duplica com atendHist)
   if(tipo==='fornecedor'){
     for(var i=0;i<DB.entradas.length;i++){
       var e=DB.entradas[i];
       if(e.forn===c.nome){var p=gP(e.pId);var val=e.total||0;total+=val;rows.push({data:e.data,num:'',desc:p?p.ic+' '+p.nome:'—',kg:e.peso||0,val:val,tipo:e.tipo,cor:'var(--rd)'});}
-    }
-  } else {
-    for(var i=0;i<DB.movs.length;i++){
-      var m=DB.movs[i];
-      if(m.cat==='Venda'&&m.desc&&m.desc.indexOf(c.nome)>=0){total+=m.valor||0;rows.push({data:m.data,num:'',desc:m.desc,kg:0,val:m.valor||0,tipo:'Venda',cor:'var(--gr)'});}
     }
   }
 
@@ -10546,10 +10641,10 @@ function delUser(uid){
 // ── Gestão de Funções ──────────────────────────────────────────
 // Base roles stored separately so we can edit them
 var BASE_ROLES=[
-  {id:'adm',     nome:'Administrador',pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','mercado','configuracoes']},
-  {id:'caixa',   nome:'Caixa',         pages:['caixa_dia','pesagem','pendencias','estoque_vis']},
-  {id:'motorista',nome:'Motorista',    pages:['agenda']},
-  {id:'operador', nome:'Operador',     pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','funcionarios','clientes','tabelas']},
+  {id:'adm',     nome:'Administrador',pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','mercado','classificador','configuracoes']},
+  {id:'caixa',   nome:'Caixa',         pages:['caixa_dia','pesagem','pendencias','estoque_vis','classificador']},
+  {id:'motorista',nome:'Motorista',    pages:['agenda','classificador']},
+  {id:'operador', nome:'Operador',     pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','funcionarios','clientes','tabelas','classificador']},
 ];
 function _buildRoleForm(r){
   var pagesH='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
@@ -10638,7 +10733,8 @@ var CFG={
     formaPagPadrao:'perguntar',permitirEdicaoItens:true,
     fmtPc:'termico58',fmtMob:'termico58',
     idioma:'pt-BR',moeda:'BRL',exibirFeriados:true,
-    atalhos:true
+    atalhos:true,
+    anthropicKey:''
   },
   integracao:{
     impressora:false,gerarAutoComprovante:true,balancaDigital:false
@@ -10660,6 +10756,7 @@ function pgConfig(){
     +'<option value="dados" '+(cfgAba==='dados'?'selected':'')+'>&#128190; Dados e Backup</option>'
     +'<option value="atalhos" '+(cfgAba==='atalhos'?'selected':'')+'>&#9875; Atalhos</option>'
     +'<option value="usuarios" '+(cfgAba==='usuarios'?'selected':'')+'>&#128101; Usuarios</option>'
+    +'<option value="ia" '+(cfgAba==='ia'?'selected':'')+'>&#129302; Inteligencia Artificial</option>'
     +'</select>'
     +'<div style="position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--mt);font-size:11px">&#9660;</div></div>'
     +_cfgConteudo()
@@ -10674,6 +10771,7 @@ function _cfgConteudo(){
   if(cfgAba==='dados')return _cfgDados();
   if(cfgAba==='atalhos')return _cfgAtalhos();
   if(cfgAba==='usuarios')return _cfgUsuarios();
+  if(cfgAba==='ia')return _cfgIA();
   return '';
 }
 function _cfgRevenda(){
@@ -11385,4 +11483,673 @@ window.addEventListener('DOMContentLoaded', function(){
     }
   });
 });
+// ── CONFIGURAÇÕES IA ──────────────────────────────────────────────────────────
+function _cfgIA(){
+  return '<div class="card">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd)">'
+    +'<div style="font-size:22px">&#129302;</div>'
+    +'<div><div style="font-size:14px;font-weight:700">Inteligencia Artificial</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-top:1px">Configure a chave da API Anthropic para o Classificador de Placas PCB</div></div></div>'
+    +'<div style="padding:16px;display:flex;flex-direction:column;gap:14px">'
+    +'<div class="fld"><label>Chave API Anthropic (para Classificador PCB)</label>'
+    +'<input class="inp" id="cfg-anthropic-key" type="password" placeholder="sk-ant-..." value="'+(CFG.sistema.anthropicKey||'')+'" style="font-family:monospace;letter-spacing:1px"></div>'
+    +'<div class="al alb" style="font-size:12px">&#128274; A chave fica salva apenas no seu navegador (localStorage). Nunca enviada para terceiros.</div>'
+    +'<button class="btn" onclick="_saveCfgIA()">Salvar Chave</button>'
+    +'</div></div>';
+}
+function _saveCfgIA(){
+  var k=document.getElementById('cfg-anthropic-key');
+  if(!k)return;
+  CFG.sistema.anthropicKey=k.value.trim();
+  _saveCFG();
+  var btn=event.target;btn.textContent='&#10003; Salvo!';setTimeout(function(){btn.textContent='Salvar Chave';},2000);
+}
+
+// ── CLASSIFICADOR PCB ─────────────────────────────────────────────────────────
+var _PCL_DB_KEY='bv_pcl_db';
+var _pclEntradas=[];
+var _pclAba='classificar'; // classificar | galeria | manual
+var _pclImgData=null;
+var _pclImgMime='image/jpeg';
+var _pclAnalisando=false;
+var _pclResultIA=null;
+var _pclClasseSel=null;
+var _pclFiltro='all';
+var _pclStream=null;
+var _pclCameraAtiva=false;
+
+var PCL_CATS={
+  telefonia_especial:{id:'telefonia_especial',label:'Telefonia Especial',color:'#FFD700',badge:'★ ESPECIAL',criteria:'2 processadores de louça com banho + acima de 10 chip 7',desc:'Placa de altíssimo valor. 2 processadores dourados com banho de ouro + mais de 10 chips tipo 7.'},
+  telefonia_ponteira:{id:'telefonia_ponteira',label:'Telefonia com Ponteira',color:'#FFA500',badge:'TELEF.+',criteria:'75–100% componentes bons + ponteira (borda de conexão)',desc:'Placa de telefonia com borda de conexão (ponteira). 75–100% de bons componentes.'},
+  telefonia:{id:'telefonia',label:'Telefonia',color:'#FF8C00',badge:'TELEF.',criteria:'75–100% componentes bons (CIs, chip 7, processador integrado) sem ponteira',desc:'Placa de telefonia sem ponteira. 75–100% de bons componentes.'},
+  leve_ponta:{id:'leve_ponta',label:'Leve com Ponta',color:'#4CAF50',badge:'LEVE+',criteria:'50–75% componentes bons + ponteira, pouco depreciador',desc:'Placa com 50–75% de bons componentes e ponteira.'},
+  leve:{id:'leve',label:'Leve',color:'#66BB6A',badge:'LEVE',criteria:'50–75% componentes bons',desc:'Placa com 50–75% de componentes bons.'},
+  intermediaria_mais:{id:'intermediaria_mais',label:'Intermediária Mais',color:'#26C6DA',badge:'INTERM.+',criteria:'Impressora com saída + chip 7 (sem chip 7 = intermediária)',desc:'Placas de impressora com saída E chip 7. Inclui Cisco e similares.'},
+  intermediaria:{id:'intermediaria',label:'Intermediária',color:'#42A5F5',badge:'INTERM.',criteria:'20–50% componentes bons (CIs, chip 7, processador)',desc:'Placa com 20–50% de bons componentes.'},
+  intermediaria_menos:{id:'intermediaria_menos',label:'Intermediária Menos',color:'#29B6F6',badge:'INTERM.-',criteria:'Modems, roteadores — componentes de baixa qualidade',desc:'Modems, roteadores e similares.'},
+  pesada_ponta:{id:'pesada_ponta',label:'Pesada com Ponta',color:'#EF5350',badge:'PESADA+',criteria:'Poucos bons, maioria depreciadores + ponteira',desc:'Placa com poucos bons componentes, predominância de depreciadores e ponteira.'},
+  pesada:{id:'pesada',label:'Pesada',color:'#E53935',badge:'PESADA',criteria:'Pouco componente bom, maioria depreciadores (bobinas, transformadores, relés)',desc:'Predominância de depreciadores: bobinas, transformadores, relés.'},
+  mae_a:{id:'mae_a',label:'Mãe A',color:'#AB47BC',badge:'MÃE A',criteria:'Soquete grande plástico (soquete 462, 370 ou 7)',desc:'Placa-mãe antiga com soquete grande de plástico.'},
+  mae_b:{id:'mae_b',label:'Mãe B',color:'#9C27B0',badge:'MÃE B',criteria:'2 chip 7, independente do soquete',desc:'Placa-mãe com 2 chips tipo 7.'},
+  mae_c:{id:'mae_c',label:'Mãe C',color:'#7B1FA2',badge:'MÃE C',criteria:'1 chip 7 + processador integrado',desc:'Placa-mãe com 1 chip 7 e processador integrado.'},
+  mae_d:{id:'mae_d',label:'Mãe D',color:'#6A1B9A',badge:'MÃE D',criteria:'1 ou 2 processadores integrados, sem chip 7',desc:'Placa-mãe moderna com processador(es) integrado(s).'},
+  mae_1chip7:{id:'mae_1chip7',label:'Mãe 1 Chip 7',color:'#4A148C',badge:'MÃE 1C7',criteria:'Placa menor sem soquete externo, só processadores integrados',desc:'Placa-mãe pequena sem soquete externo.'},
+  mae_notebook_a:{id:'mae_notebook_a',label:'Mãe Notebook A',color:'#00897B',badge:'NB-A',criteria:'Notebook com 2 chip 7',desc:'Placa-mãe de notebook com 2 chips tipo 7.'},
+  mae_notebook_b:{id:'mae_notebook_b',label:'Mãe Notebook B',color:'#00796B',badge:'NB-B',criteria:'Notebook com 1 chip 7 + processador integrado',desc:'Placa-mãe de notebook com 1 chip 7 e CPU soldada.'},
+  mae_notebook_c:{id:'mae_notebook_c',label:'Mãe Notebook C',color:'#00695C',badge:'NB-C',criteria:'Notebook com apenas processadores integrados (sem chip 7)',desc:'Placa-mãe de notebook moderna sem chip 7.'},
+  hd_completo:{id:'hd_completo',label:'HD (com placa atrás)',color:'#78909C',badge:'HD',criteria:'Hard disk completo com placa eletrônica na traseira',desc:'HD completo com placa de controle eletrônico.'},
+  placa_hd:{id:'placa_hd',label:'Placa de HD',color:'#546E7A',badge:'PL.HD',criteria:'Placa eletrônica retirada de HD (separada do disco)',desc:'Placa de controle de HD separada do disco.'},
+  marrom:{id:'marrom',label:'Marrom (Fenolite)',color:'#795548',badge:'MARROM',criteria:'Substrato marrom, sem componentes bons, maioria depreciadores',desc:'Placa de fenolite sem componentes de valor.'},
+  memoria_dourada:{id:'memoria_dourada',label:'Memória Dourada',color:'#F9A825',badge:'MEM.OURO',criteria:'Pentes de memória RAM com contatos dourados',desc:'Pentes de RAM com contatos dourados.'},
+  processador_slot:{id:'processador_slot',label:'Processador Slot',color:'#FF8F00',badge:'PROC.SLOT',criteria:'Processador em formato de placa (slot)',desc:'Processador no formato slot 1/slot A.'},
+  processador_louca:{id:'processador_louca',label:'Processador Louça',color:'#E65100',badge:'PROC.LOUÇA',criteria:'Processador cerâmico com pinos dourados (PGA)',desc:'Processador cerâmico com pinos dourados.'},
+  processador_louca_dourado:{id:'processador_louca_dourado',label:'Processador Louça Dourado',color:'#FF6F00',badge:'PROC.OURO',criteria:'Processador cerâmico com tampa totalmente dourada (Pentium Pro)',desc:'Pentium Pro — altíssima concentração de ouro.'},
+  processador_fibra_negro:{id:'processador_fibra_negro',label:'Processador Fibra Negro',color:'#424242',badge:'PROC.FIBRA',criteria:'Processador de fibra preta com pinos',desc:'Processador em substrato de fibra de vidro preto.'},
+  placa_tablet:{id:'placa_tablet',label:'Placa de Tablet',color:'#43A047',badge:'TABLET',criteria:'Placa principal retirada de tablet',desc:'Placa-mãe de tablet com processador ARM integrado.'},
+  placa_celular:{id:'placa_celular',label:'Placa de Celular',color:'#2E7D32',badge:'CELULAR',criteria:'Placa principal retirada de celular/smartphone',desc:'Placa-mãe de celular com SoC integrado.'},
+  celular_chines:{id:'celular_chines',label:'Celular Chinês',color:'#388E3C',badge:'CEL.CN',criteria:'Celular de marca chinesa simples (sem marca conhecida)',desc:'Celular genérico chinês.'},
+  celular_teclado:{id:'celular_teclado',label:'Celular Teclado',color:'#1B5E20',badge:'CEL.TEC',criteria:'Celular com teclado físico (feature phone)',desc:'Feature phone/tijolão com teclado físico.'},
+  smartphone:{id:'smartphone',label:'Smartphone',color:'#0D47A1',badge:'SMARTPH.',criteria:'Smartphone touchscreen moderno (Android/iOS)',desc:'Smartphone moderno com tela touchscreen.'},
+  celular_com_chip:{id:'celular_com_chip',label:'Celular com Chip',color:'#1565C0',badge:'CEL.CHIP',criteria:'Celular antigo de marca com chip visível (Sony Ericsson, Motorola)',desc:'Celular antigo com chip de processador visível.'},
+  tela_celular:{id:'tela_celular',label:'Tela de Celular',color:'#37474F',badge:'TELA',criteria:'Display retirado de celular (LCD/OLED com flat cable)',desc:'Tela LCD ou OLED com flat cable.'},
+  bateria_celular_tablet:{id:'bateria_celular_tablet',label:'Bateria Celular/Tablet',color:'#D84315',badge:'BAT.CEL',criteria:'Bateria Li-ion de celular ou tablet',desc:'Bateria de lítio de celular/tablet.'},
+  bateria_notebook:{id:'bateria_notebook',label:'Bateria Notebook',color:'#BF360C',badge:'BAT.NB',criteria:'Bateria Li-ion de notebook',desc:'Bateria de notebook com células cilíndricas.'},
+  placa_servidor:{id:'placa_servidor',label:'Placa de Servidor',color:'#C62828',badge:'SERVIDOR',criteria:'Placa-mãe de servidor com 2 soquetes',desc:'Placa-mãe de servidor com 2 soquetes de CPU.'},
+  placa_drive_cd:{id:'placa_drive_cd',label:'Placa de Drive CD',color:'#9E9E9E',badge:'DRIVE CD',criteria:'Placa retirada de drive de CD/DVD',desc:'Placa de controle de drive de CD/DVD.'},
+  placa_lisa:{id:'placa_lisa',label:'Placa Lisa',color:'#616161',badge:'LISA',criteria:'Placa sem componentes (só trilhas e conectores)',desc:'PCB praticamente sem componentes eletrônicos.'},
+  tabete_a:{id:'tabete_a',label:'Tabete A',color:'#FFD54F',badge:'TABETE A',criteria:'75–100% dos pinos com banho dourado visível',desc:'Barra de conectores com 75–100% de pinos dourados.'},
+  tapete_c:{id:'tapete_c',label:'Tapete C',color:'#FFB300',badge:'TAPETE C',criteria:'Conexões mais novas com baixo banho dourado',desc:'Barra de conectores com banho de qualidade inferior.'},
+};
+
+function _pclLoadDB(){
+  try{var r=localStorage.getItem(_PCL_DB_KEY);return r?JSON.parse(r):[];}catch(e){return [];}
+}
+function _pclSaveDB(){
+  try{localStorage.setItem(_PCL_DB_KEY,JSON.stringify(_pclEntradas));}catch(e){}
+}
+function _pclBadge(id,grande){
+  var c=PCL_CATS[id];if(!c)return '';
+  var pad=grande?'5px 12px':'2px 8px';var fs=grande?'12px':'10px';
+  return '<span style="background:'+c.color+';color:#fff;border-radius:4px;padding:'+pad+';font-size:'+fs+';font-weight:700;white-space:nowrap;font-family:monospace">'+c.badge+'</span>';
+}
+function _pclConfiancaBar(v){
+  var cor=v>=80?'var(--gr)':v>=55?'var(--or)':'var(--rd)';
+  return '<div style="margin-top:8px">'
+    +'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mt);margin-bottom:3px"><span>Confiança da IA</span><span style="color:'+cor+';font-weight:700">'+v+'%</span></div>'
+    +'<div style="height:5px;background:var(--s3);border-radius:3px"><div style="height:100%;width:'+v+'%;background:'+cor+';border-radius:3px;transition:width .5s"></div></div>'
+    +'</div>';
+}
+
+function pgClassificador(){
+  _pclEntradas=_pclLoadDB();
+  return '<div id="pcl-root"></div>';
+}
+
+function _pclInit(){
+  _pclRender();
+}
+
+function _pclRender(){
+  var el=document.getElementById('pcl-root');
+  if(!el)return;
+  var html='<div style="max-width:680px;margin:0 auto">'
+    // Cabeçalho
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+    +'<div style="width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,var(--gr2),var(--gr));display:flex;align-items:center;justify-content:center;font-size:18px">&#9107;</div>'
+    +'<div><div style="font-size:17px;font-weight:700">Classificador PCB</div>'
+    +'<div style="font-size:11px;color:var(--mt)">'+_pclEntradas.length+' placa'+((_pclEntradas.length!==1)?'s':'')+' no banco &bull; Manual BioVale</div></div></div>'
+    // Abas
+    +'<div class="tabs" style="margin-bottom:16px">'
+    +'<button class="tabbtn'+(_pclAba==='classificar'?' on':'')+'" onclick="_pclSetAba(\'classificar\')">&#128247; Classificar</button>'
+    +'<button class="tabbtn'+(_pclAba==='galeria'?' on':'')+'" onclick="_pclSetAba(\'galeria\')">&#128444; Banco de Dados</button>'
+    +'<button class="tabbtn'+(_pclAba==='manual'?' on':'')+'" onclick="_pclSetAba(\'manual\')">&#128214; Manual</button>'
+    +'</div>';
+
+  if(_pclAba==='classificar') html+=_pclRenderClassificar();
+  else if(_pclAba==='galeria') html+=_pclRenderGaleria();
+  else html+=_pclRenderManual();
+
+  html+='</div>';
+  el.innerHTML=html;
+}
+
+function _pclSetAba(a){_pclAba=a;_pclRender();}
+
+// ── ABA CLASSIFICAR ──────────────────────────────────────────────────────────
+function _pclRenderClassificar(){
+  var html='';
+  // Área de imagem
+  html+='<div class="card" style="margin-bottom:12px;overflow:hidden">';
+  if(_pclCameraAtiva){
+    html+='<div style="position:relative">'
+      +'<video id="pcl-video" autoplay playsinline muted style="width:100%;display:block;border-radius:var(--r2)"></video>'
+      +'<div style="position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:10px">'
+      +'<button class="btn" onclick="_pclCapturar()">&#128247; Capturar</button>'
+      +'<button class="btn" style="background:var(--s3);color:var(--tx)" onclick="_pclPararCamera()">Cancelar</button>'
+      +'</div></div>';
+  } else if(_pclImgData){
+    html+='<div style="position:relative">'
+      +'<img src="'+_pclImgData+'" style="width:100%;display:block;max-height:340px;object-fit:contain;background:#000">'
+      +'<button onclick="_pclLimpar()" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.7);border:none;border-radius:6px;color:#fff;cursor:pointer;padding:4px 9px;font-size:12px">&#10005; Trocar</button>'
+      +'</div>';
+  } else {
+    html+='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;gap:16px;padding:24px">'
+      +'<div style="font-size:42px;opacity:.25">&#128247;</div>'
+      +'<div style="color:var(--mt);font-size:13px;text-align:center">Fotografe ou envie uma imagem da placa eletrônica</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">'
+      +'<button class="btn" onclick="_pclAbrirCamera()">&#128247; Câmera</button>'
+      +'<button class="btn btn-bl" onclick="document.getElementById(\'pcl-file\').click()">&#128444; Carregar Foto</button>'
+      +'</div>'
+      +'<input type="file" id="pcl-file" accept="image/*" style="display:none" onchange="_pclArquivo(this)">'
+      +'</div>';
+  }
+  html+='</div>';
+
+  // Botão analisar
+  if(_pclImgData&&!_pclCameraAtiva){
+    html+='<button class="btn" style="width:100%;padding:13px;font-size:14px;margin-bottom:12px;background:'
+      +(_pclAnalisando?'var(--s3)':'var(--gr2)')+'" onclick="_pclAnalisar()" '
+      +(_pclAnalisando?'disabled':'')+'>'+(_pclAnalisando?'&#9881; Analisando com IA…':'&#129302; Analisar com IA')+'</button>';
+  }
+
+  // Erro IA
+  if(window._pclErroIA){
+    html+='<div class="al alr" style="margin-bottom:12px">'+window._pclErroIA+'</div>';
+  }
+
+  // Resultado IA
+  if(_pclResultIA){
+    var c=PCL_CATS[_pclResultIA.classification_id];
+    var confianca=_pclResultIA.confidence;
+    var baixaConfianca=confianca<60;
+    var semCorrespondencia=_pclResultIA.no_match;
+
+    // Card principal resultado
+    html+='<div class="card" style="margin-bottom:12px;border-color:'+(c?c.color:'var(--bd)')+';background:var(--s2)">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+      +'<span style="font-size:11px;color:var(--gr);font-weight:700">RESULTADO DA IA</span>'
+      +_pclBadge(_pclResultIA.classification_id,false)+'</div>';
+
+    // Aviso sem correspondência
+    if(semCorrespondencia){
+      html+='<div class="al aly" style="margin-bottom:8px;font-size:12px">&#9888; Não encontrei correspondência clara no banco. Esta é minha melhor sugestão pelo manual.</div>';
+    }
+    // Aviso baixa confiança
+    if(baixaConfianca&&!semCorrespondencia){
+      html+='<div class="al aly" style="margin-bottom:8px;font-size:12px">&#9888; Confiança baixa — pode ser mais de um tipo. Veja as alternativas abaixo e decida.</div>';
+    }
+
+    html+='<div style="font-size:13px;color:var(--tx);margin-bottom:6px;line-height:1.5">'+(_pclResultIA.reasoning||'')+'</div>';
+
+    if(_pclResultIA.visible_components&&_pclResultIA.visible_components.length){
+      html+='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">';
+      for(var i=0;i<_pclResultIA.visible_components.length;i++){
+        html+='<span style="background:var(--grb);color:var(--gr);border:1px solid rgba(34,197,94,.2);border-radius:4px;padding:2px 8px;font-size:11px">'+_pclResultIA.visible_components[i]+'</span>';
+      }
+      html+='</div>';
+    }
+    html+=_pclConfiancaBar(confianca);
+
+    // Alternativas (baixa confiança)
+    if(baixaConfianca&&_pclResultIA.alternatives&&_pclResultIA.alternatives.length){
+      html+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)">'
+        +'<div style="font-size:10px;color:var(--mt);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">PODE SER TAMBÉM</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      for(var i=0;i<_pclResultIA.alternatives.length;i++){
+        var alt=_pclResultIA.alternatives[i];
+        var altC=PCL_CATS[alt.id];
+        if(!altC)continue;
+        html+='<div onclick="_pclSelecionarClasse(\''+alt.id+'\')" style="'
+          +'background:var(--s3);border:1px solid '+altC.color+'55;border-radius:7px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:7px">'
+          +_pclBadge(alt.id,false)
+          +'<span style="font-size:11px;color:var(--mt)">'+alt.reason+'</span></div>';
+      }
+      html+='</div></div>';
+    }
+    html+='</div>';
+
+    // Placas do banco na mesma categoria
+    var mesmaCat=_pclEntradas.filter(function(e){return e.classeId===_pclResultIA.classification_id;});
+    if(mesmaCat.length>0){
+      html+='<div class="card" style="margin-bottom:12px">'
+        +'<div style="font-size:11px;color:var(--mt);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">'
+        +'&#128444; '+mesmaCat.length+' PLACA'+(mesmaCat.length>1?'S':'')+' '+(c?c.label.toUpperCase():'')+ ' NO SEU BANCO — compare visualmente</div>'
+        +'<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px">';
+      var max=Math.min(mesmaCat.length,8);
+      for(var i=0;i<max;i++){
+        var e=mesmaCat[i];
+        html+='<div onclick="_pclDetalhe(\''+e.id+'\')" style="flex-shrink:0;width:90px;cursor:pointer" title="'+(e.obs||c.label)+'">'
+          +'<img src="'+e.imgData+'" style="width:90px;height:70px;object-fit:cover;border-radius:7px;border:2px solid var(--bd)">'
+          +(e.obs?'<div style="font-size:9px;color:var(--mt);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+e.obs+'</div>':'')
+          +'</div>';
+      }
+      if(mesmaCat.length>8){
+        html+='<div onclick="_pclSetAba(\'galeria\');_pclSetFiltro(\''+_pclResultIA.classification_id+'\')" '
+          +'style="flex-shrink:0;width:90px;height:70px;background:var(--s3);border-radius:7px;border:2px solid var(--bd);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:11px;color:var(--mt);text-align:center">'
+          +'+'+(mesmaCat.length-8)+'<br>mais</div>';
+      }
+      html+='</div></div>';
+    } else {
+      html+='<div class="al alb" style="margin-bottom:12px;font-size:12px">&#128202; Nenhuma placa '+(c?c.label:'desta categoria')+' no banco ainda. Se confirmar, será a primeira!</div>';
+    }
+  }
+
+  // Seleção manual
+  if(_pclImgData&&!_pclCameraAtiva){
+    html+='<div class="card" style="margin-bottom:12px">'
+      +'<div style="font-size:11px;color:var(--mt);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">'
+      +(_pclResultIA?'CLASSIFICAÇÃO — confirme ou ajuste':'CLASSIFICAÇÃO MANUAL')+'</div>'
+      +'<div style="display:flex;flex-direction:column;gap:5px">';
+    var cats=Object.values(PCL_CATS);
+    for(var i=0;i<cats.length;i++){
+      var cls=cats[i];
+      var sel=_pclClasseSel===cls.id;
+      html+='<div onclick="_pclSelecionarClasse(\''+cls.id+'\')" style="'
+        +'background:'+(sel?cls.color+'18':'var(--s2)')+';'
+        +'border:1px solid '+(sel?cls.color:'var(--bd)')+';'
+        +'border-radius:8px;padding:9px 12px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .15s">'
+        +_pclBadge(cls.id,false)
+        +'<div style="flex:1"><div style="font-size:12px;font-weight:600;color:'+(sel?cls.color:'var(--tx)')+'">'+cls.label+'</div>'
+        +'<div style="font-size:11px;color:var(--mt)">'+cls.criteria+'</div></div>'
+        +(sel?'<span style="color:'+cls.color+';font-size:14px">&#10003;</span>':'')
+        +'</div>';
+    }
+    html+='</div></div>';
+
+    // Observações
+    html+='<div class="card" style="margin-bottom:12px">'
+      +'<div style="font-size:11px;color:var(--mt);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">OBSERVAÇÕES (opcional)</div>'
+      +'<textarea id="pcl-obs" class="inp" rows="2" placeholder="Ex: Placa Siemens, série PBX, bom estado…" style="resize:vertical">'+(window._pclObs||'')+'</textarea>'
+      +'</div>';
+
+    // Salvar
+    if(_pclClasseSel){
+      html+='<button class="btn" style="width:100%;padding:13px;font-size:14px" onclick="_pclSalvar()">&#128190; Salvar no Banco de Dados</button>';
+    }
+  }
+  return html;
+}
+
+function _pclAbrirCamera(){
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}})
+    .then(function(stream){
+      _pclStream=stream;_pclCameraAtiva=true;_pclRender();
+      setTimeout(function(){var v=document.getElementById('pcl-video');if(v)v.srcObject=stream;},50);
+    })
+    .catch(function(){alert('Não foi possível acessar a câmera.');});
+}
+function _pclPararCamera(){
+  if(_pclStream){_pclStream.getTracks().forEach(function(t){t.stop();});_pclStream=null;}
+  _pclCameraAtiva=false;_pclRender();
+}
+function _pclCapturar(){
+  var v=document.getElementById('pcl-video');if(!v)return;
+  var c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0);
+  _pclImgData=c.toDataURL('image/jpeg',0.9);_pclImgMime='image/jpeg';
+  _pclResultIA=null;_pclClasseSel=null;window._pclObs='';window._pclErroIA=null;
+  _pclPararCamera();
+}
+function _pclArquivo(inp){
+  var file=inp.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    _pclImgData=e.target.result;_pclImgMime=file.type||'image/jpeg';
+    _pclResultIA=null;_pclClasseSel=null;window._pclObs='';window._pclErroIA=null;
+    _pclRender();
+  };
+  reader.readAsDataURL(file);
+}
+function _pclLimpar(){
+  _pclImgData=null;_pclResultIA=null;_pclClasseSel=null;window._pclErroIA=null;window._pclObs='';
+  _pclRender();
+}
+function _pclSelecionarClasse(id){
+  _pclClasseSel=id;
+  var obs=document.getElementById('pcl-obs');
+  if(obs)window._pclObs=obs.value;
+  _pclRender();
+  // Restaura obs
+  setTimeout(function(){var obs2=document.getElementById('pcl-obs');if(obs2&&window._pclObs)obs2.value=window._pclObs;},10);
+}
+async function _pclAnalisar(){
+  if(!_pclImgData||_pclAnalisando)return;
+  var key=CFG.sistema.anthropicKey||'';
+  if(!key){
+    window._pclErroIA='&#10060; Chave API Anthropic não configurada. Vá em Configurações → Inteligência Artificial.';
+    _pclRender();return;
+  }
+  _pclAnalisando=true;window._pclErroIA=null;_pclRender();
+  try{
+    var base64=_pclImgData.split(',')[1];
+    var mime=_pclImgData.split(';')[0].replace('data:','')||_pclImgMime;
+    var ids=Object.keys(PCL_CATS).join(', ');
+    var lista=Object.values(PCL_CATS).map(function(c){return c.id+'|'+c.criteria;}).join('\n');
+
+    // Contexto do banco: quantas placas por categoria
+    var bancoCats={};
+    for(var i=0;i<_pclEntradas.length;i++){
+      var cid=_pclEntradas[i].classeId;
+      bancoCats[cid]=(bancoCats[cid]||0)+1;
+    }
+    var bancoInfo=Object.keys(bancoCats).length>0
+      ? 'Placas já classificadas no banco: '+Object.keys(bancoCats).map(function(k){return k+'('+bancoCats[k]+')';}).join(', ')
+      : 'Banco de dados ainda vazio.';
+
+    var prompt='Você é especialista em classificação de placas eletrônicas para reciclagem.\n'
+      +'Analise a imagem e classifique pelo manual BioVale.\n\n'
+      +'CONTEXTO DO BANCO DE DADOS DO USUÁRIO:\n'+bancoInfo+'\n\n'
+      +'CATEGORIAS DISPONÍVEIS (id|critério):\n'+lista+'\n\n'
+      +'INSTRUÇÕES:\n'
+      +'1. Escolha a categoria principal (classification_id)\n'
+      +'2. Se confiança < 60%, liste até 2 alternativas em "alternatives"\n'
+      +'3. Se a placa não se encaixar claramente em nenhuma categoria, defina no_match como true\n'
+      +'4. Informe os componentes visíveis\n\n'
+      +'Retorne APENAS este JSON (sem markdown, sem texto extra):\n'
+      +'{"classification_id":"ID_AQUI","confidence":85,"reasoning":"motivo detalhado em português",'
+      +'"visible_components":["componente1","componente2"],'
+      +'"alternatives":[{"id":"ID_ALT","reason":"por quê pode ser esta"}],'
+      +'"no_match":false}\n\n'
+      +'IDs válidos: '+ids;
+
+    var resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:[
+        {type:'image',source:{type:'base64',media_type:mime,data:base64}},
+        {type:'text',text:prompt}
+      ]}]})
+    });
+    var data=await resp.json();
+    if(data.error)throw new Error('API: '+(data.error.message||JSON.stringify(data.error)));
+    var raw=data.content.filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('').trim();
+    var m=raw.match(/\{[\s\S]*\}/);
+    if(!m)throw new Error('IA não retornou JSON válido.');
+    var parsed;
+    try{parsed=JSON.parse(m[0]);}catch(e){
+      var fixed=m[0].replace(/,\s*([}\]])/g,'$1').replace(/[\u0000-\u001F]/g,' ');
+      parsed=JSON.parse(fixed);
+    }
+    if(!parsed.classification_id||!PCL_CATS[parsed.classification_id])parsed.classification_id='intermediaria';
+    parsed.confidence=Math.min(100,Math.max(0,parseInt(parsed.confidence)||70));
+    parsed.reasoning=parsed.reasoning||'Classificação automática.';
+    parsed.visible_components=Array.isArray(parsed.visible_components)?parsed.visible_components:[];
+    parsed.alternatives=Array.isArray(parsed.alternatives)?parsed.alternatives.filter(function(a){return a.id&&PCL_CATS[a.id];}).slice(0,2):[];
+    parsed.no_match=!!parsed.no_match;
+    _pclResultIA=parsed;_pclClasseSel=parsed.classification_id;
+  }catch(e){window._pclErroIA='&#10060; '+e.message;}
+  _pclAnalisando=false;_pclRender();
+}
+function _pclSalvar(){
+  if(!_pclImgData||!_pclClasseSel)return;
+  var obs=document.getElementById('pcl-obs');
+  var entrada={
+    id:nid(),imgData:_pclImgData,classeId:_pclClasseSel,
+    obs:obs?obs.value:'',iaResult:_pclResultIA,
+    criado:new Date().toISOString(),operador:CU?CU.nome:'—'
+  };
+  _pclEntradas.unshift(entrada);_pclSaveDB();
+  _pclImgData=null;_pclResultIA=null;_pclClasseSel=null;window._pclObs='';window._pclErroIA=null;
+  _pclAba='galeria';
+  var el=document.getElementById('pcl-root');
+  if(el){var ok='<div class="al alg" style="margin-bottom:10px">&#10003; Placa salva no banco!</div>';el.innerHTML=ok;}
+  setTimeout(function(){_pclRender();},900);
+}
+
+// ── ABA GALERIA ──────────────────────────────────────────────────────────────
+function _pclRenderGaleria(){
+  var html='';
+  // Filtros
+  html+='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:14px;scrollbar-width:none">';
+  html+='<button onclick="_pclSetFiltro(\'all\')" style="'
+    +'background:'+(_pclFiltro==='all'?'var(--gr2)':'var(--s2)')+';'
+    +'color:'+(_pclFiltro==='all'?'#fff':'var(--mt)')+';'
+    +'border:1px solid '+(_pclFiltro==='all'?'var(--gr2)':'var(--bd)')+';'
+    +'border-radius:20px;padding:5px 13px;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer">'
+    +'Todas ('+_pclEntradas.length+')</button>';
+  var cats=Object.values(PCL_CATS);
+  for(var i=0;i<cats.length;i++){
+    var cls=cats[i];
+    var count=_pclEntradas.filter(function(e){return e.classeId===cls.id;}).length;
+    if(count===0)continue;
+    var sel=_pclFiltro===cls.id;
+    html+='<button onclick="_pclSetFiltro(\''+cls.id+'\')" style="'
+      +'background:'+(sel?cls.color:'var(--s2)')+';color:'+(sel?'#fff':'var(--mt)')+';'
+      +'border:1px solid '+(sel?cls.color:'var(--bd)')+';'
+      +'border-radius:20px;padding:5px 13px;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer">'
+      +cls.badge+' ('+count+')</button>';
+  }
+  html+='</div>';
+
+  var lista=_pclFiltro==='all'?_pclEntradas:_pclEntradas.filter(function(e){return e.classeId===_pclFiltro;});
+  if(lista.length===0){
+    html+='<div style="text-align:center;color:var(--mt);padding:60px 0">'
+      +'<div style="font-size:36px;margin-bottom:12px">&#128444;</div>'
+      +'<div>'+(_pclEntradas.length===0?'Nenhuma placa ainda. Classifique uma!':'Nenhuma placa nesta categoria.')+'</div></div>';
+  } else {
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">';
+    for(var i=0;i<lista.length;i++){
+      var e=lista[i];var c=PCL_CATS[e.classeId];
+      html+='<div onclick="_pclDetalhe(\''+e.id+'\')" style="'
+        +'background:var(--s1);border:1px solid '+(c?c.color+'33':'var(--bd)')+';'
+        +'border-radius:10px;overflow:hidden;cursor:pointer;transition:transform .15s" '
+        +'onmouseenter="this.style.transform=\'translateY(-2px)\'" onmouseleave="this.style.transform=\'none\'">'
+        +'<div style="position:relative;padding-top:66%">'
+        +'<img src="'+e.imgData+'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">'
+        +'<div style="position:absolute;top:6px;right:6px">'+_pclBadge(e.classeId,false)+'</div></div>'
+        +'<div style="padding:8px 10px">'
+        +'<div style="font-size:11px;font-weight:600;color:var(--tx)">'+(c?c.label:e.classeId)+'</div>'
+        +(e.obs?'<div style="font-size:10px;color:var(--mt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+e.obs+'</div>':'')
+        +'<div style="font-size:10px;color:var(--ft);margin-top:3px">'+new Date(e.criado).toLocaleDateString('pt-BR')+'</div>'
+        +'</div></div>';
+    }
+    html+='</div>';
+  }
+  return html;
+}
+function _pclSetFiltro(f){_pclFiltro=f;_pclRender();}
+function _pclDetalhe(id){
+  var e=null;for(var i=0;i<_pclEntradas.length;i++){if(String(_pclEntradas[i].id)===String(id)){e=_pclEntradas[i];break;}}
+  if(!e)return;
+  var c=PCL_CATS[e.classeId];
+  var html='<div style="padding:20px">'
+    +'<img src="'+e.imgData+'" style="width:100%;border-radius:10px;margin-bottom:14px;max-height:300px;object-fit:contain;background:#000">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
+    +_pclBadge(e.classeId,true)
+    +'<div><div style="font-weight:700;font-size:14px;color:var(--tx)">'+(c?c.label:e.classeId)+'</div>'
+    +'<div style="font-size:11px;color:var(--mt)">'+new Date(e.criado).toLocaleString('pt-BR')+' &bull; '+e.operador+'</div></div></div>'
+    +(c?'<div style="font-size:12px;color:var(--mt);margin-bottom:10px;line-height:1.5">'+c.desc+'</div>':'')
+    +(e.obs?'<div style="background:var(--s2);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--tx);margin-bottom:10px">&#128221; '+e.obs+'</div>':'')
+    +(e.iaResult?'<div style="background:var(--grb);border-radius:8px;padding:9px 12px;margin-bottom:10px">'
+      +'<div style="font-size:10px;color:var(--gr);font-weight:700;margin-bottom:4px">ANÁLISE DA IA</div>'
+      +'<div style="font-size:12px;color:var(--tx);line-height:1.5">'+e.iaResult.reasoning+'</div>'
+      +_pclConfiancaBar(e.iaResult.confidence)+'</div>':'')
+    +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+    +'<button class="btn btn-rd" style="font-size:12px;padding:7px 14px" onclick="_pclExcluir(\''+id+'\')">&#128465; Excluir</button>'
+    +'<button class="btn" style="background:var(--s3);color:var(--tx);font-size:12px;padding:7px 14px" onclick="closeM()">Fechar</button>'
+    +'</div></div>';
+  openM(''+(c?c.label:'Placa'),html,520);
+}
+function _pclExcluir(id){
+  confirmar('Excluir esta placa do banco?',function(){
+    _pclEntradas=_pclEntradas.filter(function(e){return String(e.id)!==String(id);});
+    _pclSaveDB();closeM();_pclRender();
+  });
+}
+
+// ── ABA MANUAL ───────────────────────────────────────────────────────────────
+// ── Fotos de referência do Manual ────────────────────────────────────────────
+var _PCL_REF_KEY='bv_pcl_refs';
+var _pclRefs={};// {catId: imgData}
+function _pclLoadRefs(){
+  try{var r=localStorage.getItem(_PCL_REF_KEY);_pclRefs=r?JSON.parse(r):{};}catch(e){_pclRefs={};}
+}
+function _pclSaveRefs(){
+  try{localStorage.setItem(_PCL_REF_KEY,JSON.stringify(_pclRefs));}catch(e){}
+}
+
+function _pclRenderManual(){
+  _pclLoadRefs();
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">'
+    +'<div><div style="font-size:16px;font-weight:700;margin-bottom:2px">Manual de Classificação</div>'
+    +'<div style="font-size:12px;color:var(--mt)">Toque para ver placas &bull; '+Object.keys(PCL_CATS).length+' categorias</div></div>'
+    +'<button class="btn btn-bl" onclick="_pclImprimirManual()" style="font-size:12px;padding:8px 14px">&#128424; Imprimir Manual</button>'
+    +'</div>';
+  var cats=Object.values(PCL_CATS);
+  for(var i=0;i<cats.length;i++){
+    var cls=cats[i];
+    var count=_pclEntradas.filter(function(e){return e.classeId===cls.id;}).length;
+    var temPlacas=count>0;
+    var refImg=_pclRefs[cls.id]||null;
+    html+='<div style="background:var(--s1);border:1px solid '+cls.color+(temPlacas?'88':'33')+';border-left:4px solid '+cls.color+';'
+      +'border-radius:10px;margin-bottom:8px;overflow:hidden">';
+    // Linha clicável principal
+    html+='<div onclick="_pclAbrirCatDoManual(\''+cls.id+'\')" style="padding:14px;cursor:pointer;transition:background .15s" '
+      +'onmouseenter="this.style.background=\''+cls.color+'11\'" onmouseleave="this.style.background=\'\'">';
+    // Layout: foto ref à esquerda (se tiver) + conteúdo
+    if(refImg){
+      html+='<div style="display:flex;gap:12px;align-items:flex-start">'
+        +'<img src="'+refImg+'" style="width:72px;height:60px;object-fit:cover;border-radius:7px;flex-shrink:0;border:2px solid '+cls.color+'55">'
+        +'<div style="flex:1">';
+    }
+    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'
+      +_pclBadge(cls.id,true)
+      +'<div style="font-size:13px;font-weight:600;color:var(--tx);flex:1">'+cls.label+'</div>'
+      +(temPlacas
+        ?'<span style="background:'+cls.color+';color:#fff;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700">'+count+'</span>'
+        :'<span style="background:var(--s3);color:var(--mt);border-radius:20px;padding:2px 9px;font-size:10px">0</span>')
+      +'</div>'
+      +'<div style="font-size:10px;color:var(--mt);font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">'+cls.criteria+'</div>'
+      +'<div style="font-size:12px;color:var(--tx);line-height:1.5">'+cls.desc+'</div>';
+    if(refImg){html+='</div></div>';}
+    html+='</div>';
+    // Barra inferior: botão definir foto ref
+    html+='<div style="border-top:1px solid var(--bd);padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--s2)">'
+      +'<span style="font-size:11px;color:var(--mt)">'+(refImg?'&#10003; Foto de referência definida':'Sem foto de referência')+'</span>'
+      +'<div style="display:flex;gap:6px">'
+      +(refImg?'<button class="bsm bsmr" onclick="event.stopPropagation();_pclRemoverRef(\''+cls.id+'\')">Remover</button>':'')
+      +(temPlacas?'<button class="bsm bsmg" onclick="event.stopPropagation();_pclEscolherRef(\''+cls.id+'\')">'+(refImg?'Trocar foto':'Definir foto')+'</button>':'')
+      +'</div></div>'
+    +'</div>';
+  }
+  return html;
+}
+
+function _pclEscolherRef(catId){
+  _pclLoadRefs();
+  var cls=PCL_CATS[catId];
+  var placas=_pclEntradas.filter(function(e){return e.classeId===catId;});
+  var grid='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:16px">';
+  for(var i=0;i<placas.length;i++){
+    var e=placas[i];
+    var selecionada=_pclRefs[catId]===e.imgData;
+    grid+='<div onclick="_pclDefinirRef(\''+catId+'\',\''+e.id+'\')" style="cursor:pointer;border-radius:8px;overflow:hidden;border:3px solid '+(selecionada?cls.color:'transparent')+'">'
+      +'<img src="'+e.imgData+'" style="width:100%;height:80px;object-fit:cover;display:block">'
+      +(e.obs?'<div style="font-size:9px;color:var(--mt);padding:3px 5px;background:var(--s2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+e.obs+'</div>':'')
+      +'</div>';
+  }
+  grid+='</div>';
+  openM('Escolher foto de referência — '+(cls?cls.label:catId),
+    '<div style="font-size:12px;color:var(--mt);padding:0 16px 8px">Toque na foto que melhor representa esta categoria para o fornecedor</div>'
+    +grid,520);
+}
+function _pclDefinirRef(catId,entradaId){
+  _pclLoadRefs();
+  var entrada=null;
+  for(var i=0;i<_pclEntradas.length;i++){if(String(_pclEntradas[i].id)===String(entradaId)){entrada=_pclEntradas[i];break;}}
+  if(!entrada)return;
+  _pclRefs[catId]=entrada.imgData;
+  _pclSaveRefs();
+  closeM();
+  _pclRender();
+}
+function _pclRemoverRef(catId){
+  _pclLoadRefs();
+  delete _pclRefs[catId];
+  _pclSaveRefs();
+  _pclRender();
+}
+
+function _pclImprimirManual(){
+  _pclLoadRefs();
+  var emp=CFG.empresa&&CFG.empresa.nome?CFG.empresa.nome:'BioVale';
+  var cats=Object.values(PCL_CATS);
+  var cards='';
+  for(var i=0;i<cats.length;i++){
+    var cls=cats[i];
+    var refImg=_pclRefs[cls.id]||null;
+    var count=_pclEntradas.filter(function(e){return e.classeId===cls.id;}).length;
+    cards+='<div style="break-inside:avoid;border:1.5px solid '+cls.color+'55;border-left:5px solid '+cls.color+';border-radius:8px;padding:10px 12px;margin-bottom:10px;background:#fff">'
+      +'<div style="display:flex;gap:10px;align-items:flex-start">'
+      +(refImg?'<img src="'+refImg+'" style="width:80px;height:66px;object-fit:cover;border-radius:6px;flex-shrink:0;border:1.5px solid '+cls.color+'44">':'')
+      +'<div style="flex:1">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'
+      +'<span style="background:'+cls.color+';color:#fff;border-radius:4px;padding:3px 9px;font-size:11px;font-weight:700;font-family:monospace">'+cls.badge+'</span>'
+      +'<span style="font-size:13px;font-weight:700;color:#111">'+cls.label+'</span>'
+      +(count>0?'<span style="margin-left:auto;background:#e8f5e9;color:#2e7d32;border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700">'+count+' no banco</span>':'')
+      +'</div>'
+      +'<div style="font-size:9.5px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">'+cls.criteria+'</div>'
+      +'<div style="font-size:11px;color:#333;line-height:1.5">'+cls.desc+'</div>'
+      +'</div></div></div>';
+  }
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    +'<title>Manual de Classificação PCB — '+emp+'</title>'
+    +'<style>'
+    +'@page{size:A4;margin:12mm 14mm}'
+    +'body{font-family:"Segoe UI",Arial,sans-serif;color:#111;background:#fff;margin:0;padding:0}'
+    +'.header{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;margin-bottom:14px;border-bottom:2px solid #16a34a}'
+    +'.logo{display:flex;align-items:center;gap:10px}'
+    +'.logo-ico{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#16a34a,#22c55e);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +'.logo-name{font-size:20px;font-weight:800;color:#16a34a}'
+    +'.logo-sub{font-size:9px;color:#888;letter-spacing:2px;text-transform:uppercase}'
+    +'.header-right{text-align:right;font-size:10px;color:#888}'
+    +'</style></head><body>'
+    +'<div class="header">'
+    +'<div class="logo"><div class="logo-ico">♻</div><div><div class="logo-name">'+emp+'</div><div class="logo-sub">Manual de Classificação PCB</div></div></div>'
+    +'<div class="header-right">Emitido em '+new Date().toLocaleDateString('pt-BR')+'<br>'+cats.length+' categorias</div>'
+    +'</div>'
+    +cards
+    +'<script>window.onload=function(){window.print();}<\/script>'
+    +'</body></html>';
+  var w=window.open('','_blank');
+  if(w){w.document.write(html);w.document.close();}
+  else{alert('Permita pop-ups para imprimir.');}
+}
+
+function _pclAbrirCatDoManual(catId){
+  var count=_pclEntradas.filter(function(e){return e.classeId===catId;}).length;
+  if(count===0){
+    var cls=PCL_CATS[catId];
+    openM('Categoria vazia',
+      '<div style="padding:20px;text-align:center">'
+      +'<div style="font-size:36px;margin-bottom:12px">&#128444;</div>'
+      +_pclBadge(catId,true)
+      +'<div style="margin-top:12px;font-size:13px;color:var(--mt);line-height:1.6">Nenhuma placa <strong style="color:var(--tx)">'+(cls?cls.label:catId)+'</strong> no banco ainda.</div>'
+      +'<div style="margin-top:16px;display:flex;gap:8px;justify-content:center">'
+      +'<button class="btn" onclick="closeM();_pclSetAba(\'classificar\')">&#128247; Classificar agora</button>'
+      +'<button class="btnO bOgr" onclick="closeM()">Fechar</button>'
+      +'</div></div>',400);
+    return;
+  }
+  _pclFiltro=catId;
+  _pclSetAba('galeria');
+}
+
+// ── Config load/save (anthropicKey) ─────────────────────────────────────────
+function _saveCFG(){
+  try{localStorage.setItem('bv_cfg',JSON.stringify(CFG));}catch(e){}
+}
+// Restaura CFG salvo (inclui anthropicKey)
+(function _restoreCFG(){
+  try{
+    var raw=localStorage.getItem('bv_cfg');
+    if(raw){
+      var s=JSON.parse(raw);
+      if(s.empresa)Object.assign(CFG.empresa,s.empresa);
+      if(s.sistema)Object.assign(CFG.sistema,s.sistema);
+      if(s.integracao)Object.assign(CFG.integracao,s.integracao);
+    }
+  }catch(e){}
+})();
+
 </script></body></html>
