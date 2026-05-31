@@ -11561,6 +11561,98 @@ var PCL_CATS={
   tapete_c:{id:'tapete_c',label:'Tapete C',color:'#FFB300',badge:'TAPETE C',criteria:'Conexões mais novas com baixo banho dourado',desc:'Barra de conectores com banho de qualidade inferior.'},
 };
 
+function _pclComprimir(base64,mime,cb){
+  var img=new Image();
+  img.onload=function(){
+    var MAX=900;var q=0.72;
+    var w=img.width,h=img.height;
+    if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
+    if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}
+    var c=document.createElement('canvas');c.width=w;c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    cb(c.toDataURL('image/jpeg',q));
+  };
+  img.src='data:'+(mime||'image/jpeg')+';base64,'+base64;
+}
+
+// ── Supabase Storage PCB ─────────────────────────────────────────────────────
+var _PCL_BUCKET='pcb-fotos';
+var _PCL_TABLE='pcb_entradas';
+
+async function _pclUploadFoto(imgData,entradaId){
+  if(!_sbClient)return null;
+  try{
+    var base64=imgData.split(',')[1];
+    var mime=imgData.split(';')[0].replace('data:','')||'image/jpeg';
+    var blob=await(await fetch(imgData)).blob();
+    var path=entradaId+'.jpg';
+    var res=await _sbClient.storage.from(_PCL_BUCKET).upload(path,blob,{contentType:'image/jpeg',upsert:true});
+    if(res.error)throw res.error;
+    var pub=_sbClient.storage.from(_PCL_BUCKET).getPublicUrl(path);
+    return pub.data.publicUrl;
+  }catch(e){console.error('Upload foto PCB:',e);return null;}
+}
+
+async function _pclSaveEntrada(entrada){
+  // Salva local sempre (fallback)
+  var local=JSON.parse(localStorage.getItem(_PCL_DB_KEY)||'[]');
+  local.unshift(entrada);
+  localStorage.setItem(_PCL_DB_KEY,JSON.stringify(local));
+  // Tenta salvar no Supabase
+  if(!_sbClient)return;
+  try{
+    // Upload da foto no Storage
+    var fotoUrl=await _pclUploadFoto(entrada.imgData,entrada.id);
+    var row={
+      id:entrada.id,
+      classe_id:entrada.classeId,
+      obs:entrada.obs||'',
+      ia_result:entrada.iaResult?JSON.stringify(entrada.iaResult):null,
+      foto_url:fotoUrl,
+      criado:entrada.criado,
+      operador:entrada.operador||''
+    };
+    var res=await _sbClient.from(_PCL_TABLE).upsert(row);
+    if(res.error)throw res.error;
+  }catch(e){console.error('Salvar entrada PCB:',e);}
+}
+
+async function _pclDeleteEntrada(id){
+  // Remove local
+  var local=JSON.parse(localStorage.getItem(_PCL_DB_KEY)||'[]');
+  local=local.filter(function(e){return String(e.id)!==String(id);});
+  localStorage.setItem(_PCL_DB_KEY,JSON.stringify(local));
+  // Remove do Supabase
+  if(!_sbClient)return;
+  try{
+    await _sbClient.storage.from(_PCL_BUCKET).remove([id+'.jpg']);
+    await _sbClient.from(_PCL_TABLE).delete().eq('id',id);
+  }catch(e){console.error('Delete entrada PCB:',e);}
+}
+
+async function _pclCarregarEntradas(){
+  // Tenta carregar do Supabase primeiro
+  if(_sbClient){
+    try{
+      var res=await _sbClient.from(_PCL_TABLE).select('*').order('criado',{ascending:false});
+      if(!res.error&&res.data&&res.data.length>0){
+        // Converte para formato interno — usa foto_url, imgData vazio (carrega sob demanda)
+        _pclEntradas=res.data.map(function(r){return{
+          id:r.id,classeId:r.classe_id,obs:r.obs||'',
+          iaResult:r.ia_result?JSON.parse(r.ia_result):null,
+          imgData:r.foto_url||'',// URL pública do Storage
+          criado:r.criado,operador:r.operador||''
+        };});
+        // Salva cache local
+        localStorage.setItem(_PCL_DB_KEY,JSON.stringify(_pclEntradas));
+        return;
+      }
+    }catch(e){console.error('Carregar PCB Supabase:',e);}
+  }
+  // Fallback: localStorage
+  try{var r=localStorage.getItem(_PCL_DB_KEY);_pclEntradas=r?JSON.parse(r):[];}catch(e){_pclEntradas=[];}
+}
+
 function _pclLoadDB(){
   try{var r=localStorage.getItem(_PCL_DB_KEY);return r?JSON.parse(r):[];}catch(e){return [];}
 }
@@ -11581,8 +11673,12 @@ function _pclConfiancaBar(v){
 }
 
 function pgClassificador(){
-  _pclEntradas=_pclLoadDB();
-  return '<div id="pcl-root"></div>';
+  _pclEntradas=_pclLoadDB();// cache local enquanto carrega
+  setTimeout(async function(){
+    await _pclCarregarEntradas();
+    _pclRender();
+  },100);
+  return '<div id="pcl-root"><div style="padding:40px;text-align:center;color:var(--mt)">&#9107; Carregando banco de placas…</div></div>';
 }
 
 function _pclInit(){
@@ -11883,17 +11979,27 @@ async function _pclAnalisar(){
 function _pclSalvar(){
   if(!_pclImgData||!_pclClasseSel)return;
   var obs=document.getElementById('pcl-obs');
-  var entrada={
-    id:nid(),imgData:_pclImgData,classeId:_pclClasseSel,
-    obs:obs?obs.value:'',iaResult:_pclResultIA,
-    criado:new Date().toISOString(),operador:CU?CU.nome:'—'
-  };
-  _pclEntradas.unshift(entrada);_pclSaveDB();
-  _pclImgData=null;_pclResultIA=null;_pclClasseSel=null;window._pclObs='';window._pclErroIA=null;
-  _pclAba='galeria';
+  var obsVal=obs?obs.value:'';
+  var entradaId=nid();
   var el=document.getElementById('pcl-root');
-  if(el){var ok='<div class="al alg" style="margin-bottom:10px">&#10003; Placa salva no banco!</div>';el.innerHTML=ok;}
-  setTimeout(function(){_pclRender();},900);
+  if(el)el.innerHTML='<div style="padding:40px;text-align:center;color:var(--mt)">&#128190; Comprimindo e salvando…</div>';
+
+  // Comprime primeiro, depois salva
+  var base64=_pclImgData.split(',')[1];
+  var mime=_pclImgData.split(';')[0].replace('data:','')||'image/jpeg';
+  _pclComprimir(base64,mime,async function(imgComprimida){
+    var entrada={
+      id:entradaId,imgData:imgComprimida,classeId:_pclClasseSel,
+      obs:obsVal,iaResult:_pclResultIA,
+      criado:new Date().toISOString(),operador:CU?CU.nome:'—'
+    };
+    await _pclSaveEntrada(entrada);
+    _pclEntradas.unshift(entrada);
+    _pclImgData=null;_pclResultIA=null;_pclClasseSel=null;window._pclObs='';window._pclErroIA=null;
+    _pclAba='galeria';
+    if(el)el.innerHTML='<div class="al alg" style="margin:16px">&#10003; Placa salva na nuvem!</div>';
+    setTimeout(function(){_pclRender();},900);
+  });
 }
 
 // ── ABA GALERIA ──────────────────────────────────────────────────────────────
@@ -11971,9 +12077,10 @@ function _pclDetalhe(id){
   openM(''+(c?c.label:'Placa'),html,520);
 }
 function _pclExcluir(id){
-  confirmar('Excluir esta placa do banco?',function(){
+  confirmar('Excluir esta placa do banco?',async function(){
+    await _pclDeleteEntrada(id);
     _pclEntradas=_pclEntradas.filter(function(e){return String(e.id)!==String(id);});
-    _pclSaveDB();closeM();_pclRender();
+    closeM();_pclRender();
   });
 }
 
