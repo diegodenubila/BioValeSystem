@@ -4896,23 +4896,77 @@ function abrirCameraBarcode(){
     return;
   }
   try{
-    _zxingReader=new ZXing.BrowserMultiFormatReader();
-    _zxingReader.decodeFromVideoDevice(null,video,function(result,err){
-      if(result){
-        var cod=result.getText();
-        if(status)status.textContent='✓ Lido: '+cod;
-        fecharCameraBarcode();
-        buscarPorCodigo(cod);
+    var hints=new Map();
+    hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+    _zxingReader=new ZXing.BrowserMultiFormatReader(hints);
+
+    // Timer de feedback — 8s sem ler mostra aviso
+    var _tentativas=0;
+    var _feedbackTimer=setTimeout(function(){
+      if(_cameraAtiva&&status){
+        status.style.background='rgba(180,0,0,.8)';
+        status.textContent='⚠️ Não consegui ler. Aproxime mais ou melhore a iluminação.';
+        // Depois de mais 5s fecha e sugere digitar
+        setTimeout(function(){
+          if(_cameraAtiva){
+            fecharCameraBarcode();
+            var inp=document.getElementById('rev-barcode-inp');
+            if(inp){inp.focus();inp.placeholder='Não leu — tente digitar o código';}
+            setTimeout(function(){
+              var i=document.getElementById('rev-barcode-inp');
+              if(i)i.placeholder='🔍 Código de barras ou número...';
+            },4000);
+          }
+        },5000);
       }
+    },8000);
+
+    navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:{ideal:'environment'},
+        width:{ideal:1280},
+        height:{ideal:720}
+      }
+    }).then(function(stream){
+      video.srcObject=stream;
+      video.play();
+      var track=stream.getVideoTracks()[0];
+      if(track&&track.applyConstraints){
+        track.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(function(){});
+      }
+      _zxingReader.decodeFromStream(stream,video,function(result,err){
+        if(result){
+          clearTimeout(_feedbackTimer);
+          var cod=result.getText();
+          if(status){status.style.background='rgba(22,163,74,.9)';status.textContent='✅ Lido: '+cod;}
+          setTimeout(function(){fecharCameraBarcode();buscarPorCodigo(cod);},400);
+        }
+        if(err&&!(err instanceof ZXing.NotFoundException)){
+          _tentativas++;
+          if(_tentativas===1&&status){
+            status.style.background='rgba(0,0,0,.6)';
+            status.textContent='📷 Aponte para o código de barras...';
+          }
+        }
+      });
+      if(status){status.style.background='rgba(0,0,0,.6)';status.textContent='📷 Aponte para o código de barras...';}
+    }).catch(function(e){
+      clearTimeout(_feedbackTimer);
+      if(status){status.style.background='rgba(180,0,0,.8)';status.textContent='❌ Câmera negada: '+e.message;}
+      setTimeout(function(){ct.style.display='none';_cameraAtiva=false;},3000);
     });
-    if(status)status.textContent='Aponte para o código de barras...';
   }catch(e){
-    if(status)status.textContent='❌ Erro ao acessar câmera: '+e.message;
+    if(status){status.style.background='rgba(180,0,0,.8)';status.textContent='❌ Erro: '+e.message;}
   }
 }
 function fecharCameraBarcode(){
   var ct=document.getElementById('rev-camera-ct');
+  var video=document.getElementById('rev-camera-video');
   if(ct)ct.style.display='none';
+  if(video&&video.srcObject){
+    video.srcObject.getTracks().forEach(function(t){t.stop();});
+    video.srcObject=null;
+  }
   if(_zxingReader){try{_zxingReader.reset();}catch(e){}}_zxingReader=null;
   _cameraAtiva=false;
 }
@@ -5446,24 +5500,38 @@ function pgFin(){
 function finTab(t){
   _finTab=t;
   if(t==='fixas')_fixasMesOffset=0;
-  var tabs=document.querySelectorAll('#fin-tabs .tabbtn');
+  // Reconstrói o highlight das abas
+  var tabsEl=document.querySelectorAll('#fin-tabs .tabbtn');
   var order=['resumo','relatorio','fluxo','conciliacao','contas','movs','fixas','categorias'];
-  for(var i=0;i<tabs.length;i++){tabs[i].classList.toggle('on',order[i]===t);}
+  for(var i=0;i<tabsEl.length;i++){
+    tabsEl[i].classList.remove('on');
+    if(i<order.length&&order[i]===t)tabsEl[i].classList.add('on');
+  }
   document.getElementById('fin-content').innerHTML=_finRender(t);
 }
 
 function _finRender(t){
-  if(t==='resumo')    return _finResumo();
-  if(t==='relatorio') return _finRelatorio();
-  if(t==='fluxo')       return _finFluxo();
-  if(t==='conciliacao') return _finConciliacao();
-  if(t==='contas')    return _finContas();
-  if(t==='movs')      return _finMovs();
-  if(t==='fixas')     return _finFixas();
-  if(t==='categorias') return _finCategorias();
+  try{
+    if(t==='resumo')    return _finResumo();
+    if(t==='relatorio') return _finRelatorio();
+    if(t==='fluxo')       return _finFluxo();
+    if(t==='conciliacao') return _finConciliacao();
+    if(t==='contas')    return _finContas();
+    if(t==='movs')      return _finMovs();
+    if(t==='fixas')     return _finFixas();
+    if(t==='categorias') return _finCategorias();
+  }catch(e){
+    return '<div class="al alr" style="margin:16px">Erro ao carregar: '+e.message+'<br><small>'+e.stack+'</small></div>';
+  }
   return '';
 }
 
+function _mvTotal(mv){
+  if(mv.total&&mv.total>0)return mv.total;
+  var itens=mv.itensList||mv.itens||[];
+  var t=0;for(var k=0;k<itens.length;k++)t+=_itVal(itens[k]);
+  return t;
+}
 function _finResumo(){
   // totais gerais
   var _movs=_filtrarMovsPeriodo(DB.movs);
