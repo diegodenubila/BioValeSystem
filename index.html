@@ -12147,7 +12147,9 @@ function _pclSaveOrder(){
   try{localStorage.setItem(_PCL_ORDER_KEY,JSON.stringify(_pclCatOrder));}catch(e){}
 }
 function _pclGetCat(id){
-  return PCL_CATS[id]||_pclCatsCustom[id]||null;
+  // custom override takes priority (includes edited defaults)
+  if(_pclCatsCustom&&_pclCatsCustom[id])return _pclCatsCustom[id];
+  return PCL_CATS[id]||null;
 }
 // Retorna todas as categorias na ordem definida pelo usuário
 function _pclGetAllCatsOrdenadas(){
@@ -12190,7 +12192,14 @@ function _pclRenderCategorias(){
     var isCustom=!!_pclCatsCustom[cls.id];
     var count=_pclEntradas.filter(function(e){return e.classeId===cls.id;}).length;
     var isFirst=i===0;var isLast=i===todasOrdenadas.length-1;
-    html+='<div style="background:var(--s1);border:1px solid '+cls.color+'55;border-left:4px solid '+cls.color+';border-radius:10px;padding:12px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px">'
+    html+='<div id="pclcard-'+cls.id+'" draggable="true" '
+      +'ondragstart="_pclDragStart(event,\''+cls.id+'\')" '
+      +'ondragover="_pclDragOver(event,\''+cls.id+'\')" '
+      +'ondrop="_pclDrop(event,\''+cls.id+'\')" '
+      +'ondragend="_pclDragEnd(event)" '
+      +'style="background:var(--s1);border:1px solid '+cls.color+'55;border-left:4px solid '+cls.color+';border-radius:10px;padding:12px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:grab;transition:opacity .15s,transform .1s">'
+      // Handle de arrastar
+      +'<div style="color:var(--ft);font-size:16px;cursor:grab;flex-shrink:0;user-select:none" title="Arrastar para reordenar">⠿</div>'
       // Setas
       +'<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">'
       +'<button onclick="_pclMoverCategoria(\''+cls.id+'\',-1)" '+(isFirst?'disabled':'')+' style="background:'+(isFirst?'var(--s3)':'var(--s2)')+';border:1px solid var(--bd);border-radius:4px;color:'+(isFirst?'var(--ft)':'var(--tx)')+';cursor:'+(isFirst?'default':'pointer')+';padding:2px 7px;font-size:13px;line-height:1">↑</button>'
@@ -12213,7 +12222,9 @@ function _pclRenderCategorias(){
           +'<button class="bsm bsmr" onclick="_pclDeletarCategoria(\''+cls.id+'\')">&#128465;</button>'
           +'<button class="bsm bsmg" onclick="_pclEditarCategoria(\''+cls.id+'\')">&#9998;</button>'
         +'</div>'
-        :'<span style="font-size:10px;color:var(--ft)">padrão</span>')
+        :'<button class="bsm bsmg" onclick="_pclEditarCategoria(\''+cls.id+'\')">&#9998;</button>'
+        +(_pclCatsCustom[cls.id]&&_pclCatsCustom[cls.id].overrideDefault?'<button class="bsm" style="background:var(--s3);color:var(--mt);font-size:9px" onclick="_pclResetarPadrao(\''+cls.id+'\')">&#8635;</button>':'')
+      )
       +'</div>'
       +'</div>';
   }
@@ -12222,10 +12233,27 @@ function _pclRenderCategorias(){
 
 function _pclNovaCategoria(editId){
   _pclLoadCatsCustom();
-  var edit=editId?_pclCatsCustom[editId]:null;
-  var cores=['#EF5350','#FF9800','#FFC107','#4CAF50','#26C6DA','#42A5F5','#7B1FA2','#795548','#607D8B','#F06292','#00BCD4','#8BC34A'];
+  // Se editId é categoria padrão, usa PCL_CATS; se é custom, usa _pclCatsCustom
+  var edit=editId?(PCL_CATS[editId]||_pclCatsCustom[editId]):null;
+  var isDefault=editId&&!!PCL_CATS[editId];
+  // Paleta completa: todas as cores das 40 categorias padrão + extras
+  var cores=[
+    '#FFD700','#FFA500','#FF8C00',// dourados/laranjas
+    '#4CAF50','#66BB6A','#2E7D32','#1B5E20','#43A047','#388E3C',// verdes
+    '#26C6DA','#42A5F5','#29B6F6','#0D47A1','#1565C0',// azuis/ciano
+    '#EF5350','#E53935','#C62828','#D84315','#BF360C',// vermelhos
+    '#AB47BC','#9C27B0','#7B1FA2','#6A1B9A','#4A148C',// roxos
+    '#00897B','#00796B','#00695C',// teais
+    '#78909C','#546E7A','#37474F','#607D8B',// cinzas azulados
+    '#795548','#616161','#9E9E9E','#424242',// marrons/cinzas
+    '#F9A825','#FF8F00','#E65100','#FF6F00',// âmbares/laranjas escuros
+    '#FFD54F','#FFB300',// amarelos
+  ];
+  // Remove duplicatas mantendo ordem
+  cores=cores.filter(function(c,i){return cores.indexOf(c)===i;});
   var corSel=edit?edit.color:cores[0];
   var html='<div style="padding:16px;display:flex;flex-direction:column;gap:12px">'
+    +(isDefault?'<div class="al aly" style="font-size:12px">&#9998; Você está editando uma categoria padrão do Manual BioVale.</div>':'')
     +'<div class="fld"><label>Nome da categoria</label>'
     +'<input class="inp" id="pclc-nome" placeholder="Ex: Processador Fibra Cobre" value="'+(edit?edit.label:'')+'">'
     +'</div>'
@@ -12238,21 +12266,50 @@ function _pclNovaCategoria(editId){
     +'<div class="fld"><label>Descrição</label>'
     +'<textarea class="inp" id="pclc-desc" rows="2" placeholder="Descreva detalhes da classificação">'+(edit?edit.desc:'')+'</textarea>'
     +'</div>'
-    +'<div class="fld"><label>Cor</label>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px" id="pclc-cores">';
+    +'<div class="fld"><label>Cor — clique para selecionar</label>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px" id="pclc-cores">';
   for(var i=0;i<cores.length;i++){
     var cor=cores[i];
-    html+='<div onclick="document.getElementById(\'pclc-cor-val\').value=\''+cor+'\';document.querySelectorAll(\'.pclc-cor\').forEach(function(x){x.style.border=\'3px solid transparent\'});this.style.border=\'3px solid #fff\'" '
-      +'class="pclc-cor" style="width:28px;height:28px;border-radius:50%;background:'+cor+';cursor:pointer;border:3px solid '+(corSel===cor?'#fff':'transparent')+'"></div>';
+    var sel=corSel===cor;
+    html+='<div onclick="_pclSelecionarCor(this,\''+cor+'\')" '
+      +'class="pclc-cor" title="'+cor+'" style="width:26px;height:26px;border-radius:50%;background:'+cor+';cursor:pointer;'
+      +'border:3px solid '+(sel?'#fff':'transparent')+';'
+      +'box-shadow:'+(sel?'0 0 0 2px '+cor:'none')+'">'
+      +'</div>';
   }
   html+='</div>'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<div id="pclc-cor-preview" style="width:32px;height:32px;border-radius:8px;background:'+corSel+';flex-shrink:0"></div>'
+    +'<input type="text" id="pclc-cor-hex" class="inp" value="'+corSel+'" placeholder="#RRGGBB" style="font-family:monospace;max-width:110px" oninput="_pclCorHexInput(this.value)">'
+    +'<span style="font-size:11px;color:var(--mt)">ou digite o código hex</span>'
+    +'</div>'
     +'<input type="hidden" id="pclc-cor-val" value="'+corSel+'">'
     +'</div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+    +(isDefault?'<button class="btn btn-rd" style="font-size:12px;padding:7px 14px" onclick="_pclResetarPadrao(\''+editId+'\')">&#8635; Restaurar padrão</button>':'')
     +'<button class="btn" onclick="_pclSalvarCategoria('+(editId?'\''+editId+'\'':'null')+')">&#10003; Salvar</button>'
     +'<button class="btn" style="background:var(--s3);color:var(--tx)" onclick="closeM()">Cancelar</button>'
     +'</div></div>';
-  openM(edit?'Editar Categoria':'Nova Categoria',html,480);
+  openM(edit?'Editar — '+edit.label:'Nova Categoria',html,500);
+}
+
+function _pclSelecionarCor(el,cor){
+  document.querySelectorAll('.pclc-cor').forEach(function(x){
+    x.style.border='3px solid transparent';x.style.boxShadow='none';
+  });
+  el.style.border='3px solid #fff';el.style.boxShadow='0 0 0 2px '+cor;
+  document.getElementById('pclc-cor-val').value=cor;
+  document.getElementById('pclc-cor-hex').value=cor;
+  document.getElementById('pclc-cor-preview').style.background=cor;
+}
+function _pclCorHexInput(val){
+  if(/^#[0-9A-Fa-f]{6}$/.test(val)){
+    document.getElementById('pclc-cor-val').value=val;
+    document.getElementById('pclc-cor-preview').style.background=val;
+    document.querySelectorAll('.pclc-cor').forEach(function(x){
+      x.style.border='3px solid transparent';x.style.boxShadow='none';
+    });
+  }
 }
 
 function _pclEditarCategoria(id){_pclNovaCategoria(id);}
@@ -12265,25 +12322,74 @@ function _pclSalvarCategoria(editId){
   var cor=document.getElementById('pclc-cor-val').value||'#42A5F5';
   if(!nome||!badge||!criteria){alert('Preencha Nome, Badge e Critério.');return;}
   _pclLoadCatsCustom();
-  var id=editId||(nome.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/__+/g,'_')+'_custom');
-  _pclCatsCustom[id]={id:id,label:nome,badge:badge,criteria:criteria,desc:desc||criteria,color:cor,custom:true};
+  var isDefault=editId&&!!PCL_CATS[editId];
+  if(isDefault){
+    // Sobrescreve categoria padrão no custom (override)
+    _pclCatsCustom[editId]=Object.assign({},PCL_CATS[editId],{label:nome,badge:badge,criteria:criteria,desc:desc||criteria,color:cor,overrideDefault:true});
+  } else {
+    var id=editId||(nome.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/__+/g,'_')+'_custom');
+    _pclCatsCustom[id]={id:id,label:nome,badge:badge,criteria:criteria,desc:desc||criteria,color:cor,custom:true};
+  }
   _pclSaveCatsCustom();
   closeM();
-  toast('Categoria "'+(nome)+'" salva!');
+  toast('Categoria "'+nome+'" salva!');
   _pclRender();
+}
+
+function _pclResetarPadrao(id){
+  confirmar('Restaurar categoria "'+( PCL_CATS[id]?PCL_CATS[id].label:id)+'" para o padrão original?',function(){
+    _pclLoadCatsCustom();
+    delete _pclCatsCustom[id];
+    _pclSaveCatsCustom();
+    closeM();
+    toast('Categoria restaurada ao padrão.');
+    _pclRender();
+  });
 }
 
 function _pclDeletarCategoria(id){
   var cls=_pclCatsCustom[id];
   var count=_pclEntradas.filter(function(e){return e.classeId===id;}).length;
-  var aviso=count>0?'<div class="al alr" style="margin-bottom:10px;font-size:12px">&#9888; Esta categoria tem '+count+' placa'+(count>1?'s':'')+' no banco. As placas não serão excluídas, mas ficarão sem categoria reconhecida.</div>':'';
-  confirmar((cls?cls.label:'Categoria')+': confirmar exclusão?',function(){
+  confirmar((cls?cls.label:'Categoria')+': confirmar exclusão?'+(count>0?' ('+count+' placa'+(count>1?'s':'')+' no banco não serão excluídas)':''),function(){
     _pclLoadCatsCustom();
     delete _pclCatsCustom[id];
     _pclSaveCatsCustom();
     toast('Categoria excluída.');
     _pclRender();
   });
+}
+
+// ── Drag & Drop reordenação ───────────────────────────────────────────────────
+var _pclDragId=null;
+function _pclDragStart(e,id){
+  _pclDragId=id;
+  e.currentTarget.style.opacity='0.4';
+  e.dataTransfer.effectAllowed='move';
+}
+function _pclDragOver(e,id){
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  if(id!==_pclDragId){
+    var el=document.getElementById('pclcard-'+id);
+    if(el)el.style.transform='translateY(-3px)';
+  }
+}
+function _pclDrop(e,targetId){
+  e.preventDefault();
+  if(!_pclDragId||_pclDragId===targetId)return;
+  var fromIdx=_pclCatOrder.indexOf(_pclDragId);
+  var toIdx=_pclCatOrder.indexOf(targetId);
+  if(fromIdx<0||toIdx<0)return;
+  _pclCatOrder.splice(fromIdx,1);
+  _pclCatOrder.splice(toIdx,0,_pclDragId);
+  _pclSaveOrder();
+  _pclDragId=null;
+  _pclRender();
+}
+function _pclDragEnd(e){
+  e.currentTarget.style.opacity='1';
+  document.querySelectorAll('[id^="pclcard-"]').forEach(function(el){el.style.transform='';});
+  _pclDragId=null;
 }
 
 // ── ABA MANUAL ───────────────────────────────────────────────────────────────
@@ -12414,7 +12520,11 @@ function _pclImprimirManual(){
     +'.header-right{text-align:right;font-size:10px;color:#888}'
     +'</style></head><body>'
     +'<div class="header">'
-    +'<div class="logo"><div class="logo-ico">♻</div><div><div class="logo-name">'+emp+'</div><div class="logo-sub">Manual de Classificação PCB</div></div></div>'
+    +'<div class="logo">'
+    +(_LOGO_B64_CACHE
+      ?'<img src="data:image/png;base64,'+_LOGO_B64_CACHE+'" style="height:44px;width:auto;object-fit:contain" alt="'+emp+'">'
+      :'<div class="logo-ico">♻</div>')
+    +'<div><div class="logo-name">'+emp+'</div><div class="logo-sub">Manual de Classificação PCB</div></div></div>'
     +'<div class="header-right">Emitido em '+new Date().toLocaleDateString('pt-BR')+'<br>'+cats.length+' categorias</div>'
     +'</div>'
     +cards
