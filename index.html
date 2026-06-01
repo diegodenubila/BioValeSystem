@@ -5043,7 +5043,7 @@ function mVerProdRevenda(id){
 function imprimirEtiqueta(id){
   var p=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){p=DB.revenda[i];break;}}
   if(!p)return;
-  var cod=_revCodigo(p.id);var bars=_gerarCode128(cod);
+  var cod=_revCodigo(p.id);var bars=_gerarBarcodeTipo(cod);
   var conteudo='<!DOCTYPE html><html><head><meta charset="UTF-8">'
     +'<style>*{margin:0;padding:0;box-sizing:border-box}@page{size:80mm auto;margin:4mm}'
     +'body{font-family:"Courier New",monospace;background:#fff;color:#000;text-align:center;padding:4mm}'
@@ -10813,7 +10813,8 @@ var CFG={
     fmtPc:'termico58',fmtMob:'termico58',
     idioma:'pt-BR',moeda:'BRL',exibirFeriados:true,
     atalhos:true,
-    anthropicKey:''
+    anthropicKey:'',
+    tipoBarcode:'ean13'
   },
   integracao:{
     impressora:false,gerarAutoComprovante:true,balancaDigital:false
@@ -10850,7 +10851,10 @@ function _cfgConteudo(){
   if(cfgAba==='dados')return _cfgDados();
   if(cfgAba==='atalhos')return _cfgAtalhos();
   if(cfgAba==='usuarios')return _cfgUsuarios();
-  if(cfgAba==='ia')return _cfgIA();
+  if(cfgAba==='ia'){
+    setTimeout(function(){_prevCfgBarcode();},80);
+    return _cfgIA();
+  }
   return '';
 }
 function _cfgRevenda(){
@@ -11576,12 +11580,149 @@ function _cfgIA(){
     +'<button class="btn" onclick="_saveCfgIA()">Salvar Chave</button>'
     +'</div></div>';
 }
+function _cfgIA(){
+  return '<div class="card">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd)">'
+    +'<div style="font-size:22px">&#129302;</div>'
+    +'<div><div style="font-size:14px;font-weight:700">Inteligencia Artificial</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-top:1px">Configure a chave da API Anthropic para o Classificador de Placas PCB</div></div></div>'
+    +'<div style="padding:16px;display:flex;flex-direction:column;gap:14px">'
+    +'<div class="fld"><label>Chave API Anthropic (para Classificador PCB)</label>'
+    +'<input class="inp" id="cfg-anthropic-key" type="password" placeholder="sk-ant-..." value="'+(CFG.sistema.anthropicKey||'')+'" style="font-family:monospace;letter-spacing:1px"></div>'
+    +'<div class="al alb" style="font-size:12px">&#128274; A chave fica salva apenas no seu navegador (localStorage). Nunca enviada para terceiros.</div>'
+    +'<button class="btn" onclick="_saveCfgIA()">Salvar Chave</button>'
+    +'</div></div>'
+    +'<div class="card" style="margin-top:12px">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd)">'
+    +'<div style="font-size:22px">&#128196;</div>'
+    +'<div><div style="font-size:14px;font-weight:700">Código de Barras — Etiquetas</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-top:1px">Tipo padrão gerado nas etiquetas da Revenda</div></div></div>'
+    +'<div style="padding:16px;display:flex;flex-direction:column;gap:12px">'
+    +'<div class="fld"><label>Tipo de código</label>'
+    +'<select class="inp" id="cfg-barcode-tipo" onchange="_prevCfgBarcode()">'
+    +'<option value="ean13" '+((CFG.sistema.tipoBarcode||'ean13')==='ean13'?'selected':'')+'>EAN-13 — recomendado (Elgin BS313 e leitores padrão)</option>'
+    +'<option value="code128" '+((CFG.sistema.tipoBarcode)==='code128'?'selected':'')+'>Code 128 — logística e etiquetas industriais</option>'
+    +'<option value="code39" '+((CFG.sistema.tipoBarcode)==='code39'?'selected':'')+'>Code 39 — compatível com maioria dos leitores</option>'
+    +'<option value="qrcode" '+((CFG.sistema.tipoBarcode)==='qrcode'?'selected':'')+'>QR Code — smartphones e leitores 2D</option>'
+    +'</select></div>'
+    +'<div style="background:#fff;border-radius:8px;padding:12px;text-align:center" id="cfg-bc-preview"></div>'
+    +'<button class="btn" onclick="_saveCfgBarcode()">Salvar</button>'
+    +'</div></div>';
+}
 function _saveCfgIA(){
   var k=document.getElementById('cfg-anthropic-key');
   if(!k)return;
   CFG.sistema.anthropicKey=k.value.trim();
   _saveCFG();
   var btn=event.target;btn.textContent='&#10003; Salvo!';setTimeout(function(){btn.textContent='Salvar Chave';},2000);
+}
+function _prevCfgBarcode(){
+  var sel=document.getElementById('cfg-barcode-tipo');
+  var prev=document.getElementById('cfg-bc-preview');
+  if(!sel||!prev)return;
+  var tipo=sel.value;
+  var cod='001871162052';
+  var svg=_gerarBarcodeTipo(cod,tipo);
+  prev.innerHTML=svg+'<div style="font-size:10px;color:#555;margin-top:4px;font-family:monospace">'+cod+'</div>';
+}
+function _saveCfgBarcode(){
+  var sel=document.getElementById('cfg-barcode-tipo');
+  if(!sel)return;
+  CFG.sistema.tipoBarcode=sel.value;
+  _saveCFG();
+  var btn=event.target;btn.textContent='&#10003; Salvo!';setTimeout(function(){btn.textContent='Salvar';},2000);
+}
+// Dispatcher — escolhe o gerador correto pelo tipo
+function _gerarBarcodeTipo(codigo,tipo){
+  tipo=tipo||(CFG.sistema.tipoBarcode)||'ean13';
+  if(tipo==='ean13')return _gerarEAN13(codigo);
+  if(tipo==='code39')return _gerarCode39(codigo);
+  if(tipo==='qrcode')return _gerarQR(codigo);
+  return _gerarCode128(codigo);// code128 default
+}
+// ── EAN-13 ───────────────────────────────────────────────────────────────────
+function _gerarEAN13(codigo){
+  // Garante 12 dígitos e calcula checksum
+  var d=codigo.replace(/\D/g,'');
+  while(d.length<12)d='0'+d;
+  d=d.slice(-12);
+  var sum=0;for(var i=0;i<12;i++)sum+=parseInt(d[i])*(i%2===0?1:3);
+  var chk=(10-(sum%10))%10;
+  var full=d+chk;
+  // Padrões L e G para EAN-13
+  var L=[[3,2,1,1],[2,2,2,1],[2,1,2,2],[1,4,1,1],[1,1,3,2],[1,2,3,1],[1,1,1,4],[1,3,1,2],[1,2,1,3],[3,1,1,2]];
+  var G=[[1,1,2,3],[1,2,2,2],[2,2,1,2],[1,1,4,1],[2,3,1,1],[1,3,2,1],[4,1,1,1],[2,1,3,1],[3,1,2,1],[2,1,1,3]];
+  var R=[[3,2,1,1],[2,2,2,1],[2,1,2,2],[1,4,1,1],[1,1,3,2],[1,2,3,1],[1,1,1,4],[1,3,1,2],[1,2,1,3],[3,1,1,2]];
+  // Primeira tabela de paridade baseada no primeiro dígito
+  var parity=[
+    [0,0,0,0,0,0],[0,0,1,0,1,1],[0,0,1,1,0,1],[0,0,1,1,1,0],
+    [0,1,0,0,1,1],[0,1,1,0,0,1],[0,1,1,1,0,0],[0,1,0,1,0,1],
+    [0,1,0,1,1,0],[0,1,1,0,1,0]
+  ];
+  var mw=2.2,h=70,hg=80;// hg = guardas mais altas
+  var quietL=9*mw;
+  // Calcula largura total: quiet+guarda3+6chars+centro5+6chars+guarda3+quiet
+  var tw=quietL*2+3*mw+6*7*mw+5*mw+6*7*mw+3*mw;
+  var svg='<svg width="'+tw.toFixed(0)+'" height="'+hg+'" xmlns="http://www.w3.org/2000/svg">';
+  var x=quietL;
+  function bar(bx,bw,tall){svg+='<rect x="'+bx.toFixed(2)+'" y="0" width="'+bw.toFixed(2)+'" height="'+(tall?hg:h)+'" fill="#000"/>';}
+  function pat(p,tall,enc){// enc: L or G or R array
+    for(var i=0;i<4;i++){var w=p[i]*mw;if(i%2===0)bar(x,w,tall);x+=w;}
+  }
+  // Guarda esquerda 1-0-1
+  bar(x,mw,true);x+=mw;x+=mw;bar(x,mw,true);x+=mw;
+  var first=parseInt(full[0]);
+  var par=parity[first];
+  // Dígitos 1-6 esquerda
+  for(var i=1;i<=6;i++){
+    var d2=parseInt(full[i]);
+    pat(par[i-1]===0?L[d2]:G[d2],false);
+  }
+  // Guarda central 0-1-0-1-0
+  x+=mw;bar(x,mw,true);x+=mw;x+=mw;bar(x,mw,true);x+=mw;x+=mw;
+  // Dígitos 7-12 direita
+  for(var i=7;i<=12;i++){pat(R[parseInt(full[i])],false);}
+  // Guarda direita 1-0-1
+  bar(x,mw,true);x+=mw;x+=mw;bar(x,mw,true);x+=mw;
+  svg+='</svg>';
+  return svg;
+}
+// ── Code 39 ──────────────────────────────────────────────────────────────────
+function _gerarCode39(codigo){
+  var chars={
+    '0':[1,1,1,3,3,1,3,1,1],'1':[3,1,1,3,1,1,1,1,3],'2':[1,1,3,3,1,1,1,1,3],
+    '3':[3,1,3,3,1,1,1,1,1],'4':[1,1,1,3,3,1,1,1,3],'5':[3,1,1,3,3,1,1,1,1],
+    '6':[1,1,3,3,3,1,1,1,1],'7':[1,1,1,3,1,1,3,1,3],'8':[3,1,1,3,1,1,3,1,1],
+    '9':[1,1,3,3,1,1,3,1,1],'A':[3,1,1,1,1,3,1,1,3],'B':[1,1,3,1,1,3,1,1,3],
+    'C':[3,1,3,1,1,3,1,1,1],'D':[1,1,1,1,3,3,1,1,3],'E':[3,1,1,1,3,3,1,1,1],
+    'F':[1,1,3,1,3,3,1,1,1],'G':[1,1,1,1,1,3,3,1,3],'H':[3,1,1,1,1,3,3,1,1],
+    'I':[1,1,3,1,1,3,3,1,1],'J':[1,1,1,1,3,3,3,1,1],'K':[3,1,1,1,1,1,1,3,3],
+    'L':[1,1,3,1,1,1,1,3,3],'M':[3,1,3,1,1,1,1,3,1],'N':[1,1,1,1,3,1,1,3,3],
+    'O':[3,1,1,1,3,1,1,3,1],'P':[1,1,3,1,3,1,1,3,1],'Q':[1,1,1,1,1,1,3,3,3],
+    'R':[3,1,1,1,1,1,3,3,1],'S':[1,1,3,1,1,1,3,3,1],'T':[1,1,1,1,3,1,3,3,1],
+    'U':[3,3,1,1,1,1,1,1,3],'V':[1,3,3,1,1,1,1,1,3],'W':[3,3,3,1,1,1,1,1,1],
+    'X':[1,3,1,1,3,1,1,1,3],'Y':[3,3,1,1,3,1,1,1,1],'Z':[1,3,3,1,3,1,1,1,1],
+    '-':[1,3,1,1,1,1,3,1,3],'.':[3,3,1,1,1,1,3,1,1],' ':[1,3,3,1,1,1,3,1,1],
+    '*':[1,3,1,1,3,1,3,1,1],'$':[1,3,1,3,1,3,1,1,1],'/':[1,3,1,3,1,1,1,3,1],
+    '+':[1,3,1,1,1,3,1,3,1],'%':[1,1,1,3,1,3,1,3,1]
+  };
+  var seq='*'+codigo.toUpperCase()+'*';
+  var mw=2.0,h=70,gap=mw;
+  var tw=10*mw*2;// quiet zones
+  for(var i=0;i<seq.length;i++){var p=chars[seq[i]];if(p){for(var j=0;j<9;j++)tw+=p[j]*mw;tw+=gap;}}
+  var svg='<svg width="'+tw.toFixed(0)+'" height="'+h+'" xmlns="http://www.w3.org/2000/svg">';
+  var x=10*mw;
+  for(var i=0;i<seq.length;i++){
+    var p=chars[seq[i]];if(!p)continue;
+    for(var j=0;j<9;j++){var w=p[j]*mw;if(j%2===0)svg+='<rect x="'+x.toFixed(2)+'" y="0" width="'+w.toFixed(2)+'" height="'+h+'" fill="#000"/>';x+=w;}
+    x+=gap;
+  }
+  return svg+'</svg>';
+}
+// ── QR Code (matriz) ─────────────────────────────────────────────────────────
+function _gerarQR(texto){
+  // QR Code simples via API pública (requer internet) — fallback SVG placeholder se offline
+  return '<img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data='+encodeURIComponent(texto)+'" width="120" height="120" style="image-rendering:pixelated" onerror="this.style.display=\'none\'">';
 }
 
 // ── CLASSIFICADOR PCB ─────────────────────────────────────────────────────────
