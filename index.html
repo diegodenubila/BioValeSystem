@@ -11673,7 +11673,7 @@ function _pclConfiancaBar(v){
 }
 
 function pgClassificador(){
-  _pclLoadCatsCustom();
+  _pclLoadCatsCustom();_pclLoadOrder();
   _pclEntradas=_pclLoadDB();// cache local enquanto carrega
   setTimeout(async function(){
     await _pclCarregarEntradas();
@@ -11839,7 +11839,7 @@ function _pclRenderClassificar(){
       +'<div style="font-size:11px;color:var(--mt);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">'
       +(_pclResultIA?'CLASSIFICAÇÃO — confirme ou ajuste':'CLASSIFICAÇÃO MANUAL')+'</div>'
       +'<div style="display:flex;flex-direction:column;gap:5px">';
-    var cats=Object.values(PCL_CATS).concat(Object.values(_pclCatsCustom||{}));
+    var cats=_pclGetAllCatsOrdenadas();
     for(var i=0;i<cats.length;i++){
       var cls=cats[i];
       var sel=_pclClasseSel===cls.id;
@@ -12016,7 +12016,7 @@ function _pclRenderGaleria(){
     +'border:1px solid '+(_pclFiltro==='all'?'var(--gr2)':'var(--bd)')+';'
     +'border-radius:20px;padding:5px 13px;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer">'
     +'Todas ('+_pclEntradas.length+')</button>';
-  var cats=Object.values(PCL_CATS);
+  var cats=_pclGetAllCatsOrdenadas();
   for(var i=0;i<cats.length;i++){
     var cls=cats[i];
     var count=_pclEntradas.filter(function(e){return e.classeId===cls.id;}).length;
@@ -12130,7 +12130,9 @@ function _pclExcluir(id){
 
 // ── CATEGORIAS CUSTOMIZADAS ───────────────────────────────────────────────────
 var _PCL_CUSTOM_KEY='bv_pcl_custom_cats';
+var _PCL_ORDER_KEY='bv_pcl_order';
 var _pclCatsCustom={};
+var _pclCatOrder=[]; // array de ids na ordem definida
 
 function _pclLoadCatsCustom(){
   try{var r=localStorage.getItem(_PCL_CUSTOM_KEY);_pclCatsCustom=r?JSON.parse(r):{};}catch(e){_pclCatsCustom={};}
@@ -12138,48 +12140,83 @@ function _pclLoadCatsCustom(){
 function _pclSaveCatsCustom(){
   try{localStorage.setItem(_PCL_CUSTOM_KEY,JSON.stringify(_pclCatsCustom));}catch(e){}
 }
+function _pclLoadOrder(){
+  try{var r=localStorage.getItem(_PCL_ORDER_KEY);_pclCatOrder=r?JSON.parse(r):[];}catch(e){_pclCatOrder=[];}
+}
+function _pclSaveOrder(){
+  try{localStorage.setItem(_PCL_ORDER_KEY,JSON.stringify(_pclCatOrder));}catch(e){}
+}
 function _pclGetCat(id){
   return PCL_CATS[id]||_pclCatsCustom[id]||null;
+}
+// Retorna todas as categorias na ordem definida pelo usuário
+function _pclGetAllCatsOrdenadas(){
+  _pclLoadCatsCustom();_pclLoadOrder();
+  var todas=Object.assign({},PCL_CATS,_pclCatsCustom);
+  var ids=Object.keys(todas);
+  // Adiciona ao order ids que ainda não estão lá
+  var order=_pclCatOrder.filter(function(id){return todas[id];});
+  ids.forEach(function(id){if(order.indexOf(id)<0)order.push(id);});
+  _pclCatOrder=order;
+  return order.map(function(id){return todas[id];});
+}
+
+function _pclMoverCategoria(id,direcao){
+  _pclGetAllCatsOrdenadas();// garante order atualizado
+  var idx=_pclCatOrder.indexOf(id);
+  if(idx<0)return;
+  var novoIdx=idx+direcao;
+  if(novoIdx<0||novoIdx>=_pclCatOrder.length)return;
+  var tmp=_pclCatOrder[idx];
+  _pclCatOrder[idx]=_pclCatOrder[novoIdx];
+  _pclCatOrder[novoIdx]=tmp;
+  _pclSaveOrder();
+  _pclRender();
 }
 
 function _pclRenderCategorias(){
   _pclLoadCatsCustom();
-  var custom=Object.values(_pclCatsCustom);
-  var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
-    +'<div><div style="font-size:16px;font-weight:700">Categorias Personalizadas</div>'
-    +'<div style="font-size:12px;color:var(--mt)">'+custom.length+' categoria'+(custom.length!==1?'s':'')+' criada'+(custom.length!==1?'s':'')+' por você</div></div>'
+  var todasOrdenadas=_pclGetAllCatsOrdenadas();
+  var customCount=Object.keys(_pclCatsCustom).length;
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">'
+    +'<div><div style="font-size:16px;font-weight:700">Categorias</div>'
+    +'<div style="font-size:12px;color:var(--mt)">'+todasOrdenadas.length+' total &bull; '+customCount+' personalizada'+(customCount!==1?'s':'')+'</div></div>'
     +'<button class="btn" onclick="_pclNovaCategoria()" style="font-size:12px;padding:8px 14px">+ Nova</button>'
-    +'</div>';
+    +'</div>'
+    +'<div class="al alb" style="margin-bottom:12px;font-size:12px">Use as setas ↑↓ para definir a ordem no Manual e na lista de classificação.</div>';
 
-  if(custom.length===0){
-    html+='<div class="al alb" style="text-align:center;padding:30px 16px">'
-      +'<div style="font-size:32px;margin-bottom:10px">&#9107;</div>'
-      +'<div style="font-weight:600;margin-bottom:6px">Nenhuma categoria personalizada</div>'
-      +'<div style="font-size:12px;color:var(--mt)">Crie categorias para novos tipos de materiais que não estão no manual padrão.</div>'
-      +'</div>';
-  } else {
-    for(var i=0;i<custom.length;i++){
-      var cls=custom[i];
-      var count=_pclEntradas.filter(function(e){return e.classeId===cls.id;}).length;
-      html+='<div style="background:var(--s1);border:1px solid '+cls.color+'55;border-left:4px solid '+cls.color+';border-radius:10px;padding:14px;margin-bottom:8px">'
-        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
-        +_pclBadge(cls.id,true)
-        +'<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--tx)">'+cls.label+'</div>'
-        +'<div style="font-size:11px;color:var(--mt)">'+cls.criteria+'</div></div>'
-        +'<span style="background:var(--s3);color:var(--mt);border-radius:20px;padding:2px 9px;font-size:10px">'+count+' placa'+(count!==1?'s':'')+'</span>'
+  for(var i=0;i<todasOrdenadas.length;i++){
+    var cls=todasOrdenadas[i];
+    var isCustom=!!_pclCatsCustom[cls.id];
+    var count=_pclEntradas.filter(function(e){return e.classeId===cls.id;}).length;
+    var isFirst=i===0;var isLast=i===todasOrdenadas.length-1;
+    html+='<div style="background:var(--s1);border:1px solid '+cls.color+'55;border-left:4px solid '+cls.color+';border-radius:10px;padding:12px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px">'
+      // Setas
+      +'<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0">'
+      +'<button onclick="_pclMoverCategoria(\''+cls.id+'\',-1)" '+(isFirst?'disabled':'')+' style="background:'+(isFirst?'var(--s3)':'var(--s2)')+';border:1px solid var(--bd);border-radius:4px;color:'+(isFirst?'var(--ft)':'var(--tx)')+';cursor:'+(isFirst?'default':'pointer')+';padding:2px 7px;font-size:13px;line-height:1">↑</button>'
+      +'<button onclick="_pclMoverCategoria(\''+cls.id+'\',1)" '+(isLast?'disabled':'')+' style="background:'+(isLast?'var(--s3)':'var(--s2)')+';border:1px solid var(--bd);border-radius:4px;color:'+(isLast?'var(--ft)':'var(--tx)')+';cursor:'+(isLast?'default':'pointer')+';padding:2px 7px;font-size:13px;line-height:1">↓</button>'
+      +'</div>'
+      // Info
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">'
+      +_pclBadge(cls.id,false)
+      +'<span style="font-size:12px;font-weight:600;color:var(--tx)">'+cls.label+'</span>'
+      +(isCustom?'<span style="background:var(--grb);color:var(--gr);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700">personalizada</span>':'')
+      +'</div>'
+      +'<div style="font-size:10px;color:var(--mt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+cls.criteria+'</div>'
+      +'</div>'
+      // Contador + ações
+      +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">'
+      +'<span style="font-size:10px;color:var(--mt)">'+count+' placa'+(count!==1?'s':'')+'</span>'
+      +(isCustom
+        ?'<div style="display:flex;gap:4px">'
+          +'<button class="bsm bsmr" onclick="_pclDeletarCategoria(\''+cls.id+'\')">&#128465;</button>'
+          +'<button class="bsm bsmg" onclick="_pclEditarCategoria(\''+cls.id+'\')">&#9998;</button>'
         +'</div>'
-        +'<div style="font-size:12px;color:var(--tx);line-height:1.5;margin-bottom:10px">'+cls.desc+'</div>'
-        +'<div style="display:flex;gap:6px;justify-content:flex-end">'
-        +'<button class="bsm bsmr" onclick="_pclDeletarCategoria(\''+cls.id+'\')">&#128465; Excluir</button>'
-        +'<button class="bsm bsmg" onclick="_pclEditarCategoria(\''+cls.id+'\')">&#9998; Editar</button>'
-        +'</div></div>';
-    }
+        :'<span style="font-size:10px;color:var(--ft)">padrão</span>')
+      +'</div>'
+      +'</div>';
   }
-
-  // Aviso categorias padrão
-  html+='<div style="margin-top:16px;padding:12px;background:var(--s2);border-radius:8px;font-size:12px;color:var(--mt)">'
-    +'&#128214; As '+Object.keys(PCL_CATS).length+' categorias do Manual BioVale são padrão e não podem ser excluídas aqui.</div>';
-
   return html;
 }
 
@@ -12267,7 +12304,7 @@ function _pclRenderManual(){
     +'<div style="font-size:12px;color:var(--mt)">Toque para ver placas &bull; '+Object.keys(PCL_CATS).length+' categorias</div></div>'
     +'<button class="btn btn-bl" onclick="_pclImprimirManual()" style="font-size:12px;padding:8px 14px">&#128424; Imprimir Manual</button>'
     +'</div>';
-  var cats=Object.values(PCL_CATS);
+  var cats=_pclGetAllCatsOrdenadas();
   for(var i=0;i<cats.length;i++){
     var cls=cats[i];
     var count=_pclEntradas.filter(function(e){return e.classeId===cls.id;}).length;
@@ -12345,7 +12382,7 @@ function _pclRemoverRef(catId){
 function _pclImprimirManual(){
   _pclLoadRefs();
   var emp=CFG.empresa&&CFG.empresa.nome?CFG.empresa.nome:'BioVale';
-  var cats=Object.values(PCL_CATS);
+  var cats=_pclGetAllCatsOrdenadas();
   var cards='';
   for(var i=0;i<cats.length;i++){
     var cls=cats[i];
