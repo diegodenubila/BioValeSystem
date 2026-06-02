@@ -208,6 +208,7 @@ select option{background:var(--s1)}.H{display:none!important}
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="BioVale">
 <style>
+@keyframes bv-scan-line{0%{top:30%}50%{top:70%}100%{top:30%}}
 #bv-sync-badge{position:fixed;bottom:12px;right:12px;z-index:9999;display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;font-size:11px;font-weight:600;transition:all .3s;pointer-events:none;backdrop-filter:blur(6px)}
 #bv-sync-badge.idle{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);color:#22c55e}
 #bv-sync-badge.saving{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);color:#3b82f6}
@@ -301,11 +302,47 @@ var DB={
   entradas:[],
   revenda:[],
   revendaCats:[
-    {nome:'Notebooks',  checklist:['Tela','Bateria','Teclado','Carregador']},
-    {nome:'Celulares',  checklist:['Tela/Touch','Bateria','Câmeras','Conector de Carga']},
-    {nome:'Monitores',  checklist:['Painel/Imagem','Botões/Menu','Conectores de Vídeo','Fonte/Cabo']},
-    {nome:'Tablets',    checklist:['Tela/Touch','Bateria','Conector de Carga']},
-    {nome:'Outros',     checklist:['Liga/Dá Sinal','Estado Estético','Funcionamento Geral']},
+    {nome:'Notebooks',  checklist:['Tela','Bateria','Teclado','Carregador'], specs:[
+      {key:'Processador',type:'text',placeholder:'Ex: Intel i5-10ª, AMD Ryzen 5'},
+      {key:'RAM',type:'text',placeholder:'Ex: 8GB, 16GB'},
+      {key:'Armazenamento',type:'text',placeholder:'Ex: 256GB SSD, 1TB HDD'},
+      {key:'Tela',type:'text',placeholder:'Ex: 15.6pol Full HD'},
+      {key:'Placa de Vídeo',type:'text',placeholder:'Ex: Intel Iris, GTX 1650'},
+      {key:'Sistema Op.',type:'text',placeholder:'Ex: Windows 11, Linux'},
+      {key:'USB 3.0',type:'bool'},{key:'HDMI',type:'bool'},{key:'Webcam',type:'bool'},{key:'Bluetooth',type:'bool'}
+    ]},
+    {nome:'Celulares',  checklist:['Tela/Touch','Bateria','Câmeras','Conector de Carga'], specs:[
+      {key:'Modelo',type:'text',placeholder:'Ex: Samsung Galaxy A54'},
+      {key:'Armazenamento',type:'text',placeholder:'Ex: 128GB'},
+      {key:'RAM',type:'text',placeholder:'Ex: 6GB'},
+      {key:'Cor',type:'text',placeholder:'Ex: Preto, Azul'},
+      {key:'Rede',type:'text',placeholder:'Ex: 4G, 5G'},
+      {key:'Dual SIM',type:'bool'},{key:'NFC',type:'bool'},{key:'Carregador Incluso',type:'bool'}
+    ]},
+    {nome:'Monitores',  checklist:['Painel/Imagem','Botões/Menu','Conectores de Vídeo','Fonte/Cabo'], specs:[
+      {key:'Tamanho',type:'text',placeholder:'Ex: 24pol, 27pol'},
+      {key:'Resolução',type:'text',placeholder:'Ex: Full HD 1080p, 4K'},
+      {key:'Taxa de Atualização',type:'text',placeholder:'Ex: 60Hz, 144Hz'},
+      {key:'Tipo de Painel',type:'text',placeholder:'Ex: IPS, TN, VA'},
+      {key:'HDMI',type:'bool'},{key:'VGA',type:'bool'},{key:'DisplayPort',type:'bool'},{key:'DVI',type:'bool'},{key:'USB-C',type:'bool'},{key:'Com Caixa',type:'bool'}
+    ]},
+    {nome:'PCs/Desktops', checklist:['Liga/Dá Sinal','Funcionamento Geral','Cooler/Temperatura'], specs:[
+      {key:'Processador',type:'text',placeholder:'Ex: Intel i7, AMD Ryzen 7'},
+      {key:'RAM',type:'text',placeholder:'Ex: 16GB DDR4'},
+      {key:'Armazenamento',type:'text',placeholder:'Ex: 512GB SSD + 1TB HDD'},
+      {key:'Placa de Vídeo',type:'text',placeholder:'Ex: RTX 3060, Integrada'},
+      {key:'Fonte',type:'text',placeholder:'Ex: 500W, 650W 80+'},
+      {key:'Sistema Op.',type:'text',placeholder:'Ex: Windows 11'},
+      {key:'HDMI',type:'bool'},{key:'USB 3.0',type:'bool'},{key:'WiFi',type:'bool'},{key:'Bluetooth',type:'bool'}
+    ]},
+    {nome:'Tablets',    checklist:['Tela/Touch','Bateria','Conector de Carga'], specs:[
+      {key:'Modelo',type:'text',placeholder:'Ex: iPad 9ª Geração'},
+      {key:'Armazenamento',type:'text',placeholder:'Ex: 64GB'},
+      {key:'Tela',type:'text',placeholder:'Ex: 10.2pol Retina'},
+      {key:'Cor',type:'text',placeholder:'Ex: Cinza espacial'},
+      {key:'WiFi + 4G',type:'bool'},{key:'Caneta Inclusa',type:'bool'},{key:'Teclado Incluso',type:'bool'}
+    ]},
+    {nome:'Outros',     checklist:['Liga/Dá Sinal','Estado Estético','Funcionamento Geral'], specs:[]},
   ],
   revendaStates:['Limpo','Revisado'],
   movs:[],
@@ -436,13 +473,28 @@ function confirmar(msg,onSim){
 // ── LOGIN ─────────────────────────────────────────────────────
 var CU=null,SU=null;
 function buildLoginList(){
+  // Verifica se há pesagem pendente no localStorage
+  var pesPendente=false;
+  try{
+    var rawP=localStorage.getItem('bv_pesAbas');
+    if(rawP){var arr=JSON.parse(rawP);pesPendente=arr&&arr.some(function(a){return a.itens&&a.itens.length>0;});}
+  }catch(e){}
   var h='';
+  if(pesPendente){
+    h+='<div style="display:flex;align-items:center;gap:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:10px 14px;margin-bottom:12px">'
+      +'<span style="font-size:20px">⚠️</span>'
+      +'<div><div style="font-size:12px;font-weight:700;color:#d97706">Pesagem em andamento!</div>'
+      +'<div style="font-size:11px;color:var(--mt)">Faça login para continuar sem perder os dados.</div></div>'
+      +'</div>';
+  }
   for(var i=0;i<USERS.length;i++){
     var u=USERS[i];
     h+='<button class="lu" onclick="selU('+u.id+',this)">'
       +'<div class="lav" style="background:'+u.cor+'22;border:2px solid '+u.cor+';color:'+u.cor+'">'+u.av+'</div>'
-      +'<div style="text-align:left"><div style="font-size:13px;font-weight:600">'+u.nome+'</div>'
-      +'<div style="font-size:11px;color:var(--mt)">'+PNOME[u.perfil]+'</div></div></button>';
+      +'<div style="text-align:left;flex:1"><div style="font-size:13px;font-weight:600">'+u.nome+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+PNOME[u.perfil]+'</div></div>'
+      +(pesPendente?'<span style="font-size:16px" title="Pesagem pendente">⚠️</span>':'')
+      +'</button>';
   }
   document.getElementById('ul').innerHTML=h;
 }
@@ -461,7 +513,26 @@ function doLogin(){
   if(SU.bloqueado){document.getElementById('pe').textContent='Usuario bloqueado. Contate o administrador.';return;}
   CU=SU;
   document.getElementById('ls').classList.add('H');document.getElementById('wrap').classList.remove('H');
-  buildSidebar();buildBottomNav();go(PPAGES[CU.perfil][0]);
+  buildSidebar();buildBottomNav();
+  // Restaura pesagem pendente do localStorage
+  var hadPes=loadPesState();
+  var hasPendente=hadPes&&pesAbas&&pesAbas.some(function(a){return a.itens&&a.itens.length>0;});
+  if(hasPendente){
+    go('pesagem');
+    setTimeout(function(){
+      var totalItens=0;pesAbas.forEach(function(a){totalItens+=a.itens.length;});
+      openM('&#9878; Pesagem em Andamento',
+        '<div style="text-align:center;padding:10px 0">'
+        +'<div style="font-size:36px;margin-bottom:8px">⚠️</div>'
+        +'<div style="font-size:15px;font-weight:700;margin-bottom:6px">Há '+pesAbas.length+' pesagem(ns) em aberto</div>'
+        +'<div style="font-size:12px;color:var(--mt);margin-bottom:4px">'+totalItens+' item(ns) no carrinho aguardando finalização.</div>'
+        +'<div style="font-size:11px;color:var(--bl);background:rgba(59,130,246,.08);border-radius:8px;padding:7px 12px;margin-bottom:16px">&#9729; Pesagem restaurada da nuvem — continua de qualquer dispositivo.</div>'
+        +'<button class="btn" style="width:100%" onclick="closeM()">&#9878; Continuar Pesagem</button>'
+        +'</div>', 380);
+    }, 600);
+  }else{
+    go(PPAGES[CU.perfil][0]);
+  }
   setTimeout(_atualizarBadgeNotif,500);
   _auditLog('Login realizado');
   // Verifica se a versão mudou desde o último acesso
@@ -480,8 +551,15 @@ function doLogin(){
   localStorage.setItem('bv_last_version',APP_VERSION);
 }
 function doLogout(){
-  CU=SU=null;document.getElementById('wrap').classList.add('H');document.getElementById('ls').classList.remove('H');
-  document.getElementById('pa').classList.add('H');pesAbas=[];pesAtiva=0;atendHist=[];
+  // Garante que pesagem atual está salva antes de sair
+  if(pesAbas&&pesAbas.length){savePesState();}
+  CU=SU=null;
+  // Limpa RAM mas NÃO apaga localStorage da pesagem
+  pesAbas=[];pesAtiva=0;atendHist=[];
+  document.getElementById('wrap').classList.add('H');
+  document.getElementById('ls').classList.remove('H');
+  document.getElementById('pa').classList.add('H');
+  buildLoginList();
 }
 
 // ── SIDEBAR ───────────────────────────────────────────────────
@@ -652,7 +730,11 @@ function closeSb(){if(window.innerWidth<=768)document.getElementById('sb').class
 
 
 var pesAbas=[],pesAtiva=0,atendHist=[];
-function savePesState(){try{localStorage.setItem('bv_pesAbas',JSON.stringify(pesAbas));localStorage.setItem('bv_pesAtiva',String(pesAtiva));}catch(e){}}
+function savePesState(){
+  try{localStorage.setItem('bv_pesAbas',JSON.stringify(pesAbas));localStorage.setItem('bv_pesAtiva',String(pesAtiva));}catch(e){}
+  // Sincroniza na nuvem (debounced) para que outros dispositivos vejam a pesagem em andamento
+  if(_sbReady){autoSave();}
+}
 function loadPesState(){try{var a=localStorage.getItem('bv_pesAbas');var i=localStorage.getItem('bv_pesAtiva');if(a){var arr=JSON.parse(a);if(arr&&arr.length){pesAbas=arr;pesAtiva=Math.min(parseInt(i)||0,arr.length-1);return true;}}return false;}catch(e){return false;}}
 function clearPesState(){try{localStorage.removeItem('bv_pesAbas');localStorage.removeItem('bv_pesAtiva');}catch(e){}}
 
@@ -763,7 +845,8 @@ function saveDB(){
       entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
       transf:DB.transf,coletas:DB.coletas,funcs:DB.funcs,clientes:DB.clientes,
       tabelas:DB.tabelas,contasFixas:DB.contasFixas,filtrosMat:DB.filtrosMat,
-      concorrentes:DB.concorrentes
+      concorrentes:DB.concorrentes,
+      pesAbasCloud:pesAbas,pesAtivaCloud:pesAtiva
     };
     // 1. Salva local como fallback imediato
     localStorage.setItem('bv_db',JSON.stringify(snap));
@@ -830,6 +913,17 @@ function _applySnap(s){
   if(s.contasFixas)DB.contasFixas=s.contasFixas;
   if(s.filtrosMat&&s.filtrosMat.length)DB.filtrosMat=s.filtrosMat;
   if(s.concorrentes)DB.concorrentes=s.concorrentes;
+  // Restaura pesagem em andamento da nuvem
+  if(s.pesAbasCloud&&Array.isArray(s.pesAbasCloud)&&s.pesAbasCloud.length){
+    // Só sobrescreve se a nuvem tiver itens e o local estiver vazio ou for mais antigo
+    var localTemItens=pesAbas&&pesAbas.some(function(a){return a.itens&&a.itens.length>0;});
+    var cloudTemItens=s.pesAbasCloud.some(function(a){return a.itens&&a.itens.length>0;});
+    if(cloudTemItens&&!localTemItens){
+      pesAbas=s.pesAbasCloud;
+      pesAtiva=Math.min(s.pesAtivaCloud||0,pesAbas.length-1);
+      savePesState();
+    }
+  }
   // Garante que as Tabelas Padrão sempre existam (migração de versões antigas)
   var temPadVenda=false,temPadCompra=false;
   for(var i=0;i<DB.tabelas.length;i++){
@@ -914,7 +1008,7 @@ function renderPesagem(){
     +'<span class="pdd-arr">&#9660;</span>'
     +'</button>'
     +'<div class="pdd-panel' +(ab.pddOpen?' open':'')+'">'
-    +'<div class="pdd-search"><input type="text" id="prod-search" placeholder="&#128269; Buscar material..." oninput="filtrarProd()" autocomplete="off"></div>'
+    +'<div class="pdd-search" style="display:flex;align-items:center;gap:6px"><input type="text" id="prod-search" placeholder="&#128269; Buscar material..." oninput="filtrarProd()" autocomplete="off" style="flex:1;border:none;background:transparent;color:var(--tx);font-size:13px;outline:none;padding:2px 0"><button onclick="abrirCameraPes(&apos;mat&apos;)" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:6px;padding:3px 9px;font-size:16px;cursor:pointer;flex-shrink:0" title="Ler código de barras">&#128247;</button></div>'
     +'<div class="pdd-list" id="prod-cards-list">'+prodCards+'</div>'
     +'</div></div></div>';
   // Build unit cards for pdd dropdown
@@ -946,7 +1040,7 @@ function renderPesagem(){
     +'<span class="pdd-arr">&#9660;</span>'
     +'</button>'
     +'<div class="pdd-panel'+(ab.pddUnitOpen?' open':'')+'">'
-    +'<div class="pdd-search"><input type="text" id="unit-search" placeholder="&#128269; Buscar produto..." oninput="filtrarUnit()" autocomplete="off"></div>'
+    +'<div class="pdd-search" style="display:flex;align-items:center;gap:6px"><input type="text" id="unit-search" placeholder="&#128269; Buscar produto..." oninput="filtrarUnit()" autocomplete="off" style="flex:1;border:none;background:transparent;color:var(--tx);font-size:13px;outline:none;padding:2px 0"><button onclick="abrirCameraPes(&apos;unit&apos;)" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:6px;padding:3px 9px;font-size:16px;cursor:pointer;flex-shrink:0" title="Ler código de barras">&#128247;</button></div>'
     +'<div class="pdd-list" id="unit-cards-list">'+unitCardsContent+'</div>'
     +'</div></div></div>';
   var cartH='';
@@ -1388,7 +1482,7 @@ function confTransfP(prodId,peso,preco){
   var pOri=null,pDest=gP(prodId);
   for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].nome===oriNome){pOri=DB.produtos[i];break;}}
   if(pOri)pOri.est=+(pOri.est-oriPeso).toFixed(2);if(pDest)pDest.est=+(pDest.est+oriPeso).toFixed(2);
-  DB.transf.unshift({id:nid(),data:hj(),de:oriNome,para:pDest.nome,pS:oriPeso,pE:oriPeso,obs:'Auto pesagem'});
+  DB.transf.unshift({id:nid(),data:hj(),de:oriNome,para:pDest.nome,pS:oriPeso,pE:oriPeso,obs:'Desmontagem para venda de '+pDest.nome});
   var ab=pesAbas[pesAtiva];var tabN='Padrao';
   if(ab.tabId){for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].id==ab.tabId){tabN=DB.tabelas[i].nome;break;}}}
   ab.itens.push({prodId:prodId,ic:pDest.ic,nome:pDest.nome,peso:peso,preco:preco,tipo:ab.tipo,uni:false,tabN:tabN});
@@ -4727,6 +4821,86 @@ var revCatFiltro='Todos';
 var revCondFiltro='Todas';
 function getRevCatNomes(){return DB.revendaCats.map(function(c){return c.nome;});}
 function getRevCatChecklist(nome){for(var i=0;i<DB.revendaCats.length;i++){if(DB.revendaCats[i].nome===nome)return DB.revendaCats[i].checklist;}return['Liga/Dá Sinal','Estado Estético','Funcionamento Geral'];}
+function getRevCatSpecs(nome){for(var i=0;i<DB.revendaCats.length;i++){if(DB.revendaCats[i].nome===nome)return DB.revendaCats[i].specs||[];}return[];}
+function toggleSpecLabel(cb){
+  var lbl=document.getElementById('lbl-'+cb.id);
+  if(!lbl)return;
+  lbl.style.background=cb.checked?'rgba(34,197,94,.07)':'var(--s3)';
+  lbl.style.borderColor=cb.checked?'rgba(34,197,94,.4)':'var(--bd)';
+}
+function renderSpecsHtml(catNome,savedSpecs,prefix){
+  var tpl=getRevCatSpecs(catNome);
+  if(!tpl||tpl.length===0)return '';
+  savedSpecs=savedSpecs||{};
+  var boolFields=[],textFields=[];
+  for(var i=0;i<tpl.length;i++){if(tpl[i].type==='bool')boolFields.push(tpl[i]);else textFields.push(tpl[i]);}
+  var h='<div id="'+prefix+'-specs-wrap" style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px;margin-bottom:8px">'
+    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">&#128736; Especifica&#231;&#245;es T&#233;cnicas</div>';
+  if(textFields.length>0){
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">';
+    for(var i=0;i<textFields.length;i++){
+      var f=textFields[i];var val=savedSpecs[f.key]||'';
+      var ph=(f.placeholder||'').replace(/"/g,'&quot;');
+      h+='<div class="fld" style="margin:0"><label style="font-size:10px">'+f.key+'</label>'
+        +'<input class="inp" id="'+prefix+'-sp-'+i+'" data-key="'+f.key+'" value="'+val+'" placeholder="'+ph+'" style="font-size:12px;padding:5px 8px"></div>';
+    }
+    h+='</div>';
+  }
+  if(boolFields.length>0){
+    h+='<div style="display:flex;flex-wrap:wrap;gap:5px">';
+    var boolStart=textFields.length;
+    for(var i=0;i<boolFields.length;i++){
+      var f=boolFields[i];var checked=savedSpecs[f.key]===true||savedSpecs[f.key]==='true';
+      var eid=prefix+'-sp-'+(boolStart+i);
+      var bg=checked?'rgba(34,197,94,.07)':'var(--s3)';
+      var bc=checked?'rgba(34,197,94,.4)':'var(--bd)';
+      h+='<label id="lbl-'+eid+'" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;background:'+bg+';border:1px solid '+bc+';cursor:pointer;font-size:11px;font-weight:500">'
+        +'<input type="checkbox" id="'+eid+'" data-key="'+f.key+'" value="'+f.key+'"'+(checked?' checked':'')+' onchange="toggleSpecLabel(this)" style="width:12px;height:12px;accent-color:var(--gr)">'
+        +f.key+'</label>';
+    }
+    h+='</div>';
+  }
+  h+='</div>';
+  return h;
+}
+
+function getSpecsFromForm(prefix,catNome){
+  var tpl=getRevCatSpecs(catNome);
+  if(!tpl||tpl.length===0)return {};
+  var specs={};
+  var boolStart=0;
+  for(var i=0;i<tpl.length;i++){if(tpl[i].type!=='bool')boolStart++;}
+  var bi=0;
+  for(var i=0;i<tpl.length;i++){
+    var f=tpl[i];
+    if(f.type==='bool'){
+      var el=document.getElementById(prefix+'-sp-'+(boolStart+bi));
+      if(el)specs[f.key]=el.checked;
+      bi++;
+    }else{
+      var el=document.getElementById(prefix+'-sp-'+i);
+      if(el&&el.value.trim())specs[f.key]=el.value.trim();
+    }
+  }
+  return specs;
+}
+function onRevCatChangeSpecs(prefix){
+  var sel=document.getElementById(prefix+'-cat');
+  if(!sel)return;
+  var wrap=document.getElementById(prefix+'-specs-wrap');
+  var parent=wrap?wrap.parentNode:null;
+  var catNome=sel.value;
+  var newHtml=renderSpecsHtml(catNome,{},prefix);
+  if(wrap){
+    if(newHtml){wrap.outerHTML=newHtml;}else{wrap.remove();}
+  }else if(newHtml&&parent){
+    // insert after checklist wrap
+    var clWrap=document.getElementById(prefix+'-cl-wrap');
+    var ref=clWrap?clWrap.nextSibling:null;
+    var tmp=document.createElement('div');tmp.innerHTML=newHtml;
+    parent.insertBefore(tmp.firstChild,ref);
+  }
+}
 function pgRevenda(){
   // Linha 1: Categorias
   var catNomes=getRevCatNomes();
@@ -4791,6 +4965,7 @@ function pgRevenda(){
       +'<div style="font-size:22px;margin-bottom:7px">&#127991;</div>'
       +'<div style="font-size:14px;font-weight:700;margin-bottom:4px">'+(p0.nomeBase||p0.prod||'Sem nome')+(qtd>1?' <span style="font-size:12px;color:var(--bl);font-weight:700">('+qtd+' unid.)</span>':'')+'</div>'
       +(p0.desc?'<div style="font-size:11px;color:var(--mt);margin-bottom:5px;line-height:1.4">'+p0.desc+'</div>':'')
+      +(function(){var s=p0.specs||{};var keys=Object.keys(s);if(!keys.length)return '';var h='<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">';for(var ki=0;ki<keys.length&&ki<6;ki++){var sv=s[keys[ki]];if(sv===''||sv===null||sv===undefined||sv===false)continue;var sval=sv===true?'&#10003; '+keys[ki]:keys[ki]+': '+sv;h+='<span style="font-size:10px;padding:1px 7px;border-radius:20px;background:rgba(59,130,246,.1);color:var(--bl);border:1px solid rgba(59,130,246,.2)">'+sval+'</span>';}return h+'</div>';})()
       +'<div style="font-size:11px;color:var(--mt);margin-bottom:5px">'+(p0.cat?'<span style="color:var(--bl)">'+p0.cat+'</span> &middot; ':'')+fKg(p0.peso)+'kg</div>'
       +(p0.cond?'<div style="margin-bottom:6px">'+condBadge+'</div>':'<div style="margin-bottom:6px"></div>')
       +testesHtml
@@ -4850,8 +5025,9 @@ function pgRevenda(){
     +'<div id="rev-camera-ct" style="display:none;margin-bottom:10px;border-radius:var(--r);overflow:hidden;position:relative">'
     +'<video id="rev-camera-video" style="width:100%;border-radius:var(--r);display:block" playsinline></video>'
     +'<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:200px;height:80px;border:2px solid var(--gr);border-radius:6px;box-shadow:0 0 0 9999px rgba(0,0,0,.4)"></div>'
+    +'<div style="position:absolute;left:calc(50% - 100px);width:200px;height:2px;background:rgba(34,197,94,.7);animation:bv-scan-line 1.5s ease-in-out infinite"></div>'
     +'<button onclick="fecharCameraBarcode()" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.7);color:#fff;border:none;border-radius:20px;padding:4px 12px;font-size:12px;cursor:pointer">✕ Fechar</button>'
-    +'<div id="rev-camera-status" style="position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:12px;color:#fff;background:rgba(0,0,0,.5);padding:4px">Aponte para o código de barras...</div>'
+    +'<div id="rev-camera-status" style="position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:11px;color:#fff;background:rgba(0,0,0,.55);padding:4px 8px">Aponte para o código de barras...</div>'
     +'</div>'
     +'<script>(function(){setTimeout(function(){'
     +'var inp=document.getElementById("rev-barcode-inp");'
@@ -5026,33 +5202,224 @@ function _gerarCode128(codigo){
   svg+='<rect x="'+x.toFixed(2)+'" y="0" width="'+(2*mw).toFixed(2)+'" height="'+h+'" fill="#000"/>';
   return svg+'</svg>';
 }
+
+// ── CAMERA ENGINE CENTRALIZADO ────────────────────────────────
+var _camDevices=[];       // lista de câmeras disponíveis
+var _camDeviceId=null;    // câmera selecionada pelo usuário
+
+// Lista câmeras disponíveis e retorna via callback
+function _listarCameras(onDone){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.enumerateDevices){onDone([]);return;}
+  navigator.mediaDevices.enumerateDevices().then(function(devs){
+    var cams=devs.filter(function(d){return d.kind==='videoinput';});
+    _camDevices=cams;
+    onDone(cams);
+  }).catch(function(){onDone([]);});
+}
+
+// Monta o bloco HTML de seleção de câmera (retorna string ou '' se só tem 1)
+function _buildCamSelectHtml(containerId){
+  if(_camDevices.length<=1)return '';
+  var h='<div id="'+containerId+'-camsel" style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:rgba(59,130,246,.08);border-bottom:1px solid rgba(59,130,246,.15)">'
+    +'<span style="font-size:13px">📷</span>'
+    +'<select data-cid="'+containerId+'" onchange="_trocarCamera(this.value,this.dataset.cid)" style="flex:1;background:transparent;border:none;color:var(--tx);font-size:11px;outline:none;cursor:pointer">';
+  for(var i=0;i<_camDevices.length;i++){
+    var d=_camDevices[i];
+    var label=d.label||('Câmera '+(i+1));
+    var sel=_camDeviceId===d.deviceId?'selected':'';
+    h+='<option value="'+d.deviceId+'" '+sel+'>'+label+'</option>';
+  }
+  h+='</select></div>';
+  return h;
+}
+
+// Troca de câmera sem fechar o container
+function _trocarCamera(deviceId, containerId){
+  _camDeviceId=deviceId;
+  // Para a stream atual
+  var video=document.getElementById(containerId+'-video');
+  if(video&&video.srcObject){video.srcObject.getTracks().forEach(function(t){t.stop();});video.srcObject=null;}
+  // Reinicia com nova câmera
+  _iniciarStream(deviceId, containerId, function(){});
+}
+
+// Inicia stream na câmera escolhida (ou padrão traseira)
+function _iniciarStream(deviceId, containerId, onReady){
+  var constraints;
+  if(deviceId){
+    constraints={video:{deviceId:{exact:deviceId},width:{ideal:1280},height:{ideal:720}}};
+  }else{
+    constraints={video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}};
+  }
+  var video=document.getElementById(containerId+'-video');
+  var status=document.getElementById(containerId+'-status');
+  if(!video)return;
+  navigator.mediaDevices.getUserMedia(constraints).then(function(stream){
+    video.srcObject=stream;video.setAttribute('playsinline','');video.play();
+    var track=stream.getVideoTracks()[0];
+    // Tenta autofoco contínuo (funciona em câmeras que suportam)
+    if(track&&track.applyConstraints){
+      track.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(function(){});
+    }
+    // Atualiza seletor com deviceId real (necessário quando usou facingMode)
+    var settings=track.getSettings();
+    if(settings.deviceId)_camDeviceId=settings.deviceId;
+    // Atualiza o select se existir
+    var sel=document.querySelector('#'+containerId+'-camsel select');
+    if(sel&&_camDeviceId)sel.value=_camDeviceId;
+    // Detecta se é webcam fixa (sem autofoco) e mostra dica
+    var caps=track.getCapabilities?track.getCapabilities():{};
+    var temAF=caps.focusMode&&caps.focusMode.indexOf('continuous')>=0;
+    if(status){
+      if(temAF){
+        status.textContent='📷 Aponte para o código de barras...';
+      }else{
+        status.innerHTML='📷 Webcam fixa &mdash; posicione a 20-40cm com boa luz';
+      }
+    }
+    onReady(stream);
+  }).catch(function(e){
+    if(status){status.style.background='rgba(180,0,0,.85)';status.textContent='❌ '+e.message;}
+  });
+}
+
+// Inicia câmera com seleção automática: pede permissão, lista câmeras, monta UI
+function _abrirCameraComSelecao(containerId, onStream){
+  var status=document.getElementById(containerId+'-status');
+  if(status)status.textContent='📷 Iniciando...';
+  // Primeiro pede permissão (necessário para enumerateDevices retornar labels)
+  navigator.mediaDevices.getUserMedia({video:true}).then(function(tmpStream){
+    tmpStream.getTracks().forEach(function(t){t.stop();}); // para o stream temporário
+    _listarCameras(function(cams){
+      // Atualiza seletor se já existe
+      var camSelWrap=document.getElementById(containerId+'-camsel');
+      if(camSelWrap){camSelWrap.outerHTML=_buildCamSelectHtml(containerId);}
+      else{
+        // Insere seletor no topo do container
+        var ct=document.getElementById(containerId);
+        if(ct&&cams.length>1){
+          var tmp=document.createElement('div');
+          tmp.innerHTML=_buildCamSelectHtml(containerId);
+          if(tmp.firstChild)ct.insertBefore(tmp.firstChild,ct.firstChild);
+        }
+      }
+      _iniciarStream(_camDeviceId,containerId,onStream);
+    });
+  }).catch(function(e){
+    if(status){status.style.background='rgba(180,0,0,.85)';status.textContent='❌ Permissão negada: '+e.message;}
+  });
+}
+var _pesCameraAtiva=false;var _pesBcStream=null;var _pesBcAnimFrame=null;var _pesBcTimeout=null;
+function abrirCameraPes(mode){
+  var panelId=mode==='mat'?'pdd-mat':'pdd-unit';
+  var panel=document.getElementById(panelId);
+  if(!panel)return;
+  if(document.getElementById('pes-cam-ct')){fecharCameraPes();return;}
+  // Build camera container
+  var ct=document.createElement('div');ct.id='pes-cam-ct';
+  ct.style.cssText='margin:6px 0 4px 0;border-radius:8px;overflow:hidden;position:relative;background:#000;border:1px solid rgba(59,130,246,.3)';
+  ct.innerHTML=''
+    +'<video id="pes-cam-ct-video" style="width:100%;display:block" playsinline></video>'
+    +'<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:200px;height:80px;border:2px solid #22c55e;border-radius:5px;box-shadow:0 0 0 9999px rgba(0,0,0,.45)"></div>'
+    +'<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:200px;height:2px;background:rgba(34,197,94,.6);animation:bv-scan-line 1.5s ease-in-out infinite"></div>'
+    +'<button onclick="fecharCameraPes()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.7);color:#fff;border:none;border-radius:16px;padding:3px 10px;font-size:11px;cursor:pointer">✕ Fechar</button>'
+    +'<div id="pes-cam-ct-status" style="position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:11px;color:#fff;background:rgba(0,0,0,.55);padding:4px 8px">📷 Iniciando...</div>';
+  var search=panel.querySelector('.pdd-search');
+  if(search)search.parentNode.insertBefore(ct,search.nextSibling);
+  else panel.appendChild(ct);
+  _pesCameraAtiva=true;
+  _abrirCameraComSelecao('pes-cam-ct', function(stream){
+    _pesBcStream=stream;
+    var video=document.getElementById('pes-cam-ct-video');
+    var status=document.getElementById('pes-cam-ct-status');
+    _pesBcTimeout=setTimeout(function(){
+      if(!_pesCameraAtiva)return;
+      if(status){status.style.background='rgba(180,0,0,.8)';status.textContent='⚠️ Não consegui ler. Tente aproximar ou melhorar a iluminação.';}
+      setTimeout(function(){if(_pesCameraAtiva)fecharCameraPes();},3000);
+    },15000);
+    function _pesOnCode(cod){
+      clearTimeout(_pesBcTimeout);
+      var status=document.getElementById('pes-cam-ct-status');
+      if(status){status.style.background='rgba(22,163,74,.9)';status.textContent='✅ Lido: '+cod;}
+      setTimeout(function(){
+        fecharCameraPes();
+        if(mode==='mat'){
+          var srch=document.getElementById('prod-search');
+          if(srch){srch.value=cod;filtrarProd();}
+        }else{
+          var codNorm=cod.replace(/^0+/,'');
+          for(var i=0;i<DB.revenda.length;i++){
+            var rv=DB.revenda[i];var rc=_revCodigo(rv.id);
+            if(rc===cod||rc.replace(/^0+/,'')=== codNorm||String(rv.id)===cod){selUnit(rv.id);return;}
+          }
+          var srch=document.getElementById('unit-search');
+          if(srch){srch.value=cod;filtrarUnit();}
+        }
+      },400);
+    }
+    video.onloadedmetadata=function(){
+      if(typeof BarcodeDetector!=='undefined'){
+        BarcodeDetector.getSupportedFormats().then(function(fmts){
+          var det=new BarcodeDetector({formats:fmts.length?fmts:['ean_13','ean_8','code_128','code_39','qr_code','upc_a','upc_e','itf']});
+          function scan(){
+            if(!_pesCameraAtiva)return;
+            if(video.readyState===video.HAVE_ENOUGH_DATA){
+              det.detect(video).then(function(res){
+                if(res&&res.length){_pesOnCode(res[0].rawValue);return;}
+                _pesBcAnimFrame=requestAnimationFrame(scan);
+              }).catch(function(){_pesBcAnimFrame=requestAnimationFrame(scan);});
+            }else{_pesBcAnimFrame=requestAnimationFrame(scan);}
+          }
+          _pesBcAnimFrame=requestAnimationFrame(scan);
+        });
+      }else if(typeof ZXing!=='undefined'){
+        var hints=new Map();hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+        var reader=new ZXing.BrowserMultiFormatReader(hints);
+        reader.decodeFromStream(stream,video,function(result){
+          if(result){_pesOnCode(result.getText());}
+        });
+        window._pesBcZxing=reader;
+      }
+    };
+  });
+}
+function fecharCameraPes(){
+  if(_pesBcAnimFrame){cancelAnimationFrame(_pesBcAnimFrame);_pesBcAnimFrame=null;}
+  if(_pesBcTimeout){clearTimeout(_pesBcTimeout);_pesBcTimeout=null;}
+  var video=document.getElementById('pes-cam-ct-video');
+  if(video&&video.srcObject){video.srcObject.getTracks().forEach(function(t){t.stop();});video.srcObject=null;}
+  if(window._pesBcZxing){try{window._pesBcZxing.reset();}catch(e){}window._pesBcZxing=null;}
+  var ct=document.getElementById('pes-cam-ct');if(ct)ct.remove();
+  _pesBcStream=null;_pesCameraAtiva=false;
+}
 var _bcStream=null;var _cameraAtiva=false;var _bcAnimFrame=null;var _bcTimeout=null;
 function abrirCameraBarcode(){
   var ct=document.getElementById('rev-camera-ct');
-  var video=document.getElementById('rev-camera-video');
-  var status=document.getElementById('rev-camera-status');
-  if(!ct||!video)return;
+  if(!ct)return;
   if(_cameraAtiva){fecharCameraBarcode();return;}
   ct.style.display='block';_cameraAtiva=true;
-  if(status){status.style.background='rgba(0,0,0,.6)';status.textContent='📷 Iniciando câmera...';}
-  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}})
-  .then(function(stream){
-    _bcStream=stream;video.srcObject=stream;video.setAttribute('playsinline','');video.play();
-    var track=stream.getVideoTracks()[0];
-    if(track&&track.applyConstraints)track.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(function(){});
+  var status=document.getElementById('rev-camera-status');
+  if(status)status.textContent='📷 Iniciando...';
+  _abrirCameraComSelecao('rev-camera', function(stream){
+    _bcStream=stream;
+    var video=document.getElementById('rev-camera-video');
+    _bcTimeout=setTimeout(function(){
+      if(!_cameraAtiva)return;
+      if(status){status.style.background='rgba(180,0,0,.85)';status.textContent='⚠️ Não consegui ler. Tente aproximar ou melhorar a iluminação.';}
+      setTimeout(function(){
+        if(_cameraAtiva){fecharCameraBarcode();
+          var inp=document.getElementById('rev-barcode-inp');
+          if(inp){inp.focus();inp.placeholder='Digite o código manualmente...';}
+          setTimeout(function(){var i=document.getElementById('rev-barcode-inp');if(i)i.placeholder='Código de barras ou número...';},4000);
+        }
+      },4000);
+    },15000);
+    function _revOnCode(cod){
+      clearTimeout(_bcTimeout);
+      if(status){status.style.background='rgba(22,163,74,.9)';status.textContent='✅ Lido: '+cod;}
+      setTimeout(function(){fecharCameraBarcode();buscarPorCodigo(cod);},400);
+    }
     video.onloadedmetadata=function(){
-      if(status)status.textContent='📷 Aponte para o código de barras...';
-      _bcTimeout=setTimeout(function(){
-        if(!_cameraAtiva)return;
-        if(status){status.style.background='rgba(180,0,0,.85)';status.textContent='⚠️ Não consegui ler. Tente digitar o código manualmente.';}
-        setTimeout(function(){
-          if(_cameraAtiva){fecharCameraBarcode();
-            var inp=document.getElementById('rev-barcode-inp');
-            if(inp){inp.focus();inp.placeholder='Digite o código manualmente...';}
-            setTimeout(function(){var i=document.getElementById('rev-barcode-inp');if(i)i.placeholder='Código de barras ou número...';},4000);
-          }
-        },4000);
-      },12000);
       if(typeof BarcodeDetector!=='undefined'){
         BarcodeDetector.getSupportedFormats().then(function(fmts){
           var detector=new BarcodeDetector({formats:fmts.length?fmts:['ean_13','ean_8','code_128','code_39','qr_code','upc_a','upc_e','itf','codabar']});
@@ -5060,11 +5427,7 @@ function abrirCameraBarcode(){
             if(!_cameraAtiva)return;
             if(video.readyState===video.HAVE_ENOUGH_DATA){
               detector.detect(video).then(function(results){
-                if(results&&results.length>0){
-                  var cod=results[0].rawValue;clearTimeout(_bcTimeout);
-                  if(status){status.style.background='rgba(22,163,74,.9)';status.textContent='✅ Lido: '+cod;}
-                  setTimeout(function(){fecharCameraBarcode();buscarPorCodigo(cod);},400);return;
-                }
+                if(results&&results.length){_revOnCode(results[0].rawValue);return;}
                 _bcAnimFrame=requestAnimationFrame(scanFrame);
               }).catch(function(){_bcAnimFrame=requestAnimationFrame(scanFrame);});
             }else{_bcAnimFrame=requestAnimationFrame(scanFrame);}
@@ -5074,26 +5437,19 @@ function abrirCameraBarcode(){
       }else if(typeof ZXing!=='undefined'){
         var hints=new Map();hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
         var reader=new ZXing.BrowserMultiFormatReader(hints);
-        reader.decodeFromStream(stream,video,function(result,err){
-          if(result){clearTimeout(_bcTimeout);var cod=result.getText();
-            if(status){status.style.background='rgba(22,163,74,.9)';status.textContent='✅ Lido: '+cod;}
-            setTimeout(function(){fecharCameraBarcode();buscarPorCodigo(cod);},400);}
+        reader.decodeFromStream(stream,video,function(result){
+          if(result){_revOnCode(result.getText());}
         });
         window._bcZxing=reader;
-      }else{
-        if(status){status.style.background='rgba(180,100,0,.85)';status.textContent='⚠️ Use o Chrome no Android para leitura automática.';}
       }
     };
-  }).catch(function(e){
-    if(status){status.style.background='rgba(180,0,0,.85)';status.textContent='❌ Câmera negada: '+e.message;}
-    setTimeout(function(){ct.style.display='none';_cameraAtiva=false;},3000);
   });
 }
 function fecharCameraBarcode(){
   var ct=document.getElementById('rev-camera-ct');
-  var video=document.getElementById('rev-camera-video');
   if(_bcAnimFrame){cancelAnimationFrame(_bcAnimFrame);_bcAnimFrame=null;}
   if(_bcTimeout){clearTimeout(_bcTimeout);_bcTimeout=null;}
+  var video=document.getElementById('rev-camera-video');
   if(video&&video.srcObject){video.srcObject.getTracks().forEach(function(t){t.stop();});video.srcObject=null;}
   if(window._bcZxing){try{window._bcZxing.reset();}catch(e){}window._bcZxing=null;}
   if(ct)ct.style.display='none';
@@ -5108,17 +5464,30 @@ function _revBarcFocus(on){
 function buscarPorCodigo(val){
   val=(val||'').trim();if(!val)return;
   var found=null;
+  var valNorm=val.replace(/^0+/,'');// remove leading zeros for flexible match
   for(var i=0;i<DB.revenda.length;i++){
     var p=DB.revenda[i];
-    if(_revCodigo(p.id)===val||String(_normId(p.id))===String(_normId(val))){found=p;break;}
+    var cod=_revCodigo(p.id);
+    var codNorm=cod.replace(/^0+/,'');
+    if(cod===val||codNorm===valNorm||String(p.id)===val||String(_normId(p.id))===String(_normId(val))){found=p;break;}
   }
   if(!found){
     var inp=document.getElementById('rev-barcode-inp');
     if(inp){inp.value='';inp.style.borderColor='var(--rd)';}
-    setTimeout(function(){var i=document.getElementById('rev-barcode-inp');if(i)i.style.borderColor='';},2000);
+    // Show "not found" message
+    var st=document.getElementById('rev-notfound-msg');
+    if(!st){
+      st=document.createElement('div');st.id='rev-notfound-msg';
+      st.style.cssText='background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--rd);display:flex;align-items:center;gap:8px';
+      st.innerHTML='<span style="font-size:16px">&#128998;</span><span>Produto não encontrado para o código: <strong>'+val+'</strong></span>';
+      var scanArea=document.querySelector('#rev-scan-status');
+      if(scanArea&&scanArea.parentNode)scanArea.parentNode.insertBefore(st,scanArea.nextSibling);
+    }else{st.style.display='flex';st.querySelector('span:last-child').innerHTML='Produto não encontrado para o código: <strong>'+val+'</strong>';}
+    setTimeout(function(){var i=document.getElementById('rev-barcode-inp');if(i)i.style.borderColor='';var m=document.getElementById('rev-notfound-msg');if(m)m.style.display='none';},3000);
     return;
   }
   var inp=document.getElementById('rev-barcode-inp');if(inp)inp.value='';
+  var m=document.getElementById('rev-notfound-msg');if(m)m.style.display='none';
   mVerProdRevenda(found.id);
 }
 function mVerProdRevenda(id){
@@ -5128,23 +5497,43 @@ function mVerProdRevenda(id){
   var catCL=getRevCatChecklist(p.cat);var aprovados=p.testesAprovados||[];
   var testesH='';
   if(catCL.length){
-    testesH='<div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0">';
-    for(var i=0;i<catCL.length;i++){var ok=aprovados.indexOf(catCL[i])>=0;testesH+='<span style="padding:2px 8px;border-radius:20px;font-size:10px;background:'+(ok?'rgba(34,197,94,.15)':'var(--s3)')+';color:'+(ok?'var(--gr)':'var(--mt)')+'">'+(ok?'✓ ':'')+catCL[i]+'</span>';}
-    testesH+='</div>';
+    var okCount=0;
+    testesH='<div style="margin:8px 0"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Testes</div><div style="display:flex;flex-wrap:wrap;gap:4px">';
+    for(var i=0;i<catCL.length;i++){var ok=aprovados.indexOf(catCL[i])>=0;if(ok)okCount++;testesH+='<span style="padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;border:1px solid '+(ok?'rgba(34,197,94,.4)':'var(--bd)')+';background:'+(ok?'rgba(34,197,94,.12)':'var(--s3)')+';color:'+(ok?'var(--gr)':'var(--mt)')+'">'+(ok?'&#10003; ':'')+catCL[i]+'</span>';}
+    testesH+='</div><div style="font-size:10px;color:var(--mt);margin-top:3px">'+okCount+'/'+catCL.length+' verificados</div></div>';
+  }
+  var specsH='';
+  var specs=p.specs||{};
+  var specKeys=Object.keys(specs);
+  if(specKeys.length>0){
+    specsH='<div style="margin:8px 0"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Especificacoes</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">';
+    for(var k=0;k<specKeys.length;k++){
+      var sv=specs[specKeys[k]];
+      if(sv===''||sv===null||sv===undefined||sv===false)continue;
+      var sval=sv===true?'&#10003;':String(sv);
+      specsH+='<div style="background:var(--s3);border-radius:5px;padding:5px 8px"><div style="font-size:9px;color:var(--mt);margin-bottom:1px">'+specKeys[k]+'</div><div style="font-size:12px;font-weight:600;color:var(--tx)">'+sval+'</div></div>';
+    }
+    specsH+='</div></div>';
   }
   var html='<div style="background:var(--s2);border-radius:var(--r);padding:14px;margin-bottom:12px">'
-    +'<div style="font-size:18px;font-weight:800;margin-bottom:4px">'+p.prod+'</div>'
-    +(p.cat?'<span style="font-size:11px;color:var(--bl)">'+p.cat+'</span>':'')+(p.cond?' · <span style="font-size:11px;color:var(--pu)">'+p.cond+'</span>':'')
-    +(p.desc?'<div style="font-size:12px;color:var(--mt);margin-top:6px">'+p.desc+'</div>':'')
+    +'<div style="font-size:18px;font-weight:800;margin-bottom:6px">'+p.prod+'</div>'
+    +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
+    +(p.cat?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(59,130,246,.12);color:var(--bl)">'+p.cat+'</span>':'')
+    +(p.cond?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(168,85,247,.12);color:var(--pu)">'+p.cond+'</span>':'')
+    +(p.peso?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;background:var(--s3);color:var(--mt)">'+fKg(p.peso)+'kg</span>':'')
+    +'</div>'
+    +(p.desc?'<div style="font-size:12px;color:var(--mt);margin-bottom:8px;line-height:1.5;border-left:3px solid var(--bd);padding-left:8px">'+p.desc+'</div>':'')
+    +specsH
     +testesH
-    +'<div style="font-size:22px;font-weight:800;color:var(--gr);margin-top:8px">'+fR(p.preco)+'</div>'
+    +'<div style="font-size:24px;font-weight:800;color:var(--gr);margin-top:8px">'+fR(p.preco)+'</div>'
+    +'<div style="font-size:10px;color:var(--mt);font-family:monospace;margin-top:2px">Cod: '+cod+'</div>'
     +'</div>'
     +'<div style="display:flex;gap:8px">'
-    +(p.status==='Disponivel'?'<button class="btn" style="flex:1" onclick="closeM();mVU('+p.id+')">Vender</button>':'<div class="tag tg" style="flex:1;text-align:center;padding:10px">Vendido</div>')
+    +(p.status==='Disponivel'?'<button class="btn" style="flex:1" onclick="closeM();mVU('+p.id+')">&#128722; Vender</button>':'<div class="tag tg" style="flex:1;text-align:center;padding:10px">Vendido</div>')
     +'<button class="btnO bOb" onclick="imprimirEtiqueta('+p.id+')" style="flex:1">&#128424; Etiqueta</button>'
     +'<button class="btnO bOgr" onclick="closeM();mEditRev('+p.id+')" style="padding:10px 14px">&#9998;</button>'
     +'</div>';
-  openM('&#127991; '+p.prod,html,460);
+  openM('&#127991; '+p.prod,html,480);
 }
 function imprimirEtiqueta(id){
   var p=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){p=DB.revenda[i];break;}}
@@ -5382,10 +5771,11 @@ function mEditRev(id){
     +'<div class="fld"><label>Descricao / Especificacoes</label><textarea class="inp" id="er-desc" rows="3" style="resize:vertical;min-height:64px;line-height:1.5">'+(it.desc||'')+'</textarea></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Preco R$</label><input class="inp" type="number" inputmode="decimal" id="er-pr" value="'+it.preco+'"></div>'
-    +'<div class="fld"><label>Categoria</label><select class="inp" id="er-cat" onchange="onRevCatChange(\'er\')">'+catO+'</select></div>'
+    +'<div class="fld"><label>Categoria</label><select class="inp" id="er-cat" onchange="onRevCatChange(\'er\');onRevCatChangeSpecs(\'er\')">'+catO+'</select></div>'
     +'</div>'
     +'<div class="fld"><label>Condicao</label><select class="inp" id="er-c">'+condO+'</select></div>'
     +clHtml
+    +renderSpecsHtml(it.cat||'',it.specs||{},'er')
     +'<div class="fld"><label>Produto do Estoque (opcional)</label><select class="inp" id="er-estprod" onchange="atualizaPesoRevenda()">'+prodO+'</select></div>'
     +debugInfo
     +estInfo
@@ -5435,6 +5825,7 @@ function saveEditRev(id){
   it.cond=document.getElementById('er-c').value;
   it.peso=pesoNovo;
   it.estProdId=pIdNovo;
+  it.specs=getSpecsFromForm('er',it.cat);
   var aprovados=[];
   var cbs=document.querySelectorAll('#er-cl-wrap input[type=checkbox]');
   for(var i=0;i<cbs.length;i++){if(cbs[i].checked)aprovados.push(cbs[i].value);}
@@ -5497,7 +5888,7 @@ function mNovoRev(){
     +'<div class="fld"><label>Produto</label><input class="inp" id="nr-p" placeholder="Ex: Notebook Dell i5"></div>'
     +'<div class="fld"><label>Descricao / Especificacoes</label><textarea class="inp" id="nr-desc" rows="3" placeholder="Ex: 8GB RAM, 256GB SSD, Intel i5 10ª geração..." style="resize:vertical;min-height:64px;line-height:1.5"></textarea></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>Categoria</label><select class="inp" id="nr-cat" onchange="onRevCatChange(\'nr\')">'+catO+'</select></div>'
+    +'<div class="fld"><label>Categoria</label><select class="inp" id="nr-cat" onchange="onRevCatChange(\'nr\');onRevCatChangeSpecs(\'nr\')">'+catO+'</select></div>'
     +'<div class="fld"><label>Preco R$ (por unidade)</label><input class="inp" type="number" inputmode="decimal" id="nr-pr"></div>'
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
@@ -5507,6 +5898,7 @@ function mNovoRev(){
     +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Cria 1 card por unidade</div></div>'
     +'</div>'
     +clHtml
+    +(firstCat?renderSpecsHtml(firstCat,{},'nr'):'')
     +'<div class="fld"><label>Produto do Estoque (opcional)</label><select class="inp" id="nr-estprod" onchange="onRevEstProdChange()">'+prodO+'</select></div>'
     +'<div class="fld"><label>Peso kg (por unidade)</label><input class="inp" type="number" inputmode="decimal" id="nr-kg"></div>'
     +'<div id="nr-est-info" style="font-size:11px;color:var(--mt);margin-top:-6px;margin-bottom:8px"></div>'
@@ -5534,8 +5926,9 @@ function saveRev(){
   var cat=document.getElementById('nr-cat').value;
   var cond=document.getElementById('nr-c').value;
   var desc=(document.getElementById('nr-desc').value||'').trim();
+  var specs=getSpecsFromForm('nr',cat);
   for(var u=0;u<qtd;u++){
-    DB.revenda.push({id:nid(),prod:n+(qtd>1?' #'+(u+1):''),desc:desc,peso:pesoRev,cond:cond,preco:preco,status:'Disponivel',cat:cat,estProdId:pIdSel,testesAprovados:aprovados.slice()});
+    DB.revenda.push({id:nid(),prod:n+(qtd>1?' #'+(u+1):''),desc:desc,peso:pesoRev,cond:cond,preco:preco,status:'Disponivel',cat:cat,estProdId:pIdSel,testesAprovados:aprovados.slice(),specs:specs});
     if(pIdSel&&pesoRev>0){
       var ep=null;
       for(var i=0;i<DB.produtos.length;i++){if(_normId(DB.produtos[i].id)===_normId(pIdSel)){ep=DB.produtos[i];break;}}
@@ -5915,7 +6308,65 @@ function _finResumo(){
       +'<div style="font-size:21px;font-weight:700;font-family:monospace;color:'+cor+'">'+val+'</div>'
       +'<div style="font-size:11px;color:var(--mt)">'+sub+'</div></div>';
   }
+  // ── Card Lucro Bruto e Líquido ──
+  // Receita de vendas = entradas categoria Venda
+  // Custo materiais = saídas categoria Compra
+  // Despesas operacionais = demais saídas (aluguel, honorários, etc.)
+  var recVendas=0,custoCompras=0,despesasOp=0;
+  for(var i=0;i<_movs.length;i++){
+    var _mv=_movs[i];
+    if(_mv.tipo==='entrada'&&(_mv.cat==='Venda'||_mv.cat==='Venda de Material')){recVendas+=_mv.valor;}
+    else if(_mv.tipo==='saida'&&(_mv.cat==='Compra'||_mv.cat==='Compra de Material')){custoCompras+=_mv.valor;}
+    else if(_mv.tipo==='saida'){despesasOp+=_mv.valor;}
+  }
+  // Complementa com atendHist (compras e vendas do caixa atual)
+  for(var i=0;i<atendHist.length;i++){
+    var _ah=atendHist[i];var _t=_mvTotal(_ah);
+    if(_ah.tipo==='Venda')recVendas+=_t;
+    else if(_ah.tipo==='Compra')custoCompras+=_t;
+  }
+  var lucroBruto=recVendas-custoCompras;
+  var lucroLiquido=lucroBruto-despesasOp-totP; // totP = contas fixas pendentes
+  var margemBruta=recVendas>0?Math.round((lucroBruto/recVendas)*100):0;
+  var margemLiq=recVendas>0?Math.round((lucroLiquido/recVendas)*100):0;
+
+  function _dreRow(lbl,val,sub,destaque,cor){
+    cor=cor||(val>=0?'var(--gr)':'var(--rd)');
+    var bg=destaque?'background:var(--s2);border-radius:8px;padding:10px 12px;margin:4px 0':'padding:8px 12px';
+    var fs=destaque?'font-size:15px;font-weight:800':'font-size:13px;font-weight:600';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;'+bg+'">'
+      +'<span style="'+fs+';color:var(--tx)">'+lbl+'</span>'
+      +'<div style="text-align:right">'
+      +'<div style="'+fs+';font-family:monospace;color:'+cor+'">'+fR(Math.abs(val))+'</div>'
+      +(sub?'<div style="font-size:10px;color:var(--mt)">'+sub+'</div>':'')
+      +'</div></div>';
+  }
+
+  var lucroCard='<div class="card" style="background:linear-gradient(135deg,var(--s1),rgba(59,130,246,0.05));border-color:rgba(59,130,246,0.2)">'
+    +'<div class="stl" style="margin-bottom:12px"><div class="stb" style="background:var(--bl)"></div><div class="stx">&#128200; Resultado Detalhado</div>'
+    +'<span style="font-size:10px;color:var(--mt);margin-left:auto">'+_finPeriodoLabel()+'</span></div>'
+    // DRE simplificado
+    +_dreRow('(+) Receita de Vendas',recVendas,'entradas de vendas','','var(--gr)')
+    +'<div style="border-top:1px solid var(--bd);margin:4px 12px"></div>'
+    +_dreRow('(-) Custo das Compras',custoCompras,'materiais comprados','','var(--rd)')
+    +'<div style="border-top:2px solid var(--bd);margin:6px 12px"></div>'
+    +_dreRow('= Lucro Bruto',lucroBruto,'margem '+margemBruta+'%',true,lucroBruto>=0?'var(--gr)':'var(--rd)')
+    +'<div style="border-top:1px solid var(--bd);margin:4px 12px"></div>'
+    +_dreRow('(-) Despesas Operacionais',despesasOp,'aluguel, honorários, outros','','var(--rd)')
+    +_dreRow('(-) Contas Fixas Pendentes',totP,pend.length+' conta'+(pend.length!==1?'s':'')+' em aberto','','var(--or)')
+    +'<div style="border-top:2px solid var(--bd);margin:6px 12px"></div>'
+    +_dreRow('= Lucro Líquido',lucroLiquido,'margem '+margemLiq+'%',true,lucroLiquido>=0?'var(--gr)':'var(--rd)')
+    // Barra visual margem líquida
+    +'<div style="margin:10px 12px 4px">'
+    +'<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mt);margin-bottom:4px">'
+    +'<span>Margem líquida</span><span style="color:'+(margemLiq>=20?'var(--gr)':margemLiq>=10?'var(--or)':'var(--rd)')+'">'+margemLiq+'%</span></div>'
+    +'<div style="height:6px;background:var(--bd);border-radius:3px;overflow:hidden">'
+    +'<div style="height:100%;width:'+Math.min(100,Math.max(0,margemLiq*2))+'%;background:'+(margemLiq>=20?'var(--gr)':margemLiq>=10?'var(--or)':'var(--rd)')+';border-radius:3px;transition:width .5s ease"></div>'
+    +'</div></div>'
+    +'</div>';
+
   return '<div class="fc"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button onclick="exportarResumoFinanceiroPDF()" class="btn" style="font-size:12px;padding:6px 12px">&#128196; PDF</button></div>'+_perLabel+resCard
+    +lucroCard
     +'<div class="g4">'
     +_scLink('&#128176;','Saldo Total',fR(sal),'em '+DB.contas.length+' contas','var(--gr)',"finTab('contas')")
     +_scLink('&#128200;','Entradas',fR(ent),vendas.length+' vendas','var(--gr)',"finTab('movs')")
@@ -11827,6 +12278,8 @@ window.addEventListener('DOMContentLoaded', function(){
           _sanitizeRevenda();
           try{localStorage.setItem('bv_db',JSON.stringify(s));}catch(e){}
           _syncBadge('idle','Nuvem ativa');
+          // Atualiza tela de login com aviso de pesagem pendente (pode ter vindo da nuvem)
+          buildLoginList();
           if(pgAtiva){go(pgAtiva);}
         } else {
           // Nuvem vazia — envia estado atual (zerado) para a nuvem
