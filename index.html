@@ -4,6 +4,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
 :root{--bg:#0b0f1a;--s1:#111827;--s2:#1a2235;--s3:#1e2a40;--bd:#2a3a52;
 --gr:#22c55e;--gr2:#16a34a;--grb:rgba(34,197,94,.1);
@@ -920,7 +921,8 @@ function renderPesagem(){
   var unitCards='';var hasD=false;
   for(var i=0;i<DB.revenda.length;i++){
     if(DB.revenda[i].status==='Disponivel'){hasD=true;var rv=DB.revenda[i];
-      unitCards+='<div class="prod-card" data-nome="'+(rv.prod||rv.nome||'').toLowerCase()+'" onclick="selUnit('+rv.id+')">'
+      var _rvCod=(function(id){var s=String(Math.abs(Math.floor(parseFloat(id)||0)));while(s.length<12)s='0'+s;return s.slice(-12);})(rv.id);
+      unitCards+='<div class="prod-card" data-nome="'+(rv.prod||rv.nome||'').toLowerCase()+'" data-cod="'+_rvCod+'" onclick="selUnit('+rv.id+')">'
         +'<span style="font-size:20px;flex-shrink:0">&#127991;</span>'
         +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:13px;font-weight:600">'+(rv.prod||rv.nome||'Produto')+'</div>'
@@ -1164,6 +1166,7 @@ function filtrarProd(){
     cards[i].classList.remove('pdd-focus');
   }
 }
+
 function _pddGetVisible(listId){
   var cards=document.querySelectorAll('#'+listId+' .prod-card');
   var vis=[];for(var i=0;i<cards.length;i++){if(cards[i].style.display!=='none')vis.push(cards[i]);}
@@ -1254,11 +1257,19 @@ function closePddUnit(){
   if(panel)panel.classList.remove('open');
 }
 function filtrarUnit(){
-  var q=(document.getElementById('unit-search').value||'').toLowerCase();
+  var q=(document.getElementById('unit-search').value||'').toLowerCase().trim();
   var cards=document.querySelectorAll('#unit-cards-list .prod-card');
+  _pddFocusIdx=-1;
   for(var i=0;i<cards.length;i++){
     var nome=cards[i].getAttribute('data-nome')||'';
-    cards[i].style.display=(q===''||nome.indexOf(q)>=0)?'flex':'none';
+    var cod=cards[i].getAttribute('data-cod')||'';
+    cards[i].style.display=(q===''||nome.indexOf(q)>=0||cod.indexOf(q)>=0)?'flex':'none';
+    cards[i].classList.remove('pdd-focus');
+  }
+  // Se digitou código completo (8+ dígitos) e só um resultado visível, seleciona direto
+  if(q.length>=8&&/^\d+$/.test(q)){
+    var vis=_pddGetVisible('unit-cards-list');
+    if(vis.length===1){setTimeout(function(){vis[0].click();var s=document.getElementById('unit-search');if(s)s.value='';},120);}
   }
 }
 
@@ -3181,6 +3192,85 @@ function pgDash(){
     +'<span style="font-size:22px;opacity:.4">&#128197;</span></div></div>'
     +'</div>'
 
+    // ── Card Lucro Previsto do Estoque ──
+    +(function(){
+      var _totLucroPrev=0,_totCustoEst=0,_totValorVenda=0,_qtdProd=0;
+      var _topProds=[];
+      for(var _i=0;_i<DB.produtos.length;_i++){
+        var _p=DB.produtos[_i];
+        if(_p.est<=0)continue;
+        var _lucroProd=_p.est*(_p.vV-_p.vC);
+        var _custoP=_p.est*_p.vC;
+        var _vendaP=_p.est*_p.vV;
+        _totLucroPrev+=_lucroProd;
+        _totCustoEst+=_custoP;
+        _totValorVenda+=_vendaP;
+        _qtdProd++;
+        if(_p.vV>0&&_p.vC>=0){
+          var _margP=_p.vV>0?Math.round((_p.vV-_p.vC)/_p.vV*100):0;
+          _topProds.push({nome:_p.nome,ic:_p.ic||'📦',est:_p.est,lucro:_lucroProd,marg:_margP,vV:_p.vV,vC:_p.vC});
+        }
+      }
+      _topProds.sort(function(a,b){return b.lucro-a.lucro;});
+      var _margemGeral=_totValorVenda>0?Math.round((_totLucroPrev/_totValorVenda)*100):0;
+      var _corLucro=_totLucroPrev>=0?'var(--gr)':'var(--rd)';
+      var _topH='';
+      var _lim=Math.min(4,_topProds.length);
+      for(var _i=0;_i<_lim;_i++){
+        var _tp=_topProds[_i];
+        var _pctBar=_totLucroPrev>0?Math.max(4,Math.round((_tp.lucro/_totLucroPrev)*100)):0;
+        var _corBar=_tp.marg>=30?'var(--gr)':_tp.marg>=15?'var(--or)':'var(--rd)';
+        _topH+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd)">'
+          +'<span style="font-size:13px;flex-shrink:0">'+_tp.ic+'</span>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">'
+          +'<span style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">'+_tp.nome+'</span>'
+          +'<span style="font-size:10px;font-family:monospace;color:var(--gr);flex-shrink:0">'+fR(_tp.lucro)+'</span>'
+          +'</div>'
+          +'<div style="height:4px;background:var(--bd);border-radius:2px;overflow:hidden">'
+          +'<div style="height:100%;width:'+_pctBar+'%;background:'+_corBar+';border-radius:2px;transition:width .4s ease"></div></div>'
+          +'<div style="font-size:9px;color:var(--mt);margin-top:1px">'+fKg(_tp.est)+'kg &middot; margem '+_tp.marg+'%</div>'
+          +'</div></div>';
+      }
+      if(!_qtdProd){
+        return '<div class="card" style="background:linear-gradient(135deg,var(--s1),rgba(34,197,94,0.04));border-color:rgba(34,197,94,0.15)">'
+          +'<div class="stl" style="margin-bottom:6px"><div class="stb" style="background:var(--gr)"></div><div class="stx">Lucro Previsto do Estoque</div></div>'
+          +'<div style="text-align:center;padding:14px 0;font-size:12px;color:var(--mt)">Nenhum produto com estoque no momento.</div>'
+          +'</div>';
+      }
+      return '<div class="card" style="background:linear-gradient(135deg,var(--s1),rgba(34,197,94,0.07));border-color:rgba(34,197,94,0.25)">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+        +'<div class="stl" style="margin-bottom:0"><div class="stb" style="background:var(--gr)"></div><div class="stx">&#128200; Lucro Previsto do Estoque</div></div>'
+        +'<span style="font-size:10px;color:var(--mt)">'+_qtdProd+' produto'+(+_qtdProd!==1?'s':'')+'</span>'
+        +'</div>'
+        // Linha de totais
+        +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">'
+        +'<div style="background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px;text-align:center">'
+        +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Custo Compra</div>'
+        +'<div style="font-size:13px;font-weight:700;color:var(--bl);font-family:monospace">'+fR(_totCustoEst)+'</div>'
+        +'</div>'
+        +'<div style="background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px;text-align:center">'
+        +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Valor de Venda</div>'
+        +'<div style="font-size:13px;font-weight:700;color:var(--or);font-family:monospace">'+fR(_totValorVenda)+'</div>'
+        +'</div>'
+        +'<div style="background:var(--bg);border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:10px;text-align:center">'
+        +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Lucro Previsto</div>'
+        +'<div style="font-size:13px;font-weight:800;color:'+_corLucro+';font-family:monospace">'+fR(_totLucroPrev)+'</div>'
+        +'</div>'
+        +'</div>'
+        // Margem geral
+        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+        +'<div style="font-size:11px;color:var(--mt)">Margem média do estoque:</div>'
+        +'<div style="font-size:13px;font-weight:700;color:'+(_margemGeral>=20?'var(--gr)':_margemGeral>=10?'var(--or)':'var(--rd)')+'">'+_margemGeral+'%</div>'
+        +'<div style="flex:1;height:6px;background:var(--bd);border-radius:3px;overflow:hidden">'
+        +'<div style="height:100%;width:'+Math.min(100,_margemGeral*2)+'%;background:'+(_margemGeral>=20?'var(--gr)':_margemGeral>=10?'var(--or)':'var(--rd)')+';border-radius:3px;transition:width .5s ease"></div>'
+        +'</div></div>'
+        // Top produtos
+        +(_topH?'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Top produtos por lucro previsto</div>'+_topH:'')
+        +'<button onclick="go(\'estoque\')" style="margin-top:10px;width:100%;padding:7px;border:none;border-radius:8px;background:rgba(34,197,94,0.1);color:var(--gr);font-size:11px;font-weight:600;cursor:pointer">Ver estoque completo ›</button>'
+        +'</div>';
+    })()
+
     // ── Alerta: Contas a Vencer ──
     +(function(){
       var _hoje=new Date();
@@ -4257,6 +4347,16 @@ function _perFiltro(dataStr, per, d1, d2){
   if(per==='mespass'){var m=new Date(hoje.getFullYear(),hoje.getMonth()-1,1);return d.getMonth()===m.getMonth()&&d.getFullYear()===m.getFullYear();}
   if(per==='30dias'){return (hoje-d)<=(30*864e5)&&d<=hoje;}
   if(per==='ano'){return d.getFullYear()===hoje.getFullYear();}
+  if(per==='trimestre'){
+    var trimAtual=Math.floor(hoje.getMonth()/3);
+    var trimData=Math.floor(d.getMonth()/3);
+    return trimData===trimAtual&&d.getFullYear()===hoje.getFullYear();
+  }
+  if(per==='semestre'){
+    var semAtual=Math.floor(hoje.getMonth()/6);
+    var semData=Math.floor(d.getMonth()/6);
+    return semData===semAtual&&d.getFullYear()===hoje.getFullYear();
+  }
   if(per==='custom'&&d1&&d2){
     var pd1=_parseDataBR(d1),pd2=_parseDataBR(d2);
     return pd1&&pd2&&d>=pd1&&d<=pd2;
@@ -4273,6 +4373,8 @@ function _buildPerBar(per, varName, d1, d2, onchange){
     {id:'mespass',l:'Mês passado'},
     {id:'30dias',l:'Últimos 30 dias'},
     {id:'ano',l:'Este ano'},
+    {id:'trimestre',l:'Este trimestre'},
+    {id:'semestre',l:'Este semestre'},
     {id:'custom',l:'Personalizado'},
   ];
   var sel=ops.find(function(o){return o.id===per;})||ops[3];
@@ -4455,6 +4557,7 @@ function mNovoProd(){
     +'<div class="fld"><label>Compra R$/kg</label><input class="inp" type="number" inputmode="decimal" id="np-vc"></div>'
     +'<div class="fld"><label>Filtro/Categoria</label><select class="inp" id="np-c">'+catO+'</select></div>'
     +'</div>'
+    +'<div class="fld"><label>Cód. de barras (opcional)</label><input class="inp" id="np-barras" placeholder="Ex: 7891234567890" inputmode="numeric"></div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveNP()">Cadastrar</button></div>'
     +'</div>',480);
 }
@@ -4464,7 +4567,8 @@ function saveNP(){
   var ic=document.getElementById('np-ic-val').value||'📦';
   var vV=parseFloat(document.getElementById('np-vv').value)||0;
   var vC=parseFloat(document.getElementById('np-vc').value)||0;
-  var newProd={id:nid(),nome:n,ic:ic,vV:vV,vC:vC,est:0,cat:document.getElementById('np-c').value};
+  var barrasVal=(document.getElementById('np-barras')&&document.getElementById('np-barras').value.trim())||'';
+  var newProd={id:nid(),nome:n,ic:ic,vV:vV,vC:vC,est:0,cat:document.getElementById('np-c').value,barras:barrasVal};
   DB.produtos.push(newProd);
   // Auto-adiciona à Tabela Padrão de venda e compra
   for(var j=0;j<DB.tabelas.length;j++){
@@ -4504,6 +4608,7 @@ function mEditProd(id){
     +'<div class="fld"><label>Venda R$/kg</label><input class="inp" type="number" inputmode="decimal" id="ep-vv" value="'+p.vV+'" step="0.01"></div>'
     +'<div class="fld"><label>Compra R$/kg</label><input class="inp" type="number" inputmode="decimal" id="ep-vc" value="'+p.vC+'" step="0.01"></div>'
     +'</div>'
+    +'<div class="fld"><label>Cód. de barras (opcional)</label><input class="inp" id="ep-barras" placeholder="Ex: 7891234567890" inputmode="numeric" value="'+(p.barras||'')+'"></div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveEditProd('+id+')">Salvar</button></div>'
     +'</div>',480);
 }
@@ -4519,6 +4624,7 @@ function saveEditProd(id){
   p.ic=document.getElementById('ep-ic-val').value||p.ic;
   p.cat=document.getElementById('ep-c').value;
   p.vV=novoVV;p.vC=novoVC;
+  var epBarras=document.getElementById('ep-barras');if(epBarras)p.barras=epBarras.value.trim();
   // Atualiza tabela Padrao automaticamente (mão dupla: Estoque→Tabela)
   for(var i=0;i<DB.tabelas.length;i++){
     if(DB.tabelas[i].nome.toLowerCase()==='padrao'){
@@ -4731,7 +4837,7 @@ function pgRevenda(){
     +relatorio
     +'<div style="position:relative;margin-bottom:10px;display:flex;gap:8px">'
     +'<div style="position:relative;flex:1">'
-    +'<input class="inp" id="rev-barcode-inp" type="text" inputmode="numeric" placeholder="🔍 Código de barras ou número..." style="padding-left:38px;font-size:14px;transition:box-shadow .2s,border-color .2s" onkeydown="if(event.key===\'Enter\'){buscarPorCodigo(this.value);event.preventDefault();}" onfocus="_revBarcFocus(true)" onblur="_revBarcFocus(false)">'
+    +'<input class="inp" id="rev-barcode-inp" type="text" inputmode="numeric" placeholder="Código de barras ou número..." style="padding-left:38px;font-size:14px;transition:box-shadow .2s,border-color .2s" onkeydown="if(event.key===\'Enter\'){buscarPorCodigo(this.value);event.preventDefault();}" onfocus="_revBarcFocus(true)" onblur="_revBarcFocus(false)">'
     +'<span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none">&#128269;</span>'
     +'</div>'
     +'<button onclick="buscarPorCodigo(document.getElementById(\'rev-barcode-inp\').value)" style="background:var(--gr2);color:#fff;border:none;border-radius:8px;padding:0 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Buscar</button>'
@@ -4943,7 +5049,7 @@ function abrirCameraBarcode(){
           if(_cameraAtiva){fecharCameraBarcode();
             var inp=document.getElementById('rev-barcode-inp');
             if(inp){inp.focus();inp.placeholder='Digite o código manualmente...';}
-            setTimeout(function(){var i=document.getElementById('rev-barcode-inp');if(i)i.placeholder='🔍 Código de barras ou número...';},4000);
+            setTimeout(function(){var i=document.getElementById('rev-barcode-inp');if(i)i.placeholder='Código de barras ou número...';},4000);
           }
         },4000);
       },12000);
@@ -5045,16 +5151,25 @@ function imprimirEtiqueta(id){
   if(!p)return;
   var cod=_revCodigo(p.id);var bars=_gerarBarcodeTipo(cod);
   var conteudo='<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    +'<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>'
     +'<style>*{margin:0;padding:0;box-sizing:border-box}@page{size:80mm auto;margin:4mm}'
     +'body{font-family:"Courier New",monospace;background:#fff;color:#000;text-align:center;padding:4mm}'
     +'.preco{font-size:30px;font-weight:900;margin:6px 0}'
     +'.bc{margin:8px 0;line-height:0}'
-    +'.cod{font-size:11px;letter-spacing:4px;margin-top:4px}'
     +'</style></head><body>'
     +'<div class="preco">'+fR(p.preco)+'</div>'
     +'<div class="bc">'+bars+'</div>'
-    +'<div class="cod">'+cod+'</div>'
-    +'<script>window.onload=function(){window.print();}<\/script>'
+    +'<script>'
+    +'window.onload=function(){'
+    +'  var el=document.getElementById("bc-svg");'
+    +'  if(el&&typeof JsBarcode!=="undefined"){'
+    +'    var fmt=el.getAttribute("data-fmt")||"CODE128";'
+    +'    var code=el.getAttribute("data-code")||"";'
+    +'    try{JsBarcode(el,code,{format:fmt,width:2,height:60,displayValue:true,fontSize:14,margin:8});}catch(e){}'
+    +'  }'
+    +'  setTimeout(function(){window.print();},400);'
+    +'};'
+    +'<\/script>'
     +'</body></html>';
   var html='<div style="text-align:center;margin-bottom:10px">'
     +'<iframe id="etq-frame" style="width:100%;height:260px;border:1px solid var(--bd);border-radius:var(--r);background:#fff"></iframe>'
@@ -5067,7 +5182,12 @@ function imprimirEtiqueta(id){
   openM('&#128424; Etiqueta — '+p.prod, html, 440);
   setTimeout(function(){
     var frame=document.getElementById('etq-frame');
-    if(frame){frame.contentDocument.open();frame.contentDocument.write(conteudo);frame.contentDocument.close();}
+    if(frame){
+      frame.contentDocument.open();
+      frame.contentDocument.write(conteudo);
+      frame.contentDocument.close();
+      // JsBarcode roda dentro do iframe pelo window.onload do conteudo
+    }
   },100);
 }
 function setRevCond(c){revCondFiltro=c;go('revenda');}
@@ -5453,7 +5573,7 @@ var _finPeriodo='mes';
 var _finPerD1='';var _finPerD2='';
 
 function _finPeriodoLabel(){
-  var ops={tudo:'Todos os registros',hoje:'Hoje',7:'Últimos 7 dias',mes:'Este mês',mespass:'Mês passado',30:'Últimos 30 dias',ano:'Este ano',custom:'Personalizado'};
+  var ops={tudo:'Todos os registros',hoje:'Hoje',7:'Últimos 7 dias',mes:'Este mês',mespass:'Mês passado',30:'Últimos 30 dias',ano:'Este ano',trimestre:'Este trimestre',semestre:'Este semestre',custom:'Personalizado'};
   return '📅 '+(ops[_finPeriodo]||'Este mês');
 }
 function _filtrarPorPeriodo(data){
@@ -5795,7 +5915,7 @@ function _finResumo(){
       +'<div style="font-size:21px;font-weight:700;font-family:monospace;color:'+cor+'">'+val+'</div>'
       +'<div style="font-size:11px;color:var(--mt)">'+sub+'</div></div>';
   }
-  return '<div class="fc">'+_perLabel+resCard
+  return '<div class="fc"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button onclick="exportarResumoFinanceiroPDF()" class="btn" style="font-size:12px;padding:6px 12px">&#128196; PDF</button></div>'+_perLabel+resCard
     +'<div class="g4">'
     +_scLink('&#128176;','Saldo Total',fR(sal),'em '+DB.contas.length+' contas','var(--gr)',"finTab('contas')")
     +_scLink('&#128200;','Entradas',fR(ent),vendas.length+' vendas','var(--gr)',"finTab('movs')")
@@ -6368,7 +6488,7 @@ function _finContas(){
       +'</div>'
       +'</div>';
   }
-  return '<div class="fc">'
+  return '<div class="fc"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button onclick="exportarContasPDF()" class="btn" style="font-size:12px;padding:6px 12px">&#128196; PDF</button></div>'
     +'<div class="card" style="text-align:center;background:var(--grb);border-color:rgba(34,197,94,.3)">'
     +'<div style="font-size:11px;color:var(--mt);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">Saldo Total</div>'
     +'<div style="font-size:28px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(sal)+'</div>'
@@ -6493,10 +6613,11 @@ function _finMovs(){
       +'</div>';
   }
   if(!rows)rows='<div style="padding:24px;text-align:center;color:var(--mt)">Nenhuma movimentacao encontrada.</div>';
-  return '<div class="card" style="padding:0;overflow:hidden">'
+  return '<div class="fc"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button onclick="exportarMovimentacoesPDF()" class="btn" style="font-size:12px;padding:6px 12px">&#128196; PDF</button></div>'
+    +'<div class="card" style="padding:0;overflow:hidden">'
     +'<div style="padding:13px 15px;border-bottom:1px solid var(--bd)">'
     +'<div class="stl" style="margin-bottom:0"><div class="stb"></div><div class="stx">Todas as Movimentacoes</div></div></div>'
-    +rows+'</div>';
+    +rows+'</div></div>';
 }
 
 var _cfSubTab='contas'; // 'contas' ou 'hist'
@@ -6656,7 +6777,7 @@ function _finFixas(){
   sumCards+='</div>';
   return '<div class="fc">'
     +'<div style="display:flex;justify-content:space-between;align-items:center">'
-    +'<div></div>'
+    +'<button onclick="exportarContasAPagarPDF()" class="btn" style="font-size:12px;padding:6px 12px">&#128196; PDF</button>'
     +(_fixasMesOffset===0?'<button class="btn" onclick="mNovaCF()">+ Nova Conta</button>':'<div style="font-size:11px;color:var(--mt)">Navegando meses &mdash; volte ao mes atual para editar</div>')
     +'</div>'
     +navBar
@@ -10054,6 +10175,7 @@ function mVerTab(idx){
     +cascataHtml
     +'<div class="brow" style="margin-top:12px">'
     +'<button class="btnO bOgr" onclick="closeM()">Fechar</button>'
+    +(isPadrao?'<button class="btn" style="background:var(--or);color:#000" onclick="sincronizarTabPadrao('+idx+')">&#128257; Sincronizar Estoque</button>':'')
     +'<button class="btn" style="background:var(--bl)" onclick="printTab('+idx+')">&#128438; Imprimir</button>'
     +'</div>'
     +'</div>',580);
@@ -10089,6 +10211,51 @@ function addTabItemFora(tIdx,pId){
   for(var i=0;i<t.itens.length;i++){if(t.itens[i].pId===pId)return;}
   t.itens.push({pId:pId,preco:0});
   saveDB();mVerTab(tIdx);go('tabelas');
+}
+
+// ── Sincronizar tabela padrão com todos os produtos do estoque ──
+function sincronizarTabPadrao(tIdx){
+  var t=DB.tabelas[tIdx];
+  var isPadrao=t.nome.toLowerCase()==='padrao';
+  if(!isPadrao)return;
+  var adicionados=0;
+  var atualizados=0;
+  for(var i=0;i<DB.produtos.length;i++){
+    var p=DB.produtos[i];
+    var precoRef=t.tipo==='compra'?(p.vC||p.vV||0):(p.vV||0);
+    var found=false;
+    for(var j=0;j<t.itens.length;j++){
+      if(t.itens[j].pId===p.id){
+        found=true;
+        if(t.itens[j].preco!==precoRef){
+          if(!t.itens[j].histPreco)t.itens[j].histPreco=[];
+          t.itens[j].histPreco.unshift({data:hj(),hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),de:t.itens[j].preco,para:precoRef,user:CU?CU.nome:'Sistema'});
+          if(t.itens[j].histPreco.length>50)t.itens[j].histPreco.length=50;
+          t.itens[j].preco=precoRef;
+          atualizados++;
+        }
+        break;
+      }
+    }
+    if(!found){
+      t.itens.push({pId:p.id,preco:precoRef,histPreco:[]});
+      adicionados++;
+    }
+  }
+  saveDB();
+  var msg='<div style="text-align:center;padding:16px">'
+    +'<div style="font-size:36px;margin-bottom:10px">&#9989;</div>'
+    +'<div style="font-size:15px;font-weight:700;margin-bottom:8px">Sincronizacao concluida!</div>'
+    +'<div style="font-size:13px;color:var(--mt);line-height:1.7">'
+    +(adicionados>0?'<b style="color:var(--gr)">'+adicionados+' produto(s)</b> adicionado(s)<br>':'')
+    +(atualizados>0?'<b style="color:var(--or)">'+atualizados+' preco(s)</b> atualizado(s)<br>':'')
+    +(adicionados===0&&atualizados===0?'Tabela ja estava atualizada com o estoque.':'')
+    +'</div>'
+    +'<div class="brow" style="justify-content:center;margin-top:14px">'
+    +'<button class="btn" onclick="closeM();mVerTab('+tIdx+')">Ver tabela</button>'
+    +'</div></div>';
+  openM('Sincronizacao — Tabela '+t.nome+' ('+t.tipo+')',msg,400);
+  go('tabelas');
 }
 
 function updTabItemByPId(tIdx,pId,val){
@@ -10236,6 +10403,142 @@ function exportarRelatorioEstoque(fmt){
   if(fmt==='csv'){rows.push(['TOTAIS','',fR(totC),'','',fR(totV),'',fR(totL),'']);_exportCSV('relatorio-estoque-'+hj().replace(/\//g,'-')+'.csv',[hdr].concat(rows));}
   else{var th='<table><thead><tr>'+hdr.map(function(h){return'<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return'<tr>'+r.map(function(c){return'<td>'+c+'</td>';}).join('')+'</tr>';}).join('')+'<tr style="font-weight:700"><td>TOTAL</td><td></td><td>'+fR(totC)+'</td><td></td><td></td><td>'+fR(totV)+'</td><td></td><td>'+fR(totL)+'</td><td></td></tr></tbody></table>';_exportPDF('Relatório de Estoque',th);}
 }
+
+// ── Exportações PDF financeiro ─────────────────────────────────
+function _exportFinPDF(titulo, htmlContent){
+  var emp=CFG.empresa&&CFG.empresa.nome?CFG.empresa.nome:'BioVale';
+  var perLabel=_finPeriodoLabel().replace('📅 ','');
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+titulo+' — '+emp+'</title>'
+    +'<style>'
+    +'@page{size:A4;margin:12mm 14mm}'
+    +'body{font-family:"Segoe UI",Arial,sans-serif;color:#111;background:#fff;margin:0;padding:0;font-size:12px}'
+    +'.header{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;margin-bottom:14px;border-bottom:2px solid #16a34a}'
+    +'.logo-name{font-size:18px;font-weight:800;color:#16a34a}'
+    +'.logo-sub{font-size:9px;color:#888;letter-spacing:2px;text-transform:uppercase}'
+    +'.header-right{text-align:right;font-size:10px;color:#888}'
+    +'table{width:100%;border-collapse:collapse;margin-top:8px}'
+    +'th{background:#16a34a;color:#fff;padding:7px 10px;text-align:left;font-size:11px;font-weight:700}'
+    +'td{padding:6px 10px;font-size:11px;border-bottom:1px solid #eee}'
+    +'tr:nth-child(even) td{background:#f9fafb}'
+    +'.total-row td{font-weight:700;background:#e8f5e9;color:#15803d}'
+    +'.negative{color:#dc2626}'
+    +'.positive{color:#16a34a}'
+    +'h3{font-size:13px;color:#111;margin:14px 0 6px;padding-bottom:4px;border-bottom:1px solid #ddd}'
+    +'</style></head><body>'
+    +'<div class="header">'
+    +'<div>'
+    +'<div class="logo-name">'+emp+'</div>'
+    +'<div class="logo-sub">'+titulo+'</div>'
+    +'</div>'
+    +'<div class="header-right">Período: '+perLabel+'<br>Emitido em '+new Date().toLocaleDateString('pt-BR')+'</div>'
+    +'</div>'
+    +htmlContent
+    +'<script>window.onload=function(){window.print();}<\/script>'
+    +'</body></html>';
+  var w=window.open('','_blank');
+  if(w){w.document.write(html);w.document.close();}
+  else alert('Permita pop-ups para exportar.');
+}
+
+function exportarResumoFinanceiroPDF(){
+  var _movs=_filtrarMovsPeriodo(DB.movs);
+  var ent=0,sai=0;
+  for(var i=0;i<_movs.length;i++){if(_movs[i].tipo==='entrada')ent+=_movs[i].valor;else sai+=_movs[i].valor;}
+  var sal=0;for(var i=0;i<DB.contas.length;i++)sal+=DB.contas[i].saldo;
+  var vendas=_movs.filter(function(m){return m.cat==='Venda';});
+  var compras=_movs.filter(function(m){return m.cat==='Compra';});
+  var resultado=ent-sai;
+  var tmV=vendas.length?vendas.reduce(function(a,m){return a+m.valor;},0)/vendas.length:0;
+  var tmC=compras.length?compras.reduce(function(a,m){return a+m.valor;},0)/compras.length:0;
+  var h='<h3>Resumo Financeiro</h3>'
+    +'<table><tbody>'
+    +'<tr><td>Total de Entradas</td><td class="positive">'+fR(ent)+'</td></tr>'
+    +'<tr><td>Total de Saídas</td><td class="negative">'+fR(sai)+'</td></tr>'
+    +'<tr class="total-row"><td>Resultado do Período</td><td class="'+(resultado>=0?'positive':'negative')+'">'+fR(resultado)+'</td></tr>'
+    +'<tr><td>Saldo Total em Contas</td><td class="positive">'+fR(sal)+'</td></tr>'
+    +'</tbody></table>'
+    +'<h3>Ticket Médio</h3>'
+    +'<table><tbody>'
+    +'<tr><td>Ticket Médio de Compra</td><td>'+fR(tmC)+'</td></tr>'
+    +'<tr><td>Ticket Médio de Venda</td><td>'+fR(tmV)+'</td></tr>'
+    +'<tr><td>Qtd. Compras</td><td>'+compras.length+'</td></tr>'
+    +'<tr><td>Qtd. Vendas</td><td>'+vendas.length+'</td></tr>'
+    +'</tbody></table>';
+  _exportFinPDF('Resumo Financeiro',h);
+}
+
+function exportarContasPDF(){
+  var sal=0;for(var i=0;i<DB.contas.length;i++)sal+=DB.contas[i].saldo;
+  var rows='';
+  var _movsFilt=_filtrarMovsPeriodo(DB.movs);
+  for(var i=0;i<DB.contas.length;i++){
+    var c=DB.contas[i];var cEnt=0,cSai=0;
+    for(var j=0;j<_movsFilt.length;j++){if(_movsFilt[j].conta===c.nome){if(_movsFilt[j].tipo==='entrada')cEnt+=_movsFilt[j].valor;else cSai+=_movsFilt[j].valor;}}
+    rows+='<tr><td>'+c.ic+' '+c.nome+'</td><td>'+c.tipo+'</td><td class="positive">+'+fR(cEnt)+'</td><td class="negative">-'+fR(cSai)+'</td><td class="'+(c.saldo>=0?'positive':'negative')+'">'+fR(c.saldo)+'</td></tr>';
+  }
+  var h='<table><thead><tr><th>Conta</th><th>Tipo</th><th>Entradas</th><th>Saídas</th><th>Saldo</th></tr></thead><tbody>'+rows+'<tr class="total-row"><td colspan="4">Saldo Total</td><td>'+fR(sal)+'</td></tr></tbody></table>';
+  _exportFinPDF('Saldo de Contas',h);
+}
+
+function exportarMovimentacoesPDF(){
+  var _movs=_filtrarMovsPeriodo(DB.movs);
+  _movs=_movs.slice().sort(function(a,b){return(b.data||'')<(a.data||'')?-1:1;});
+  var rows='';
+  var totEnt=0,totSai=0;
+  for(var i=0;i<_movs.length;i++){
+    var m=_movs[i];var ent=m.tipo==='entrada';
+    if(ent)totEnt+=m.valor;else totSai+=m.valor;
+    rows+='<tr><td>'+m.data+'</td><td>'+m.desc+'</td><td>'+( m.cat||'—')+'</td><td>'+( m.conta||'—')+'</td><td class="'+(ent?'positive':'negative')+'">'+(ent?'+':'- ')+fR(m.valor)+'</td></tr>';
+  }
+  if(!rows)rows='<tr><td colspan="5" style="text-align:center;color:#888">Nenhuma movimentação no período.</td></tr>';
+  var h='<table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Valor</th></tr></thead><tbody>'+rows
+    +'<tr class="total-row"><td colspan="3"></td><td>Entradas</td><td class="positive">+'+fR(totEnt)+'</td></tr>'
+    +'<tr class="total-row"><td colspan="3"></td><td>Saídas</td><td class="negative">-'+fR(totSai)+'</td></tr>'
+    +'</tbody></table>';
+  _exportFinPDF('Movimentações Financeiras',h);
+}
+
+function exportarContasAPagarPDF(){
+  var rows='';var totPend=0,totPago=0;
+  for(var i=0;i<DB.contasFixas.length;i++){
+    var c=DB.contasFixas[i];var v=_cfValorMes(c);var s=_cfStatusMes(c);
+    if(s==='Pendente')totPend+=v;else if(s==='Pago')totPago+=v;
+    var cor=s==='Pago'?'#16a34a':s==='Pendente'?'#dc2626':'#d97706';
+    rows+='<tr><td>'+( c.ic||'')+' '+c.nome+'</td><td>Dia '+c.venc+'</td><td>'+( c.cat||'—')+'</td><td>'+fR(v)+'</td><td style="color:'+cor+';font-weight:700">'+s+'</td></tr>';
+  }
+  if(!rows)rows='<tr><td colspan="5" style="text-align:center;color:#888">Nenhuma conta cadastrada.</td></tr>';
+  var h='<table><thead><tr><th>Conta</th><th>Vencimento</th><th>Categoria</th><th>Valor</th><th>Status</th></tr></thead><tbody>'+rows
+    +'<tr class="total-row"><td colspan="3">Total Pendente</td><td class="negative">'+fR(totPend)+'</td><td></td></tr>'
+    +'<tr class="total-row"><td colspan="3">Total Pago</td><td class="positive">'+fR(totPago)+'</td><td></td></tr>'
+    +'</tbody></table>';
+  _exportFinPDF('Contas a Pagar',h);
+}
+
+function exportarConciliacaoPDF(){
+  var _movsFilt=_filtrarMovsPeriodo(DB.movs);
+  var contaNome=DB.conciliacao&&DB.conciliacao.conta?DB.conciliacao.conta:(DB.contas.length?DB.contas[0].nome:'—');
+  var saldoBanco=DB.conciliacao&&DB.conciliacao.saldoBanco!=null?DB.conciliacao.saldoBanco:null;
+  var conta=DB.contas.find(function(c){return c.nome===contaNome;});
+  var saldoSistema=conta?conta.saldo:0;
+  var movsConta=_movsFilt.filter(function(m){return m.conta===contaNome;});
+  movsConta=movsConta.slice().sort(function(a,b){return(b.data||'')<(a.data||'')?-1:1;});
+  var rows='';
+  for(var i=0;i<movsConta.length;i++){
+    var m=movsConta[i];var ent=m.tipo==='entrada';
+    rows+='<tr><td>'+m.data+'</td><td>'+m.desc+'</td><td class="'+(ent?'positive':'negative')+'">'+(ent?'+':'- ')+fR(m.valor)+'</td></tr>';
+  }
+  if(!rows)rows='<tr><td colspan="3" style="text-align:center;color:#888">Nenhuma movimentação no período.</td></tr>';
+  var dif=saldoBanco!=null?saldoBanco-saldoSistema:null;
+  var h='<h3>Conta: '+contaNome+'</h3>'
+    +'<table><tbody>'
+    +'<tr><td>Saldo no Sistema</td><td class="positive">'+fR(saldoSistema)+'</td></tr>'
+    +(saldoBanco!=null?'<tr><td>Saldo no Banco (informado)</td><td>'+fR(saldoBanco)+'</td></tr><tr class="total-row"><td>Diferença</td><td class="'+(dif===0?'positive':'negative')+'">'+(dif>=0?'+':'')+fR(dif)+'</td></tr>':'')
+    +'</tbody></table>'
+    +'<h3>Movimentações do Período</h3>'
+    +'<table><thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  _exportFinPDF('Conciliação Bancária',h);
+}
+// ── Fim exportações PDF financeiro ─────────────────────────────
 function exportarRelatorioFinanceiro(fmt){
   var movs=_filtrarMovsPeriodo(DB.movs);
   var hdr=['Data','Tipo','Categoria','Descricao','Conta','Valor'];
@@ -10434,10 +10737,7 @@ function delTab(idx){
 
 // ── Criar nova tabela ──
 function mNovaTab(){
-  if(DB.tabelas.length>=5){
-    openM('Limite atingido','<div style="padding:20px;text-align:center;color:var(--mt)">Limite de 5 tabelas atingido.<br>Exclua uma tabela para criar outra.</div>',380);
-    return;
-  }
+
   tabItens=[];
   var opts='';for(var i=0;i<DB.produtos.length;i++)opts+='<option value="'+DB.produtos[i].id+'">'+DB.produtos[i].ic+' '+DB.produtos[i].nome+'</option>';
   openM('Nova Tabela de Precos',
@@ -11622,8 +11922,19 @@ function _prevCfgBarcode(){
   if(!sel||!prev)return;
   var tipo=sel.value;
   var cod='001871162052';
-  var svg=_gerarBarcodeTipo(cod,tipo);
-  prev.innerHTML=svg+'<div style="font-size:10px;color:#555;margin-top:4px;font-family:monospace">'+cod+'</div>';
+  if(tipo==='qrcode'){
+    prev.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data='+encodeURIComponent(cod)+'" width="120" height="120" style="image-rendering:pixelated">'
+      +'<div style="font-size:10px;color:#555;margin-top:4px;font-family:monospace">'+cod+'</div>';
+    return;
+  }
+  var fmt={ean13:'EAN13',code128:'CODE128',code39:'CODE39'}[tipo]||'CODE128';
+  prev.innerHTML='<svg id="cfg-bc-svg"></svg><div style="font-size:10px;color:#555;margin-top:4px;font-family:monospace">'+cod+'</div>';
+  setTimeout(function(){
+    var el=document.getElementById('cfg-bc-svg');
+    if(el&&typeof JsBarcode!=='undefined'){
+      try{JsBarcode(el,cod,{format:fmt,width:2,height:50,displayValue:true,fontSize:12,margin:6,background:'#ffffff',lineColor:'#000000'});}catch(e){prev.innerHTML='<span style="color:red;font-size:11px">Erro: '+e.message+'</span>';}
+    }
+  },50);
 }
 function _saveCfgBarcode(){
   var sel=document.getElementById('cfg-barcode-tipo');
@@ -11632,98 +11943,40 @@ function _saveCfgBarcode(){
   _saveCFG();
   var btn=event.target;btn.textContent='&#10003; Salvo!';setTimeout(function(){btn.textContent='Salvar';},2000);
 }
-// Dispatcher — escolhe o gerador correto pelo tipo
+// ── Geração de código de barras via JsBarcode ───────────────────────────────
+// Retorna uma tag <svg> com o barcode pronto para embutir em HTML/iframe
 function _gerarBarcodeTipo(codigo,tipo){
-  tipo=tipo||(CFG.sistema.tipoBarcode)||'ean13';
-  if(tipo==='ean13')return _gerarEAN13(codigo);
-  if(tipo==='code39')return _gerarCode39(codigo);
-  if(tipo==='qrcode')return _gerarQR(codigo);
-  return _gerarCode128(codigo);// code128 default
-}
-// ── EAN-13 ───────────────────────────────────────────────────────────────────
-function _gerarEAN13(codigo){
-  // Garante 12 dígitos e calcula checksum
-  var d=codigo.replace(/\D/g,'');
-  while(d.length<12)d='0'+d;
-  d=d.slice(-12);
-  var sum=0;for(var i=0;i<12;i++)sum+=parseInt(d[i])*(i%2===0?1:3);
-  var chk=(10-(sum%10))%10;
-  var full=d+chk;
-  // Padrões L e G para EAN-13
-  var L=[[3,2,1,1],[2,2,2,1],[2,1,2,2],[1,4,1,1],[1,1,3,2],[1,2,3,1],[1,1,1,4],[1,3,1,2],[1,2,1,3],[3,1,1,2]];
-  var G=[[1,1,2,3],[1,2,2,2],[2,2,1,2],[1,1,4,1],[2,3,1,1],[1,3,2,1],[4,1,1,1],[2,1,3,1],[3,1,2,1],[2,1,1,3]];
-  var R=[[3,2,1,1],[2,2,2,1],[2,1,2,2],[1,4,1,1],[1,1,3,2],[1,2,3,1],[1,1,1,4],[1,3,1,2],[1,2,1,3],[3,1,1,2]];
-  // Primeira tabela de paridade baseada no primeiro dígito
-  var parity=[
-    [0,0,0,0,0,0],[0,0,1,0,1,1],[0,0,1,1,0,1],[0,0,1,1,1,0],
-    [0,1,0,0,1,1],[0,1,1,0,0,1],[0,1,1,1,0,0],[0,1,0,1,0,1],
-    [0,1,0,1,1,0],[0,1,1,0,1,0]
-  ];
-  var mw=2.2,h=70,hg=80;// hg = guardas mais altas
-  var quietL=9*mw;
-  // Calcula largura total: quiet+guarda3+6chars+centro5+6chars+guarda3+quiet
-  var tw=quietL*2+3*mw+6*7*mw+5*mw+6*7*mw+3*mw;
-  var svg='<svg width="'+tw.toFixed(0)+'" height="'+hg+'" xmlns="http://www.w3.org/2000/svg">';
-  var x=quietL;
-  function bar(bx,bw,tall){svg+='<rect x="'+bx.toFixed(2)+'" y="0" width="'+bw.toFixed(2)+'" height="'+(tall?hg:h)+'" fill="#000"/>';}
-  function pat(p,tall,enc){// enc: L or G or R array
-    for(var i=0;i<4;i++){var w=p[i]*mw;if(i%2===0)bar(x,w,tall);x+=w;}
+  tipo=tipo||(CFG.sistema&&CFG.sistema.tipoBarcode)||'ean13';
+  // Para QR continua usando API externa
+  if(tipo==='qrcode'){
+    return '<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data='+encodeURIComponent(codigo)+'" width="150" height="150" style="image-rendering:pixelated" onerror="this.style.display=\'none\'">';
   }
-  // Guarda esquerda 1-0-1
-  bar(x,mw,true);x+=mw;x+=mw;bar(x,mw,true);x+=mw;
-  var first=parseInt(full[0]);
-  var par=parity[first];
-  // Dígitos 1-6 esquerda
-  for(var i=1;i<=6;i++){
-    var d2=parseInt(full[i]);
-    pat(par[i-1]===0?L[d2]:G[d2],false);
-  }
-  // Guarda central 0-1-0-1-0
-  x+=mw;bar(x,mw,true);x+=mw;x+=mw;bar(x,mw,true);x+=mw;x+=mw;
-  // Dígitos 7-12 direita
-  for(var i=7;i<=12;i++){pat(R[parseInt(full[i])],false);}
-  // Guarda direita 1-0-1
-  bar(x,mw,true);x+=mw;x+=mw;bar(x,mw,true);x+=mw;
-  svg+='</svg>';
-  return svg;
+  // Mapa de formato JsBarcode
+  var fmt={ean13:'EAN13',code128:'CODE128',code39:'CODE39'}[tipo]||'CODE128';
+  // Retorna placeholder SVG — será renderizado no iframe com JsBarcode
+  return '<svg id="bc-svg" data-code="'+codigo+'" data-fmt="'+fmt+'"></svg>';
 }
-// ── Code 39 ──────────────────────────────────────────────────────────────────
-function _gerarCode39(codigo){
-  var chars={
-    '0':[1,1,1,3,3,1,3,1,1],'1':[3,1,1,3,1,1,1,1,3],'2':[1,1,3,3,1,1,1,1,3],
-    '3':[3,1,3,3,1,1,1,1,1],'4':[1,1,1,3,3,1,1,1,3],'5':[3,1,1,3,3,1,1,1,1],
-    '6':[1,1,3,3,3,1,1,1,1],'7':[1,1,1,3,1,1,3,1,3],'8':[3,1,1,3,1,1,3,1,1],
-    '9':[1,1,3,3,1,1,3,1,1],'A':[3,1,1,1,1,3,1,1,3],'B':[1,1,3,1,1,3,1,1,3],
-    'C':[3,1,3,1,1,3,1,1,1],'D':[1,1,1,1,3,3,1,1,3],'E':[3,1,1,1,3,3,1,1,1],
-    'F':[1,1,3,1,3,3,1,1,1],'G':[1,1,1,1,1,3,3,1,3],'H':[3,1,1,1,1,3,3,1,1],
-    'I':[1,1,3,1,1,3,3,1,1],'J':[1,1,1,1,3,3,3,1,1],'K':[3,1,1,1,1,1,1,3,3],
-    'L':[1,1,3,1,1,1,1,3,3],'M':[3,1,3,1,1,1,1,3,1],'N':[1,1,1,1,3,1,1,3,3],
-    'O':[3,1,1,1,3,1,1,3,1],'P':[1,1,3,1,3,1,1,3,1],'Q':[1,1,1,1,1,1,3,3,3],
-    'R':[3,1,1,1,1,1,3,3,1],'S':[1,1,3,1,1,1,3,3,1],'T':[1,1,1,1,3,1,3,3,1],
-    'U':[3,3,1,1,1,1,1,1,3],'V':[1,3,3,1,1,1,1,1,3],'W':[3,3,3,1,1,1,1,1,1],
-    'X':[1,3,1,1,3,1,1,1,3],'Y':[3,3,1,1,3,1,1,1,1],'Z':[1,3,3,1,3,1,1,1,1],
-    '-':[1,3,1,1,1,1,3,1,3],'.':[3,3,1,1,1,1,3,1,1],' ':[1,3,3,1,1,1,3,1,1],
-    '*':[1,3,1,1,3,1,3,1,1],'$':[1,3,1,3,1,3,1,1,1],'/':[1,3,1,3,1,1,1,3,1],
-    '+':[1,3,1,1,1,3,1,3,1],'%':[1,1,1,3,1,3,1,3,1]
-  };
-  var seq='*'+codigo.toUpperCase()+'*';
-  var mw=2.0,h=70,gap=mw;
-  var tw=10*mw*2;// quiet zones
-  for(var i=0;i<seq.length;i++){var p=chars[seq[i]];if(p){for(var j=0;j<9;j++)tw+=p[j]*mw;tw+=gap;}}
-  var svg='<svg width="'+tw.toFixed(0)+'" height="'+h+'" xmlns="http://www.w3.org/2000/svg">';
-  var x=10*mw;
-  for(var i=0;i<seq.length;i++){
-    var p=chars[seq[i]];if(!p)continue;
-    for(var j=0;j<9;j++){var w=p[j]*mw;if(j%2===0)svg+='<rect x="'+x.toFixed(2)+'" y="0" width="'+w.toFixed(2)+'" height="'+h+'" fill="#000"/>';x+=w;}
-    x+=gap;
-  }
-  return svg+'</svg>';
+
+// Renderiza o SVG de barcode dentro de um documento (iframe) usando JsBarcode
+function _renderBarcodeInDoc(doc){
+  var el=doc.getElementById('bc-svg');
+  if(!el||typeof doc.defaultView.JsBarcode==='undefined')return;
+  var code=el.getAttribute('data-code')||'';
+  var fmt=el.getAttribute('data-fmt')||'CODE128';
+  try{
+    doc.defaultView.JsBarcode(el,code,{
+      format:fmt,
+      width:2,
+      height:60,
+      displayValue:true,
+      fontSize:14,
+      margin:8,
+      background:'#ffffff',
+      lineColor:'#000000'
+    });
+  }catch(e){el.outerHTML='<div style="color:red;font-size:11px">Barcode err: '+e.message+'</div>';}
 }
-// ── QR Code (matriz) ─────────────────────────────────────────────────────────
-function _gerarQR(texto){
-  // QR Code simples via API pública (requer internet) — fallback SVG placeholder se offline
-  return '<img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data='+encodeURIComponent(texto)+'" width="120" height="120" style="image-rendering:pixelated" onerror="this.style.display=\'none\'">';
-}
+
 
 // ── CLASSIFICADOR PCB ─────────────────────────────────────────────────────────
 var _PCL_DB_KEY='bv_pcl_db';
