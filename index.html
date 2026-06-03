@@ -883,7 +883,6 @@ function _sbStartRealtime(){
         if(chave === 'bv_db'){
         var diff=Date.now()-_lastSaveTs;
         console.log('[BioVale RT] bv_db recebido, diff ms:', diff, '(ignora se <8000)');
-        // Ignora se o update foi gerado por este mesmo dispositivo (dentro de 8s)
         if(diff < 8000){console.log('[BioVale RT] IGNORADO (próprio device)');return;}
         {
           _rtApplying = true;
@@ -1009,7 +1008,7 @@ function saveDB(){
       transf:DB.transf,coletas:DB.coletas,funcs:DB.funcs,clientes:DB.clientes,
       tabelas:DB.tabelas,contasFixas:DB.contasFixas,filtrosMat:DB.filtrosMat,
       concorrentes:DB.concorrentes,
-      pesAbasCloud:pesAbas,pesAtivaCloud:pesAtiva
+      pesAbasCloud:pesAbas,pesAtivaCloud:pesAtiva,pesAbasTs:Date.now()
     };
     // 1. Salva local como fallback imediato
     localStorage.setItem('bv_db',JSON.stringify(snap));
@@ -1134,16 +1133,19 @@ function _applySnap(s){
   if(s.contasFixas)DB.contasFixas=s.contasFixas;
   if(s.filtrosMat!==undefined)DB.filtrosMat=s.filtrosMat;
   if(s.concorrentes)DB.concorrentes=s.concorrentes;
-  // Restaura pesagem em andamento da nuvem
-  if(s.pesAbasCloud&&Array.isArray(s.pesAbasCloud)&&s.pesAbasCloud.length){
-    // Só sobrescreve se a nuvem tiver itens e o local estiver vazio ou for mais antigo
-    var localTemItens=pesAbas&&pesAbas.some(function(a){return a.itens&&a.itens.length>0;});
-    var cloudTemItens=s.pesAbasCloud.some(function(a){return a.itens&&a.itens.length>0;});
-    if(cloudTemItens&&!localTemItens){
+  // Restaura pesagem em andamento da nuvem — sempre aplica se a nuvem for mais recente
+  var _pesCloudTs=s.pesAbasTs||0;
+  var _pesLocalTs=parseInt(localStorage.getItem('bv_pesAbas_ts')||'0');
+  if(s.hasOwnProperty('pesAbasCloud')&&_pesCloudTs>=_pesLocalTs){
+    if(s.pesAbasCloud&&Array.isArray(s.pesAbasCloud)&&s.pesAbasCloud.length){
       pesAbas=s.pesAbasCloud;
       pesAtiva=Math.min(s.pesAtivaCloud||0,pesAbas.length-1);
-      savePesState();
+    } else {
+      // Nuvem vazia = atendimento fechado em outro dispositivo
+      pesAbas=[];pesAtiva=0;
     }
+    savePesState();
+    localStorage.setItem('bv_pesAbas_ts',String(_pesCloudTs));
   }
   // Garante que as Tabelas Padrão sempre existam (migração de versões antigas)
   var temPadVenda=false,temPadCompra=false;
