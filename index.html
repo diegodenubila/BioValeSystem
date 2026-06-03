@@ -2141,20 +2141,6 @@ function _finalizarPesagem(){
   closeM();pesAbas.splice(pesAtiva,1);
   if(!pesAbas.length){clearPesState();novaPesAba();autoSave();}else{pesAtiva=Math.min(pesAtiva,pesAbas.length-1);savePesState();renderPesagem();}
   autoSave();
-  // Gera e abre o boleto automaticamente ao finalizar
-  (function(){
-    var html=_gerarHTMLBoleto(_abSnap,recMethods,pagMethods,obs,num);
-    var nw=window.open('','_blank','width=350,height=750');
-    if(nw){
-      nw.document.write(html);
-      nw.document.close();
-      // Imprime automaticamente só se toggle estiver ligado E previa estiver desligada
-      if(CFG.sistema.autoImpressao!==false && CFG.sistema.previaImpressao!==true){
-        nw.onload=function(){try{nw.print();}catch(e){}};
-      }
-      // Se previa ligada: só abre, não imprime (usuário decide)
-    }
-  })();
 }
 
 // ── PESAGENS EM ABERTO / ATENDIMENTOS SUSPENSOS ──────────────
