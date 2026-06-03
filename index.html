@@ -876,15 +876,19 @@ function _sbStartRealtime(){
     .on('postgres_changes',
       {event:'UPDATE', schema:'public', table:'biovale_dados'},
       function(payload){
+        console.log('[BioVale RT] evento recebido, chave:', payload.new&&payload.new.chave, '_rtApplying:', _rtApplying);
         if(_rtApplying)return;
         var chave = payload.new && payload.new.chave;
 
         if(chave === 'bv_db'){
+        var diff=Date.now()-_lastSaveTs;
+        console.log('[BioVale RT] bv_db recebido, diff ms:', diff, '(ignora se <2000)');
         // Ignora se o update foi gerado por este mesmo dispositivo (dentro de 2s)
-        if(Date.now() - _lastSaveTs < 2000)return;
+        if(diff < 2000){console.log('[BioVale RT] IGNORADO (próprio device)');return;}
         {
           _rtApplying = true;
           try{
+            console.log('[BioVale RT] aplicando snapshot...');
             var snap = JSON.parse(payload.new.valor);
             _applySnap(snap);
             _sanitizeRevenda();
