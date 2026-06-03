@@ -882,9 +882,9 @@ function _sbStartRealtime(){
 
         if(chave === 'bv_db'){
         var diff=Date.now()-_lastSaveTs;
-        console.log('[BioVale RT] bv_db recebido, diff ms:', diff, '(ignora se <2000)');
-        // Ignora se o update foi gerado por este mesmo dispositivo (dentro de 2s)
-        if(diff < 2000){console.log('[BioVale RT] IGNORADO (próprio device)');return;}
+        console.log('[BioVale RT] bv_db recebido, diff ms:', diff, '(ignora se <8000)');
+        // Ignora se o update foi gerado por este mesmo dispositivo (dentro de 8s)
+        if(diff < 8000){console.log('[BioVale RT] IGNORADO (próprio device)');return;}
         {
           _rtApplying = true;
           try{
@@ -973,7 +973,7 @@ function _sbPoll(){
       // Se o timestamp mudou desde a última vez que aplicamos, busca o dado completo
       if(ts !== _lastCloudTs && _lastCloudTs !== ''){
         // Só aplica se não foi este dispositivo que salvou (janela de 4s)
-        if(Date.now() - _lastSaveTs > 4000){
+        if(Date.now() - _lastSaveTs > 10000){
           _sbGet('bv_db', function(s){
             if(s){
               _applySnap(s);
@@ -1019,6 +1019,7 @@ function saveDB(){
       _syncBadge('saving','Salvando…');
       _sbSet('bv_db', snap, function(ok){
         if(ok){
+          _lastCloudTs = new Date().toISOString();
           // Também salva USERS na nuvem
           _sbSet('bv_users', USERS, function(ok2){
             if(ok2) _syncBadge('idle','Nuvem ativa');
@@ -1359,7 +1360,7 @@ function renderPesagem(){
     +'</div>'+finBtn+'</div>';
 }
 function selPesAba(i){pesAtiva=i;savePesState();renderPesagem();}
-function delPesAba(e,i){e.stopPropagation();pesAbas.splice(i,1);if(pesAtiva>=pesAbas.length)pesAtiva=Math.max(0,pesAbas.length-1);if(!pesAbas.length)novaPesAba();else{savePesState();renderPesagem();}}
+function delPesAba(e,i){e.stopPropagation();pesAbas.splice(i,1);if(pesAtiva>=pesAbas.length)pesAtiva=Math.max(0,pesAbas.length-1);if(!pesAbas.length)novaPesAba();else{savePesState();renderPesagem();}autoSave();}
 function setPesTipo(t){
   var ab=pesAbas[pesAtiva];
   ab.tipo=t;ab.showUnit=false;
@@ -1468,7 +1469,7 @@ function updITara(i,v){
 function updIPLiq(i,v){pesAbas[pesAtiva].itens[i].pesoLiquido=parseFloat(v)||0;savePesState();renderPesagem();}
 function updIPr(i,v){pesAbas[pesAtiva].itens[i].preco=parseFloat(v)||0;savePesState();renderPesagem();}
 function updIObs(i,v){pesAbas[pesAtiva].itens[i].obs=v.trim();savePesState();}
-function delIP(i){pesAbas[pesAtiva].itens.splice(i,1);savePesState();renderPesagem();}
+function delIP(i){pesAbas[pesAtiva].itens.splice(i,1);savePesState();autoSave();renderPesagem();}
 var _pddFocusIdx=-1;
 function filtrarProd(){
   var q=(document.getElementById('prod-search').value||'').toLowerCase();
@@ -2136,7 +2137,7 @@ function _finalizarPesagem(){
   // Snapshot do ab antes de limpar, para gerar o boleto
   var _abSnap={itens:ab.itens.slice(),tipo:ab.tipo,cliId:ab.cliId,tabId:ab.tabId,nfNum:ab.nfNum||''};
   closeM();pesAbas.splice(pesAtiva,1);
-  if(!pesAbas.length){clearPesState();novaPesAba();}else{pesAtiva=Math.min(pesAtiva,pesAbas.length-1);savePesState();renderPesagem();}
+  if(!pesAbas.length){clearPesState();novaPesAba();autoSave();}else{pesAtiva=Math.min(pesAtiva,pesAbas.length-1);savePesState();renderPesagem();}
   autoSave();
   // Gera e abre o boleto automaticamente ao finalizar
   (function(){
