@@ -852,12 +852,11 @@ function _sbStartRealtime(){
       function(payload){
         if(_rtApplying)return;
         var chave = payload.new && payload.new.chave;
-        var ts    = payload.new && payload.new.atualizado_em;
-
-        // Ignora se o update foi gerado por este mesmo dispositivo (dentro de 3s)
-        if(Date.now() - _lastSaveTs < 3000)return;
 
         if(chave === 'bv_db'){
+        // Ignora se o update foi gerado por este mesmo dispositivo (dentro de 2s)
+        if(Date.now() - _lastSaveTs < 2000)return;
+        {
           _rtApplying = true;
           try{
             var snap = JSON.parse(payload.new.valor);
@@ -871,11 +870,12 @@ function _sbStartRealtime(){
               var mOpen = document.getElementById('mo') && !document.getElementById('mo').classList.contains('H');
               if(!mOpen) _rtRerenderAtual();
             }
-            _syncBadge('idle','Sincronizado ↓');
-            setTimeout(function(){_syncBadge('idle','Nuvem ativa');},2000);
+            var now=new Date();var hm=now.getHours()+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+            _syncBadge('idle','↓ Sync '+hm);
+            setTimeout(function(){_syncBadge('idle','Nuvem ativa');},3000);
           }catch(e){}
           _rtApplying = false;
-        }
+        }}
 
         if(chave === 'bv_users'){
           try{
@@ -1034,16 +1034,16 @@ function _applySnap(s){
   if(s.caixaOntem!==undefined)DB.caixaOntem=s.caixaOntem;
   if(s.caixasHist)DB.caixasHist=s.caixasHist;
   if(s.atendNum)DB.atendNum=s.atendNum;
-  if(s.produtos&&s.produtos.length)DB.produtos=s.produtos;
-  if(s.movs)DB.movs=s.movs;
-  if(s.contas&&s.contas.length)DB.contas=s.contas;
-  if(s.revenda)DB.revenda=s.revenda;
+  if(s.produtos!==undefined)DB.produtos=s.produtos;
+  if(s.movs!==undefined)DB.movs=s.movs;
+  if(s.contas!==undefined)DB.contas=s.contas;
+  if(s.revenda!==undefined)DB.revenda=s.revenda;
   // Sanitiza IMEDIATAMENTE após carregar
   for(var _rsi=0;_rsi<DB.revenda.length;_rsi++){
     if(!DB.revenda[_rsi].prod)DB.revenda[_rsi].prod=DB.revenda[_rsi].nome||'Produto '+(_rsi+1);
   }
-  if(s.revendaCats&&s.revendaCats.length)DB.revendaCats=s.revendaCats;
-  if(s.revendaStates&&s.revendaStates.length)DB.revendaStates=s.revendaStates;
+  if(s.revendaCats!==undefined)DB.revendaCats=s.revendaCats;
+  if(s.revendaStates!==undefined)DB.revendaStates=s.revendaStates;
   if(s.entradas)DB.entradas=s.entradas;
   if(s.atendHistLS)atendHist=s.atendHistLS;
   if(s.pesagensEmAberto)DB.pesagensEmAberto=s.pesagensEmAberto;
@@ -1053,7 +1053,7 @@ function _applySnap(s){
   if(s.clientes)DB.clientes=s.clientes;
   if(s.tabelas)DB.tabelas=s.tabelas;
   if(s.contasFixas)DB.contasFixas=s.contasFixas;
-  if(s.filtrosMat&&s.filtrosMat.length)DB.filtrosMat=s.filtrosMat;
+  if(s.filtrosMat!==undefined)DB.filtrosMat=s.filtrosMat;
   if(s.concorrentes)DB.concorrentes=s.concorrentes;
   // Restaura pesagem em andamento da nuvem
   if(s.pesAbasCloud&&Array.isArray(s.pesAbasCloud)&&s.pesAbasCloud.length){
