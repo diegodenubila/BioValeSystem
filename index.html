@@ -5490,9 +5490,11 @@ function abrirCameraPes(mode){
           if(srch){srch.value=cod;filtrarProd();}
         }else{
           var codNorm=cod.replace(/^0+/,'');
+          var cod12=cod.length===13?cod.slice(0,12):null;
+          var cod12Norm=cod12?cod12.replace(/^0+/,''):null;
           for(var i=0;i<DB.revenda.length;i++){
-            var rv=DB.revenda[i];var rc=_revCodigo(rv.id);
-            if(rc===cod||rc.replace(/^0+/,'')=== codNorm||String(rv.id)===cod){selUnit(rv.id);return;}
+            var rv=DB.revenda[i];var rc=_revCodigo(rv.id);var rcNorm=rc.replace(/^0+/,'');
+            if(rc===cod||rcNorm===codNorm||(cod12&&(rc===cod12||rcNorm===cod12Norm))||String(rv.id)===cod){selUnit(rv.id);return;}
           }
           var srch=document.getElementById('unit-search');
           if(srch){srch.value=cod;filtrarUnit();}
@@ -5606,12 +5608,17 @@ function _revBarcFocus(on){
 function buscarPorCodigo(val){
   val=(val||'').trim();if(!val)return;
   var found=null;
-  var valNorm=val.replace(/^0+/,'');// remove leading zeros for flexible match
+  var valNorm=val.replace(/^0+/,'');
+  // EAN-13: scanner retorna 13 dígitos, código interno tem 12. Tenta os dois.
+  var val12=val.length===13?val.slice(0,12):null;
+  var val12Norm=val12?val12.replace(/^0+/,''):null;
   for(var i=0;i<DB.revenda.length;i++){
     var p=DB.revenda[i];
     var cod=_revCodigo(p.id);
     var codNorm=cod.replace(/^0+/,'');
-    if(cod===val||codNorm===valNorm||String(p.id)===val||String(_normId(p.id))===String(_normId(val))){found=p;break;}
+    if(cod===val||codNorm===valNorm
+      ||(val12&&(cod===val12||codNorm===val12Norm))
+      ||String(p.id)===val||String(_normId(p.id))===String(_normId(val))){found=p;break;}
   }
   if(!found){
     var inp=document.getElementById('rev-barcode-inp');
