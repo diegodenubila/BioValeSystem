@@ -795,7 +795,8 @@ function _initSupabase(){
     if(typeof supabase !== 'undefined' && supabase.createClient){
       _sbClient = supabase.createClient(_SB_URL, _SB_ANON);
       _sbReady  = true;
-      _syncBadge('idle','Nuvem ativa');
+      console.log('[BioVale] Supabase OK, iniciando realtime...');
+      _syncBadge('saving','Supabase OK...');
       _sbEnsureTable();
       _sbStartRealtime();
       _sbPollStart();
@@ -821,14 +822,12 @@ function _syncBadge(cls,txt){
 // Cria a tabela se não existir (usa upsert para ser idempotente)
 function _sbEnsureTable(){
   if(!_sbReady||!_sbClient)return;
-  // Faz um select silencioso — se a tabela não existir, cria via SQL pelo Supabase
-  // (o usuário deve criar a tabela manualmente caso apareça erro; ver instrução no badge)
   _sbClient.from('biovale_dados').select('chave').limit(1).then(function(r){
     if(r.error){
-      // Tabela não existe ainda — informa usuário
-      _syncBadge('error','Criar tabela no Supabase');
-      console.warn('BioVale Supabase: crie a tabela "biovale_dados" com colunas: chave (text, PK), valor (text), atualizado_em (timestamptz). Erro:', r.error.message);
+      _syncBadge('error','Erro tabela: '+r.error.message.slice(0,30));
+      console.warn('BioVale Supabase tabela erro:', r.error.message);
     } else {
+      console.log('[BioVale] Tabela OK, realtime channel:', _sbChannel?'criado':'null');
       _syncBadge('idle','Nuvem ativa');
     }
   });
@@ -868,8 +867,9 @@ var _lastSaveTs = 0;   // timestamp do último saveDB() DESTE dispositivo
 var _rtApplying = false;
 
 function _sbStartRealtime(){
-  if(!_sbReady||!_sbClient)return;
+  if(!_sbReady||!_sbClient){_syncBadge('error','RT: sbReady='+_sbReady);return;}
   if(_sbChannel)_sbChannel.unsubscribe();
+  _syncBadge('saving','Iniciando tempo real...');
 
   _sbChannel = _sbClient
     .channel('biovale-realtime')
