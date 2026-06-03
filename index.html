@@ -140,7 +140,7 @@ select option{background:var(--s1)}.H{display:none!important}
 .prod-card:hover{background:var(--s3);border-color:var(--gr)}
 .prod-card:active{transform:scale(.98)}
 .prod-card.pdd-focus{background:var(--s3);border-color:var(--gr);outline:2px solid var(--gr);outline-offset:-1px}
-.cb{display:grid;grid-template-columns:1fr 340px;gap:14px}
+.cb{display:grid;grid-template-columns:3fr 2fr;gap:14px}
 .pgto-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .pgto-itm{background:var(--s2);border:2px solid var(--bd);border-radius:var(--r);padding:10px 8px;text-align:center;cursor:pointer}
 .pgto-itm .pi-ic{font-size:18px;margin-bottom:3px}
@@ -1340,7 +1340,7 @@ function renderPesagem(){
     ?'<div id="pes-fin-bar" style="position:sticky;bottom:0;left:0;right:0;padding:10px 0 4px;background:linear-gradient(to bottom,transparent,var(--bg) 35%);z-index:10;display:block">'
      +'<button class="btn" style="width:100%;padding:14px;font-size:15px;font-weight:700;background:var(--gr2);box-shadow:0 2px 16px rgba(34,197,94,.4)" onclick="mFinPes()">&#10003; Finalizar Pesagem &mdash; '+fR(Math.abs(totLiq))+'</button></div>'
     :'';
-  cc.innerHTML='<div class="fc" style="max-width:960px;margin:0 auto;width:100%">'
+  cc.innerHTML='<div class="fc">'
     +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
     +'<div style="flex:1"><div class="pl">Operacoes</div><div class="pt">Pesagem</div></div>'
     +(DB.pesagensEmAberto&&DB.pesagensEmAberto.length>0?'<button class="btn" style="background:var(--or);color:#000;font-size:12px;font-weight:700" onclick="go(&quot;pendencias&quot;)">&#9203; Em Aberto ('+DB.pesagensEmAberto.length+')</button>':'')
