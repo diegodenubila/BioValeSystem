@@ -773,6 +773,7 @@ function _initSupabase(){
       _sbReady  = true;
       _syncBadge('idle','Nuvem ativa');
       _sbEnsureTable();
+      _sbStartRealtime();
     } else {
       _syncBadge('local','Só local');
     }
@@ -834,9 +835,93 @@ function _sbGet(chave, onDone){
   }
 })();
 
+
+// ── REALTIME SYNC ─────────────────────────────────────────────────────────
+var _sbChannel = null;
+var _lastSaveTs = 0;   // timestamp do último saveDB() DESTE dispositivo
+var _rtApplying = false;
+
+function _sbStartRealtime(){
+  if(!_sbReady||!_sbClient)return;
+  if(_sbChannel)_sbChannel.unsubscribe();
+
+  _sbChannel = _sbClient
+    .channel('biovale-realtime')
+    .on('postgres_changes',
+      {event:'UPDATE', schema:'public', table:'biovale_dados'},
+      function(payload){
+        if(_rtApplying)return;
+        var chave = payload.new && payload.new.chave;
+        var ts    = payload.new && payload.new.atualizado_em;
+
+        // Ignora se o update foi gerado por este mesmo dispositivo (dentro de 3s)
+        if(Date.now() - _lastSaveTs < 3000)return;
+
+        if(chave === 'bv_db'){
+          _rtApplying = true;
+          try{
+            var snap = JSON.parse(payload.new.valor);
+            _applySnap(snap);
+            _sanitizeRevenda();
+            try{localStorage.setItem('bv_db', payload.new.valor);}catch(e){}
+            buildLoginList();
+            // Re-render da página atual se estiver logado
+            if(CU && pgAtiva){
+              // Suave: só re-renderiza sem fechar modais abertos
+              var mOpen = document.getElementById('mo') && !document.getElementById('mo').classList.contains('H');
+              if(!mOpen) _rtRerenderAtual();
+            }
+            _syncBadge('idle','Sincronizado ↓');
+            setTimeout(function(){_syncBadge('idle','Nuvem ativa');},2000);
+          }catch(e){}
+          _rtApplying = false;
+        }
+
+        if(chave === 'bv_users'){
+          try{
+            var us = JSON.parse(payload.new.valor);
+            if(us && Array.isArray(us) && us.length){
+              USERS = us;
+              buildLoginList();
+              // Atualiza sidebar se logado
+              if(CU){
+                var me = null;
+                for(var i=0;i<USERS.length;i++){if(USERS[i].id===CU.id){me=USERS[i];break;}}
+                if(me) CU=me;
+                buildSidebar(); buildBottomNav();
+              }
+            }
+          }catch(e){}
+        }
+      }
+    )
+    .subscribe(function(status){
+      if(status === 'SUBSCRIBED'){
+        _syncBadge('idle','Nuvem ativa · ⚡ Tempo real');
+        setTimeout(function(){_syncBadge('idle','Nuvem ativa');},3000);
+      } else if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT'){
+        _syncBadge('error','Tempo real offline');
+        // Tenta reconectar em 5s
+        setTimeout(_sbStartRealtime, 5000);
+      }
+    });
+}
+
+// Re-renderiza a página atual sem perder contexto
+function _rtRerenderAtual(){
+  try{
+    if(!pgAtiva)return;
+    // Salva scroll e foco antes
+    var scrollY = window.scrollY;
+    go(pgAtiva);
+    setTimeout(function(){window.scrollTo(0,scrollY);},50);
+  }catch(e){}
+}
+
 // ── PERSISTENCIA DO DB (localStorage + Supabase cloud) ───────────────────
 var _dbSaveTimer=null;
 function saveDB(){
+  _lastSaveTs = Date.now();
   try{
     var snap={
       caixaDia:DB.caixaDia,caixaOntem:DB.caixaOntem,caixasHist:DB.caixasHist,
@@ -880,10 +965,67 @@ function loadDB(){
   }catch(e){}
   return localOk;
 }
+var _SPECS_DEFAULT={
+  'Notebooks':[
+    {key:'Processador',type:'text',placeholder:'Ex: Intel i5-10, AMD Ryzen 5'},
+    {key:'RAM',type:'text',placeholder:'Ex: 8GB, 16GB'},
+    {key:'Armazenamento',type:'text',placeholder:'Ex: 256GB SSD, 1TB HDD'},
+    {key:'Tela',type:'text',placeholder:'Ex: 15.6pol Full HD'},
+    {key:'Placa de Video',type:'text',placeholder:'Ex: Intel Iris, GTX 1650'},
+    {key:'Sistema Op.',type:'text',placeholder:'Ex: Windows 11, Linux'},
+    {key:'USB 3.0',type:'bool'},{key:'HDMI',type:'bool'},{key:'Webcam',type:'bool'},{key:'Bluetooth',type:'bool'}
+  ],
+  'Celulares':[
+    {key:'Modelo',type:'text',placeholder:'Ex: Samsung Galaxy A54'},
+    {key:'Armazenamento',type:'text',placeholder:'Ex: 128GB'},
+    {key:'RAM',type:'text',placeholder:'Ex: 6GB'},
+    {key:'Cor',type:'text',placeholder:'Ex: Preto, Azul'},
+    {key:'Rede',type:'text',placeholder:'Ex: 4G, 5G'},
+    {key:'Dual SIM',type:'bool'},{key:'NFC',type:'bool'},{key:'Carregador Incluso',type:'bool'}
+  ],
+  'Monitores':[
+    {key:'Tamanho',type:'text',placeholder:'Ex: 24pol, 27pol'},
+    {key:'Resolucao',type:'text',placeholder:'Ex: Full HD 1080p, 4K'},
+    {key:'Taxa Atualizacao',type:'text',placeholder:'Ex: 60Hz, 144Hz'},
+    {key:'Tipo de Painel',type:'text',placeholder:'Ex: IPS, TN, VA'},
+    {key:'HDMI',type:'bool'},{key:'VGA',type:'bool'},{key:'DisplayPort',type:'bool'},{key:'DVI',type:'bool'},{key:'USB-C',type:'bool'},{key:'Com Caixa',type:'bool'}
+  ],
+  'PCs/Desktops':[
+    {key:'Processador',type:'text',placeholder:'Ex: Intel i7, AMD Ryzen 7'},
+    {key:'RAM',type:'text',placeholder:'Ex: 16GB DDR4'},
+    {key:'Armazenamento',type:'text',placeholder:'Ex: 512GB SSD + 1TB HDD'},
+    {key:'Placa de Video',type:'text',placeholder:'Ex: RTX 3060, Integrada'},
+    {key:'Fonte',type:'text',placeholder:'Ex: 500W, 650W 80+'},
+    {key:'Sistema Op.',type:'text',placeholder:'Ex: Windows 11'},
+    {key:'HDMI',type:'bool'},{key:'USB 3.0',type:'bool'},{key:'WiFi',type:'bool'},{key:'Bluetooth',type:'bool'}
+  ],
+  'Tablets':[
+    {key:'Modelo',type:'text',placeholder:'Ex: iPad 9a Geracao'},
+    {key:'Armazenamento',type:'text',placeholder:'Ex: 64GB'},
+    {key:'Tela',type:'text',placeholder:'Ex: 10.2pol Retina'},
+    {key:'Cor',type:'text',placeholder:'Ex: Cinza espacial'},
+    {key:'WiFi + 4G',type:'bool'},{key:'Caneta Inclusa',type:'bool'},{key:'Teclado Incluso',type:'bool'}
+  ]
+};
 function _sanitizeRevenda(){
   if(!DB.revenda)return;
   for(var i=0;i<DB.revenda.length;i++){
     if(!DB.revenda[i].prod)DB.revenda[i].prod=DB.revenda[i].nome||('Produto '+(i+1));
+  }
+  // Migração: garante que todas as categorias têm specs
+  for(var i=0;i<DB.revendaCats.length;i++){
+    var cat=DB.revendaCats[i];
+    if(!cat.specs||cat.specs.length===0){
+      cat.specs=_SPECS_DEFAULT[cat.nome]||[];
+    }
+  }
+  // Garante que categorias padrão existam sempre
+  var catNomes=DB.revendaCats.map(function(c){return c.nome;});
+  var padrao=['Notebooks','Celulares','Monitores','PCs/Desktops','Tablets','Outros'];
+  for(var i=0;i<padrao.length;i++){
+    if(catNomes.indexOf(padrao[i])<0){
+      DB.revendaCats.push({nome:padrao[i],checklist:['Liga/Da Sinal','Estado Estetico','Funcionamento Geral'],specs:_SPECS_DEFAULT[padrao[i]]||[]});
+    }
   }
 }
 function _applySnap(s){
@@ -5759,12 +5901,14 @@ function mEditRev(id){
     var sel=_normId(it.estProdId)===_normId(p.id);
     prodO+='<option value="'+p.id+'"'+(sel?' selected':'')+'>'+p.ic+' '+p.nome+' (Est: '+fKg(p.est)+'kg)</option>';
   }
-  // Debug — mostra o estProdId salvo e IDs disponíveis
-  var debugInfo=it.estProdId
-    ?'<div style="font-size:10px;color:var(--or);margin-bottom:6px">estProdId: '+it.estProdId+' | IDs disponíveis: '+DB.produtos.slice(0,5).map(function(p){return p.id+':'+p.nome.slice(0,8);}).join(', ')+'</div>'
-    :'<div style="font-size:10px;color:var(--rd);margin-bottom:6px">estProdId: vazio</div>';
-  var estInfo='';
-  if(it.estProdId){var ep=gP(it.estProdId);if(!ep){for(var i=0;i<DB.produtos.length;i++){if(String(DB.produtos[i].id)===String(it.estProdId)){ep=DB.produtos[i];break;}}}if(ep)estInfo='<div style="font-size:11px;color:var(--mt);margin-top:-6px;margin-bottom:8px">Estoque atual: <strong style="color:var(--gr)">'+fKg(ep.est)+' kg</strong></div>';}
+
+  var estInfo='<div id="er-est-info" style="font-size:11px;color:var(--mt);margin-top:-6px;margin-bottom:8px">';
+  if(it.estProdId){
+    var ep=gP(it.estProdId);
+    if(!ep){for(var i=0;i<DB.produtos.length;i++){if(String(DB.produtos[i].id)===String(it.estProdId)){ep=DB.produtos[i];break;}}}
+    if(ep)estInfo+='Estoque atual: <strong style="color:var(--gr)">'+fKg(ep.est)+' kg</strong>';
+  }
+  estInfo+='</div>';
   var clHtml=renderChecklistHtml(it.cat||'',it.testesAprovados||[],'er');
   var h='<div class="mf">'
     +'<div class="fld"><label>Produto</label><input class="inp" id="er-p" value="'+(it.prod||'')+'"></div>'
@@ -5777,7 +5921,6 @@ function mEditRev(id){
     +clHtml
     +renderSpecsHtml(it.cat||'',it.specs||{},'er')
     +'<div class="fld"><label>Produto do Estoque (opcional)</label><select class="inp" id="er-estprod" onchange="atualizaPesoRevenda()">'+prodO+'</select></div>'
-    +debugInfo
     +estInfo
     +'<div class="fld"><label>Peso kg</label><input class="inp" type="number" inputmode="decimal" id="er-kg" value="'+it.peso+'"></div>'
     +'<div class="brow">'
@@ -5790,13 +5933,12 @@ function atualizaPesoRevenda(){
   var sel=document.getElementById('er-estprod');
   if(!sel)return;
   var pId=parseInt(sel.value)||null;
+  var info=document.getElementById('er-est-info');
   if(pId){
     var p=gP(pId);
-    if(p){
-      // Mostra estoque disponível
-      var info=document.querySelector('#er-estprod + div');
-      if(info)info.innerHTML='Estoque atual: <strong style="color:var(--gr)">'+fKg(p.est)+' kg</strong>';
-    }
+    if(p&&info)info.innerHTML='Estoque atual: <strong style="color:var(--gr)">'+fKg(p.est)+' kg</strong>';
+  }else{
+    if(info)info.innerHTML='';
   }
 }
 function saveEditRev(id){
