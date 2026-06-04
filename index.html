@@ -2648,18 +2648,18 @@ function renderCaixaDia(){
   var despCard='';
   if(_despDia.length){
     var _despRows='';
+    window._despDiaIds=[];
     for(var i=0;i<_despDia.length;i++){
       var _d=_despDia[i];
+      window._despDiaIds.push(_d.id);
       _despRows+='<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bd)">'
         +'<div style="width:3px;height:32px;border-radius:2px;background:var(--rd);flex-shrink:0"></div>'
         +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:13px;font-weight:600;color:var(--tx)">'+_d.desc+'</div>'
         +'<div style="font-size:10px;color:var(--mt)">'+(_d.cat||'—')+' &middot; '+(_d.conta||'Caixa')+'</div>'
         +'</div>'
-        +'<span style="font-size:14px;font-weight:700;font-family:monospace;color:var(--rd)">-'+fR(_d.valor)+'</span>'
-        +'<button onclick="mEditDesp(\''+_d.id+'\')" style="background:var(--s2);border:1px solid var(--bd);color:var(--mt);border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;flex-shrink:0">&#9998;</button>'
-        +'<button onclick="mDelDesp(\''+_d.id+'\')" style="background:var(--rdb);border:1px solid rgba(239,68,68,.2);color:var(--rd);border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;flex-shrink:0">&#128465;</button>'
-        +'</div>';    }
+        +'<span style="font-size:14px;font-weight:700;font-family:monospace;color:var(--rd)">-'+fR(_d.valor)+'</span>'        +'<button onclick="mEditDesp(_despDiaIds['+i+'])" style="background:var(--s2);border:1px solid var(--bd);color:var(--mt);border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;flex-shrink:0">&#9998;</button>'        +'<button onclick="mDelDesp(_despDiaIds['+i+'])" style="background:var(--rdb);border:1px solid rgba(239,68,68,.2);color:var(--rd);border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;flex-shrink:0">&#128465;</button>'        +'</div>';
+    }
     despCard='<div class="card" style="padding:0;overflow:hidden">'
       +'<div style="padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between">'
       +'<div class="stl" style="margin-bottom:0"><div class="stb" style="background:var(--rd)"></div><div class="stx">Despesas do Dia ('+_despDia.length+')</div></div>'
@@ -3004,21 +3004,44 @@ function mEditDesp(id){
   var d=null;
   for(var i=0;i<DB.movs.length;i++){if(DB.movs[i].id===id){d=DB.movs[i];break;}}
   if(!d)return;
+  // Guarda id globalmente para o confEditDesp usar
+  window._editDespId=id;
   var catsH=_buildCatBtns(DB.cats.saida,'dr');
   var contaO='';
   for(var i=0;i<DB.contas.length;i++){
     contaO+='<option value="'+DB.contas[i].nome+'"'+(DB.contas[i].nome===d.conta?' selected':'')+'>'+( DB.contas[i].ic||'')+' '+DB.contas[i].nome+'</option>';
   }
-  openM('&#9998; Editar Despesa','<div class="mf">'    +'<div class="fld"><label>Descricao</label><input class="inp" id="dr-desc" value="'+d.desc.replace(/"/g,'&quot;')+'"></div>'    +'<div class="fld"><label>Valor R$</label><input class="inp" type="number" inputmode="decimal" id="dr-v" value="'+d.valor+'" style="font-size:22px;text-align:center;font-family:monospace;padding:12px"></div>'    +'<div class="fld"><label>Pago com</label><select class="inp" id="dr-conta">'+contaO+'</select></div>'    +'<input type="hidden" id="dr-cat-val" value="'+(d.cat||'')+'">'    +'<div><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px">Categoria</div>'    +catsH+'</div>'    +'<div class="brow">'    +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'    +'<button class="btn btn-or" style="color:#000" onclick="confEditDesp(\''+id+'\')">&#10003; Salvar</button>'    +'</div></div>',480);
-  // Pre-select category
+  var _dcat=d.cat||'';
+  var body='<div class="mf">'
+    +'<div class="fld"><label>Descricao</label><input class="inp" id="dr-desc"></div>'
+    +'<div class="fld"><label>Valor R$</label><input class="inp" type="number" inputmode="decimal" id="dr-v" style="font-size:22px;text-align:center;font-family:monospace;padding:12px"></div>'
+    +'<div class="fld"><label>Pago com</label><select class="inp" id="dr-conta">'+contaO+'</select></div>'
+    +'<div><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px">Categoria</div>'
+    +catsH+'</div>'
+    +'<div class="brow">'
+    +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
+    +'<button class="btn btn-or" style="color:#000" onclick="confEditDesp()">&#10003; Salvar</button>'
+    +'</div></div>';
+  openM('&#9998; Editar Despesa', body, 480);
+  // Preenche campos após abrir
   setTimeout(function(){
-    var btns=document.querySelectorAll('[id^="dr-cat-"]');
-    for(var i=0;i<btns.length;i++){
-      if(btns[i].getAttribute('data-cat')===d.cat){btns[i].click();break;}
+    var descEl=document.getElementById('dr-desc');
+    var valEl=document.getElementById('dr-v');
+    if(descEl)descEl.value=d.desc;
+    if(valEl)valEl.value=d.valor;
+    // Pré-seleciona categoria
+    var wrap=document.getElementById('dr-cats');
+    if(wrap){
+      var btns=wrap.querySelectorAll('button');
+      for(var i=0;i<btns.length;i++){
+        var span=btns[i].querySelector('span:last-child');
+        if(span&&span.textContent.trim()===_dcat){btns[i].click();break;}
+      }
     }
   },100);
 }
-function confEditDesp(id){
+function confEditDesp(){
+  var id=window._editDespId;
   var desc=document.getElementById('dr-desc').value.trim();
   var v=parseFloat(document.getElementById('dr-v').value)||0;
   var cat=_getCatVal('dr');
