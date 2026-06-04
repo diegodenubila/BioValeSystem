@@ -765,8 +765,8 @@ function closeSb(){if(window.innerWidth<=768)document.getElementById('sb').class
 var pesAbas=[],pesAtiva=0,atendHist=[];
 function savePesState(){
   try{localStorage.setItem('bv_pesAbas',JSON.stringify(pesAbas));localStorage.setItem('bv_pesAtiva',String(pesAtiva));}catch(e){}
-  // Sincroniza na nuvem (debounced) para que outros dispositivos vejam a pesagem em andamento
-  if(_sbReady){autoSave();}
+  // Sincroniza na nuvem só se este dispositivo fez alterações
+  if(_sbReady && _localHasChanges){autoSave();}
 }
 function loadPesState(){try{var a=localStorage.getItem('bv_pesAbas');var i=localStorage.getItem('bv_pesAtiva');if(a){var arr=JSON.parse(a);if(arr&&arr.length){pesAbas=arr;pesAtiva=Math.min(parseInt(i)||0,arr.length-1);return true;}}return false;}catch(e){return false;}}
 function clearPesState(){try{localStorage.removeItem('bv_pesAbas');localStorage.removeItem('bv_pesAtiva');}catch(e){}}
@@ -1186,7 +1186,7 @@ function _applySnap(s){
   // Restaura pesagem em andamento da nuvem — sempre aplica se a nuvem for mais recente
   var _pesCloudTs=s.pesAbasTs||0;
   var _pesLocalTs=parseInt(localStorage.getItem('bv_pesAbas_ts')||'0');
-  if(s.hasOwnProperty('pesAbasCloud')&&_pesCloudTs>=_pesLocalTs){
+  if(s.hasOwnProperty('pesAbasCloud')){  // nuvem sempre prevalece nas pesagens
     if(s.pesAbasCloud&&Array.isArray(s.pesAbasCloud)&&s.pesAbasCloud.length){
       pesAbas=s.pesAbasCloud;
       pesAtiva=Math.min(s.pesAtivaCloud||0,pesAbas.length-1);
@@ -1194,7 +1194,8 @@ function _applySnap(s){
       // Nuvem vazia = atendimento fechado em outro dispositivo
       pesAbas=[];pesAtiva=0;
     }
-    savePesState();
+    // Salva localmente sem subir para nuvem (veio da nuvem)
+    try{localStorage.setItem('bv_pesAbas',JSON.stringify(pesAbas));localStorage.setItem('bv_pesAtiva',String(pesAtiva));}catch(e){}
     localStorage.setItem('bv_pesAbas_ts',String(_pesCloudTs));
   }
   // Garante que as Tabelas Padrão sempre existam (migração de versões antigas)
