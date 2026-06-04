@@ -988,10 +988,12 @@ function _sbPoll(){
               // Só aplica se os dados da nuvem são mais recentes que os locais
               var _localTs=parseInt(localStorage.getItem('bv_db_savedAt')||'0');
               var _cloudTs=s.savedAt||0;
-              if(_cloudTs <= _localTs){
+              if(_cloudTs <= _localTs && _localTs > 0){
                 _lastCloudTs=ts;
                 return; // dados locais são mais recentes, ignora
               }
+              // Atualiza bv_db_savedAt com o timestamp do dado recebido
+              try{localStorage.setItem('bv_db_savedAt',String(_cloudTs));}catch(e){}
               _applySnap(s);
               _sanitizeRevenda();
               try{localStorage.setItem('bv_db',JSON.stringify(s));}catch(e){}
@@ -1017,6 +1019,9 @@ var _dbSaveTimer=null;
 function saveDB(){
   _lastSaveTs = Date.now();
   _localHasChanges = true;
+  // Antes de subir, verifica se o q está na nuvem não é mais recente
+  // _lastCloudTs é o atualizado_em do Supabase que recebemos por último
+  // Se ele for mais recente que nosso último save, não sobrescreve
   try{
     var snap={
       savedAt:Date.now(),geminiKey:DB.geminiKey,caixaDia:DB.caixaDia,caixaOntem:DB.caixaOntem,caixasHist:DB.caixasHist,
@@ -1037,7 +1042,18 @@ function saveDB(){
     // 2. Sincroniza na nuvem
     if(_sbReady){
       _syncBadge('saving','Salvando…');
-      _sbSet('bv_db', snap, function(ok){
+      // Só sobe pro Supabase se o local for mais recente que o que está lá
+      _sbGet('bv_db', function(existing){
+        var _existingTs = existing ? (existing.savedAt||0) : 0;
+        if(snap.savedAt < _existingTs){
+          // Supabase tem dado mais recente — aplica localmente
+          _applySnap(existing);
+          _sanitizeRevenda();
+          try{localStorage.setItem('bv_db',JSON.stringify(existing));localStorage.setItem('bv_db_savedAt',String(_existingTs));}catch(e){}
+          _syncBadge('idle','Nuvem ativa');
+          return;
+        }
+        _sbSet('bv_db', snap, function(ok){
         if(ok){
           _lastCloudTs = new Date().toISOString();
           _sbSet('bv_users', USERS, function(ok2){
@@ -1051,6 +1067,7 @@ function saveDB(){
         } else {
           _syncBadge('error','Erro na nuvem');
         }
+      });
       });
     }
   }catch(e){}
