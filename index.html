@@ -1042,18 +1042,8 @@ function saveDB(){
     // 2. Sincroniza na nuvem
     if(_sbReady){
       _syncBadge('saving','Salvando…');
-      // Só sobe pro Supabase se o local for mais recente que o que está lá
-      _sbGet('bv_db', function(existing){
-        var _existingTs = existing ? (existing.savedAt||0) : 0;
-        if(snap.savedAt < _existingTs){
-          // Supabase tem dado mais recente — aplica localmente
-          _applySnap(existing);
-          _sanitizeRevenda();
-          try{localStorage.setItem('bv_db',JSON.stringify(existing));localStorage.setItem('bv_db_savedAt',String(_existingTs));}catch(e){}
-          _syncBadge('idle','Nuvem ativa');
-          return;
-        }
-        _sbSet('bv_db', snap, function(ok){
+      // Sobe para o Supabase — usuário fez uma alteração
+      _sbSet('bv_db', snap, function(ok){
         if(ok){
           _lastCloudTs = new Date().toISOString();
           _sbSet('bv_users', USERS, function(ok2){
@@ -1067,7 +1057,6 @@ function saveDB(){
         } else {
           _syncBadge('error','Erro na nuvem');
         }
-      });
       });
     }
   }catch(e){}
@@ -12692,43 +12681,32 @@ document.addEventListener('keydown',function(e){
 })();
 // ── INICIALIZAÇÃO PRINCIPAL (aguarda DOM + Supabase) ─────────────────────
 window.addEventListener('DOMContentLoaded', function(){
-  // 1. Carrega local imediatamente (síncrono) para não travar a tela de login
-  loadDB();
+  // 1. Carrega local SÓ como fallback enquanto aguarda a nuvem
+  //    (evita tela em branco se internet demorar)
+  var _localLoaded = loadDB();
   buildLoginList();
 
-  // 2. Aguarda Supabase ficar pronto e então puxa dados da nuvem
+  // 2. Aguarda Supabase e carrega da nuvem — NUVEM SEMPRE PREVALECE
   (function _waitSBAndLoad(){
     if(_sbReady){
       _syncBadge('saving','Carregando nuvem…');
-      // Carrega DB principal
+      // Carrega DB principal — nuvem sempre tem prioridade
       _sbGet('bv_db', function(s){
         if(s){
-          // Compara timestamps: só aplica nuvem se for mais recente que o local
-          var _localTs2=parseInt(localStorage.getItem('bv_db_savedAt')||'0');
-          var _cloudTs2=s.savedAt||0;
-          // Se local não tem savedAt (dados antigos), tenta usar caixaDia como referência
-          if(_localTs2===0){
-            var _rawLocal=localStorage.getItem('bv_db');
-            if(_rawLocal){try{var _ld=JSON.parse(_rawLocal);if(_ld.caixaDia&&_ld.caixaDia.data===hj())_localTs2=Date.now()-1000;}catch(e){}}
-          }
-          if(_cloudTs2 >= _localTs2){
-            // Nuvem é mais recente ou igual — aplica
-            _applySnap(s);
-            _sanitizeRevenda();
-            try{localStorage.setItem('bv_db',JSON.stringify(s));localStorage.setItem('bv_db_savedAt',String(_cloudTs2));}catch(e){}
-            _syncBadge('idle','Nuvem ativa');
-          } else {
-            // Local é mais recente — sobe o local para a nuvem
-            _syncBadge('saving','Sincronizando dados locais…');
-            saveDB();
-          }
-          // Guarda timestamp para o polling saber qual foi o último sync
+          // SEMPRE aplica da nuvem — ela é a fonte da verdade
+          _applySnap(s);
+          _sanitizeRevenda();
+          try{
+            localStorage.setItem('bv_db',JSON.stringify(s));
+            localStorage.setItem('bv_db_savedAt',String(s.savedAt||Date.now()));
+          }catch(e){}
+          _syncBadge('idle','Nuvem ativa');
+          // Guarda timestamp do último sync
           _sbClient.from('biovale_dados').select('atualizado_em').eq('chave','bv_db').maybeSingle().then(function(r){if(r.data)_lastCloudTs=r.data.atualizado_em||'';});
-          // Atualiza tela de login com aviso de pesagem pendente (pode ter vindo da nuvem)
           buildLoginList();
           if(pgAtiva){go(pgAtiva);}
         } else {
-          // Nuvem vazia — envia estado atual (zerado) para a nuvem
+          // Nuvem vazia — primeira vez, sobe o que tem localmente
           _syncBadge('saving','Iniciando nuvem…');
           saveDB();
         }
