@@ -873,6 +873,7 @@ function _sbGet(chave, onDone){
 // ── REALTIME SYNC ─────────────────────────────────────────────────────────
 var _sbChannel = null;
 var _lastSaveTs = 0;   // timestamp do último saveDB() DESTE dispositivo
+var _localHasChanges = false; // true se este dispositivo fez alguma alteração
 var _rtApplying = false;
 
 function _sbStartRealtime(){
@@ -984,6 +985,13 @@ function _sbPoll(){
         if(Date.now() - _lastSaveTs > 10000){
           _sbGet('bv_db', function(s){
             if(s){
+              // Só aplica se os dados da nuvem são mais recentes que os locais
+              var _localTs=parseInt(localStorage.getItem('bv_db_savedAt')||'0');
+              var _cloudTs=s.savedAt||0;
+              if(_cloudTs <= _localTs){
+                _lastCloudTs=ts;
+                return; // dados locais são mais recentes, ignora
+              }
               _applySnap(s);
               _sanitizeRevenda();
               try{localStorage.setItem('bv_db',JSON.stringify(s));}catch(e){}
@@ -1008,9 +1016,10 @@ function _sbPoll(){
 var _dbSaveTimer=null;
 function saveDB(){
   _lastSaveTs = Date.now();
+  _localHasChanges = true;
   try{
     var snap={
-      geminiKey:DB.geminiKey,caixaDia:DB.caixaDia,caixaOntem:DB.caixaOntem,caixasHist:DB.caixasHist,
+      savedAt:Date.now(),geminiKey:DB.geminiKey,caixaDia:DB.caixaDia,caixaOntem:DB.caixaOntem,caixasHist:DB.caixasHist,
       atendNum:DB.atendNum,produtos:DB.produtos,movs:DB.movs,contas:DB.contas,
       revenda:DB.revenda,revendaCats:DB.revendaCats,revendaStates:DB.revendaStates,
       entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
@@ -1021,6 +1030,7 @@ function saveDB(){
     };
     // 1. Salva local como fallback imediato
     localStorage.setItem('bv_db',JSON.stringify(snap));
+    localStorage.setItem('bv_db_savedAt',String(snap.savedAt));
     localStorage.setItem('bv_users',JSON.stringify(USERS));
     localStorage.setItem('bv_roles',JSON.stringify({base:BASE_ROLES,custom:CUSTOM_ROLES}));
     localStorage.setItem('bv_cfg',JSON.stringify(CFG));
@@ -1141,6 +1151,7 @@ function _sanitizeRevenda(){
 }
 function _applySnap(s){
   if(!s)return;
+  _localHasChanges = false; // dados vieram da nuvem, não são alterações locais
   if(s.caixaDia!==undefined)DB.caixaDia=s.caixaDia;
   if(s.caixaOntem!==undefined)DB.caixaOntem=s.caixaOntem;
   if(s.caixasHist)DB.caixasHist=s.caixasHist;
@@ -12658,10 +12669,25 @@ window.addEventListener('DOMContentLoaded', function(){
       // Carrega DB principal
       _sbGet('bv_db', function(s){
         if(s){
-          _applySnap(s);
-          _sanitizeRevenda();
-          try{localStorage.setItem('bv_db',JSON.stringify(s));}catch(e){}
-          _syncBadge('idle','Nuvem ativa');
+          // Compara timestamps: só aplica nuvem se for mais recente que o local
+          var _localTs2=parseInt(localStorage.getItem('bv_db_savedAt')||'0');
+          var _cloudTs2=s.savedAt||0;
+          // Se local não tem savedAt (dados antigos), tenta usar caixaDia como referência
+          if(_localTs2===0){
+            var _rawLocal=localStorage.getItem('bv_db');
+            if(_rawLocal){try{var _ld=JSON.parse(_rawLocal);if(_ld.caixaDia&&_ld.caixaDia.data===hj())_localTs2=Date.now()-1000;}catch(e){}}
+          }
+          if(_cloudTs2 >= _localTs2){
+            // Nuvem é mais recente ou igual — aplica
+            _applySnap(s);
+            _sanitizeRevenda();
+            try{localStorage.setItem('bv_db',JSON.stringify(s));localStorage.setItem('bv_db_savedAt',String(_cloudTs2));}catch(e){}
+            _syncBadge('idle','Nuvem ativa');
+          } else {
+            // Local é mais recente — sobe o local para a nuvem
+            _syncBadge('saving','Sincronizando dados locais…');
+            saveDB();
+          }
           // Guarda timestamp para o polling saber qual foi o último sync
           _sbClient.from('biovale_dados').select('atualizado_em').eq('chave','bv_db').maybeSingle().then(function(r){if(r.data)_lastCloudTs=r.data.atualizado_em||'';});
           // Atualiza tela de login com aviso de pesagem pendente (pode ter vindo da nuvem)
