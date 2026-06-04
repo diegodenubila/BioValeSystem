@@ -1,4 +1,7 @@
 <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>BioVale</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
@@ -301,7 +304,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.5.0';
+var APP_VERSION='5.5.3';
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[],
@@ -448,11 +451,11 @@ function getPreco(prod,tipo,tabId){
   // Primeiro: verificar se há tabela selecionada com preço definido para o produto
   if(tabId){for(var i=0;i<DB.tabelas.length;i++){if(String(DB.tabelas[i].id)===String(tabId)){var t=DB.tabelas[i];for(var j=0;j<t.itens.length;j++){if(t.itens[j].pId===prod.id)return t.itens[j].preco;}}}}
   // Fallback: preço padrão do produto
-  if(tipo==='Compra')return prod.vC||prod.vV;
+  if(tipo==='Compra'||tipo==='Logistica Reversa')return prod.vC||prod.vV;
   return prod.vV;
 }
-function tipoCol(t){return t==='Venda'?'var(--rd)':t==='Compra'?'var(--gr)':'var(--bl)';}
-function tipoIco(t){return t==='Compra'?'&#128229;':t==='Venda'?'&#128228;':'&#127873;';}
+function tipoCol(t){return t==='Venda'?'var(--rd)':t==='Compra'?'var(--gr)':t==='Logistica Reversa'?'#a855f7':'var(--bl)';}
+function tipoIco(t){return t==='Compra'?'&#128229;':t==='Venda'?'&#128228;':t==='Logistica Reversa'?'&#9851;':'&#127873;';}
 function caixaAberto(){return !!(DB.caixaDia&&DB.caixaDia.aberto);}
 function openM(title,body,w){
   w=w||500;
@@ -735,10 +738,16 @@ function go(pid){
   pgAtiva=pid;setNav(pid);closeSb();
   // Sanitiza revenda — corrige prod undefined antes de qualquer render
   if(DB&&DB.revenda){for(var _ri=0;_ri<DB.revenda.length;_ri++){if(!DB.revenda[_ri].prod)DB.revenda[_ri].prod=DB.revenda[_ri].nome||'Produto';}}
-  var m={dashboard:pgDash,pesagem:pgPesagem,pendencias:pgPendencias,caixa_dia:pgCaixaDia,estoque:pgEstoque,
-    estoque_vis:pgEstVis,revenda:pgRevenda,financeiro:pgFin,agenda:pgAgenda,
-    funcionarios:pgFuncs,clientes:pgClis,tabelas:pgTabs,mercado:pgMercado,classificador:pgClassificador,usuarios:pgUsers,configuracoes:pgConfig};
-  var _phtml=(m[pid]||function(){return '<p>Pagina nao encontrada</p>';})();document.getElementById('ct').innerHTML=_breadcrumb(pid)+_phtml;
+  try{
+    var m={dashboard:pgDash,pesagem:pgPesagem,pendencias:pgPendencias,caixa_dia:pgCaixaDia,estoque:pgEstoque,
+      estoque_vis:pgEstVis,revenda:pgRevenda,financeiro:pgFin,agenda:pgAgenda,
+      funcionarios:pgFuncs,clientes:pgClis,tabelas:pgTabs,mercado:pgMercado,classificador:pgClassificador,usuarios:pgUsers,configuracoes:pgConfig};
+    var _phtml=(m[pid]||function(){return '<p>Pagina nao encontrada</p>';})();
+    document.getElementById('ct').innerHTML=_breadcrumb(pid)+_phtml;
+  }catch(_goErr){
+    console.error('go('+pid+') error:',_goErr);
+    document.getElementById('ct').innerHTML='<div class="card" style="color:var(--rd);padding:20px">Erro ao carregar página <b>'+pid+'</b>: '+(_goErr.message||_goErr)+'</div>';
+  }
   if(pid==='dashboard')setTimeout(function(){_dashCharts();if(CU&&CU.perfil==='adm')_mktFetchWidget();},80);
   if(pid==='mercado')setTimeout(function(){_mktFetch();},80);
   if(pid==='classificador')setTimeout(function(){_pclInit();},80);
@@ -1001,7 +1010,7 @@ function saveDB(){
   _lastSaveTs = Date.now();
   try{
     var snap={
-      caixaDia:DB.caixaDia,caixaOntem:DB.caixaOntem,caixasHist:DB.caixasHist,
+      geminiKey:DB.geminiKey,caixaDia:DB.caixaDia,caixaOntem:DB.caixaOntem,caixasHist:DB.caixasHist,
       atendNum:DB.atendNum,produtos:DB.produtos,movs:DB.movs,contas:DB.contas,
       revenda:DB.revenda,revendaCats:DB.revendaCats,revendaStates:DB.revendaStates,
       entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
@@ -1013,16 +1022,21 @@ function saveDB(){
     // 1. Salva local como fallback imediato
     localStorage.setItem('bv_db',JSON.stringify(snap));
     localStorage.setItem('bv_users',JSON.stringify(USERS));
+    localStorage.setItem('bv_roles',JSON.stringify({base:BASE_ROLES,custom:CUSTOM_ROLES}));
+    localStorage.setItem('bv_cfg',JSON.stringify(CFG));
     // 2. Sincroniza na nuvem
     if(_sbReady){
       _syncBadge('saving','Salvando…');
       _sbSet('bv_db', snap, function(ok){
         if(ok){
           _lastCloudTs = new Date().toISOString();
-          // Também salva USERS na nuvem
           _sbSet('bv_users', USERS, function(ok2){
-            if(ok2) _syncBadge('idle','Nuvem ativa');
-            else     _syncBadge('error','Erro na nuvem');
+            _sbSet('bv_roles',{base:BASE_ROLES,custom:CUSTOM_ROLES},function(){
+              _sbSet('bv_cfg', CFG, function(){
+                if(ok2) _syncBadge('idle','Nuvem ativa');
+                else     _syncBadge('error','Erro na nuvem');
+              });
+            });
           });
         } else {
           _syncBadge('error','Erro na nuvem');
@@ -1040,6 +1054,25 @@ function loadDB(){
     // Carrega USERS salvos localmente
     var rawU=localStorage.getItem('bv_users');
     if(rawU){var u=JSON.parse(rawU);if(Array.isArray(u)&&u.length)USERS=u;}
+    // Carrega CFG salvo localmente
+    var rawCFG=localStorage.getItem('bv_cfg');
+    if(rawCFG){try{var _cfg=JSON.parse(rawCFG);
+      if(_cfg.empresa)Object.assign(CFG.empresa,_cfg.empresa);
+      if(_cfg.sistema)Object.assign(CFG.sistema,_cfg.sistema);
+      if(_cfg.integracao)Object.assign(CFG.integracao,_cfg.integracao);
+      if(_cfg.motivosSangria)CFG.motivosSangria=_cfg.motivosSangria;
+      if(_cfg.motivosReforco)CFG.motivosReforco=_cfg.motivosReforco;
+      if(_cfg.saldoAberturaPadrao!=null)CFG.saldoAberturaPadrao=_cfg.saldoAberturaPadrao;
+    }catch(e){}}
+    // Carrega ROLES salvos localmente
+    var rawR=localStorage.getItem('bv_roles');
+    if(rawR){var ro=JSON.parse(rawR);
+      if(ro.base&&Array.isArray(ro.base))BASE_ROLES=ro.base;
+      if(ro.custom&&Array.isArray(ro.custom))CUSTOM_ROLES=ro.custom;
+      // Rebuilds PPAGES from restored roles
+      var _allR=BASE_ROLES.concat(CUSTOM_ROLES);
+      for(var _ri=0;_ri<_allR.length;_ri++){PPAGES[_allR[_ri].id]=_allR[_ri].pages;}
+    }
   }catch(e){}
   return localOk;
 }
@@ -1185,15 +1218,15 @@ function renderPesagem(){
     var cl=pesAbas.length>1?'<button class="aba-close" onclick="delPesAba(event,'+i+')">&#215;</button>':'';
     abH+='<div class="aba-tab'+(i===pesAtiva?' on':'')+'" onclick="selPesAba('+i+')"'+(a.fin?' style="opacity:.5"':'')+'>'+tipoIco(a.tipo)+' '+a.label+(a.fin?' &#10003;':'')+cl+'</div>';
   }
-  var tipos=['Compra','Venda','Doacao'];var tbH='';
+  var tipos=['Compra','Venda','Doacao','Logistica Reversa'];var tbH='';
   for(var i=0;i<tipos.length;i++){
-    var t=tipos[i];var tc=tipoCol(t);var on=(ab.tipo===t)||(ab.tipo==='Doacao'&&t==='Doacao');
+    var t=tipos[i];var tc=tipoCol(t);var on=(ab.tipo===t)||(ab.tipo==='Doacao'&&t==='Doacao')||(ab.tipo==='Logistica Reversa'&&t==='Logistica Reversa');
     tbH+='<button onclick="setPesTipo(\&apos;'+t+'\&apos;)" style="border:2px solid '+(on?tc:'var(--bd)')+';background:'+(on?tc+'15':'var(--s2)')+';color:'+(on?tc:'var(--mt)')+';border-radius:var(--r);padding:9px;font-size:13px;font-weight:600">'+tipoIco(t)+' '+t+'</button>';
   }
   var cliO='<option value="">Avulso</option>';
   for(var i=0;i<DB.clientes.length;i++){var c=DB.clientes[i];cliO+='<option value="'+c.id+'"'+(ab.cliId==c.id?' selected':'')+'>'+c.nome+'</option>';}
   var tabO='';
-  var tipoTabFiltro=ab.tipo==='Compra'?'compra':'venda';
+  var tipoTabFiltro=(ab.tipo==='Compra'||ab.tipo==='Logistica Reversa')?'compra':'venda';
   // Encontra tabela Padrão do tipo atual para marcar como default
   var tabPadraoIdPes=null;
   for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].nome.toLowerCase()==='padrao'&&DB.tabelas[i].tipo===tipoTabFiltro){tabPadraoIdPes=DB.tabelas[i].id;break;}}
@@ -1271,7 +1304,7 @@ function renderPesagem(){
   else{
     for(var i=0;i<ab.itens.length;i++){
       var it=ab.itens[i];var ic=tipoCol(it.tipo);
-      var ibg=it.tipo==='Venda'?'rgba(239,68,68,.1)':it.tipo==='Compra'?'rgba(34,197,94,.1)':'rgba(59,130,246,.1)';
+      var ibg=it.tipo==='Venda'?'rgba(239,68,68,.1)':it.tipo==='Compra'?'rgba(34,197,94,.1)':it.tipo==='Logistica Reversa'?'rgba(168,85,247,.1)':'rgba(59,130,246,.1)';
       var ubadge=it.uni?'<span style="font-size:10px;color:var(--or);background:var(--orb);padding:1px 7px;border-radius:10px">Unidade</span>':'';
       var pesoEfetivo=it.pesoLiquido!=null?it.pesoLiquido:it.peso;
       var detalhe='';
@@ -1304,17 +1337,18 @@ function renderPesagem(){
     }
   }
   var hasIt=ab.itens.length>0;
-  // Recebeu = Venda (kg e unidade) | Pagou = Compra/Doacao
-  var pesoReceb=0,pesoPagei=0,valReceb=0,valPagei=0,valDoc=0;
+  // Recebeu = Venda + Logistica Reversa (kg e unidade) | Pagou = Compra/Doacao
+  var pesoReceb=0,pesoPagei=0,valReceb=0,valPagei=0,valDoc=0,valLR=0,pesoLR=0;
   for(var i=0;i<ab.itens.length;i++){
     var it=ab.itens[i];
     var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;
     var v=it.uni?it.preco:pesoEf*it.preco;
     if(it.tipo==='Venda'){valReceb+=v;if(!it.uni)pesoReceb+=pesoEf;}
     else if(it.tipo==='Compra'){valPagei+=v;if(!it.uni)pesoPagei+=pesoEf;}
+    else if(it.tipo==='Logistica Reversa'){valLR+=v;if(!it.uni)pesoLR+=pesoEf;}
     else{valDoc+=v;if(!it.uni)pesoPagei+=pesoEf;}
   }
-  var totLiq=valReceb-(valPagei+valDoc);
+  var totLiq=(valReceb+valLR)-(valPagei+valDoc);
   var liqColor=totLiq>=0?'var(--gr)':'var(--rd)';
   var balH='';
   if(hasIt){
@@ -1322,6 +1356,7 @@ function renderPesagem(){
     balH+='<tr><td style="padding:3px 0;color:var(--mt)">Tipo</td><td style="padding:3px 0;color:var(--mt);text-align:right">Peso</td><td style="padding:3px 0;color:var(--mt);text-align:right">Valor</td></tr>';
     if(valReceb>0)balH+='<tr><td style="padding:4px 0;color:var(--gr);font-weight:600">&#11014; A receber (Venda)</td><td style="padding:4px 0;color:var(--gr);font-family:monospace;text-align:right">'+(pesoReceb>0?fKg(pesoReceb)+'kg':'-')+'</td><td style="padding:4px 0;color:var(--gr);font-family:monospace;text-align:right">+'+fR(valReceb)+'</td></tr>';
     if(valPagei+valDoc>0)balH+='<tr><td style="padding:4px 0;color:var(--rd);font-weight:600">&#11015; A pagar (Compra)</td><td style="padding:4px 0;color:var(--rd);font-family:monospace;text-align:right">'+(pesoPagei>0?fKg(pesoPagei)+'kg':'-')+'</td><td style="padding:4px 0;color:var(--rd);font-family:monospace;text-align:right">-'+fR(valPagei+valDoc)+'</td></tr>';
+    if(valLR>0)balH+='<tr><td style="padding:4px 0;color:#a855f7;font-weight:600">&#9851; A receber (Log. Reversa)</td><td style="padding:4px 0;color:#a855f7;font-family:monospace;text-align:right">'+(pesoLR>0?fKg(pesoLR)+'kg':'-')+'</td><td style="padding:4px 0;color:#a855f7;font-family:monospace;text-align:right">+'+fR(valLR)+'</td></tr>';
     balH+='</table>';
     balH+='<div style="height:1px;background:var(--bd);margin:8px 0"></div>';
     var liqLabel=totLiq>=0?'Total a receber':'Total a pagar';
@@ -1716,7 +1751,7 @@ function confTransfP(prodId,peso,preco){
 function mFinPes(){
   var ab=pesAbas[pesAtiva];
   var valReceb=0,valPagei=0;
-  for(var i=0;i<ab.itens.length;i++){var it=ab.itens[i];var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;var v=it.uni?it.preco:pesoEf*it.preco;if(it.tipo==='Venda')valReceb+=v;else valPagei+=v;}
+  for(var i=0;i<ab.itens.length;i++){var it=ab.itens[i];var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;var v=it.uni?it.preco:pesoEf*it.preco;if(it.tipo==='Venda'||it.tipo==='Logistica Reversa')valReceb+=v;else valPagei+=v;}
   valReceb=+valReceb.toFixed(2);valPagei=+valPagei.toFixed(2);
   var totLiq=+(valReceb-valPagei).toFixed(2);
   var liqColor=totLiq>=0?'var(--gr)':'var(--rd)';
@@ -1780,7 +1815,7 @@ function mFinPes(){
   openM('&#128181; Forma de Pagamento / Recebimento','<div class="mf">'
     // Resumo topo
     +'<div style="background:var(--s2);border-radius:var(--r);padding:12px 14px">'
-    +(valReceb>0?'<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span style="color:var(--gr)">&#11014; Venda (a receber)</span><span style="color:var(--gr);font-weight:700;font-family:monospace">+'+fR(valReceb)+'</span></div>':'')
+    +(valReceb>0?'<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span style="color:var(--gr)">&#11014; A receber (Venda / Log. Reversa)</span><span style="color:var(--gr);font-weight:700;font-family:monospace">+'+fR(valReceb)+'</span></div>':'')
     +(valPagei>0?'<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span style="color:var(--rd)">&#11015; Compra (a pagar)</span><span style="color:var(--rd);font-weight:700;font-family:monospace">-'+fR(valPagei)+'</span></div>':'')
     +'<div style="height:1px;background:var(--bd);margin:8px 0"></div>'
     +'<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:700">'+liqLabel+'</span><span style="font-size:20px;font-weight:800;color:'+liqColor+';font-family:monospace">'+fR(Math.abs(totLiq))+'</span></div>'
@@ -1900,7 +1935,7 @@ function getPgMethods(){
     var it=ab.itens[i];
     var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;
     var v=it.uni?it.preco:pesoEf*it.preco;
-    if(it.tipo==='Venda')valReceb+=v;else valPagei+=v;
+    if(it.tipo==='Venda'||it.tipo==='Logistica Reversa')valReceb+=v;else valPagei+=v;
   }
   valReceb=+valReceb.toFixed(2);valPagei=+valPagei.toFixed(2);
   var recMethods=getBlocoMethods('rec-',valReceb);
@@ -2099,6 +2134,12 @@ function _finalizarPesagem(){
       var p=gP(it.prodId);
       var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;
       if(p)p.est=+(p.est+pesoEf).toFixed(2);
+      DB.entradas.unshift({id:nid(),data:hj(),forn:obs||(_cliNomeSnap||ab.label)||'Compra',tipo:'Compra',pId:it.prodId,peso:pesoEf,vKg:it.preco,total:+(it.preco*pesoEf).toFixed(2),status:'Triagem'});
+    }else if(it.tipo==='Logistica Reversa'){
+      var p=gP(it.prodId);
+      var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;
+      if(p)p.est=+(p.est+pesoEf).toFixed(2);
+      DB.entradas.unshift({id:nid(),data:hj(),forn:obs||'Logistica Reversa',tipo:'Logistica Reversa',pId:it.prodId,peso:pesoEf,vKg:it.preco,total:+(it.preco*pesoEf).toFixed(2),status:'Triagem'});
     }else{
       var p=gP(it.prodId);
       var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;
@@ -2107,10 +2148,11 @@ function _finalizarPesagem(){
     }
   }
   // Registrar movimentacoes financeiras separadas por bloco
-  // Bloco Recebimento (Venda) — sempre entrada
+  // Bloco Recebimento (Venda + Logistica Reversa) — sempre entrada
   for(var i=0;i<recMethods.length;i++){
     var m=recMethods[i];
-    DB.movs.unshift({id:nid(),data:hj(),desc:'Recebimento Venda #'+num+' ('+m.label+')',tipo:'entrada',cat:'Venda',valor:m.valor,conta:m.conta});
+    var recDesc=ab.tipo==='Logistica Reversa'?'Logistica Reversa':'Venda';
+    DB.movs.unshift({id:nid(),data:hj(),desc:'Recebimento '+recDesc+' #'+num+' ('+m.label+')',tipo:'entrada',cat:recDesc,valor:m.valor,conta:m.conta});
     for(var j=0;j<DB.contas.length;j++){if(DB.contas[j].nome===m.conta){DB.contas[j].saldo=+(DB.contas[j].saldo+m.valor).toFixed(2);break;}}
   }
   // Bloco Pagamento (Compra) — sempre saida
@@ -2157,7 +2199,7 @@ function suspenderAtendimento(){
     var it=ab.itens[i];
     if(it.uni){for(var j=0;j<DB.revenda.length;j++){if(DB.revenda[j].id===it.uid){DB.revenda[j].status='Reservado';break;}}}
     else if(it.tipo==='Venda'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est-pesoEf).toFixed(2);}
-    else if(it.tipo==='Compra'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(2);}
+    else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(2);}
   }
   if(!DB.pesagensEmAberto)DB.pesagensEmAberto=[];
   DB.pesagensEmAberto.unshift({id:nid(),num:num,label:ab.label,tipo:ab.tipo,cliId:ab.cliId,tabId:ab.tabId,itens:ab.itens.slice(),obs:obs,valTotal:valTotal,suspendoEm:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),suspendoData:hj(),nfNum:ab.nfNum||''});
@@ -2181,7 +2223,7 @@ function pgPendencias(){
       var at=list[i];
       var cliNome='Avulso';
       if(at.cliId){for(var ci=0;ci<DB.clientes.length;ci++){if(DB.clientes[ci].id==at.cliId){cliNome=DB.clientes[ci].nome;break;}}}
-      var tipoC=at.tipo==='Venda'?'var(--gr)':at.tipo==='Compra'?'var(--rd)':'var(--bl)';
+      var tipoC=at.tipo==='Venda'?'var(--gr)':at.tipo==='Compra'?'var(--rd)':at.tipo==='Logistica Reversa'?'#a855f7':'var(--bl)';
       var itensSumario='';
       for(var j=0;j<Math.min(at.itens.length,3);j++){var it=at.itens[j];var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;itensSumario+='<div style="font-size:11px;color:var(--mt)">'+(it.ic||'')+' '+it.nome+' &mdash; '+fKg(pesoEf)+'kg &mdash; '+fR(it.uni?it.preco:pesoEf*it.preco)+'</div>';}
       if(at.itens.length>3)itensSumario+='<div style="font-size:11px;color:var(--mt)">+ '+(at.itens.length-3)+' item(s)...</div>';
@@ -2223,7 +2265,7 @@ function reabrirPendencia(pendId){
   DB.pesagensEmAberto.splice(pendIdx,1);
   if(!caixaAberto()){
     openM('Caixa Fechado','<div class="mf"><div class="al aly">Abra o caixa do dia antes de reabrir atendimentos.</div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-bl" onclick="closeM();go(&apos;caixa_dia&apos;)">Ir para Caixa</button></div></div>');
-    for(var i=0;i<pend.itens.length;i++){var it=pend.itens[i];if(it.uni){for(var j=0;j<DB.revenda.length;j++){if(DB.revenda[j].id===it.uid){DB.revenda[j].status='Reservado';break;}}}else if(it.tipo==='Venda'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est-pesoEf).toFixed(2);}else if(it.tipo==='Compra'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(2);}}
+    for(var i=0;i<pend.itens.length;i++){var it=pend.itens[i];if(it.uni){for(var j=0;j<DB.revenda.length;j++){if(DB.revenda[j].id===it.uid){DB.revenda[j].status='Reservado';break;}}}else if(it.tipo==='Venda'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est-pesoEf).toFixed(2);}else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(2);}}
     DB.pesagensEmAberto.splice(pendIdx,0,pend);autoSave();return;
   }
   pesAbas.push({id:nid(),label:'Pen.#'+pend.num,tipo:pend.tipo,cliId:pend.cliId,tabId:pend.tabId,itens:pend.itens.slice(),obs:pend.obs||'',showUnit:false,numAtend:pend.num,nfNum:pend.nfNum||''});
@@ -2237,7 +2279,7 @@ function liquidarPendencia(pendId){
   var cliNome='Avulso';
   if(pend.cliId){for(var ci=0;ci<DB.clientes.length;ci++){if(DB.clientes[ci].id==pend.cliId){cliNome=DB.clientes[ci].nome;break;}}}
   var valReceb=0,valPagei=0;
-  for(var i=0;i<pend.itens.length;i++){var it=pend.itens[i];var v=it.uni?it.preco:(it.pesoLiquido!=null?it.pesoLiquido:it.peso)*it.preco;if(it.tipo==='Venda')valReceb+=v;else valPagei+=v;}
+  for(var i=0;i<pend.itens.length;i++){var it=pend.itens[i];var v=it.uni?it.preco:(it.pesoLiquido!=null?it.pesoLiquido:it.peso)*it.preco;if(it.tipo==='Venda'||it.tipo==='Logistica Reversa')valReceb+=v;else valPagei+=v;}
   valReceb=+valReceb.toFixed(2);valPagei=+valPagei.toFixed(2);
   var totLiq=+(valReceb-valPagei).toFixed(2);
   var liqColor=totLiq>=0?'var(--gr)':'var(--rd)';
@@ -2291,7 +2333,7 @@ function confirmarLiquidacao(pendId,valReceb,valPagei){
   var forma=document.getElementById('liq-forma-val')?document.getElementById('liq-forma-val').value:'Dinheiro';
   var num=pend.num;
   var totLiq=+(valReceb-valPagei).toFixed(2);
-  if(valReceb>0){DB.movs.unshift({id:nid(),data:hj(),desc:'Liquidacao Venda #'+num+' ('+forma+')',tipo:'entrada',cat:'Venda',valor:valReceb,conta:conta});for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo+valReceb).toFixed(2);break;}}}
+  var _liqCat=pend.tipo==='Logistica Reversa'?'Logistica Reversa':'Venda';if(valReceb>0){DB.movs.unshift({id:nid(),data:hj(),desc:'Liquidacao '+_liqCat+' #'+num+' ('+forma+')',tipo:'entrada',cat:_liqCat,valor:valReceb,conta:conta});for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo+valReceb).toFixed(2);break;}}}
   if(valPagei>0){DB.movs.unshift({id:nid(),data:hj(),desc:'Liquidacao Compra #'+num+' ('+forma+')',tipo:'saida',cat:'Compra',valor:valPagei,conta:conta});for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo-valPagei).toFixed(2);break;}}}
   if(DB.caixaDia){if(!DB.caixaDia.movimentos)DB.caixaDia.movimentos=[];DB.caixaDia.movimentos.unshift({num:num,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),itens:pend.itens.length,total:totLiq,venda:valReceb,compra:valPagei,methods:[{label:forma,valor:Math.abs(totLiq),conta:conta}],obs:pend.obs,itensList:pend.itens.slice(),label:pend.label,tipo:pend.tipo,cliId:pend.cliId,tabId:pend.tabId,liquidadoPendencia:true});}
   atendHist.unshift({id:nid(),label:pend.label,tipo:pend.tipo,itens:pend.itens.slice(),num:num,total:totLiq,methods:[{label:forma,valor:Math.abs(totLiq),conta:conta}],obs:pend.obs,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
@@ -2324,7 +2366,7 @@ function reabrirA(i){
     var it=snap.itens[j];
     if(it.uni){for(var k=0;k<DB.revenda.length;k++){if(DB.revenda[k].id===it.uid){DB.revenda[k].status='Disponivel';break;}}}
     else if(it.tipo==='Venda'){var p=gP(it.prodId);if(p)p.est=+(p.est+it.peso).toFixed(2);}
-    else if(it.tipo==='Compra'){var p=gP(it.prodId);if(p)p.est=+(p.est-it.peso).toFixed(2);}
+    else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'){var p=gP(it.prodId);if(p)p.est=+(p.est-it.peso).toFixed(2);}
   }
   if(DB.caixaDia&&DB.caixaDia.movimentos){for(var j=0;j<DB.caixaDia.movimentos.length;j++){if(DB.caixaDia.movimentos[j].num===snap.num){DB.caixaDia.movimentos.splice(j,1);break;}}}
   // Reverse financial movements
@@ -2346,7 +2388,7 @@ function execReabrirDoCaixa(numAtend){
     var it=snap.itensList[j];
     if(it.uni){for(var k=0;k<DB.revenda.length;k++){if(DB.revenda[k].id===it.uid){DB.revenda[k].status='Disponivel';break;}}}
     else if(it.tipo==='Venda'){var p=gP(it.prodId);if(p)p.est=+(p.est+it.peso).toFixed(2);}
-    else if(it.tipo==='Compra'){var p=gP(it.prodId);if(p)p.est=+(p.est-it.peso).toFixed(2);}
+    else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'){var p=gP(it.prodId);if(p)p.est=+(p.est-it.peso).toFixed(2);}
   }
   // Reverse financial movements
   for(var j=DB.movs.length-1;j>=0;j--){
@@ -2556,9 +2598,25 @@ function renderCaixaDia(){
   var vendas=movsDia.reduce(function(a,m){return a+(m.venda||0);},0);
   var compras=movsDia.reduce(function(a,m){return a+(m.compra||0);},0);
   var pesoTotal=0;for(var i=0;i<movsDia.length;i++){var mv=movsDia[i];if(mv.itensList){for(var j=0;j<mv.itensList.length;j++){var itp=mv.itensList[j];if(!itp.uni&&itp.peso)pesoTotal+=itp.peso;}}}
+  // Saldo Caixa (conta)
   var saldoAt=0;for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){saldoAt=DB.contas[i].saldo;break;}}
   var sang=0;if(cd.sangrias)for(var i=0;i<cd.sangrias.length;i++)sang+=cd.sangrias[i].valor;
   var refor=0;if(cd.reforcos)for(var i=0;i<cd.reforcos.length;i++)refor+=cd.reforcos[i].valor;
+  // Estimado = reconstrução a partir dos movimentos do dia (só Dinheiro no caixa físico)
+  var _estim=+(cd.saldoAbertura||0);
+  for(var i=0;i<movsDia.length;i++){
+    var mv=movsDia[i];
+    // recMethods = entradas (vendas/LR pagas em dinheiro)
+    if(mv.recMethods){for(var j=0;j<mv.recMethods.length;j++){if(mv.recMethods[j].conta==='Caixa'||mv.recMethods[j].label==='Dinheiro')_estim=+(_estim+mv.recMethods[j].valor).toFixed(2);}}
+    // pagMethods = saídas (compras pagas em dinheiro)
+    if(mv.pagMethods){for(var j=0;j<mv.pagMethods.length;j++){if(mv.pagMethods[j].conta==='Caixa'||mv.pagMethods[j].label==='Dinheiro')_estim=+(_estim-mv.pagMethods[j].valor).toFixed(2);}}
+    // liquidações de pendência (methods direto)
+    if(mv.liquidadoPendencia&&mv.methods){for(var j=0;j<mv.methods.length;j++){var _lm=mv.methods[j];if(_lm.conta==='Caixa'||_lm.label==='Dinheiro'){if(mv.tipo==='Compra')_estim=+(_estim-_lm.valor).toFixed(2);else _estim=+(_estim+_lm.valor).toFixed(2);}}}
+  }
+  // despesas do dia — subtrai as pagas em conta tipo Dinheiro (caixa físico)
+  var _contasDinheiro={};for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].tipo==='Dinheiro')_contasDinheiro[DB.contas[i].nome]=true;}
+  for(var i=0;i<DB.movs.length;i++){var _mv=DB.movs[i];if(_mv.tipo==='saida'&&_mv.data===hj()&&(!_mv.desc||_mv.desc.indexOf('#')<0)&&_contasDinheiro[_mv.conta])_estim=+(_estim-_mv.valor).toFixed(2);}
+  _estim=+(_estim+refor-sang).toFixed(2);
   var extras='';if(sang>0)extras+=sc('&#128182;','Sangrias',fR(sang),'Retiradas','var(--rd)');if(refor>0)extras+=sc('&#128176;','Reforcos',fR(refor),'Adicoes','var(--bl)');
 
   // ── Despesas do dia ──
@@ -2608,7 +2666,7 @@ function renderCaixaDia(){
     +sc('&#128229;','Compras',fR(compras),'no dia','var(--rd)')
     +sc('&#9878;','Peso Total',fKg(pesoTotal)+' kg','pesagens','var(--bl)')
     +'</div>'
-    +sc('&#128176;','Saldo Caixa',fR(saldoAt),'Estimado','var(--gr)')
+    +sc('&#128176;','Saldo Caixa',fR(_estim),'Estimado','var(--gr)')
     +(_totDesp>0?sc('&#127869;','Despesas',fR(_totDesp),_despDia.length+' lancamento(s)','var(--or)'):'')
     +(extras?'<div class="g2">'+extras+'</div>':'')
     +'<div class="card" style="padding:0;overflow:hidden"><div style="padding:13px 16px;border-bottom:1px solid var(--bd)"><div class="stl" style="margin-bottom:0"><div class="stb"></div><div class="stx">Atendimentos ('+movsDia.length+')</div></div></div>'+movsH+'</div>'
@@ -3055,7 +3113,19 @@ function cfgMotSalvar(){
   alert('Configuracoes salvas!');
 }
 
-function mFecharCaixa(){var saldoAt=0;for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){saldoAt=DB.contas[i].saldo;break;}}openM('Fechar Caixa','<div class="mf"><div class="al aly">Voce esta prestes a fechar o caixa de hoje.</div><div style="background:var(--s2);border-radius:var(--r);padding:13px"><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--bd)"><span style="color:var(--mt)">Abertura</span><span style="font-family:monospace">'+fR(DB.caixaDia.saldoAbertura)+'</span></div><div style="display:flex;justify-content:space-between;padding:7px 0;font-size:15px;font-weight:700"><span>Saldo esperado</span><span style="color:var(--gr);font-family:monospace">'+fR(saldoAt)+'</span></div></div><div class="fld"><label>Valor contado R$</label><input class="inp" type="number" inputmode="decimal" id="fc-v" value="'+saldoAt+'" style="font-size:20px;text-align:center;font-family:monospace" oninput="calcFD('+saldoAt+')"></div><div id="fc-dif"></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-rd" onclick="confirmarFech('+saldoAt+')">Fechar Caixa</button></div></div>');}
+function mFecharCaixa(){
+  var saldoAt=0;for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){saldoAt=DB.contas[i].saldo;break;}}
+  // Estimado reconstruído (igual ao da tela)
+  var cd=DB.caixaDia;var movsDia=cd?cd.movimentos||[]:[];
+  var _fe=+(cd?cd.saldoAbertura||0:0);
+  var _refor=0;if(cd&&cd.reforcos)for(var i=0;i<cd.reforcos.length;i++)_refor+=cd.reforcos[i].valor;
+  var _sang=0;if(cd&&cd.sangrias)for(var i=0;i<cd.sangrias.length;i++)_sang+=cd.sangrias[i].valor;
+  for(var i=0;i<movsDia.length;i++){var mv=movsDia[i];if(mv.recMethods){for(var j=0;j<mv.recMethods.length;j++){if(mv.recMethods[j].conta==='Caixa'||mv.recMethods[j].label==='Dinheiro')_fe=+(_fe+mv.recMethods[j].valor).toFixed(2);}}if(mv.pagMethods){for(var j=0;j<mv.pagMethods.length;j++){if(mv.pagMethods[j].conta==='Caixa'||mv.pagMethods[j].label==='Dinheiro')_fe=+(_fe-mv.pagMethods[j].valor).toFixed(2);}}if(mv.liquidadoPendencia&&mv.methods){for(var j=0;j<mv.methods.length;j++){var _lm=mv.methods[j];if(_lm.conta==='Caixa'||_lm.label==='Dinheiro'){if(mv.tipo==='Compra')_fe=+(_fe-_lm.valor).toFixed(2);else _fe=+(_fe+_lm.valor).toFixed(2);}}}}
+  var _fContasDin={};for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].tipo==='Dinheiro')_fContasDin[DB.contas[i].nome]=true;}
+  for(var i=0;i<DB.movs.length;i++){var _mv=DB.movs[i];if(_mv.tipo==='saida'&&_mv.data===hj()&&(!_mv.desc||_mv.desc.indexOf('#')<0)&&_fContasDin[_mv.conta])_fe=+(_fe-_mv.valor).toFixed(2);}
+  _fe=+(_fe+_refor-_sang).toFixed(2);
+  saldoAt=_fe; // usa o estimado reconstruído
+  openM('Fechar Caixa','<div class="mf"><div class="al aly">Voce esta prestes a fechar o caixa de hoje.</div><div style="background:var(--s2);border-radius:var(--r);padding:13px"><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--bd)"><span style="color:var(--mt)">Abertura</span><span style="font-family:monospace">'+fR(DB.caixaDia.saldoAbertura)+'</span></div><div style="display:flex;justify-content:space-between;padding:7px 0;font-size:15px;font-weight:700"><span>Saldo esperado</span><span style="color:var(--gr);font-family:monospace">'+fR(saldoAt)+'</span></div></div><div class="fld"><label>Valor contado R$</label><input class="inp" type="number" inputmode="decimal" id="fc-v" value="'+saldoAt+'" style="font-size:20px;text-align:center;font-family:monospace" oninput="calcFD('+saldoAt+')"></div><div id="fc-dif"></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-rd" onclick="confirmarFech('+saldoAt+')">Fechar Caixa</button></div></div>');}
 function calcFD(esp){var v=parseFloat(document.getElementById('fc-v')?document.getElementById('fc-v').value:0)||0,dif=+(v-esp).toFixed(2);var el=document.getElementById('fc-dif');if(!el)return;if(Math.abs(dif)<0.01)el.innerHTML='<div class="al alg">&#10003; Caixa confere!</div>';else if(dif<0)el.innerHTML='<div class="al alr">Falta '+fR(Math.abs(dif))+'</div>';else el.innerHTML='<div class="al aly">Sobra '+fR(dif)+'</div>';}
 function confirmarFech(esp){
   var v=parseFloat(document.getElementById('fc-v').value)||0;
@@ -3108,10 +3178,42 @@ function _parseDataBR(s){
   return new Date(parseInt(pts[2]),parseInt(pts[1])-1,parseInt(pts[0]));
 }
 function _entrPeriodo(per){
+  // Compras (entradas físicas)
   var pesoKg=0,valorR=0;
   for(var i=0;i<DB.entradas.length;i++){
     var e=DB.entradas[i];
     if(_perFiltro(e.data,per,_dashPerD1,_dashPerD2)){pesoKg+=e.peso;valorR+=e.total||0;}
+  }
+  return {kg:pesoKg,val:valorR};
+}
+function _vendasPeriodo(per){
+  // Receita de vendas do período — lê atendHist + caixasHist + movs financeiros
+  var valorR=0,pesoKg=0;
+  // atendHist (dia atual em memória)
+  for(var i=0;i<atendHist.length;i++){
+    var ah=atendHist[i];
+    if(ah.tipo!=='Venda'&&ah.tipo!=='Logistica Reversa')continue;
+    // Descobre data via movs financeiros
+    var ahData=null;
+    for(var k=0;k<DB.movs.length;k++){if(DB.movs[k].desc&&DB.movs[k].desc.indexOf('#'+ah.num)>=0){ahData=DB.movs[k].data;break;}}
+    if(!ahData)ahData=hj();
+    if(!_perFiltro(ahData,per,_dashPerD1,_dashPerD2))continue;
+    valorR+=Math.abs(ah.total||0);
+    if(ah.itens){for(var j=0;j<ah.itens.length;j++){var it=ah.itens[j];if(!it.uni&&(it.tipo==='Venda'||it.tipo==='Logistica Reversa'))pesoKg+=(it.pesoLiquido!=null?it.pesoLiquido:it.peso)||0;}}
+  }
+  // caixasHist (dias anteriores)
+  if(DB.caixasHist){
+    for(var i=0;i<DB.caixasHist.length;i++){
+      var cx=DB.caixasHist[i];
+      if(!_perFiltro(cx.data||'',per,_dashPerD1,_dashPerD2))continue;
+      var mvs=cx.movimentos||[];
+      for(var j=0;j<mvs.length;j++){
+        if(mvs[j].tipo==='Venda'||mvs[j].tipo==='Logistica Reversa'){
+          valorR+=Math.abs(mvs[j].total||mvs[j].venda||0);
+          if(mvs[j].itensList){for(var k=0;k<mvs[j].itensList.length;k++){var it=mvs[j].itensList[k];if(!it.uni&&(it.tipo==='Venda'||it.tipo==='Logistica Reversa'))pesoKg+=(it.pesoLiquido!=null?it.pesoLiquido:it.peso)||0;}}
+        }
+      }
+    }
   }
   return {kg:pesoKg,val:valorR};
 }
@@ -3125,7 +3227,7 @@ function _dashCharts(){
     c.width=c.offsetWidth||320;c.height=160;
     var pers=['hoje','semana','mes','trim','sem','ano'];
     var nms=['Hj','7d','Mês','Trim','Sem','Ano'];
-    var vals=[];for(var i=0;i<pers.length;i++)vals.push(_entrPeriodo(pers[i]).val);
+    var vals=[];for(var i=0;i<pers.length;i++)vals.push(_vendasPeriodo(pers[i]).val);
     var max=Math.max.apply(null,vals)||1;
     var W=c.width,H=c.height,pad=10,bw=Math.floor((W-pad*2)/pers.length)-6,gap=6;
     ctx.clearRect(0,0,W,H);
@@ -3211,15 +3313,17 @@ function _dashCharts(){
     var ctx=c.getContext('2d');
     var sz=Math.min(c.offsetWidth||140,140);
     c.width=sz;c.height=sz;
-    var tipos={Compra:0,Doacao:0,Coleta:0};
+    var tipos={Compra:0,Doacao:0,Coleta:0,'Logistica Reversa':0};
     for(var i=0;i<DB.entradas.length;i++){
       var t=DB.entradas[i].tipo;
+      var tNorm=t?t.charAt(0).toUpperCase()+t.slice(1):t;
       if(tipos[t]!==undefined)tipos[t]+=DB.entradas[i].peso;
+      else if(tipos[tNorm]!==undefined)tipos[tNorm]+=DB.entradas[i].peso;
       else tipos['Coleta']+=DB.entradas[i].peso;
     }
     var keys=Object.keys(tipos);var total=0;for(var i=0;i<keys.length;i++)total+=tipos[keys[i]];
     if(!total){ctx.fillStyle='#2a3a52';ctx.beginPath();ctx.arc(sz/2,sz/2,sz/2-4,0,Math.PI*2);ctx.fill();return;}
-    var cols={Compra:'#22c55e',Doacao:'#3b82f6',Coleta:'#f59e0b'};
+    var cols={Compra:'#22c55e',Doacao:'#3b82f6',Coleta:'#f59e0b','Logistica Reversa':'#a855f7'};
     var start=-Math.PI/2;
     for(var i=0;i<keys.length;i++){
       var k=keys[i];if(!tipos[k])continue;
@@ -3328,7 +3432,7 @@ function pgDash(){
 
   // ── Período selecionado ──
   var per=_dashPer;
-  var perRes=_entrPeriodo(per);
+  var perRes=_vendasPeriodo(per);
   var perLabels={hoje:'Hoje',semana:'7 dias',mes:'Este mês',trim:'Trimestre',sem:'Semestre',ano:'Este ano'};
 
   // ── Coletas ──
@@ -3419,11 +3523,11 @@ function pgDash(){
   var perTabH=_buildPerBar(_dashPer,'dash','','','swDashPer');
 
   // ── Pizza legenda ──
-  var tiposEntr={Compra:0,Doacao:0,Coleta:0};
-  for(var i=0;i<DB.entradas.length;i++){var t=DB.entradas[i].tipo;if(tiposEntr[t]!==undefined)tiposEntr[t]+=DB.entradas[i].peso;else tiposEntr['Coleta']+=DB.entradas[i].peso;}
-  var totEntr=tiposEntr.Compra+tiposEntr.Doacao+tiposEntr.Coleta||1;
+  var tiposEntr={Compra:0,Doacao:0,Coleta:0,'Logistica Reversa':0};
+  for(var i=0;i<DB.entradas.length;i++){var t=DB.entradas[i].tipo;var tN=t?t.charAt(0).toUpperCase()+t.slice(1):t;if(tiposEntr[t]!==undefined)tiposEntr[t]+=DB.entradas[i].peso;else if(tiposEntr[tN]!==undefined)tiposEntr[tN]+=DB.entradas[i].peso;else tiposEntr['Coleta']+=DB.entradas[i].peso;}
+  var totEntr=tiposEntr.Compra+tiposEntr.Doacao+tiposEntr.Coleta+tiposEntr['Logistica Reversa']||1;
   var pzLegH='<div style="display:flex;flex-direction:column;gap:7px;justify-content:center">';
-  var pzDat=[{k:'Compra',c:'#22c55e'},{k:'Doacao',c:'#3b82f6'},{k:'Coleta',c:'#f59e0b'}];
+  var pzDat=[{k:'Compra',c:'#22c55e'},{k:'Doacao',c:'#3b82f6'},{k:'Coleta',c:'#f59e0b'},{k:'Logistica Reversa',c:'#a855f7'}];
   for(var i=0;i<pzDat.length;i++){
     var pk=pzDat[i];var pct=Math.round(tiposEntr[pk.k]/totEntr*100);
     pzLegH+='<div style="display:flex;align-items:center;gap:7px">'
@@ -3694,7 +3798,7 @@ function pgDash(){
       ?'<div style="font-size:24px;font-weight:800;color:var(--gr);font-family:monospace;line-height:1">'+fR(perRes.val)+'</div>'
        +'<div style="font-size:11px;color:var(--mt)">'+fKg(perRes.kg)+'kg recebido</div>'
       :'<div style="font-size:20px;font-weight:800;color:var(--mt);font-family:monospace;line-height:1">R$ 0,00</div>'
-       +'<div style="font-size:11px;color:var(--mt)">sem compras no período</div>')
+       +'<div style="font-size:11px;color:var(--mt)">sem vendas no período</div>')
     +'</div>'
     +'</div>'
     +'<canvas id="ch-barras" style="width:100%;height:130px;display:block"></canvas>'
@@ -4411,7 +4515,7 @@ function pgEstoque(){
 
   // ── Aba Entradas ───────────────────────────────────────────
   var ef=_eTabEntrFiltro;
-  var tipos_entr=['Todos','Compra','Doacao','Coleta'];
+  var tipos_entr=['Todos','Compra','Doacao','Coleta','Logistica Reversa'];
   var filtH='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">';
   for(var i=0;i<tipos_entr.length;i++){
     var on=tipos_entr[i]===ef;
@@ -4423,7 +4527,7 @@ function pgEstoque(){
     var e=DB.entradas[i];
     if(ef!=='Todos'&&e.tipo!==ef)continue;
     totEntrKg+=e.peso;totEntrVal+=e.total||0;
-    var tcol=e.tipo==='Compra'?'var(--gr)':e.tipo==='Doacao'?'var(--bl)':'var(--or)';
+    var tcol=e.tipo==='Compra'?'var(--gr)':e.tipo==='Doacao'?'var(--bl)':e.tipo==='Logistica Reversa'?'#a855f7':'var(--or)';
     var pNome='—';for(var j=0;j<DB.produtos.length;j++){if(DB.produtos[j].id===e.pId){pNome=DB.produtos[j].ic+' '+DB.produtos[j].nome;break;}}
     entrRows+='<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--bd)">'
       +'<div style="width:36px;height:36px;border-radius:8px;background:'+tcol+'18;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px">&#128229;</div>'
@@ -5022,7 +5126,7 @@ function saveTransf(){
     if(pPa)pPa.est=+(pPa.est+d.pE).toFixed(2);
     DB.transf.unshift({id:nid(),data:hj(),de:de,para:d.para,pS:+(totalPE/destinos.length).toFixed(2),pE:d.pE,obs:ob+(destinos.length>1?' ('+i+1+'/'+destinos.length+')':'')});
   }
-  closeM();go('estoque');
+  autoSave();closeM();go('estoque');
 }
 
 
@@ -5069,26 +5173,66 @@ function renderSpecsHtml(catNome,savedSpecs,prefix){
     }
     h+='</div>';
   }
+  // Extra specs (campos extras do usuario)
+  h+='<div id="'+prefix+'-extra-specs" style="margin-top:8px">';
+  var extraSpecs=savedSpecs?Object.keys(savedSpecs).filter(function(k){var inTpl=false;for(var i=0;i<tpl.length;i++){if(tpl[i].key===k){inTpl=true;break;}}return !inTpl&&savedSpecs[k]!==false&&savedSpecs[k]!==''&&savedSpecs[k]!==undefined;}):[];
+  for(var ei=0;ei<extraSpecs.length;ei++){
+    var ek=extraSpecs[ei];var ev=savedSpecs[ek];
+    h+='<div style="display:flex;gap:5px;align-items:center;margin-bottom:4px" id="'+prefix+'-extra-row-'+ei+'">'      +'<input class="inp" style="flex:0 0 38%;font-size:11px;padding:4px 7px" placeholder="Nome" id="'+prefix+'-ek-'+ei+'" value="'+ek.replace(/"/g,'&quot;')+'">'      +'<input class="inp" style="flex:1;font-size:11px;padding:4px 7px" placeholder="Valor" id="'+prefix+'-ev-'+ei+'" value="'+(ev===true?'Sim':ev).toString().replace(/"/g,'&quot;')+'">'      +'<button onclick="removeExtraSpec(this)" style="background:var(--s3);border:1px solid var(--rd);color:var(--rd);border-radius:6px;padding:3px 8px;font-size:13px;cursor:pointer;flex-shrink:0">&#10005;</button>'      +'</div>';
+  }
+  h+='</div>';
+  h+='<button onclick="addExtraSpec(\&apos;'+prefix+'\&apos;)" style="margin-top:6px;background:var(--s3);border:1px dashed var(--bd);color:var(--mt);border-radius:var(--r);padding:5px 12px;font-size:11px;cursor:pointer;width:100%">+ Adicionar característica</button>';
   h+='</div>';
   return h;
 }
 
+function addExtraSpec(prefix){
+  var ct=document.getElementById(prefix+'-extra-specs');
+  if(!ct)return;
+  var idx=ct.querySelectorAll('[id^="'+prefix+'-ek-"]').length;
+  var row=document.createElement('div');
+  row.style.cssText='display:flex;gap:5px;align-items:center;margin-bottom:4px';
+  row.id=prefix+'-extra-row-'+idx;
+  row.innerHTML='<input class="inp" style="flex:0 0 38%;font-size:11px;padding:4px 7px" placeholder="Nome" id="'+prefix+'-ek-'+idx+'">'
+    +'<input class="inp" style="flex:1;font-size:11px;padding:4px 7px" placeholder="Valor" id="'+prefix+'-ev-'+idx+'">'
+    +'<button onclick="removeExtraSpec(this)" style="background:var(--s3);border:1px solid var(--rd);color:var(--rd);border-radius:6px;padding:3px 8px;font-size:13px;cursor:pointer;flex-shrink:0">&#10005;</button>';
+  ct.appendChild(row);
+  row.querySelector('input').focus();
+}
+
+function removeExtraSpec(btn){
+  var row=btn.parentNode;if(row)row.remove();
+}
+
 function getSpecsFromForm(prefix,catNome){
   var tpl=getRevCatSpecs(catNome);
-  if(!tpl||tpl.length===0)return {};
   var specs={};
-  var boolStart=0;
-  for(var i=0;i<tpl.length;i++){if(tpl[i].type!=='bool')boolStart++;}
-  var bi=0;
-  for(var i=0;i<tpl.length;i++){
-    var f=tpl[i];
-    if(f.type==='bool'){
-      var el=document.getElementById(prefix+'-sp-'+(boolStart+bi));
-      if(el)specs[f.key]=el.checked;
-      bi++;
-    }else{
-      var el=document.getElementById(prefix+'-sp-'+i);
-      if(el&&el.value.trim())specs[f.key]=el.value.trim();
+  if(tpl&&tpl.length>0){
+    var boolStart=0;
+    for(var i=0;i<tpl.length;i++){if(tpl[i].type!=='bool')boolStart++;}
+    var bi=0;
+    for(var i=0;i<tpl.length;i++){
+      var f=tpl[i];
+      if(f.type==='bool'){
+        var el=document.getElementById(prefix+'-sp-'+(boolStart+bi));
+        if(el)specs[f.key]=el.checked;
+        bi++;
+      }else{
+        var el=document.getElementById(prefix+'-sp-'+i);
+        if(el&&el.value.trim())specs[f.key]=el.value.trim();
+      }
+    }
+  }
+  // Extra specs (campos livres)
+  var ct=document.getElementById(prefix+'-extra-specs');
+  if(ct){
+    var keyEls=ct.querySelectorAll('[id^="'+prefix+'-ek-"]');
+    for(var i=0;i<keyEls.length;i++){
+      var k=keyEls[i].value.trim();
+      var vidx=keyEls[i].id.replace(prefix+'-ek-','');
+      var vel=document.getElementById(prefix+'-ev-'+vidx);
+      var v=vel?vel.value.trim():'';
+      if(k)specs[k]=v||true;
     }
   }
   return specs;
@@ -5190,6 +5334,28 @@ function pgRevenda(){
   }
   if(!cards)cards='<div class="card" style="text-align:center;color:var(--mt);padding:30px">Nenhum produto encontrado.</div>';
 
+  // Modo lista
+  var listaRows='';
+  for(var g=0;g<ordemGrupos.length;g++){
+    var grp=grupos[ordemGrupos[g]];
+    var p0=grp.items[0];var qtd=grp.items.length;
+    var specsStr='';var s=p0.specs||{};var sk=Object.keys(s);
+    for(var ki=0;ki<sk.length&&ki<3;ki++){var sv=s[sk[ki]];if(!sv&&sv!==0)continue;specsStr+=(specsStr?' · ':'')+( sv===true?sk[ki]:sk[ki]+': '+sv);}
+    listaRows+='<tr style="border-bottom:1px solid var(--bd);cursor:pointer" onclick="mEditRev('+p0.id+')">'
+      +'<td style="padding:9px 10px"><div style="font-size:13px;font-weight:600">'+(p0.nomeBase||p0.prod||'Sem nome')+(qtd>1?' <span style="font-size:11px;color:var(--bl);font-weight:700">('+qtd+'x)</span>':'')+'</div>'
+      +(specsStr?'<div style="font-size:10px;color:var(--mt);margin-top:1px">'+specsStr+'</div>':'')+'</td>'
+      +'<td style="padding:9px 6px;font-size:11px;color:var(--mt);white-space:nowrap">'+(p0.cat||'')+'</td>'
+      +'<td style="padding:9px 6px;font-size:11px;white-space:nowrap">'+(p0.cond?'<span style="color:var(--pu)">'+p0.cond+'</span>':'')+'</td>'
+      +'<td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--gr);font-family:monospace;white-space:nowrap">'+fR(p0.preco)+'</td>'
+      +'<td style="padding:9px 8px;text-align:right" onclick="event.stopPropagation()">'
+      +'<button class="btn" style="font-size:11px;padding:4px 9px" onclick="mVU('+p0.id+')">Vender</button>'
+      +'</td>'
+      +'</tr>';
+  }
+  var listaHtml=listaRows
+    ?'<div class="card" style="padding:0;overflow:hidden"><table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--bd)"><th style="padding:8px 10px;font-size:11px;color:var(--mt);text-align:left;font-weight:600">Produto</th><th style="padding:8px 6px;font-size:11px;color:var(--mt);text-align:left;font-weight:600">Cat</th><th style="padding:8px 6px;font-size:11px;color:var(--mt);text-align:left;font-weight:600">Cond.</th><th style="padding:8px 10px;font-size:11px;color:var(--mt);text-align:right;font-weight:600">Preço</th><th></th></tr></thead><tbody>'+listaRows+'</tbody></table></div>'
+    :'<div class="card" style="text-align:center;color:var(--mt);padding:30px">Nenhum produto encontrado.</div>';
+
   // Relatório
   var totalDisp=0,totalVend=0,totalRec=0,qtdDisp=0,qtdVend=0;
   for(var i=0;i<DB.revenda.length;i++){
@@ -5250,8 +5416,7 @@ function pgRevenda(){
     +'var i=document.getElementById("rev-barcode-inp");if(i)i.focus();}'
     +'});}'
     +'},200);})();<\/script>'
-    +'<div class="tabs"><button class="tabbtn'+(revTabAtiva==='lista'?' on':'')+'" onclick="revTabView=\'lista\';go(\'revenda\')">Lista</button><button class="tabbtn'+(revTabAtiva==='vendidos'?' on':'')+'" onclick="revTabView=\'vendidos\';go(\'revenda\')">&#128200; Vendidos</button></div>'
-    +(revTabAtiva==='lista'?catBar+condBar+'<div class="g2">'+cards+'</div>':_buildRevVendidos())
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'    +'<div class="tabs" style="margin-bottom:0"><button class="tabbtn'+(revTabAtiva==='lista'?' on':'')+'" onclick="revTabView=\'lista\';go(\'revenda\')">Lista</button><button class="tabbtn'+(revTabAtiva==='vendidos'?' on':'')+'" onclick="revTabView=\'vendidos\';go(\'revenda\')">&#128200; Vendidos</button></div>'    +(revTabAtiva==='lista'?'<div style="display:flex;gap:4px"><button onclick="revViewMode=\'cards\';go(\'revenda\')" style="background:'+(revViewMode!=='lista'?'var(--grb)':'var(--s2)')+';border:1px solid '+(revViewMode!=='lista'?'var(--gr)':'var(--bd)')+';color:'+(revViewMode!=='lista'?'var(--gr)':'var(--mt)')+';border-radius:6px;padding:5px 10px;font-size:15px;cursor:pointer" title="Cards">&#9638;</button><button onclick="revViewMode=\'lista\';go(\'revenda\')" style="background:'+(revViewMode==='lista'?'var(--grb)':'var(--s2)')+';border:1px solid '+(revViewMode==='lista'?'var(--gr)':'var(--bd)')+';color:'+(revViewMode==='lista'?'var(--gr)':'var(--mt)')+';border-radius:6px;padding:5px 10px;font-size:15px;cursor:pointer" title="Lista">&#9776;</button></div>':'')+'</div>'    +(revTabAtiva==='lista'?catBar+condBar+(revViewMode==='lista'?listaHtml:'<div class="g2">'+cards+'</div>'):_buildRevVendidos())
     +'</div>';
 }
 function mVerUnidadesPorIds(){
@@ -5797,6 +5962,7 @@ function imprimirEtiqueta(id){
 }
 function setRevCond(c){revCondFiltro=c;go('revenda');}
 var revTabView='lista';
+var revViewMode='cards';
 function _buildRevVendidos(){
   var per=_revRelPer;
   var perBar=_buildPerBar(per,'revRel','','','swRevRelPer');
@@ -6652,13 +6818,13 @@ function _finRelatorio(){
 
   // Vendas do período via atendHist + caixasHist
   var vendasPeriodo=0;
-  for(var i=0;i<atendHist.length;i++){if(atendHist[i].tipo==='Venda')vendasPeriodo+=_mvTotal(atendHist[i]);}
+  for(var i=0;i<atendHist.length;i++){if(atendHist[i].tipo==='Venda'||atendHist[i].tipo==='Logistica Reversa')vendasPeriodo+=_mvTotal(atendHist[i]);}
   if(DB.caixasHist){
     for(var i=0;i<DB.caixasHist.length;i++){
       var cx=DB.caixasHist[i];
       if(!_filtrarPorPeriodo(cx.data||''))continue;
       var mvs=cx.movimentos||[];
-      for(var j=0;j<mvs.length;j++){if(mvs[j].tipo==='Venda')vendasPeriodo+=_mvTotal({total:mvs[j].total,itens:mvs[j].itensList||[]});}
+      for(var j=0;j<mvs.length;j++){if(mvs[j].tipo==='Venda'||mvs[j].tipo==='Logistica Reversa')vendasPeriodo+=_mvTotal({total:mvs[j].total,itens:mvs[j].itensList||[]});}
     }
   }
 
@@ -7868,7 +8034,7 @@ function saveNovaCat(tipo){
   if(!n){alert('Informe o nome da categoria!');return;}
   var arr=tipo==='entrada'?DB.cats.entrada:DB.cats.saida;
   arr.push({id:nid(),nome:n,cor:cor});
-  closeM();
+  autoSave();closeM();
   document.getElementById('fin-content').innerHTML=_finRender('categorias');
 }
 function mEditCat(id,tipo){
@@ -7892,7 +8058,7 @@ function saveEditCat(id,tipo){
   var cor=document.getElementById('cat-cor').value||'#6b7280';
   if(!n){alert('Informe o nome!');return;}
   for(var i=0;i<arr.length;i++){if(arr[i].id===id){arr[i].nome=n;arr[i].cor=cor;break;}}
-  closeM();
+  autoSave();closeM();
   document.getElementById('fin-content').innerHTML=_finRender('categorias');
 }
 function delCat(id,tipo){
@@ -7901,7 +8067,7 @@ function delCat(id,tipo){
   confirmar('Excluir a categoria <b>'+nome+'</b>?',function(){
     var arr2=tipo==='entrada'?DB.cats.entrada:DB.cats.saida;
     for(var i=0;i<arr2.length;i++){if(arr2[i].id===id){arr2.splice(i,1);break;}}
-    closeM();
+    autoSave();closeM();
     document.getElementById('fin-content').innerHTML=_finRender('categorias');
   });
 }
@@ -7935,7 +8101,7 @@ function saveMov(tipo){
   if(!cat){alert('Selecione uma categoria!');return;}
   DB.movs.unshift({id:nid(),data:hj(),desc:d,tipo:tipo,cat:cat,valor:v,conta:c});
   for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===c){DB.contas[i].saldo=+(tipo==='entrada'?DB.contas[i].saldo+v:DB.contas[i].saldo-v).toFixed(2);break;}}
-  closeM();go('financeiro');
+  autoSave();closeM();go('financeiro');
 }
 
 
@@ -10182,7 +10348,7 @@ function delCmpPreco(lado,prodId,itemIdx){
   var tab=null;for(var i=0;i<DB.tabelas.length;i++){if(String(DB.tabelas[i].id)===String(tabId)){tab=DB.tabelas[i];break;}}
   if(!tab||itemIdx<0)return;
   confirmar('Remover este produto da tabela?',function(){
-    tab.itens.splice(itemIdx,1);go('tabelas');
+    tab.itens.splice(itemIdx,1);autoSave();go('tabelas');
   });
 }
 
@@ -10426,7 +10592,7 @@ async function _imtAiPreview(input){
     });
     var mimeType=file.type||'image/jpeg';
     if(file.name.toLowerCase().endsWith('.pdf'))mimeType='application/pdf';
-    var key=DB.geminiKey||'';
+    var key=DB.geminiKey||CFG.sistema.geminiKey||'';
     if(!key){status.innerHTML='<div class="al alr">Chave do Gemini não configurada!</div>';return;}
     var prompt='Você é um extrator de dados de tabelas de preços de materiais recicláveis. Analise este arquivo e extraia TODOS os produtos e seus preços. Retorne APENAS um JSON válido neste formato, sem markdown, sem explicação:\n{"itens":[{"nome":"Nome do produto","preco":0.00}]}\nSe um preço estiver em formato brasileiro (vírgula), converta para número decimal com ponto. Extraia todos os itens visíveis.';
     var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+key,{
@@ -11665,6 +11831,7 @@ function saveMeuPin(){
   // Update in USERS array and in CU
   for(var i=0;i<USERS.length;i++){if(USERS[i].id===CU.id){USERS[i].pin=nw;break;}}
   CU.pin=nw;
+  saveDB();
   closeM();
   // Brief success feedback
   var sb=document.getElementById('sbur');if(sb){var orig=sb.textContent;sb.textContent='PIN alterado!';sb.style.color='var(--gr)';setTimeout(function(){sb.textContent=orig;sb.style.color='';},2000);}
@@ -11722,7 +11889,7 @@ function saveNovaRole(){
   var id='role_'+Date.now();
   CUSTOM_ROLES.push({id:id,nome:n,pages:pages});
   PPAGES[id]=pages;PNOME[id]=n;
-  closeM();_goUsuarios();
+  saveDB();closeM();_goUsuarios();
 }
 function mEditRole(roleId){
   var r=getRoleById(roleId);
@@ -11750,6 +11917,7 @@ function saveEditRole(roleId){
     }
   }
   PPAGES[roleId]=pages;PNOME[roleId]=n;
+  saveDB();
   closeM();_goUsuarios();
 }
 function delRole(roleId){
@@ -11759,7 +11927,7 @@ function delRole(roleId){
   confirmar('Excluir a funcao <b>'+nome+'</b>?',function(){
     for(var i=0;i<BASE_ROLES.length;i++){if(BASE_ROLES[i].id===roleId){BASE_ROLES.splice(i,1);break;}}
     for(var i=0;i<CUSTOM_ROLES.length;i++){if(CUSTOM_ROLES[i].id===roleId){CUSTOM_ROLES.splice(i,1);break;}}
-    _goUsuarios();
+    saveDB();_goUsuarios();
   });
 }
 
@@ -12276,8 +12444,8 @@ function cfgToggleEmp(key,val){
   if(sp){sp.style.background=val?'var(--gr2)':'var(--ft)';}
   if(kn){kn.style.left=val?'20px':'2px';}
 }
-function _saveCfgSistema(){try{localStorage.setItem('bv_cfg_sistema',JSON.stringify(CFG.sistema));}catch(e){}}
-function _saveCfgIntegracao(){try{localStorage.setItem('bv_cfg_integracao',JSON.stringify(CFG.integracao));}catch(e){}}
+function _saveCfgSistema(){autoSave();}
+function _saveCfgIntegracao(){autoSave();}
 function cfgToggleSis(key,val){
   CFG.sistema[key]=val;
   _saveCfgSistema();
@@ -12513,6 +12681,28 @@ window.addEventListener('DOMContentLoaded', function(){
         } else {
           // Nuvem vazia — salva o usuário admin padrão
           _sbSet('bv_users', USERS, function(){});
+        }
+      });
+      // Carrega ROLES da nuvem
+      _sbGet('bv_roles', function(ro){
+        if(ro && ro.base && Array.isArray(ro.base)){
+          BASE_ROLES=ro.base;
+          if(ro.custom && Array.isArray(ro.custom)) CUSTOM_ROLES=ro.custom;
+          var _allR=BASE_ROLES.concat(CUSTOM_ROLES);
+          for(var _ri=0;_ri<_allR.length;_ri++){PPAGES[_allR[_ri].id]=_allR[_ri].pages;}
+          localStorage.setItem('bv_roles',JSON.stringify(ro));
+        }
+      });
+      // Carrega CFG da nuvem
+      _sbGet('bv_cfg', function(cfg){
+        if(cfg && typeof cfg === 'object'){
+          if(cfg.empresa) Object.assign(CFG.empresa, cfg.empresa);
+          if(cfg.sistema) Object.assign(CFG.sistema, cfg.sistema);
+          if(cfg.integracao) Object.assign(CFG.integracao, cfg.integracao);
+          if(cfg.motivosSangria) CFG.motivosSangria=cfg.motivosSangria;
+          if(cfg.motivosReforco) CFG.motivosReforco=cfg.motivosReforco;
+          if(cfg.saldoAberturaPadrao!=null) CFG.saldoAberturaPadrao=cfg.saldoAberturaPadrao;
+          localStorage.setItem('bv_cfg',JSON.stringify(CFG));
         }
       });
     } else {
@@ -13216,8 +13406,8 @@ function _pclDetalhe(id){
     +(e.iaResult?'<div style="background:var(--grb);border-radius:8px;padding:9px 12px;margin-bottom:10px">'
       +'<div style="font-size:10px;color:var(--gr);font-weight:700;margin-bottom:4px">ANÁLISE DA IA</div>'
       +'<div style="font-size:12px;color:var(--tx);line-height:1.5">'+e.iaResult.reasoning+'</div>'
-      +_pclConfiancaBar(e.iaResult.confidence)+'</div>':'')
-    +'<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">'
+      +'</div>':'')
+    +'<div style="display:flex;gap:8px;justijustify-content:flex-end;flex-wrap:wrap">'
     +'<button class="btn btn-rd" style="font-size:12px;padding:7px 14px" onclick="_pclExcluir(\''+id+'\')">&#128465; Excluir</button>'
     +'<button class="btn" style="background:var(--or);font-size:12px;padding:7px 14px" onclick="_pclReclassificar(\''+id+'\')">&#9998; Reclassificar</button>'
     +'<button class="btn" style="background:var(--s3);color:var(--tx);font-size:12px;padding:7px 14px" onclick="closeM()">Fechar</button>'
