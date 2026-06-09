@@ -305,7 +305,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.5.6';
+var APP_VERSION='5.5.7';
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[],
@@ -771,8 +771,10 @@ function closeSb(){if(window.innerWidth<=768)document.getElementById('sb').class
 var pesAbas=[],pesAtiva=0,atendHist=[];
 function savePesState(){
   try{localStorage.setItem('bv_pesAbas',JSON.stringify(pesAbas));localStorage.setItem('bv_pesAtiva',String(pesAtiva));}catch(e){}
-  // Sincroniza na nuvem só se este dispositivo fez alterações
-  if(_sbReady && _localHasChanges){autoSave();}
+  // Toda ação do usuário no carrinho deve propagar para a nuvem.
+  // (Antes dependia de _localHasChanges, que era zerado por _applySnap e travava
+  //  o save após receber dados da nuvem — causava carrinho não sincronizar.)
+  if(_sbReady){autoSave();}
 }
 function loadPesState(){try{var a=localStorage.getItem('bv_pesAbas');var i=localStorage.getItem('bv_pesAtiva');if(a){var arr=JSON.parse(a);if(arr&&arr.length){pesAbas=arr;pesAtiva=Math.min(parseInt(i)||0,arr.length-1);return true;}}return false;}catch(e){return false;}}
 function clearPesState(){try{localStorage.removeItem('bv_pesAbas');localStorage.removeItem('bv_pesAtiva');}catch(e){}}
@@ -882,6 +884,86 @@ function _sbGet(chave, onDone){
   });
 }
 
+// Leitura usada pelo guard de gravação: devolve {ok, snap}.
+// ok=false significa FALHA DE LEITURA (rede) — nesse caso o guard NÃO grava,
+// para não arriscar sobrescrever a nuvem às cegas com dados possivelmente antigos.
+// ok=true com snap=null significa nuvem genuinamente vazia (primeira gravação).
+function _sbGetGuard(chave, onDone){
+  if(!_sbReady||!_sbClient){onDone({ok:false,snap:null});return;}
+  _sbClient.from('biovale_dados').select('valor').eq('chave',chave).maybeSingle().then(function(r){
+    if(r.error){onDone({ok:false,snap:null});return;}      // erro de rede/consulta
+    if(!r.data){onDone({ok:true,snap:null});return;}        // nuvem vazia de verdade
+    try{onDone({ok:true,snap:JSON.parse(r.data.valor)});}catch(e){onDone({ok:false,snap:null});}
+  }, function(){onDone({ok:false,snap:null});});             // rejeição da promise (offline)
+}
+
+// ── BACKUP DIÁRIO AUTOMÁTICO NA NUVEM ─────────────────────────────────────
+// Salva uma cópia do estado completo com chave bv_backup_AAAA-MM-DD, uma vez
+// por dia. Mantém os últimos 30 dias. Permite recuperar dados de dias passados
+// mesmo no plano gratuito do Supabase (que não tem Point-in-Time Recovery).
+var _backupChecked = false;
+
+function _dataChaveHoje(){
+  var d=new Date();
+  return 'bv_backup_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+// Verifica e cria o backup do dia, se ainda não existir. Chamado após o load da nuvem.
+function _checkBackupDiario(){
+  if(_backupChecked || !_sbReady || !_sbClient) return;
+  _backupChecked = true;
+  var chaveHoje = _dataChaveHoje();
+  // Verifica se já existe backup de hoje
+  _sbClient.from('biovale_dados').select('chave').eq('chave',chaveHoje).maybeSingle().then(function(r){
+    if(r.error) return;             // erro de rede: tenta de novo no próximo load
+    if(r.data) return;              // backup de hoje já existe
+    // Cria o backup do dia com o estado atual da nuvem (fonte da verdade)
+    _sbGet('bv_db', function(snap){
+      if(!snap) return;             // sem dados na nuvem ainda
+      var backup={
+        criadoEm:new Date().toISOString(),
+        versao:APP_VERSION||'BioVale-v5',
+        DB:snap,
+        CFG:JSON.parse(JSON.stringify(CFG))
+      };
+      _sbSet(chaveHoje, backup, function(ok){
+        if(ok){
+          console.log('[BioVale] Backup diário criado:', chaveHoje);
+          _limparBackupsAntigos(); // remove backups com mais de 30 dias
+        }
+      });
+    });
+  });
+}
+
+// Remove backups com mais de 30 dias para não acumular indefinidamente.
+function _limparBackupsAntigos(){
+  if(!_sbReady||!_sbClient)return;
+  _sbClient.from('biovale_dados').select('chave').like('chave','bv_backup_%').then(function(r){
+    if(r.error||!r.data)return;
+    var limite=new Date(); limite.setDate(limite.getDate()-30);
+    for(var i=0;i<r.data.length;i++){
+      var ch=r.data[i].chave;                       // formato: bv_backup_AAAA-MM-DD
+      var iso=ch.replace('bv_backup_','');
+      var dt=new Date(iso+'T00:00:00');
+      if(!isNaN(dt.getTime()) && dt < limite){
+        _sbClient.from('biovale_dados').delete().eq('chave',ch).then(function(){});
+      }
+    }
+  });
+}
+
+// Lista os backups disponíveis na nuvem (mais recentes primeiro). Callback recebe array de chaves.
+function _listarBackups(onDone){
+  if(!_sbReady||!_sbClient){onDone([]);return;}
+  _sbClient.from('biovale_dados').select('chave,atualizado_em').like('chave','bv_backup_%').then(function(r){
+    if(r.error||!r.data){onDone([]);return;}
+    var arr=r.data.map(function(x){return {chave:x.chave, data:x.chave.replace('bv_backup_',''), ts:x.atualizado_em};});
+    arr.sort(function(a,b){return b.data.localeCompare(a.data);}); // mais recente primeiro
+    onDone(arr);
+  });
+}
+
 // Inicia Supabase assim que a lib CDN estiver disponível
 (function _waitSB(){
   if(typeof supabase !== 'undefined' && supabase.createClient){
@@ -896,6 +978,8 @@ function _sbGet(chave, onDone){
 var _sbChannel = null;
 var _lastSaveTs = 0;   // timestamp do último saveDB() DESTE dispositivo
 var _localHasChanges = false; // true se este dispositivo fez alguma alteração
+var _baseCloudSavedAt = 0;    // savedAt do último snapshot da nuvem que ESTE dispositivo carregou/aplicou
+var _saveInFlight = false;    // evita saves concorrentes durante a verificação de freshness
 var _rtApplying = false;
 
 function _sbStartRealtime(){
@@ -1041,9 +1125,6 @@ var _dbSaveTimer=null;
 function saveDB(){
   _lastSaveTs = Date.now();
   _localHasChanges = true;
-  // Antes de subir, verifica se o q está na nuvem não é mais recente
-  // _lastCloudTs é o atualizado_em do Supabase que recebemos por último
-  // Se ele for mais recente que nosso último save, não sobrescreve
   try{
     var snap={
       savedAt:Date.now(),geminiKey:DB.geminiKey,caixaDia:DB.caixaDia,caixaOntem:DB.caixaOntem,caixasHist:DB.caixasHist,
@@ -1055,33 +1136,86 @@ function saveDB(){
       concorrentes:DB.concorrentes,
       pesAbasCloud:pesAbas,pesAtivaCloud:pesAtiva,pesAbasTs:Date.now()
     };
-    // 1. Salva local como fallback imediato
+    // 1. Salva local como fallback imediato (sempre — nunca perde dado local)
     localStorage.setItem('bv_db',JSON.stringify(snap));
     localStorage.setItem('bv_db_savedAt',String(snap.savedAt));
     localStorage.setItem('bv_users',JSON.stringify(USERS));
     localStorage.setItem('bv_roles',JSON.stringify({base:BASE_ROLES,custom:CUSTOM_ROLES}));
     localStorage.setItem('bv_cfg',JSON.stringify(CFG));
-    // 2. Sincroniza na nuvem
+    // 2. Sincroniza na nuvem COM proteção anti-sobrescrita
     if(_sbReady){
       _syncBadge('saving','Salvando…');
-      // Sobe para o Supabase — usuário fez uma alteração
-      _sbSet('bv_db', snap, function(ok){
-        if(ok){
-          _lastCloudTs = new Date().toISOString();
-          _sbSet('bv_users', USERS, function(ok2){
-            _sbSet('bv_roles',{base:BASE_ROLES,custom:CUSTOM_ROLES},function(){
-              _sbSet('bv_cfg', CFG, function(){
-                if(ok2) _syncBadge('idle','Nuvem ativa');
-                else     _syncBadge('error','Erro na nuvem');
-              });
-            });
-          });
-        } else {
-          _syncBadge('error','Erro na nuvem');
-        }
-      });
+      _saveToCloudGuarded(snap);
     }
   }catch(e){}
+}
+
+// Sobe o snapshot para a nuvem SOMENTE após confirmar que a nuvem não avançou
+// além da base que este dispositivo carregou. Protege contra um dispositivo
+// "zumbi" (aba/celular que ficou aberto com dados antigos) apagar o trabalho
+// salvo por outros dispositivos.
+function _saveToCloudGuarded(snap){
+  if(_saveInFlight) return; // já tem uma verificação em andamento; o timer do autoSave reagenda
+  _saveInFlight = true;
+  // Lê o estado atual da nuvem antes de gravar
+  _sbGetGuard('bv_db', function(res){
+    // FALHA DE LEITURA (rede): não grava às cegas. Mantém local salvo e reagenda.
+    if(!res.ok){
+      _saveInFlight = false;
+      _syncBadge('error','Sem conexão — salvo localmente, tentando de novo…');
+      // Tenta de novo em alguns segundos (sem perder o dado, que já está em localStorage)
+      setTimeout(function(){ if(_localHasChanges) autoSave(); }, 5000);
+      return;
+    }
+    var cloud = res.snap;
+    var cloudSavedAt = (cloud && cloud.savedAt) ? cloud.savedAt : 0;
+    // Se a nuvem está MAIS RECENTE do que a base que este dispositivo conhece,
+    // significa que outro dispositivo salvou enquanto este estava com dados antigos.
+    // NÃO sobrescreve: recarrega a nuvem e cancela esta gravação cega.
+    if(cloud && cloudSavedAt > _baseCloudSavedAt && cloudSavedAt > 0){
+      _saveInFlight = false;
+      console.warn('[BioVale] Save bloqueado: nuvem mais recente ('+cloudSavedAt+') que a base local ('+_baseCloudSavedAt+'). Recarregando nuvem.');
+      _syncBadge('saving','Sincronizando dados mais recentes…');
+      // Recarrega o estado da nuvem por cima (a nuvem é a fonte da verdade)
+      _applySnap(cloud);
+      _sanitizeRevenda();
+      try{
+        localStorage.setItem('bv_db',JSON.stringify(cloud));
+        localStorage.setItem('bv_db_savedAt',String(cloud.savedAt||Date.now()));
+      }catch(e){}
+      buildLoginList();
+      if(CU && pgAtiva){
+        var mOpen = document.getElementById('mo') && !document.getElementById('mo').classList.contains('H');
+        if(!mOpen) _rtRerenderAtual();
+      }
+      _syncBadge('idle','Nuvem ativa');
+      // Avisa o usuário de forma não-bloqueante: a alteração local não foi perdida
+      // localmente, mas precisa ser refeita sobre os dados atualizados.
+      setTimeout(function(){
+        _syncBadge('idle','Dados atualizados da nuvem — confira antes de continuar');
+        setTimeout(function(){_syncBadge('idle','Nuvem ativa');},4000);
+      },50);
+      return;
+    }
+    // Nuvem não avançou (ou está vazia): seguro gravar.
+    _sbSet('bv_db', snap, function(ok){
+      _saveInFlight = false;
+      if(ok){
+        _baseCloudSavedAt = snap.savedAt; // nossa gravação passa a ser a base conhecida
+        _lastCloudTs = new Date().toISOString();
+        _sbSet('bv_users', USERS, function(ok2){
+          _sbSet('bv_roles',{base:BASE_ROLES,custom:CUSTOM_ROLES},function(){
+            _sbSet('bv_cfg', CFG, function(){
+              if(ok2) _syncBadge('idle','Nuvem ativa');
+              else     _syncBadge('error','Erro na nuvem');
+            });
+          });
+        });
+      } else {
+        _syncBadge('error','Erro na nuvem');
+      }
+    });
+  });
 }
 function loadDB(){
   // Carrega imediatamente do localStorage (síncrono) — a nuvem é carregada no DOMContentLoaded
@@ -1180,6 +1314,9 @@ function _sanitizeRevenda(){
 function _applySnap(s){
   if(!s)return;
   _localHasChanges = false; // dados vieram da nuvem, não são alterações locais
+  // Marca a versão da nuvem que este dispositivo agora possui em memória.
+  // Usado por saveDB() para detectar se a nuvem avançou desde então (proteção anti-sobrescrita).
+  if(s.savedAt && s.savedAt > _baseCloudSavedAt) _baseCloudSavedAt = s.savedAt;
   if(s.caixaDia!==undefined)DB.caixaDia=s.caixaDia;
   if(s.caixaOntem!==undefined)DB.caixaOntem=s.caixaOntem;
   if(s.caixasHist)DB.caixasHist=s.caixasHist;
@@ -13018,6 +13155,12 @@ function _cfgDados(){
     +'<div style="display:flex;gap:8px">'
     +'<button class="btn" style="flex:1" onclick="exportarBackupJSON()">&#128229; Backup Completo (JSON)</button>'
     +'</div></div>'
+    // Backup automático na nuvem
+    +'<div style="margin-bottom:14px;padding:12px;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);border-radius:var(--r)">'
+    +'<div style="font-size:13px;font-weight:600;color:var(--gr);margin-bottom:4px">&#9729; Backup Automático na Nuvem</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:8px">O sistema salva automaticamente uma cópia por dia na nuvem (últimos 30 dias). Permite recuperar dados de dias anteriores.</div>'
+    +'<button class="btnO bOg" style="width:100%" onclick="mRestaurarBackupNuvem()">&#128336; Ver e Restaurar Backups Diários</button>'
+    +'</div>'
     // Restaurar
     +'<div style="margin-bottom:14px;padding:12px;background:var(--rdb);border:1px solid rgba(239,68,68,.2);border-radius:var(--r)">'
     +'<div style="font-size:13px;font-weight:600;color:var(--rd);margin-bottom:4px">&#9888; Restaurar Backup</div>'
@@ -13088,6 +13231,59 @@ function restaurarBackup(input){
     }
   };
   reader.readAsText(file);
+}
+
+// Modal: lista os backups diários da nuvem e permite restaurar
+function mRestaurarBackupNuvem(){
+  if(!_sbReady){alert('Nuvem não conectada. Conecte-se à internet para ver os backups.');return;}
+  openM('&#9729; Backups Diários na Nuvem','<div id="bkp-lista" style="max-height:55vh;overflow-y:auto"><div style="text-align:center;padding:30px;color:var(--mt);font-size:13px">Carregando backups…</div></div>',460);
+  _listarBackups(function(arr){
+    var cont=document.getElementById('bkp-lista');
+    if(!cont)return;
+    if(!arr.length){
+      cont.innerHTML='<div style="text-align:center;padding:30px;color:var(--mt);font-size:13px">Nenhum backup encontrado ainda.<br><br>O primeiro backup é criado automaticamente hoje.</div>';
+      return;
+    }
+    var rows='';
+    for(var i=0;i<arr.length;i++){
+      var b=arr[i];
+      var partes=b.data.split('-'); // AAAA-MM-DD
+      var dataBR=partes.length===3?(partes[2]+'/'+partes[1]+'/'+partes[0]):b.data;
+      var hoje=_dataChaveHoje().replace('bv_backup_','');
+      var ehHoje=(b.data===hoje);
+      rows+='<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--bd)">'
+        +'<div><div style="font-size:13px;font-weight:600">'+dataBR+(ehHoje?' <span style="color:var(--gr);font-size:10px">(hoje)</span>':'')+'</div>'
+        +'<div style="font-size:10px;color:var(--mt)">Backup automático</div></div>'
+        +'<button class="bsm bsmg" onclick="restaurarBackupNuvem(\''+b.chave+'\',\''+dataBR+'\')">&#128228; Restaurar</button>'
+        +'</div>';
+    }
+    cont.innerHTML=rows;
+  });
+}
+
+// Restaura um backup específico da nuvem (com dupla confirmação)
+function restaurarBackupNuvem(chave, dataBR){
+  if(!confirm('ATENÇÃO: Isso vai substituir TODOS os dados atuais pela cópia do dia '+dataBR+'.\n\nOs dados de hoje serão perdidos se não estiverem nesse backup. Tem certeza?'))return;
+  if(!confirm('Confirme novamente: restaurar o backup de '+dataBR+'? Esta ação não pode ser desfeita.'))return;
+  _syncBadge('saving','Restaurando backup…');
+  _sbGet(chave, function(backup){
+    if(!backup || !backup.DB){alert('Erro: backup inválido ou não encontrado.');_syncBadge('error','Erro ao restaurar');return;}
+    try{
+      _applySnap(backup.DB);
+      if(backup.CFG)Object.assign(CFG,backup.CFG);
+      _sanitizeRevenda();
+      // Força a base para permitir que esta restauração suba para a nuvem
+      _baseCloudSavedAt = 0;
+      saveDB();
+      _auditLog('Backup do dia '+dataBR+' restaurado');
+      closeM();
+      alert('Backup de '+dataBR+' restaurado com sucesso!');
+      go('dashboard');
+    }catch(err){
+      alert('Erro ao restaurar: '+err.message);
+      _syncBadge('error','Erro ao restaurar');
+    }
+  });
 }
 function _cfgImpressao(){
   return '<div class="card">'
@@ -13699,6 +13895,8 @@ window.addEventListener('DOMContentLoaded', function(){
           _sbClient.from('biovale_dados').select('atualizado_em').eq('chave','bv_db').maybeSingle().then(function(r){if(r.data)_lastCloudTs=r.data.atualizado_em||'';});
           buildLoginList();
           if(pgAtiva){go(pgAtiva);}
+          // Cria o backup diário automático (se ainda não existir hoje)
+          setTimeout(_checkBackupDiario, 2000);
         } else {
           // Nuvem vazia — primeira vez, sobe o que tem localmente
           _syncBadge('saving','Iniciando nuvem…');
