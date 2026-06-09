@@ -311,6 +311,7 @@ var DB={
   produtos:[],
   transf:[],
   entradas:[],
+  gerarTabsCustom:[],
   revenda:[],
   revendaCats:[
     {nome:'Notebooks',  checklist:['Tela','Bateria','Teclado','Carregador'], specs:[
@@ -529,6 +530,13 @@ function doLogin(){
   CU=SU;
   document.getElementById('ls').classList.add('H');document.getElementById('wrap').classList.remove('H');
   buildSidebar();buildBottomNav();
+  // Recarrega o histórico de atendimentos do dia a partir dos dados salvos.
+  // (No logout o atendHist é limpo da memória; sem isto, ao trocar de login o
+  //  histórico do fornecedor/cliente do dia aparecia vazio até dar F5.)
+  try{
+    var _rawDb=localStorage.getItem('bv_db');
+    if(_rawDb){var _snapDb=JSON.parse(_rawDb);if(_snapDb&&Array.isArray(_snapDb.atendHistLS))atendHist=_snapDb.atendHistLS;}
+  }catch(e){}
   // Restaura pesagem pendente do localStorage
   var hadPes=loadPesState();
   var hasPendente=hadPes&&pesAbas&&pesAbas.some(function(a){return a.itens&&a.itens.length>0;});
@@ -1132,6 +1140,7 @@ function saveDB(){
       revenda:DB.revenda,revendaCats:DB.revendaCats,revendaStates:DB.revendaStates,
       entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
       transf:DB.transf,coletas:DB.coletas,funcs:DB.funcs,clientes:DB.clientes,
+      gerarTabsCustom:DB.gerarTabsCustom,
       tabelas:DB.tabelas,contasFixas:DB.contasFixas,contasReceber:DB.contasReceber,centroCusto:DB.centroCusto,cotacoesHist:DB.cotacoesHist,metas:DB.metas,filtrosMat:DB.filtrosMat,
       concorrentes:DB.concorrentes,
       pesAbasCloud:pesAbas,pesAtivaCloud:pesAtiva,pesAbasTs:Date.now()
@@ -1332,6 +1341,7 @@ function _applySnap(s){
   if(s.revendaCats!==undefined)DB.revendaCats=s.revendaCats;
   if(s.revendaStates!==undefined)DB.revendaStates=s.revendaStates;
   if(s.entradas)DB.entradas=s.entradas;
+  if(s.gerarTabsCustom!==undefined)DB.gerarTabsCustom=s.gerarTabsCustom;
   if(s.atendHistLS)atendHist=s.atendHistLS;
   if(s.pesagensEmAberto)DB.pesagensEmAberto=s.pesagensEmAberto;
   if(s.transf)DB.transf=s.transf;
@@ -10991,6 +11001,55 @@ var _gTabs=[
 ];
 var _gPreview=false;
 
+// Insere no _gTabs as tabelas personalizadas salvas (por referência, p/ tweaks persistirem).
+function _gSyncCustom(){
+  if(!DB.gerarTabsCustom)DB.gerarTabsCustom=[];
+  for(var i=0;i<DB.gerarTabsCustom.length;i++){
+    var c=DB.gerarTabsCustom[i];
+    var existe=false;
+    for(var j=0;j<_gTabs.length;j++){if(_gTabs[j].key===c.key){existe=true;break;}}
+    if(!existe)_gTabs.push(c); // mesma referência: alterações refletem no objeto salvo
+  }
+}
+// Abre modal para criar uma nova tabela personalizada (nome + cor + desconto)
+function _gAddCustomModal(){
+  openM('&#127991; Nova Tabela Personalizada',
+    '<div class="mf">'
+    +'<div class="al aly" style="margin-bottom:10px;font-size:12px">Crie uma tabela com qualquer cor da paleta, para usar com clientes específicos. As 5 tabelas padrão não são alteradas.</div>'
+    +'<div class="fld"><label>Nome da Tabela</label><input class="inp" id="gct-nome" placeholder="Ex: Roxa, VIP, Atacado..." maxlength="20"></div>'
+    +'<div class="fld"><label>Desconto padrão (% do preço de venda)</label><input class="inp" type="number" inputmode="decimal" id="gct-val" value="20"></div>'
+    +'<div class="fld">'+buildCorPicker('roxo','gct-cor')+'</div>'
+    +'<div class="brow" style="margin-top:12px"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="_gSaveCustom()">Criar Tabela</button></div>'
+    +'</div>',460);
+}
+// Salva a nova tabela personalizada
+function _gSaveCustom(){
+  var nome=(document.getElementById('gct-nome').value||'').trim();
+  if(!nome){alert('Informe o nome da tabela!');return;}
+  var corId=(document.getElementById('gct-cor')&&document.getElementById('gct-cor').value)||'roxo';
+  var val=parseFloat(document.getElementById('gct-val').value)||0;
+  // Evita nome duplicado (entre padrão e personalizadas)
+  var nomeLow=nome.toLowerCase();
+  var nomesUsados=_gTabs.map(function(t){return t.nome.toLowerCase();});
+  if(nomesUsados.indexOf(nomeLow)>=0){alert('Já existe uma tabela com esse nome. Escolha outro.');return;}
+  var cor=getTabCor({cor:corId});
+  if(!DB.gerarTabsCustom)DB.gerarTabsCustom=[];
+  var nova={key:'cst_'+nid(),nome:nome,emoji:'&#127991;',cor:cor.hex,corId:corId,custom:true,ativo:true,modo:'geral',tipoVal:'pct',valGeral:val,porProd:{}};
+  DB.gerarTabsCustom.push(nova);
+  _gTabs.push(nova);
+  saveDB();
+  closeM();
+  go('tabelas');
+}
+// Remove uma tabela personalizada do gerador (não apaga a tabela já gerada no banco)
+function _gRemoveCustom(key){
+  if(!confirm('Remover esta tabela do gerador? (As tabelas já geradas no banco não serão apagadas.)'))return;
+  for(var i=0;i<DB.gerarTabsCustom.length;i++){if(DB.gerarTabsCustom[i].key===key){DB.gerarTabsCustom.splice(i,1);break;}}
+  for(var j=0;j<_gTabs.length;j++){if(_gTabs[j].key===key){_gTabs.splice(j,1);break;}}
+  saveDB();
+  go('tabelas');
+}
+
 function _gGetBasePrecos(){
   // Retorna {pId, nome, ic, preco} SOMENTE para produtos da tabela base selecionada
   // ou, se nenhuma selecionada, da Tabela Padrão de venda (Tabela Referência)
@@ -11098,7 +11157,8 @@ function _gGerar(){
       DB.tabelas[tabExist].itens=itens;
     } else {
       var corMap={amarela:'amarelo',azul:'azul',verde:'verde',preta:'preto',dourada:'dourado'};
-      DB.tabelas.push({id:nid(),nome:'Tabela '+cfg.nome,tipo:'compra',cor:corMap[cfg.key]||'padrao',itens:itens});
+      var corFinal=cfg.corId||corMap[cfg.key]||'padrao';
+      DB.tabelas.push({id:nid(),nome:'Tabela '+cfg.nome,tipo:'compra',cor:corFinal,itens:itens});
     }
     geradas.push(cfg.nome);
   }
@@ -11109,6 +11169,7 @@ function _gGerar(){
 }
 
 function buildGerarTabelas(){
+  _gSyncCustom();
   var base=_gGetBasePrecos();
   // Opções de tabelas de venda
   var optsVenda='<option value="">— Precos padrão dos produtos —</option>';
@@ -11233,6 +11294,7 @@ function buildGerarTabelas(){
       +'<span style="font-size:14px;font-weight:700;color:'+(isAtivo?cfg.cor:'var(--mt)')+'">'+cfg.emoji+' Tabela '+cfg.nome+'</span>'
       +'</label>'
       +(jaExiste?'<span style="font-size:10px;font-weight:700;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:var(--or);padding:2px 8px;border-radius:20px;flex-shrink:0">⚡ Já existe</span>':'')
+      +(cfg.custom?'<button onclick="_gRemoveCustom(\&apos;'+cfg.key+'\&apos;)" title="Remover esta tabela do gerador" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#fca5a5;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;flex-shrink:0">&#128465; Remover</button>':'')
       +(isAtivo?
         '<div style="display:flex;gap:5px;margin-left:auto">'
         +'<button onclick="_gSetModo(\&apos;'+cfg.key+'\&apos;,\&apos;geral\&apos;)" style="background:'+(isModoGeral?cfg.cor:'var(--bg)')+';border:1px solid '+(isModoGeral?cfg.cor:'var(--bd)')+';border-radius:6px;padding:3px 9px;color:'+(isModoGeral?'#fff':'var(--mt)')+';font-size:11px;cursor:pointer">Geral</button>'
@@ -11260,6 +11322,7 @@ function buildGerarTabelas(){
     +'<div class="stl" style="margin-bottom:10px"><div class="stb" style="background:var(--or)"></div><div class="stx" style="color:var(--or)">2. Configurar Tabelas</div></div>'
     +'<div class="al aly" style="margin-bottom:10px;font-size:12px">Ative as tabelas que deseja gerar/atualizar e defina o desconto — em % do preço de venda ou valor fixo em R$/kg. Tabelas marcadas com ⚡ já existem e serão atualizadas.</div>'
     +'<div style="display:flex;flex-direction:column;gap:8px">'+tabCards+'</div>'
+    +'<button class="btnO bOgr" style="width:100%;margin-top:10px;border-style:dashed" onclick="_gAddCustomModal()">&#10133; Nova Tabela Personalizada</button>'
     +'</div>';
 
   var secPreview='';
