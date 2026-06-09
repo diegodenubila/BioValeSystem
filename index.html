@@ -3486,6 +3486,28 @@ function confirmarFech(esp){
   DB.caixaDia.pesoTotal=+pesoTotal.toFixed(3);
   DB.caixaDia.fechadoEm=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   _auditLog('Caixa fechado','Saldo: '+fR(esp)+' | Contado: '+fR(v)+(Math.abs(v-esp)>0.01?' | Diferenca: '+fR(v-esp):''));
+  // ── RECONCILIA A CONTA "CAIXA" COM O DINHEIRO FÍSICO CONTADO ──────────────
+  // Lança um "Ajuste de Caixa" (sobra/falta) para que o saldo da conta "Caixa"
+  // do Financeiro fique IGUAL ao valor realmente contado na gaveta. Sem isso,
+  // a diferença de fechamento ficava registrada mas nunca entrava na conta,
+  // fazendo a conta e o dinheiro físico divergirem ao longo do tempo.
+  var _idxCaixa=-1,_saldoCaixaAntes=0;
+  for(var _i=0;_i<DB.contas.length;_i++){if(DB.contas[_i].nome==='Caixa'){_idxCaixa=_i;_saldoCaixaAntes=DB.contas[_i].saldo;break;}}
+  if(_idxCaixa>=0){
+    var _ajuste=+(v-_saldoCaixaAntes).toFixed(2);
+    if(Math.abs(_ajuste)>=0.01){
+      DB.contas[_idxCaixa].saldo=v; // conta passa a refletir o dinheiro físico contado
+      DB.movs.unshift({
+        id:nid(),data:hj(),
+        desc:'Ajuste de Caixa (fechamento '+DB.caixaDia.data+')',
+        tipo:_ajuste>=0?'entrada':'saida',
+        cat:'Ajuste de Caixa',
+        valor:Math.abs(_ajuste),
+        conta:'Caixa'
+      });
+      _auditLog('Ajuste de Caixa', (_ajuste>=0?'Sobra de ':'Falta de ')+fR(Math.abs(_ajuste))+' lançado na conta Caixa');
+    }
+  }
   // Snapshot dos produtos/contas no momento do fechamento para reversão futura
   DB.caixaDia.snapProdutos=DB.produtos.map(function(p){return {id:p.id,est:p.est};});
   DB.caixaDia.snapContas=DB.contas.map(function(c){return {nome:c.nome,saldo:c.saldo};});
@@ -6714,7 +6736,7 @@ function mEditRev(id){
     +'<div class="fld"><label>Produto</label><input class="inp" id="er-p" value="'+(it.prod||'')+'"></div>'
     +'<div class="fld"><label>Descricao / Especificacoes</label><textarea class="inp" id="er-desc" rows="3" style="resize:vertical;min-height:64px;line-height:1.5">'+(it.desc||'')+'</textarea></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>Preco R$</label><input class="inp" type="number" inputmode="decimal" id="er-pr" value="'+it.preco+'"></div>'
+    +'<div class="fld"><label>Preco R$</label><input class="inp" type="number" inputmode="decimal" id="er-pr" value="'+it.preco+'" oninput="_calcMargemRev(\'er\')"></div>'
     +'<div class="fld"><label>Categoria</label><select class="inp" id="er-cat" onchange="onRevCatChange(\'er\');onRevCatChangeSpecs(\'er\')">'+catO+'</select></div>'
     +'</div>'
     +'<div class="fld"><label>Condicao</label><select class="inp" id="er-c">'+condO+'</select></div>'
@@ -6722,12 +6744,14 @@ function mEditRev(id){
     +renderSpecsHtml(it.cat||'',it.specs||{},'er')
     +'<div class="fld"><label>Produto do Estoque (opcional)</label><select class="inp" id="er-estprod" onchange="atualizaPesoRevenda()">'+prodO+'</select></div>'
     +estInfo
-    +'<div class="fld"><label>Peso kg</label><input class="inp" type="number" inputmode="decimal" id="er-kg" value="'+it.peso+'"></div>'
+    +'<div class="fld"><label>Peso kg</label><input class="inp" type="number" inputmode="decimal" id="er-kg" value="'+it.peso+'" oninput="_calcMargemRev(\'er\')"></div>'
+    +'<div id="er-marg" style="margin-bottom:8px"></div>'
     +'<div class="brow">'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
     +'<button class="btn" onclick="saveEditRev('+id+')">Salvar</button>'
     +'</div></div>';
   openM('Editar Produto Revenda',h,500);
+  setTimeout(function(){_calcMargemRev('er');},60);
 }
 function atualizaPesoRevenda(){
   var sel=document.getElementById('er-estprod');
@@ -6740,6 +6764,34 @@ function atualizaPesoRevenda(){
   }else{
     if(info)info.innerHTML='';
   }
+  _calcMargemRev('er');
+}
+// Calcula e exibe Custo / Lucro / Margem do produto de revenda ao vivo.
+// Custo = peso × custo por kg (vC) do material vinculado no estoque.
+function _calcMargemRev(prefix){
+  var el=document.getElementById(prefix+'-marg');
+  if(!el)return;
+  var estSel=document.getElementById(prefix+'-estprod');
+  var kgEl=document.getElementById(prefix+'-kg');
+  var prEl=document.getElementById(prefix+'-pr');
+  var pId=estSel?(parseInt(estSel.value)||null):null;
+  var peso=kgEl?(parseFloat(kgEl.value)||0):0;
+  var preco=prEl?(parseFloat(prEl.value)||0):0;
+  var p=pId?gP(pId):null;
+  if(!p){
+    el.innerHTML='<div style="font-size:11px;color:var(--mt);padding:9px 11px;background:var(--s2);border-radius:var(--r)">&#128161; Vincule um produto do estoque e informe o peso para ver o custo e a margem de lucro.</div>';
+    return;
+  }
+  var vC=p.vC||0;
+  var custo=+(peso*vC).toFixed(2);
+  var lucro=+(preco-custo).toFixed(2);
+  var margem=preco>0?Math.round((lucro/preco)*100):0;
+  var cor=margem>=30?'var(--gr)':margem>=15?'var(--or)':'var(--rd)';
+  el.innerHTML='<div style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">'
+    +'<div><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Custo</div><div style="font-size:13px;font-weight:700;color:var(--bl);font-family:monospace">'+fR(custo)+'</div><div style="font-size:9px;color:var(--mt)">'+fKg(peso)+'kg &times; '+fR(vC)+'/kg</div></div>'
+    +'<div><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Lucro</div><div style="font-size:13px;font-weight:700;color:'+(lucro>=0?'var(--gr)':'var(--rd)')+';font-family:monospace">'+fR(lucro)+'</div></div>'
+    +'<div><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Margem</div><div style="font-size:13px;font-weight:800;color:'+cor+'">'+margem+'%</div></div>'
+    +'</div>';
 }
 function saveEditRev(id){
   var it=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){it=DB.revenda[i];break;}}if(!it)return;
@@ -6831,7 +6883,7 @@ function mNovoRev(){
     +'<div class="fld"><label>Descricao / Especificacoes</label><textarea class="inp" id="nr-desc" rows="3" placeholder="Ex: 8GB RAM, 256GB SSD, Intel i5 10ª geração..." style="resize:vertical;min-height:64px;line-height:1.5"></textarea></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Categoria</label><select class="inp" id="nr-cat" onchange="onRevCatChange(\'nr\');onRevCatChangeSpecs(\'nr\')">'+catO+'</select></div>'
-    +'<div class="fld"><label>Preco R$ (por unidade)</label><input class="inp" type="number" inputmode="decimal" id="nr-pr"></div>'
+    +'<div class="fld"><label>Preco R$ (por unidade)</label><input class="inp" type="number" inputmode="decimal" id="nr-pr" oninput="_calcMargemRev(\'nr\')"></div>'
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Condicao</label><select class="inp" id="nr-c">'+condO+'</select></div>'
@@ -6842,8 +6894,9 @@ function mNovoRev(){
     +clHtml
     +(firstCat?renderSpecsHtml(firstCat,{},'nr'):'')
     +'<div class="fld"><label>Produto do Estoque (opcional)</label><select class="inp" id="nr-estprod" onchange="onRevEstProdChange()">'+prodO+'</select></div>'
-    +'<div class="fld"><label>Peso kg (por unidade)</label><input class="inp" type="number" inputmode="decimal" id="nr-kg"></div>'
+    +'<div class="fld"><label>Peso kg (por unidade)</label><input class="inp" type="number" inputmode="decimal" id="nr-kg" oninput="_calcMargemRev(\'nr\')"></div>'
     +'<div id="nr-est-info" style="font-size:11px;color:var(--mt);margin-top:-6px;margin-bottom:8px"></div>'
+    +'<div id="nr-marg" style="margin-bottom:8px"></div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveRev()">Cadastrar</button></div></div>',500);
 }
 function onRevEstProdChange(){
@@ -6854,6 +6907,7 @@ function onRevEstProdChange(){
   var pId=parseInt(sel.value)||null;
   if(pId){var p=gP(pId);if(p){info.textContent='Estoque atual: '+fKg(p.est)+' kg';kgEl&&(kgEl.placeholder='Peso por unidade');}}
   else{if(info)info.textContent='';}
+  _calcMargemRev('nr');
 }
 function saveRev(){
   var n=document.getElementById('nr-p').value.trim();if(!n)return;
