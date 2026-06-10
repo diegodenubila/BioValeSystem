@@ -2860,7 +2860,8 @@ function _buildHistHtml(){
       +'<div id="hc-det-'+hi+'" style="display:none;border-top:1px solid var(--bd)">'
       +'<div style="padding:10px 14px;background:var(--s2);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">'
       +'<span style="font-size:12px;color:var(--mt)">'+hMovs.length+' atendimento(s)</span>'
-      +'<div style="display:flex;gap:7px">'
+      +'<div style="display:flex;gap:7px;flex-wrap:wrap">'
+      +(CU&&CU.perfil==='adm'?'<button class="btnO bOgr" style="font-size:12px;padding:6px 13px;border-color:rgba(168,85,247,.5);color:#a855f7" onclick="mEditarDataCaixa('+hi+')">&#128197; Data</button>':'')
       +'<button class="btn btn-or" style="font-size:12px;padding:6px 13px;background:var(--or);color:#000" onclick="mReabrirCaixaCompleto('+hi+')">&#9099; Reabrir</button>'
       +'<button class="btnO bOr" style="font-size:12px;padding:6px 13px" onclick="excluirCaixaHist('+hi+')">&#128465; Excluir</button>'
       +'</div></div>'
@@ -2948,12 +2949,13 @@ function renderCaixaDia(){
   }
   // despesas do dia — subtrai as pagas em conta tipo Dinheiro (caixa físico)
   var _contasDinheiro={};for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].tipo==='Dinheiro')_contasDinheiro[DB.contas[i].nome]=true;}
-  for(var i=0;i<DB.movs.length;i++){var _mv=DB.movs[i];if(_mv.tipo==='saida'&&_mv.data===hj()&&(!_mv.desc||_mv.desc.indexOf('#')<0)&&_contasDinheiro[_mv.conta])_estim=+(_estim-_mv.valor).toFixed(2);}
+  var _cxDataStr=cd.data||hj();
+  for(var i=0;i<DB.movs.length;i++){var _mv=DB.movs[i];if(_mv.tipo==='saida'&&_mv.data===_cxDataStr&&(!_mv.desc||_mv.desc.indexOf('#')<0)&&_contasDinheiro[_mv.conta])_estim=+(_estim-_mv.valor).toFixed(2);}
   _estim=+(_estim+refor-sang).toFixed(2);
   var extras='';if(sang>0)extras+=sc('&#128182;','Sangrias',fR(sang),'Retiradas','var(--rd)');if(refor>0)extras+=sc('&#128176;','Reforcos',fR(refor),'Adicoes','var(--bl)');
 
   // ── Despesas do dia ──
-  var _hjStr3=hj();var _despDia=[];var _totDesp=0;
+  var _hjStr3=_cxDataStr;var _despDia=[];var _totDesp=0;
   for(var i=0;i<DB.movs.length;i++){
     var _mv=DB.movs[i];
     if(_mv.tipo==='saida'&&_mv.data===_hjStr3&&(!_mv.desc||_mv.desc.indexOf('#')<0)){
@@ -3142,6 +3144,34 @@ function excluirCaixaHist(hi){
     saveDB();renderCaixaDia();
   });
 }
+function mEditarDataCaixa(hi){
+  var hc=DB.caixasHist[hi];if(!hc)return;
+  // Converte dd/mm/aaaa para yyyy-mm-dd
+  var parts=(hc.data||'').split('/');
+  var isoVal=parts.length===3?(parts[2]+'-'+parts[1]+'-'+parts[0]):'';
+  openM('&#128197; Editar Data do Caixa',
+    '<div class="mf">'
+    +'<div class="al alb" style="margin-bottom:4px">Caixa atual: <strong>'+hc.data+'</strong> &mdash; '+(hc.movimentos||[]).length+' atendimento(s)</div>'
+    +'<div class="fld"><label>Nova data</label>'
+    +'<input class="inp" type="date" id="cx-edit-data" value="'+isoVal+'" style="font-size:16px;text-align:center;font-family:monospace;cursor:pointer"></div>'
+    +'<div class="brow" style="justify-content:flex-end">'
+    +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
+    +'<button class="btn" style="background:#a855f7" onclick="execEditarDataCaixa('+hi+')">&#10003; Salvar Data</button>'
+    +'</div></div>',380);
+}
+function execEditarDataCaixa(hi){
+  var hc=DB.caixasHist[hi];if(!hc)return;
+  var el=document.getElementById('cx-edit-data');if(!el||!el.value)return;
+  var parts=el.value.split('-');
+  if(parts.length!==3){alert('Data inválida');return;}
+  var novaData=parts[2]+'/'+parts[1]+'/'+parts[0];
+  var dataAntiga=hc.data;
+  hc.data=novaData;
+  // Atualiza caixaOntem se for o mais recente
+  if(hi===0)DB.caixaOntem={data:novaData,saldoFinal:hc.saldoFinal,saldoContado:hc.saldoContado,diferenca:hc.diferenca};
+  _auditLog('Data do caixa editada','De: '+dataAntiga+' Para: '+novaData);
+  saveDB();closeM();renderCaixaDia();
+}
 function toggleHistCaixa(i){
   var det=document.getElementById('hc-det-'+i);var arr=document.getElementById('hc-arr-'+i);
   if(!det)return;var open=det.style.display==='block';
@@ -3276,10 +3306,11 @@ function confSangria(){
   DB.caixaDia.sangrias.push({valor:v,cat:cat,dest:dest,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
   for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){DB.contas[i].saldo=+(DB.contas[i].saldo-v).toFixed(2);break;}}
   var descFin='Sangria: '+cat+(dest?' → '+dest:'');
-  DB.movs.unshift({id:nid(),data:hj(),desc:descFin,tipo:'saida',cat:cat,valor:v,conta:'Caixa'});
+  var _cxD=DB.caixaDia&&DB.caixaDia.data?DB.caixaDia.data:hj();
+  DB.movs.unshift({id:nid(),data:_cxD,desc:descFin,tipo:'saida',cat:cat,valor:v,conta:'Caixa'});
   if(dest){
     for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===dest){DB.contas[i].saldo=+(DB.contas[i].saldo+v).toFixed(2);break;}}
-    DB.movs.unshift({id:nid(),data:hj(),desc:'Transferencia recebida (Sangria): '+cat,tipo:'entrada',cat:'Outros Recebimentos',valor:v,conta:dest});
+    DB.movs.unshift({id:nid(),data:_cxD,desc:'Transferencia recebida (Sangria): '+cat,tipo:'entrada',cat:'Outros Recebimentos',valor:v,conta:dest});
   }
   closeM();autoSave();renderCaixaDia();
 }
@@ -3314,10 +3345,11 @@ function confReforco(){
   DB.caixaDia.reforcos.push({valor:v,cat:cat,orig:orig,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
   for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){DB.contas[i].saldo=+(DB.contas[i].saldo+v).toFixed(2);break;}}
   var descFin='Reforco: '+cat+(orig?' ← '+orig:'');
-  DB.movs.unshift({id:nid(),data:hj(),desc:descFin,tipo:'entrada',cat:cat,valor:v,conta:'Caixa'});
+  var _cxD2=DB.caixaDia&&DB.caixaDia.data?DB.caixaDia.data:hj();
+  DB.movs.unshift({id:nid(),data:_cxD2,desc:descFin,tipo:'entrada',cat:cat,valor:v,conta:'Caixa'});
   if(orig){
     for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===orig){DB.contas[i].saldo=+(DB.contas[i].saldo-v).toFixed(2);break;}}
-    DB.movs.unshift({id:nid(),data:hj(),desc:'Transferencia enviada (Reforco): '+cat,tipo:'saida',cat:'Outros',valor:v,conta:orig});
+    DB.movs.unshift({id:nid(),data:_cxD2,desc:'Transferencia enviada (Reforco): '+cat,tipo:'saida',cat:'Outros',valor:v,conta:orig});
   }
   closeM();autoSave();renderCaixaDia();
 }
@@ -3427,7 +3459,8 @@ function confDespesaRapida(){
   if(!desc){alert('Informe a descricao!');return;}
   if(!v){alert('Informe o valor!');return;}
   if(!cat){alert('Selecione uma categoria!');return;}
-  DB.movs.unshift({id:nid(),data:hj(),desc:desc,tipo:'saida',cat:cat,valor:v,conta:conta});
+  var _cxD3=DB.caixaDia&&DB.caixaDia.data?DB.caixaDia.data:hj();
+  DB.movs.unshift({id:nid(),data:_cxD3,desc:desc,tipo:'saida',cat:cat,valor:v,conta:conta});
   for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo-v).toFixed(2);break;}}
   closeM();autoSave();renderCaixaDia();
 }
@@ -3541,7 +3574,7 @@ function mFecharCaixa(){
   var _sang=0;if(cd&&cd.sangrias)for(var i=0;i<cd.sangrias.length;i++)_sang+=cd.sangrias[i].valor;
   for(var i=0;i<movsDia.length;i++){var mv=movsDia[i];if(mv.recMethods){for(var j=0;j<mv.recMethods.length;j++){if(mv.recMethods[j].conta==='Caixa'||mv.recMethods[j].label==='Dinheiro')_fe=+(_fe+mv.recMethods[j].valor).toFixed(2);}}if(mv.pagMethods){for(var j=0;j<mv.pagMethods.length;j++){if(mv.pagMethods[j].conta==='Caixa'||mv.pagMethods[j].label==='Dinheiro')_fe=+(_fe-mv.pagMethods[j].valor).toFixed(2);}}if(mv.liquidadoPendencia&&mv.methods){for(var j=0;j<mv.methods.length;j++){var _lm=mv.methods[j];if(_lm.conta==='Caixa'||_lm.label==='Dinheiro'){if(mv.tipo==='Compra')_fe=+(_fe-_lm.valor).toFixed(2);else _fe=+(_fe+_lm.valor).toFixed(2);}}}}
   var _fContasDin={};for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].tipo==='Dinheiro')_fContasDin[DB.contas[i].nome]=true;}
-  for(var i=0;i<DB.movs.length;i++){var _mv=DB.movs[i];if(_mv.tipo==='saida'&&_mv.data===hj()&&(!_mv.desc||_mv.desc.indexOf('#')<0)&&_fContasDin[_mv.conta])_fe=+(_fe-_mv.valor).toFixed(2);}
+  var _fCxDataStr=DB.caixaDia&&DB.caixaDia.data?DB.caixaDia.data:hj();for(var i=0;i<DB.movs.length;i++){var _mv=DB.movs[i];if(_mv.tipo==='saida'&&_mv.data===_fCxDataStr&&(!_mv.desc||_mv.desc.indexOf('#')<0)&&_fContasDin[_mv.conta])_fe=+(_fe-_mv.valor).toFixed(2);}
   _fe=+(_fe+_refor-_sang).toFixed(2);
   saldoAt=_fe; // usa o estimado reconstruído
   openM('Fechar Caixa','<div class="mf"><div class="al aly">Voce esta prestes a fechar o caixa de hoje.</div><div style="background:var(--s2);border-radius:var(--r);padding:13px"><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--bd)"><span style="color:var(--mt)">Abertura</span><span style="font-family:monospace">'+fR(DB.caixaDia.saldoAbertura)+'</span></div><div style="display:flex;justify-content:space-between;padding:7px 0;font-size:15px;font-weight:700"><span>Saldo esperado</span><span style="color:var(--gr);font-family:monospace">'+fR(saldoAt)+'</span></div></div><div class="fld"><label>Valor contado R$</label><input class="inp" type="number" inputmode="decimal" id="fc-v" value="'+saldoAt+'" style="font-size:20px;text-align:center;font-family:monospace" oninput="calcFD('+saldoAt+')"></div><div id="fc-dif"></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-rd" onclick="confirmarFech('+saldoAt+')">Fechar Caixa</button></div></div>');}
