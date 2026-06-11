@@ -312,6 +312,8 @@ var DB={
   transf:[],
   entradas:[],
   gerarTabsCustom:[],
+  pclCatsCustom:{},
+  pclCatOrder:[],
   revenda:[],
   revendaCats:[
     {nome:'Notebooks',  checklist:['Tela','Bateria','Teclado','Carregador'], specs:[
@@ -1174,6 +1176,8 @@ function saveDB(){
       entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
       transf:DB.transf,coletas:DB.coletas,funcs:DB.funcs,clientes:DB.clientes,
       gerarTabsCustom:DB.gerarTabsCustom,
+      pclCatsCustom:DB.pclCatsCustom||{},
+      pclCatOrder:DB.pclCatOrder||[],
       tabelas:DB.tabelas,contasFixas:DB.contasFixas,contasReceber:DB.contasReceber,centroCusto:DB.centroCusto,cotacoesHist:DB.cotacoesHist,metas:DB.metas,filtrosMat:DB.filtrosMat,
       concorrentes:DB.concorrentes,
       pesAbasCloud:pesAbas,pesAtivaCloud:pesAtiva,pesAbasTs:Date.now()
@@ -1389,6 +1393,8 @@ function _applySnap(s){
   if(s.revendaStates!==undefined)DB.revendaStates=s.revendaStates;
   if(s.entradas)DB.entradas=s.entradas;
   if(s.gerarTabsCustom!==undefined)DB.gerarTabsCustom=s.gerarTabsCustom;
+  if(s.pclCatsCustom!==undefined){DB.pclCatsCustom=s.pclCatsCustom;_pclCatsCustom=s.pclCatsCustom;}
+  if(s.pclCatOrder!==undefined){DB.pclCatOrder=s.pclCatOrder;_pclCatOrder=s.pclCatOrder;}
   if(s.atendHistLS)atendHist=s.atendHistLS;
   if(s.pesagensEmAberto)DB.pesagensEmAberto=s.pesagensEmAberto;
   if(s.transf)DB.transf=s.transf;
@@ -13491,11 +13497,29 @@ function restaurarBackupNuvem(chave, dataBR){
       _sanitizeRevenda();
       // Força a base para permitir que esta restauração suba para a nuvem
       _baseCloudSavedAt = 0;
-      saveDB();
+      // Salva localmente de imediato
+      try{
+        var snap=backup.DB;
+        localStorage.setItem('bv_db',JSON.stringify(snap));
+        localStorage.setItem('bv_db_savedAt',String(snap.savedAt||Date.now()));
+      }catch(e){}
       _auditLog('Backup do dia '+dataBR+' restaurado');
       closeM();
-      alert('Backup de '+dataBR+' restaurado com sucesso!');
-      go('dashboard');
+      // Sobe para a nuvem e SÓ ENTÃO confirma e redireciona
+      _syncBadge('saving','Enviando para a nuvem…');
+      _sbSet('bv_db', backup.DB, function(ok){
+        if(ok){
+          _baseCloudSavedAt = backup.DB.savedAt||0;
+          _syncBadge('idle','✓ Backup restaurado');
+          setTimeout(function(){_syncBadge('idle','Nuvem ativa');},4000);
+          alert('Backup de '+dataBR+' restaurado com sucesso!');
+          go('dashboard');
+        } else {
+          _syncBadge('error','Erro ao enviar para nuvem — dado salvo localmente');
+          alert('Backup aplicado localmente, mas não foi possível enviar para a nuvem agora. Tente salvar qualquer dado para sincronizar.');
+          go('dashboard');
+        }
+      });
     }catch(err){
       alert('Erro ao restaurar: '+err.message);
       _syncBadge('error','Erro ao restaurar');
@@ -14912,22 +14936,38 @@ function _pclExcluir(id){
 }
 
 // ── CATEGORIAS CUSTOMIZADAS ───────────────────────────────────────────────────
-var _PCL_CUSTOM_KEY='bv_pcl_custom_cats';
-var _PCL_ORDER_KEY='bv_pcl_order';
+var _PCL_CUSTOM_KEY='bv_pcl_custom_cats'; // mantido para migração do localStorage
+var _PCL_ORDER_KEY='bv_pcl_order';        // mantido para migração do localStorage
 var _pclCatsCustom={};
 var _pclCatOrder=[]; // array de ids na ordem definida
 
 function _pclLoadCatsCustom(){
-  try{var r=localStorage.getItem(_PCL_CUSTOM_KEY);_pclCatsCustom=r?JSON.parse(r):{};}catch(e){_pclCatsCustom={};}
+  // Prioridade: DB (nuvem) > localStorage (migração)
+  if(DB.pclCatsCustom && typeof DB.pclCatsCustom==='object'){
+    _pclCatsCustom=DB.pclCatsCustom;
+  } else {
+    try{var r=localStorage.getItem(_PCL_CUSTOM_KEY);_pclCatsCustom=r?JSON.parse(r):{};}catch(e){_pclCatsCustom={};}
+    DB.pclCatsCustom=_pclCatsCustom; // migra para o DB
+  }
 }
 function _pclSaveCatsCustom(){
+  DB.pclCatsCustom=_pclCatsCustom;
   try{localStorage.setItem(_PCL_CUSTOM_KEY,JSON.stringify(_pclCatsCustom));}catch(e){}
+  autoSave(); // sincroniza com a nuvem
 }
 function _pclLoadOrder(){
-  try{var r=localStorage.getItem(_PCL_ORDER_KEY);_pclCatOrder=r?JSON.parse(r):[];}catch(e){_pclCatOrder=[];}
+  // Prioridade: DB (nuvem) > localStorage (migração)
+  if(DB.pclCatOrder && Array.isArray(DB.pclCatOrder)){
+    _pclCatOrder=DB.pclCatOrder;
+  } else {
+    try{var r=localStorage.getItem(_PCL_ORDER_KEY);_pclCatOrder=r?JSON.parse(r):[];}catch(e){_pclCatOrder=[];}
+    DB.pclCatOrder=_pclCatOrder; // migra para o DB
+  }
 }
 function _pclSaveOrder(){
+  DB.pclCatOrder=_pclCatOrder;
   try{localStorage.setItem(_PCL_ORDER_KEY,JSON.stringify(_pclCatOrder));}catch(e){}
+  autoSave(); // sincroniza com a nuvem
 }
 function _pclGetCat(id){
   // custom override takes priority (includes edited defaults)
