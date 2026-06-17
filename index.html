@@ -453,6 +453,51 @@ function sc(icon,lbl,val,sub,cor){
     +'<div style="font-size:21px;font-weight:700;font-family:monospace;color:'+cor+'">'+val+'</div>'
     +'<div style="font-size:11px;color:var(--mt)">'+sub+'</div></div>';
 }
+// ── MASCARAMENTO DE VALORES SENSÍVEIS (Caixa e Pendências) ──────────────
+// Para perfis não-admin, oculta valores financeiros do dia. O admin pode
+// revelar temporariamente nessa sessão digitando a própria senha.
+var _valoresRevelados = false; // true só após o admin destravar nesta sessão (não persiste)
+function _deveOcultarValores(){
+  return !(CU && CU.perfil==='adm') && !_valoresRevelados;
+}
+// Aplica a máscara num valor já formatado (ex: "R$ 1.234,56" -> "R$ ••••••")
+function _mask(valorFormatado){
+  if(!_deveOcultarValores())return valorFormatado;
+  return '<span style="letter-spacing:2px">R$ &bull;&bull;&bull;&bull;</span>';
+}
+// Botão de olho — aparece para QUALQUER perfil (qualquer login pode tentar revelar,
+// mas só quem souber a senha de revelação consegue de fato).
+function _olhoValores(){
+  if(!_deveOcultarValores()){
+    return '<button onclick="_toggleValores()" title="Ocultar valores" style="background:none;border:1px solid var(--bd);border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;color:var(--mt)">&#128065; Ocultar</button>';
+  }
+  return '<button onclick="_toggleValores()" title="Revelar valores com senha" style="background:none;border:1px solid var(--bd);border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;color:var(--mt)">&#128065; Revelar</button>';
+}
+function _toggleValores(){
+  if(_valoresRevelados){_valoresRevelados=false;go(pgAtiva);return;}
+  openM('&#128274; Senha para Revelar','<div class="mf">'
+    +'<div class="al aly" style="margin-bottom:10px;font-size:12px">Digite a senha de revelacao para ver os valores do Caixa e Pendencias nesta sessao.</div>'
+    +'<div class="fld"><input class="inp" type="password" id="ov-pin" placeholder="Senha" maxlength="20" onkeydown="if(event.key===\'Enter\')_confirmToggleValores()"></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="_confirmToggleValores()">Confirmar</button></div>'
+    +'</div>',380);
+  setTimeout(function(){var el=document.getElementById('ov-pin');if(el)el.focus();},100);
+}
+function _confirmToggleValores(){
+  var senha=document.getElementById('ov-pin').value;
+  // Usa a senha de revelação configurada. Se ainda não foi definida,
+  // o admin logado pode usar o próprio PIN como destrave temporário.
+  var senhaConfigurada = CFG.sistema.senhaRevelarValores || '';
+  var ok = false;
+  if(senhaConfigurada){
+    ok = (senha === senhaConfigurada);
+  } else if(CU && CU.perfil==='adm'){
+    ok = (senha === CU.pin); // fallback: admin sem senha configurada ainda
+  }
+  if(!ok){alert('Senha incorreta!');return;}
+  _valoresRevelados=true;
+  closeM();
+  go(pgAtiva);
+}
 function getPreco(prod,tipo,tabId){
   if(!prod)return 0;
   if(tipo==='Doacao')return 0;
@@ -1595,21 +1640,55 @@ function renderPesagem(){
     +'</div></div></div>';
   // Build unit cards for pdd dropdown
   var unitCards='';var hasD=false;
-  for(var i=0;i<DB.revenda.length;i++){
-    if(DB.revenda[i].status==='Disponivel'){hasD=true;var rv=DB.revenda[i];
-      var _rvCod=(function(id){var s=String(Math.abs(Math.floor(parseFloat(id)||0)));while(s.length<12)s='0'+s;return s.slice(-12);})(rv.id);
-      unitCards+='<div class="prod-card" data-nome="'+(rv.prod||rv.nome||'').toLowerCase()+'" data-cod="'+_rvCod+'" onclick="selUnit('+rv.id+')">'
-        +'<span style="font-size:20px;flex-shrink:0">&#127991;</span>'
-        +'<div style="flex:1;min-width:0">'
-        +'<div style="font-size:13px;font-weight:600">'+(rv.prod||rv.nome||'Produto')+'</div>'
-        +'<div style="font-size:11px;color:var(--mt);margin-top:1px">'+rv.cond+' &middot; '+fKg(rv.peso)+'kg</div>'
-        +'</div>'
-        +'<div style="text-align:right;flex-shrink:0">'
-        +'<div style="font-size:14px;font-weight:700;color:#f59e0b;font-family:monospace">'+fR(rv.preco)+'</div>'
-        +'<div style="font-size:10px;color:#7a90b0;margin-top:1px">Unidade</div>'
-        +'</div></div>';
+  // Unidades já presentes no carrinho desta aba — nunca devem aparecer de novo no seletor,
+  // para impedir clique duplicado no mesmo produto.
+  var _uidsNoCarrinho={};
+  (function(){
+    var abAtual=pesAbas[pesAtiva];
+    if(abAtual&&abAtual.itens){
+      for(var k=0;k<abAtual.itens.length;k++){
+        if(abAtual.itens[k].uni&&abAtual.itens[k].uid!=null) _uidsNoCarrinho[abAtual.itens[k].uid]=true;
+      }
     }
+  })();
+  // Agrupa unidades disponíveis por nome+condição idênticos (preço também deve bater,
+  // já que itens idênticos têm o mesmo preço por definição).
+  var _gruposUni={}; // chave "nomeBase|cond|preco" -> {ids:[...], nome, cond, preco, peso}
+  for(var i=0;i<DB.revenda.length;i++){
+    var rv=DB.revenda[i];
+    if(rv.status!=='Disponivel')continue;
+    if(_uidsNoCarrinho[rv.id])continue; // já está no carrinho — não oferece de novo
+    hasD=true;
+    var nomeRv=(rv.prod||rv.nome||'Produto');
+    // Remove sufixo " #N" usado no cadastro em lote (ex: "motor de tanquinho #3" -> "motor de tanquinho")
+    var nomeBase=nomeRv.replace(/\s*#\d+\s*$/,'');
+    var chave=nomeBase.toLowerCase()+'|'+(rv.cond||'')+'|'+rv.preco;
+    if(!_gruposUni[chave])_gruposUni[chave]={ids:[],nome:nomeBase,cond:rv.cond,preco:rv.preco,peso:rv.peso};
+    _gruposUni[chave].ids.push(rv.id);
   }
+  // Detecta nomes que aparecem em mais de um grupo (= mesma "família" mas condição/preço diferente)
+  var _contagemNome={};
+  Object.keys(_gruposUni).forEach(function(k){
+    var nLow=_gruposUni[k].nome.toLowerCase();
+    _contagemNome[nLow]=(_contagemNome[nLow]||0)+1;
+  });
+  Object.keys(_gruposUni).forEach(function(k){
+    var g=_gruposUni[k];
+    var qtd=g.ids.length;
+    var _rvCod=(function(id){var s=String(Math.abs(Math.floor(parseFloat(id)||0)));while(s.length<12)s='0'+s;return s.slice(-12);})(g.ids[0]);
+    var temVariante=_contagemNome[g.nome.toLowerCase()]>1;
+    unitCards+='<div class="prod-card" data-nome="'+g.nome.toLowerCase()+'" data-cod="'+_rvCod+'" onclick="'+(qtd>1?'selUnitGrupo(\''+k.replace(/'/g,"\\'")+'\')':'selUnit('+g.ids[0]+')')+'">'
+      +'<span style="font-size:20px;flex-shrink:0">&#127991;</span>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:13px;font-weight:600">'+g.nome+(qtd>1?' <span style="font-size:11px;font-weight:700;color:var(--gr);background:rgba(34,197,94,.12);padding:1px 7px;border-radius:10px;margin-left:4px">'+qtd+' disponivel'+(qtd>1?'is':'')+'</span>':'')+(temVariante?' <span title="Existe outra variante deste produto com condicao/preco diferente" style="font-size:11px;font-weight:700;color:var(--or);background:rgba(245,158,11,.12);padding:1px 7px;border-radius:10px;margin-left:4px">&#9888; variante</span>':'')+'</div>'
+      +'<div style="font-size:11px;color:var(--mt);margin-top:1px">'+g.cond+' &middot; '+fKg(g.peso)+'kg</div>'
+      +'</div>'
+      +'<div style="text-align:right;flex-shrink:0">'
+      +'<div style="font-size:14px;font-weight:700;color:#f59e0b;font-family:monospace">'+fR(g.preco)+'</div>'
+      +'<div style="font-size:10px;color:#7a90b0;margin-top:1px">Unidade</div>'
+      +'</div></div>';
+  });
+  window._gruposUniCache=_gruposUni; // cache p/ selUnitGrupo() e mVerVariantes()
   var unitCardsContent=hasD?unitCards:'<div style="text-align:center;padding:20px;color:var(--mt)">Nenhum disponivel.</div>';
   var selUnitLabel='<span style="color:var(--mt)">-- Selecione a unidade --</span>';
   var selUnitIc='&#127991;';
@@ -2029,6 +2108,78 @@ function selUnit(uid){
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
     +'<button class="btn btn-or" onclick="confAddU('+uid+')">+ Adicionar Unidade</button></div></div>',420);
 }
+// Abre modal de quantidade para um grupo de unidades idênticas (nome+condicao+preco).
+// Se o produto tiver variantes (mesmo nome, condicao/preco diferente), oferece um link
+// para revisar antes de decidir.
+function selUnitGrupo(chave){
+  var g=window._gruposUniCache&&window._gruposUniCache[chave];
+  if(!g){alert('Grupo nao encontrado. Atualize a lista.');return;}
+  var qtdMax=g.ids.length;
+  var nomeLow=g.nome.toLowerCase();
+  var outrosGrupos=[];
+  if(window._gruposUniCache){
+    Object.keys(window._gruposUniCache).forEach(function(k){
+      var og=window._gruposUniCache[k];
+      if(og.nome.toLowerCase()===nomeLow && k!==chave) outrosGrupos.push(og);
+    });
+  }
+  var avisoVariante=outrosGrupos.length
+    ?'<div class="al aly" style="font-size:12px;margin-top:8px">&#9888; Existe'+(outrosGrupos.length>1?'m':'')+' tambem '+outrosGrupos.length+' variante'+(outrosGrupos.length>1?'s':'')+' deste produto com condicao/preco diferente. <a href="#" onclick="event.preventDefault();mVerVariantes(\''+nomeLow.replace(/'/g,"\\'")+'\')" style="color:var(--bl);text-decoration:underline">Ver detalhes</a></div>'
+    :'';
+  openM('&#127991; '+g.nome,'<div class="mf">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:11px;background:var(--s2);border-radius:var(--r)">'
+    +'<span style="font-size:26px">&#127991;</span>'
+    +'<div style="flex:1"><div style="font-size:14px;font-weight:700">'+g.nome+'</div>'
+    +'<div style="font-size:12px;color:var(--mt)">'+g.cond+' &middot; '+fKg(g.peso)+'kg &middot; '+qtdMax+' disponivel'+(qtdMax>1?'is':'')+'</div></div>'
+    +'<div style="font-size:18px;font-weight:800;color:var(--or)">'+fR(g.preco)+'</div></div>'
+    +avisoVariante
+    +'<div class="fld" style="margin-top:10px"><label>Quantidade a vender</label>'
+    +'<div style="display:flex;align-items:center;gap:10px">'
+    +'<button class="btnO bOgr" style="padding:8px 14px;font-size:18px" onclick="var el=document.getElementById(\'sug-qtd\');el.value=Math.max(1,(parseInt(el.value)||1)-1)">&minus;</button>'
+    +'<input class="inp" type="number" id="sug-qtd" value="1" min="1" max="'+qtdMax+'" style="text-align:center;font-size:16px;font-weight:700" oninput="if(parseInt(this.value)>'+qtdMax+')this.value='+qtdMax+';if(parseInt(this.value)<1)this.value=1;">'
+    +'<button class="btnO bOgr" style="padding:8px 14px;font-size:18px" onclick="var el=document.getElementById(\'sug-qtd\');el.value=Math.min('+qtdMax+',(parseInt(el.value)||1)+1)">&plus;</button>'
+    +'</div></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
+    +'<button class="btn btn-or" onclick="confAddUGrupo(\''+chave.replace(/'/g,"\\'")+'\')">+ Adicionar ao Carrinho</button></div></div>',420);
+}
+// Adiciona N unidades do grupo ao carrinho de uma vez (uma linha por unidade, já que
+// cada unidade física continua sendo um item próprio no atendimento e no estoque).
+function confAddUGrupo(chave){
+  var g=window._gruposUniCache&&window._gruposUniCache[chave];
+  if(!g){alert('Grupo nao encontrado.');return;}
+  var qtd=parseInt(document.getElementById('sug-qtd').value)||1;
+  qtd=Math.max(1,Math.min(qtd,g.ids.length));
+  var ab=pesAbas[pesAtiva];
+  for(var i=0;i<qtd;i++){
+    var uid=g.ids[i];
+    var rv=null;for(var j=0;j<DB.revenda.length;j++){if(DB.revenda[j].id===uid){rv=DB.revenda[j];break;}}
+    if(!rv)continue;
+    ab.itens.push({prodId:null,uid:uid,ic:'&#127991;',nome:g.nome,peso:rv.peso,preco:rv.preco,tipo:'Venda',uni:true});
+  }
+  closeM();savePesState();renderPesagem();
+  setTimeout(_reabrirBuscaProd,150);
+}
+// Mostra todas as variantes de um produto (mesmo nome, condicao/preco diferentes)
+// para o usuario decidir antes de adicionar.
+function mVerVariantes(nomeLow){
+  if(!window._gruposUniCache)return;
+  var grupos=[];
+  Object.keys(window._gruposUniCache).forEach(function(k){
+    var g=window._gruposUniCache[k];
+    if(g.nome.toLowerCase()===nomeLow) grupos.push({chave:k,g:g});
+  });
+  if(!grupos.length){alert('Nenhuma variante encontrada.');return;}
+  var rows=grupos.map(function(x){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--s2);border-radius:var(--r);margin-bottom:8px;cursor:pointer" onclick="closeM();selUnitGrupo(\''+x.chave.replace(/'/g,"\\'")+'\')">'
+      +'<div><div style="font-size:13px;font-weight:600">'+x.g.cond+'</div><div style="font-size:11px;color:var(--mt)">'+fKg(x.g.peso)+'kg &middot; '+x.g.ids.length+' disponivel'+(x.g.ids.length>1?'is':'')+'</div></div>'
+      +'<div style="font-size:15px;font-weight:800;color:var(--or)">'+fR(x.g.preco)+'</div>'
+      +'</div>';
+  }).join('');
+  openM('&#127991; Variantes encontradas','<div class="mf">'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:10px">Toque em uma variante para selecionar a quantidade.</div>'
+    +rows
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Fechar</button></div></div>',440);
+}
 function confAddU(uid){
   var rv=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===uid){rv=DB.revenda[i];break;}}if(!rv)return;
   pesAbas[pesAtiva].itens.push({prodId:null,uid:uid,ic:'&#127991;',nome:rv.prod,peso:rv.peso,preco:rv.preco,tipo:'Venda',uni:true});
@@ -2321,9 +2472,11 @@ function _gerarHTMLBoleto(ab, recMethods, pagMethods, obs, num){
   var tipoLabel=tipoPed==='Venda'?'Itens vendidos:':'Itens comprados:';
   var forn=cli?(tipoPed==='Venda'?'Cliente':'Fornecedor')+': '+cli.nome:'Fornecedor: Não informado';
 
-  // itens
-  var itRows='<tr><th>ITEM</th><th>PESO</th><th>PRECO</th><th>TOTAL</th></tr>';
-  var pesoTotal=0;var totalGeral=0;
+  // itens — separa compras de vendas em operação mista
+  var isMisto = ab.itens.some(function(it){return it.tipo==='Venda';}) && ab.itens.some(function(it){return it.tipo==='Compra';});
+  var itensCompra=[], itensVenda=[], itensGeral=[];
+  var pesoTotal=0, totalGeral=0, totalCompra=0, totalVenda=0;
+
   for(var i=0;i<ab.itens.length;i++){
     var it=ab.itens[i];
     var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;
@@ -2333,17 +2486,54 @@ function _gerarHTMLBoleto(ab, recMethods, pagMethods, obs, num){
     var pesoCell=it.uni?'1 un':parseFloat(pesoEf).toLocaleString('pt-BR',{maximumFractionDigits:3});
     var taraInfo='';
     if(!it.uni&&(it.tara||it.desconto))taraInfo='<br><span style="font-size:9px">Bruto:'+fKg(it.peso)+'kg'+(it.tara?' Tara:'+fKg(it.tara)+'kg':'')+'</span>';
-    itRows+='<tr><td>'+it.nome.toUpperCase()+taraInfo+(it.obs?'<br><span style="font-size:9px;color:#888">'+it.obs+'</span>':'')+'</td><td>'+pesoCell+'</td><td>'+fR(it.preco)+'</td><td>'+fR(val)+'</td></tr>';
+    var row='<tr><td>'+it.nome.toUpperCase()+taraInfo+(it.obs?'<br><span style="font-size:9px;color:#888">'+it.obs+'</span>':'')+'</td><td>'+pesoCell+'</td><td>'+fR(it.preco)+'</td><td>'+fR(val)+'</td></tr>';
+    if(isMisto){
+      if(it.tipo==='Venda'){itensVenda.push(row);totalVenda+=val;}
+      else{itensCompra.push(row);totalCompra+=val;}
+    } else {
+      itensGeral.push(row);
+    }
   }
 
-  // pagamentos
+  // Monta tabela de itens
+  var cabTh='<tr><th>ITEM</th><th>PESO</th><th>PRECO</th><th>TOTAL</th></tr>';
+  var tabelaItens='';
+  if(isMisto){
+    if(itensCompra.length){
+      tabelaItens+='<div class="small bold" style="margin:6px 0 3px">Itens comprados:</div>'
+        +'<table>'+cabTh+itensCompra.join('')+'</table>'
+        +'<div class="center small bold" style="margin:3px 0">Subtotal compras: '+fR(totalCompra)+'</div>';
+    }
+    if(itensVenda.length){
+      tabelaItens+='<div class="small bold" style="margin:6px 0 3px">Itens vendidos:</div>'
+        +'<table>'+cabTh+itensVenda.join('')+'</table>'
+        +'<div class="center small bold" style="margin:3px 0">Subtotal vendas: '+fR(totalVenda)+'</div>';
+    }
+  } else {
+    tabelaItens='<table>'+cabTh+itensGeral.join('')+'</table>';
+  }
+
+  // pagamentos — separa recebimentos de pagamentos em operação mista
   var pgtoH='';
-  var allMethods=recMethods.concat(pagMethods);
-  if(allMethods.length>0){
-    for(var i=0;i<allMethods.length;i++){
-      var m=allMethods[i];
-      // Mostra somente o tipo (Pix, Dinheiro, Cartão), sem o banco
-      pgtoH+='<div class="center small">'+m.label+': '+fR(m.valor)+'</div>';
+  if(isMisto){
+    var somaRec=0, somaPag=0;
+    if(recMethods.length){
+      pgtoH+='<div class="center small bold" style="margin-top:4px">A receber (vendas):</div>';
+      for(var i=0;i<recMethods.length;i++){somaRec+=recMethods[i].valor;pgtoH+='<div class="center small">'+recMethods[i].label+': '+fR(recMethods[i].valor)+'</div>';}
+    }
+    if(pagMethods.length){
+      pgtoH+='<div class="center small bold" style="margin-top:4px">A pagar (compras):</div>';
+      for(var i=0;i<pagMethods.length;i++){somaPag+=pagMethods[i].valor;pgtoH+='<div class="center small">'+pagMethods[i].label+': '+fR(pagMethods[i].valor)+'</div>';}
+    }
+    var saldo=+(somaRec-somaPag).toFixed(2);
+    pgtoH+='<div class="dash"></div><div class="center small bold">Saldo líquido: '+(saldo>=0?'receber ':'pagar ')+fR(Math.abs(saldo))+'</div>';
+  } else {
+    var allMethods=recMethods.concat(pagMethods);
+    if(allMethods.length>0){
+      for(var i=0;i<allMethods.length;i++){
+        var m=allMethods[i];
+        pgtoH+='<div class="center small">'+m.label+': '+fR(m.valor)+'</div>';
+      }
     }
   }
 
@@ -2390,17 +2580,19 @@ function _gerarHTMLBoleto(ab, recMethods, pagMethods, obs, num){
     +'<div class="info-box">'+forn+'</div>'
     +'<div class="info-row"><span>Operador(a): '+op+'</span><span>'+hj()+', '+hora+'</span></div>'
     +nfH
-    +'<div class="small bold" style="margin-bottom:4px;margin-top:6px">'+tipoLabel+'</div>'
-    +'<table>'+itRows+'</table>'
+    +(isMisto?'':('<div class="small bold" style="margin-bottom:4px;margin-top:6px">'+tipoLabel+'</div>'))
+    +tabelaItens
     +(pesoTotal>0?'<div class="faixa peso">Peso Total: '+parseFloat(pesoTotal).toLocaleString('pt-BR',{maximumFractionDigits:3})+' kg</div>':'')
-    +'<div class="faixa total">Total: '+fR(totalGeral)+'</div>'
-    // Lucro no comprovante (só para vendas)
-    +(CFG.sistema.lucroComprovante&&tipoPed==='Venda'
+    +(isMisto
+      ?'<div class="faixa total" style="font-size:14px;line-height:1.4">Compras: '+fR(totalCompra)+'<br>Vendas: '+fR(totalVenda)+'</div>'
+      :'<div class="faixa total">Total: '+fR(totalGeral)+'</div>')
+    // Lucro no comprovante (só para vendas simples)
+    +(CFG.sistema.lucroComprovante&&tipoPed==='Venda'&&!isMisto
       ?'<div class="center small" style="margin-top:3px">Lucro estimado: '+fR(totalGeral-(ab._custoEstimado||0))+'</div>':'')
     // Chave PIX do cliente no comprovante
     +(CFG.sistema.pixComprovante&&cli&&cli.pix
       ?'<div class="center small" style="margin-top:3px">PIX: '+cli.pix+'</div>':'')
-    +(pgtoH?'<div class="dash"></div><div class="center small bold">Formas de Pagamento:</div>'+pgtoH:'')
+    +(pgtoH?'<div class="dash"></div><div class="center small bold">'+(isMisto?'Pagamentos:':'Formas de Pagamento:')+'</div>'+pgtoH:'')
     +obsH
     +'<div class="dash-dot"></div>'
     +'</body></html>';
@@ -2553,7 +2745,7 @@ function pgPendencias(){
       if(at.cliId){for(var ci=0;ci<DB.clientes.length;ci++){if(DB.clientes[ci].id==at.cliId){cliNome=DB.clientes[ci].nome;break;}}}
       var tipoC=at.tipo==='Venda'?'var(--gr)':at.tipo==='Compra'?'var(--rd)':at.tipo==='Logistica Reversa'?'#a855f7':'var(--bl)';
       var itensSumario='';
-      for(var j=0;j<Math.min(at.itens.length,3);j++){var it=at.itens[j];var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;itensSumario+='<div style="font-size:11px;color:var(--mt)">'+(it.ic||'')+' '+it.nome+' &mdash; '+fKg(pesoEf)+'kg &mdash; '+fR(it.uni?it.preco:pesoEf*it.preco)+'</div>';}
+      for(var j=0;j<Math.min(at.itens.length,3);j++){var it=at.itens[j];var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;itensSumario+='<div style="font-size:11px;color:var(--mt)">'+(it.ic||'')+' '+it.nome+' &mdash; '+fKg(pesoEf)+'kg &mdash; '+_mask(fR(it.uni?it.preco:pesoEf*it.preco))+'</div>';}
       if(at.itens.length>3)itensSumario+='<div style="font-size:11px;color:var(--mt)">+ '+(at.itens.length-3)+' item(s)...</div>';
       cards+='<div class="card" style="border-left:4px solid var(--or);position:relative">'
         +'<div style="position:absolute;top:12px;right:12px;background:var(--orb);border:1px solid rgba(245,158,11,.35);color:var(--or);font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:1px">EM ABERTO</div>'
@@ -2565,7 +2757,7 @@ function pgPendencias(){
         +'<div style="background:var(--bg);border-radius:var(--r);padding:9px 11px;margin-bottom:10px;display:flex;flex-direction:column;gap:3px">'+itensSumario+'</div>'
         +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
         +'<div style="font-size:11px;color:var(--mt)">'+at.itens.length+' item(s)'+(at.obs?' &middot; '+at.obs:'')+'</div>'
-        +'<div style="font-size:16px;font-weight:800;font-family:monospace;color:var(--or)">~'+fR(at.valTotal)+'</div></div>'
+        +'<div style="font-size:16px;font-weight:800;font-family:monospace;color:var(--or)">~'+_mask(fR(at.valTotal))+'</div></div>'
         +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
         +'<button class="btn" style="background:var(--bl)" onclick="reabrirPendencia('+at.id+')">&#9998; Reabrir p/ Ajuste</button>'
         +'<button class="btn" style="background:var(--gr2)" onclick="liquidarPendencia('+at.id+')">&#10003; Liquidar (Concluir)</button>'
@@ -2574,8 +2766,9 @@ function pgPendencias(){
   }
   return '<div class="fc">'
     +'<div class="ptop"><div><div class="pl">Financeiro</div><div class="pt">&#9203; Pesagens em Aberto</div></div>'
-    +(list.length>0?'<div style="background:var(--orb);border:1px solid rgba(245,158,11,.3);border-radius:var(--r);padding:8px 14px;text-align:right"><div style="font-size:10px;color:var(--or);text-transform:uppercase;letter-spacing:1px">Total Estimado</div><div style="font-size:18px;font-weight:800;color:var(--or);font-family:monospace">~'+fR(totalVal)+'</div><div style="font-size:10px;color:var(--mt)">'+list.length+' atendimento(s)</div></div>':'')
-    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px">'+_olhoValores()
+    +(list.length>0?'<div style="background:var(--orb);border:1px solid rgba(245,158,11,.3);border-radius:var(--r);padding:8px 14px;text-align:right"><div style="font-size:10px;color:var(--or);text-transform:uppercase;letter-spacing:1px">Total Estimado</div><div style="font-size:18px;font-weight:800;color:var(--or);font-family:monospace">~'+_mask(fR(totalVal))+'</div><div style="font-size:10px;color:var(--mt)">'+list.length+' atendimento(s)</div></div>':'')
+    +'</div></div>'
     +(list.length>0?'<div class="al aly" style="font-size:12px">&#9888; Estes atendimentos tiveram o estoque movimentado mas o financeiro ainda nao foi registrado. Liquide-os assim que o pagamento for confirmado.</div>':'')
     +'<div class="fc">'+cards+'</div></div>';
 }
@@ -3001,15 +3194,16 @@ function renderCaixaDia(){
     +'<button class="btnO bOgr" onclick="mReforco()">Reforco</button>'
     +'<button class="btn btn-or" onclick="mDespesaRapida()" style="color:#000">&#127869; Despesa</button>'
     +'<button class="btnO bOgr" onclick="mConfigCaixa()" style="padding:8px 11px" title="Configuracoes do Caixa">&#9881;</button>'
+    +_olhoValores()
     +'<button class="btn btn-rd" onclick="mFecharCaixa()">Fechar Caixa</button></div></div>'
     +'<div class="g4">'
-    +sc('&#128181;','Abertura',fR(cd.saldoAbertura),'Saldo inicial','var(--mt)')
-    +sc('&#128228;','Vendas',fR(vendas),'no dia','var(--gr)')
-    +sc('&#128229;','Compras',fR(compras),'no dia','var(--rd)')
+    +sc('&#128181;','Abertura',_mask(fR(cd.saldoAbertura)),'Saldo inicial','var(--mt)')
+    +sc('&#128228;','Vendas',_mask(fR(vendas)),'no dia','var(--gr)')
+    +sc('&#128229;','Compras',_mask(fR(compras)),'no dia','var(--rd)')
     +sc('&#9878;','Peso Total',fKg(pesoTotal)+' kg','pesagens','var(--bl)')
     +'</div>'
-    +sc('&#128176;','Saldo Caixa',fR(_estim),'Estimado','var(--gr)')
-    +(_totDesp>0?sc('&#127869;','Despesas',fR(_totDesp),_despDia.length+' lancamento(s)','var(--or)'):'')
+    +sc('&#128176;','Saldo Caixa',_mask(fR(_estim)),'Estimado','var(--gr)')
+    +(_totDesp>0?sc('&#127869;','Despesas',_mask(fR(_totDesp)),_despDia.length+' lancamento(s)','var(--or)'):'')
     +(extras?'<div class="g2">'+extras+'</div>':'')
     +'<div class="card" style="padding:0;overflow:hidden"><div style="padding:13px 16px;border-bottom:1px solid var(--bd)"><div class="stl" style="margin-bottom:0"><div class="stb"></div><div class="stx">Atendimentos ('+movsDia.length+')</div></div></div>'+movsH+'</div>'
     +despCard
@@ -6851,6 +7045,23 @@ function mEditRev(id){
   }
   estInfo+='</div>';
   var clHtml=renderChecklistHtml(it.cat||'',it.testesAprovados||[],'er');
+  // Detecta outras unidades "idênticas" (mesmo nome-base + mesma condição) ainda disponíveis,
+  // para oferecer a opção de aplicar a edição a todo o grupo de uma vez.
+  var nomeBaseAtual=(it.prod||'').replace(/\s*#\d+\s*$/,'').toLowerCase();
+  var irmaos=[];
+  for(var i=0;i<DB.revenda.length;i++){
+    var rv2=DB.revenda[i];
+    if(rv2.id===it.id||rv2.status!=='Disponivel')continue;
+    var nomeBase2=(rv2.prod||'').replace(/\s*#\d+\s*$/,'').toLowerCase();
+    if(nomeBase2===nomeBaseAtual && rv2.cond===it.cond) irmaos.push(rv2.id);
+  }
+  var grupoHtml=irmaos.length
+    ?'<div style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:var(--r);padding:10px;margin-bottom:10px">'
+      +'<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">'
+      +'<input type="checkbox" id="er-aplicar-grupo" checked style="margin-top:2px">'
+      +'<span style="font-size:12px">Aplicar Preco, Peso e Descricao as outras <strong>'+irmaos.length+'</strong> unidade'+(irmaos.length>1?'s':'')+' identica'+(irmaos.length>1?'s':'')+' ('+it.cond+') ainda disponive'+(irmaos.length>1?'is':'l')+'</span>'
+      +'</label></div>'
+    :'';
   var h='<div class="mf">'
     +'<div class="fld"><label>Produto</label><input class="inp" id="er-p" value="'+(it.prod||'')+'"></div>'
     +'<div class="fld"><label>Descricao / Especificacoes</label><textarea class="inp" id="er-desc" rows="3" style="resize:vertical;min-height:64px;line-height:1.5">'+(it.desc||'')+'</textarea></div>'
@@ -6865,6 +7076,7 @@ function mEditRev(id){
     +estInfo
     +'<div class="fld"><label>Peso kg</label><input class="inp" type="number" inputmode="decimal" id="er-kg" value="'+it.peso+'" oninput="_calcMargemRev(\'er\')"></div>'
     +'<div id="er-marg" style="margin-bottom:8px"></div>'
+    +grupoHtml
     +'<div class="brow">'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
     +'<button class="btn" onclick="saveEditRev('+id+')">Salvar</button>'
@@ -6943,6 +7155,36 @@ function saveEditRev(id){
   var cbs=document.querySelectorAll('#er-cl-wrap input[type=checkbox]');
   for(var i=0;i<cbs.length;i++){if(cbs[i].checked)aprovados.push(cbs[i].value);}
   it.testesAprovados=aprovados;
+
+  // Se marcado, aplica Preco, Peso, Descricao e testes às outras unidades idênticas
+  // (mesmo nome-base + mesma condição original) ainda disponíveis.
+  var chkGrupo=document.getElementById('er-aplicar-grupo');
+  if(chkGrupo&&chkGrupo.checked){
+    var nomeBaseEditado=n.replace(/\s*#\d+\s*$/,'').toLowerCase();
+    for(var i=0;i<DB.revenda.length;i++){
+      var irmao=DB.revenda[i];
+      if(irmao.id===it.id||irmao.status!=='Disponivel')continue;
+      var nomeBaseIrmao=(irmao.prod||'').replace(/\s*#\d+\s*$/,'').toLowerCase();
+      if(nomeBaseIrmao!==nomeBaseEditado||irmao.cond!==it.cond)continue;
+      irmao.preco=it.preco;
+      irmao.desc=it.desc;
+      irmao.cat=it.cat;
+      irmao.specs=it.specs;
+      irmao.testesAprovados=aprovados.slice();
+      // Peso/estoque do irmão só é ajustado se ele também estiver vinculado ao mesmo produto do estoque
+      if(_normId(irmao.estProdId)===_normId(it.estProdId) && irmao.peso!==pesoNovo){
+        if(irmao.estProdId&&irmao.peso>0){
+          var epA=null;for(var j=0;j<DB.produtos.length;j++){if(_normId(DB.produtos[j].id)===_normId(irmao.estProdId)){epA=DB.produtos[j];break;}}
+          if(epA)epA.est=+(epA.est+irmao.peso).toFixed(3);
+        }
+        if(pIdNovo&&pesoNovo>0){
+          var epN=null;for(var j=0;j<DB.produtos.length;j++){if(_normId(DB.produtos[j].id)===_normId(pIdNovo)){epN=DB.produtos[j];break;}}
+          if(epN)epN.est=+(epN.est-pesoNovo).toFixed(3);
+        }
+        irmao.peso=pesoNovo;
+      }
+    }
+  }
   saveDB();closeM();go('revenda');
 }
 function mDelRev(id){
@@ -8344,6 +8586,7 @@ function _finFixas(){
         else acoes='<span class="tag tg">Pago</span> <button onclick="desfazerPagCF('+c.id+')" style="background:none;border:none;color:var(--mt);font-size:11px;cursor:pointer;text-decoration:underline" title="Desfazer pagamento">↩ Desfazer</button>';
       } else if(s==='Pendente'){
         if(c.tipo==='variavel'&&v===0) acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="mLancarCF('+c.id+')">Lancar Valor</button>';
+        else if(c.tipo==='variavel'&&v>0) acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);margin-right:4px" onclick="mLancarCF('+c.id+')">&#9998; Alterar</button><button class="bsm bsmg" onclick="mPagarCF('+c.id+')">Pagar</button>';
         else if(v>0) acoes='<button class="bsm bsmg" onclick="mPagarCF('+c.id+')">Pagar</button>';
         else acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="mLancarCF('+c.id+')">Lancar Valor</button>';
       } else {
@@ -13287,7 +13530,8 @@ var CFG={
     idioma:'pt-BR',moeda:'BRL',exibirFeriados:true,
     atalhos:true,
     anthropicKey:'',
-    tipoBarcode:'ean13'
+    tipoBarcode:'ean13',
+    senhaRevelarValores:''
   },
   integracao:{
     impressora:false,gerarAutoComprovante:true,balancaDigital:false
@@ -13362,6 +13606,7 @@ function _cfgRevenda(){
 }
 
 function _cfgDados(){
+  var s=CFG.sistema;
   var totalMB=(JSON.stringify(DB).length/1024/1024).toFixed(2);
   var logs=DB.auditLogs||[];
   var logsRecent=logs.slice(0,10);
@@ -13374,6 +13619,17 @@ function _cfgDados(){
     +'<div style="font-size:11px;color:var(--mt)">Banco local atual</div></div>'
     +'<div style="font-size:20px;font-weight:800;color:var(--bl);font-family:monospace">'+totalMB+' MB</div>'
     +'</div>'
+    // Privacidade — senha para revelar valores ocultos
+    +'<div style="margin-bottom:14px;padding:12px;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-radius:var(--r)">'
+    +'<div style="font-size:13px;font-weight:600;color:#a855f7;margin-bottom:4px">&#128274; Privacidade — Ocultar Valores</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:8px">Logins que nao sao Administrador veem os valores do Caixa e Pendencias ocultos (R$ &bull;&bull;&bull;&bull;). Defina aqui a senha que permite revelar temporariamente, no proprio dispositivo, sem trocar de login.</div>'
+    +(s.senhaRevelarValores
+      ?'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:11px;background:rgba(34,197,94,.15);color:var(--gr);padding:3px 9px;border-radius:20px;font-weight:600">&#10003; Senha definida</span></div>'
+      :'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:11px;background:rgba(245,158,11,.15);color:var(--or);padding:3px 9px;border-radius:20px;font-weight:600">&#9888; Nenhuma senha definida</span></div>')
+    +'<div style="display:flex;gap:8px">'
+    +'<input class="inp" type="password" id="cfg-senha-revelar" placeholder="'+(s.senhaRevelarValores?'Digite para alterar a senha':'Defina uma senha de revelacao')+'" style="flex:1">'
+    +'<button class="btn" style="white-space:nowrap" onclick="_cfgSalvarSenhaRevelar()">Salvar</button>'
+    +'</div></div>'
     // Backup
     +'<div style="margin-bottom:14px">'
     +'<div style="font-size:13px;font-weight:600;margin-bottom:4px">&#128229; Exportar Backup</div>'
@@ -13910,6 +14166,20 @@ function cfgToggleEmp(key,val){
   if(kn){kn.style.left=val?'20px':'2px';}
 }
 function _saveCfgSistema(){autoSave();}
+function _cfgSalvarSenhaRevelar(){
+  var el=document.getElementById('cfg-senha-revelar');
+  if(!el)return;
+  var val=el.value;
+  if(!val){alert('Digite uma senha antes de salvar!');return;}
+  CFG.sistema.senhaRevelarValores=val;
+  _saveCfgSistema();
+  var toast=document.createElement('div');
+  toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--gr);color:#fff;padding:8px 16px;border-radius:20px;font-size:12px;z-index:9999;font-weight:600';
+  toast.textContent='Senha de revelacao salva!';
+  document.body.appendChild(toast);
+  setTimeout(function(){toast.remove();},2000);
+  go('configuracoes'); // recarrega a tela para mostrar o status "Senha definida"
+}
 function _saveCfgIntegracao(){autoSave();}
 function cfgToggleSis(key,val){
   CFG.sistema[key]=val;
