@@ -8502,18 +8502,30 @@ function _mesParaDate(mes){
   return new Date(parseInt(p[1]),parseInt(p[0])-1,1);
 }
 function _cfAtivaNoMes(c,mesRef){
-  // Retorna false se mesRef é anterior ao mesInicio da conta
+  // Retorna false se mesRef é anterior ao mesInicio da conta.
+  // Exceção: conta FIXA com valor cadastrado sempre é considerada ativa no mês atual
+  // (o usuário já definiu o valor — não faz sentido esconder).
   if(!c.mesInicio)return true;
   var dRef=_mesParaDate(mesRef);
   var dIni=_mesParaDate(c.mesInicio);
   if(!dRef||!dIni)return true;
-  return dRef>=dIni;
+  if(dRef>=dIni)return true;
+  // Conta fixa com valor: ativa a partir do mês atual mesmo se mesInicio for futuro
+  if(c.tipo==='fixa'&&c.valor>0&&mesRef===_mesAtual())return true;
+  return false;
 }
 function _cfValorMesRef(c,mesRef){
+  // Conta fixa: o valor sempre é o cadastrado, independente do mês de início.
+  // O mês de início só controla a EXIBIÇÃO (a conta só aparece na lista a partir dele),
+  // mas nunca deve fazer o valor sumir ou mostrar "Lançar Valor".
+  if(c.tipo==='fixa'){
+    if(!_cfAtivaNoMes(c,mesRef))return 0; // não ativa ainda: não exibe
+    if(c.historico){for(var i=0;i<c.historico.length;i++){if(c.historico[i].mes===mesRef)return c.historico[i].valor;}}
+    return c.valor; // valor fixo cadastrado — sempre disponível
+  }
   if(!_cfAtivaNoMes(c,mesRef))return 0;
   if(c.historico){for(var i=0;i<c.historico.length;i++){if(c.historico[i].mes===mesRef)return c.historico[i].valor;}}
-  if(c.tipo==='fixa')return c.valor;
-  return 0;
+  return 0; // variável sem lançamento = 0
 }
 function _cfStatusMesRef(c,mesRef){
   if(!_cfAtivaNoMes(c,mesRef))return 'Pendente';
@@ -8557,8 +8569,22 @@ function _finFixas(){
     if(isFuturo&&v>0&&s==='Pendente')totFuturo+=v;
   }
   var cfH='';
-  for(var i=0;i<DB.contasFixas.length;i++){
-    var c=DB.contasFixas[i];
+  // Ordena por dia de vencimento (mais próximo primeiro) e depois por status (pendente antes de pago)
+  var _cfOrdenadas=DB.contasFixas.slice().sort(function(a,b){
+    // Parceladas sem parcela neste mês ficam por último
+    var aTemParcela=!(a.tipo==='parcelada'&&!_cfHasParcelaNoMes(a,ma));
+    var bTemParcela=!(b.tipo==='parcelada'&&!_cfHasParcelaNoMes(b,ma));
+    if(aTemParcela!==bTemParcela) return aTemParcela?-1:1;
+    var sA=_cfStatusMesRef(a,ma);var sB=_cfStatusMesRef(b,ma);
+    // Pendentes antes de pagas
+    if(sA!==sB) return sA==='Pendente'?-1:1;
+    // Dentro de pendentes: ordena por vencimento
+    return (a.venc||31)-(b.venc||31);
+  });
+  // Dia atual para calcular urgência
+  var _diaHoje=new Date().getDate();
+  for(var i=0;i<_cfOrdenadas.length;i++){
+    var c=_cfOrdenadas[i];
     // Para parcelada, pular se nao tem parcela neste mes
     if(c.tipo==='parcelada'&&!_cfHasParcelaNoMes(c,ma))continue;
     var v=_cfValorMesRef(c,ma);
@@ -8575,7 +8601,22 @@ function _finFixas(){
       tipoTag='<span style="font-size:9px;background:var(--pub);color:var(--pu);border:1px solid rgba(168,85,247,.3);border-radius:10px;padding:1px 6px">'+numParc+'/'+totParc+'x</span>';
     } else tipoTag='<span style="font-size:9px;background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:1px 6px">VARIAVEL</span>';
     var acoes='';
-    if(isFuturo||isPast){
+    // Badge de urgência — só no mês atual e se estiver pendente
+    var _urgBadge='';
+    if(!isFuturo&&!isPast&&s==='Pendente'&&v>0){
+      var diasParaVenc=c.venc-_diaHoje;
+      if(diasParaVenc<0)
+        _urgBadge='<span style="font-size:9px;background:rgba(239,68,68,.2);color:var(--rd);border:1px solid rgba(239,68,68,.4);border-radius:10px;padding:1px 7px;font-weight:700">&#128680; Atrasada '+Math.abs(diasParaVenc)+'d</span>';
+      else if(diasParaVenc===0)
+        _urgBadge='<span style="font-size:9px;background:rgba(239,68,68,.15);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:1px 7px;font-weight:700">&#128680; Vence hoje</span>';
+      else if(diasParaVenc<=3)
+        _urgBadge='<span style="font-size:9px;background:rgba(245,158,11,.15);color:var(--or);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:1px 7px;font-weight:700">&#9888; Vence em '+diasParaVenc+'d</span>';
+    }
+    // Conta fixa com valor cadastrado mas mês de início no futuro — não aparece no mês atual
+    var _cfInativa=!isFuturo&&!isPast&&c.tipo==='fixa'&&c.valor>0&&!_cfAtivaNoMes(c,ma);
+    if(_cfInativa){
+      acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.4)" onclick="mEditCF('+c.id+')" title="Mes de inicio posterior ao mes atual. Clique para editar e corrigir.">&#9888; Inicia em '+c.mesInicio+' — Corrigir</button>';
+    } else if(isFuturo||isPast){
       if(s==='Pago') acoes='<span class="tag tg">Pago</span>';
       else if(v>0) acoes='<span class="tag to">Previsto</span>';
       else acoes='<span style="font-size:11px;color:var(--mt)">sem valor</span>';
@@ -8587,7 +8628,8 @@ function _finFixas(){
       } else if(s==='Pendente'){
         if(c.tipo==='variavel'&&v===0) acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="mLancarCF('+c.id+')">Lancar Valor</button>';
         else if(c.tipo==='variavel'&&v>0) acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);margin-right:4px" onclick="mLancarCF('+c.id+')">&#9998; Alterar</button><button class="bsm bsmg" onclick="mPagarCF('+c.id+')">Pagar</button>';
-        else if(v>0) acoes='<button class="bsm bsmg" onclick="mPagarCF('+c.id+')">Pagar</button>';
+        else if(v>0) acoes='<button class="bsm bsmg" onclick="mPagarCF('+c.id+')">Pagar</button>'
+          +(_cfUltimaConta(c)?'<button class="bsm" style="background:rgba(34,197,94,.12);color:var(--gr);border:1px solid rgba(34,197,94,.3);font-size:10px" onclick="pagarCFRapido('+c.id+')" title="Pagar rapidamente com '+_cfUltimaConta(c)+'">&#9889; '+_cfUltimaConta(c)+'</button>':'');
         else acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="mLancarCF('+c.id+')">Lancar Valor</button>';
       } else {
         acoes='<span class="tag tg">Pago</span> <button onclick="desfazerPagCF('+c.id+')" style="background:none;border:none;color:var(--mt);font-size:11px;cursor:pointer;text-decoration:underline" title="Desfazer pagamento">↩ Desfazer</button>';
@@ -8599,8 +8641,8 @@ function _finFixas(){
       +'<div style="display:flex;align-items:center;gap:10px">'
       +'<span style="font-size:22px">'+(c.ic||'&#128197;')+'</span>'
       +'<div>'
-      +'<div style="display:flex;align-items:center;gap:6px">'
-      +'<span style="font-size:13px;font-weight:600">'+c.nome+'</span>'+tipoTag+'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+      +'<span style="font-size:13px;font-weight:600">'+c.nome+'</span>'+tipoTag+_urgBadge+'</div>'
       +'<div style="font-size:10px;color:var(--mt);margin-top:2px">Vence dia '+c.venc+' &middot; <button onclick="mHistCF('+c.id+')" style="background:none;border:none;color:var(--bl);font-size:10px;cursor:pointer;padding:0">ver historico</button></div>'
       +'</div></div>'
       +'<div style="display:flex;align-items:center;gap:9px">'
@@ -8651,7 +8693,7 @@ function pgCF(id){
   var c=null;for(var i=0;i<DB.contasFixas.length;i++){if(DB.contasFixas[i].id===id){c=DB.contasFixas[i];break;}}
   if(!c)return;
   c.status='Pago';
-  DB.movs.unshift({id:nid(),data:hj(),desc:'Pagamento: '+c.nome,tipo:'saida',cat:'Fixo',valor:c.valor,conta:'Caixa'});
+  DB.movs.unshift({id:nid(),data:hj(),desc:'Pagamento: '+c.nome,tipo:'saida',cat:c.cat||'Fixo',valor:c.valor,conta:'Caixa'});
   for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){DB.contas[i].saldo=+(DB.contas[i].saldo-c.valor).toFixed(2);break;}}
   go('financeiro');
 }
@@ -8683,14 +8725,25 @@ function mNovaCF(){
     +'<div class="fld" id="cf-parc-wrap" style="display:none"><label>Numero de Parcelas</label><input class="inp" type="number" inputmode="numeric" id="cf-parc" placeholder="Ex: 4, 6, 12..." min="2" max="60" value=""></div>'
     +'<div class="fld" id="cf-mes-inicio-wrap"><label>Mes de inicio (MM/AAAA)</label><input class="inp" id="cf-mes-inicio" placeholder="Ex: 06/2025"></div>'
     +'<div class="fld"><label>Dia de Vencimento</label><input class="inp" type="number" inputmode="numeric" id="cf-venc" placeholder="Ex: 5, 10, 15..." min="1" max="31"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Categoria (DRE)</label><select class="inp" id="cf-cat">'
+    +'<option value="Fixo">Despesa Fixa</option><option value="Aluguel">Aluguel</option>'
+    +'<option value="Energia">Energia</option><option value="Agua">Água</option>'
+    +'<option value="Internet">Internet / Telefone</option><option value="Honorarios">Honorários</option>'
+    +'<option value="Salario">Salário / Pró-labore</option><option value="Imposto">Impostos</option>'
+    +'<option value="Manutencao">Manutenção</option><option value="Servico">Serviços</option>'
+    +'<option value="Outros">Outros</option></select></div>'
+    +'<div class="fld"><label>Conta padrão</label><select class="inp" id="cf-conta-pad"><option value="">— Perguntar sempre —</option>'
+    +DB.contas.map(function(ct){return'<option value="'+ct.nome+'">'+ct.nome+'</option>';}).join('')
+    +'</select></div></div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveNovaCF()">Cadastrar</button></div>'
     +'</div>',520);
   // highlight first icon
   setTimeout(function(){
     var btns=document.querySelectorAll('[data-ic]');
     if(btns.length)btns[0].style.borderColor='var(--gr)';
-    // Pre-fill mes inicio com mes seguinte
-    var d=new Date();d.setMonth(d.getMonth()+1);
+    // Pre-fill mes inicio com mes ATUAL (não o seguinte — causava conta fixa não aparecer no mês vigente)
+    var d=new Date();
     var el=document.getElementById('cf-mes-inicio');
     if(el)el.value=String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
   },50);
@@ -8756,7 +8809,9 @@ function saveNovaCF(){
     DB.contasFixas.push({id:nid(),nome:n,ic:ic,tipo:'parcelada',valor:v,venc:venc,status:'Pendente',totalParcelas:np,mesInicio:mesInicio,historico:hist});
   } else {
     var mesInicio=document.getElementById('cf-mes-inicio').value.trim()||_mesAtual();
-    DB.contasFixas.push({id:nid(),nome:n,ic:ic,tipo:tipo,valor:tipo==='fixa'?v:0,venc:venc,status:'Pendente',mesInicio:mesInicio,historico:[]});
+    var contaPad=(document.getElementById('cf-conta-pad')&&document.getElementById('cf-conta-pad').value)||'';
+    var catCF=(document.getElementById('cf-cat')&&document.getElementById('cf-cat').value)||'Fixo';
+    DB.contasFixas.push({id:nid(),nome:n,ic:ic,tipo:tipo,valor:tipo==='fixa'?v:0,venc:venc,status:'Pendente',mesInicio:mesInicio,contaPadrao:contaPad,cat:catCF,historico:[]});
   }
   closeM();saveDB();
   document.getElementById('fin-content').innerHTML=_finRender('fixas');
@@ -8786,8 +8841,20 @@ function mEditCF(id){
       :'<div class="al alb" style="font-size:12px">&#128179; Conta Parcelada &mdash; '+((c.historico||[]).filter(function(h){return h.pago;}).length)+'/'+(c.totalParcelas||'?')+'x parcelas pagas. Para alterar o tipo, exclua e recadastre.</div>')
     +'<input type="hidden" id="cf-tipo" value="'+c.tipo+'">'
     +'<div class="fld" id="cf-valor-wrap" style="display:'+(c.tipo!=='variavel'?'flex':'none')+'"><label>'+(c.tipo==='parcelada'?'Valor por Parcela R$':'Valor Fixo R$')+'</label><input class="inp" type="number" inputmode="decimal" id="cf-v" value="'+(c.tipo!=='variavel'?c.valor:'')+'" placeholder="0.00"></div>'
-    +(c.tipo!=='parcelada'?'<div class="fld" id="cf-mes-inicio-wrap"><label>Mes de inicio (MM/AAAA)</label><input class="inp" id="cf-mes-inicio" value="'+(c.mesInicio||_mesAtual())+'" placeholder="Ex: 05/2025"></div>':'')
+    +(c.tipo!=='parcelada'?'<div class="fld" id="cf-mes-inicio-wrap"><label>Mes de inicio (MM/AAAA) <span style="font-size:10px;color:var(--mt);font-weight:400">— a conta aparece a partir deste mes</span></label><input class="inp" id="cf-mes-inicio" value="'+(c.mesInicio||_mesAtual())+'" placeholder="Ex: 05/2025">'
+      +(!_cfAtivaNoMes(c,_mesAtual())&&c.tipo==='fixa'&&c.valor>0?'<div style="font-size:11px;color:var(--or);margin-top:4px">&#9888; Este mes de inicio e posterior ao mes atual ('+_mesAtual()+'), por isso a conta aparece como "Lançar Valor". Altere para '+_mesAtual()+' para ativar agora.</div>':'')
+      +'</div>':'')
     +'<div class="fld"><label>Dia de Vencimento</label><input class="inp" type="number" inputmode="numeric" id="cf-venc" value="'+c.venc+'" min="1" max="31"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Categoria (DRE)</label><select class="inp" id="cf-cat">'
+    +['Fixo','Aluguel','Energia','Agua','Internet','Honorarios','Salario','Imposto','Manutencao','Servico','Outros'].map(function(cat){
+      var labels={'Fixo':'Despesa Fixa','Aluguel':'Aluguel','Energia':'Energia','Agua':'Água','Internet':'Internet / Telefone','Honorarios':'Honorários','Salario':'Salário / Pró-labore','Imposto':'Impostos','Manutencao':'Manutenção','Servico':'Serviços','Outros':'Outros'};
+      return'<option value="'+cat+'"'+((c.cat||'Fixo')===cat?' selected':'')+'>'+labels[cat]+'</option>';
+    }).join('')
+    +'</select></div>'
+    +'<div class="fld"><label>Conta padrão</label><select class="inp" id="cf-conta-pad"><option value="">— Perguntar sempre —</option>'
+    +DB.contas.map(function(ct){return'<option value="'+ct.nome+'"'+(c.contaPadrao===ct.nome?' selected':'')+'>'+ct.nome+'</option>';}).join('')
+    +'</select></div></div>'
     +'<div class="brow">'
     +'<button class="btnO bOr" onclick="delCF('+id+')">&#128465; Excluir</button>'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
@@ -8805,6 +8872,10 @@ function saveEditCF(id){
   if(!n){alert('Informe o nome!');return;}
   if(tipo==='fixa'&&!v){alert('Informe o valor!');return;}
   c.nome=n;c.ic=ic;c.tipo=tipo;c.valor=tipo==='fixa'?v:0;c.venc=venc;
+  var cpEl=document.getElementById('cf-conta-pad');
+  if(cpEl)c.contaPadrao=cpEl.value||'';
+  var catEl=document.getElementById('cf-cat');
+  if(catEl)c.cat=catEl.value||'Fixo';
   var miEl=document.getElementById('cf-mes-inicio');
   if(miEl)c.mesInicio=miEl.value.trim()||c.mesInicio||_mesAtual();
   saveDB();closeM();
@@ -8853,7 +8924,7 @@ function saveLancarCF(id,pagar){
   c.historico=c.historico.filter(function(h){return h.mes!==ma;});
   c.historico.unshift({mes:ma,valor:v,pago:pagar,dataPag:pagar?hj():null,conta:pagar?conta:null});
   if(pagar){
-    DB.movs.unshift({id:nid(),data:hj(),desc:'Pagamento: '+c.nome+' ('+ma+')',tipo:'saida',cat:'Fixo',valor:v,conta:conta});
+    DB.movs.unshift({id:nid(),data:hj(),desc:'Pagamento: '+c.nome+' ('+ma+')',tipo:'saida',cat:c.cat||'Fixo',valor:v,conta:conta});
     for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo-v).toFixed(2);break;}}
   }
   closeM();saveDB();
@@ -8864,34 +8935,51 @@ function desfazerPagCF(id){
   var c=null;for(var i=0;i<DB.contasFixas.length;i++){if(DB.contasFixas[i].id===id){c=DB.contasFixas[i];break;}}
   if(!c)return;
   var ma=_mesComOffset(_fixasMesOffset);
-  if(!confirm('Desfazer pagamento de "'+c.nome+'" em '+ma+'?'))return;
-  // Marca como não pago no histórico
-  var v=0,conta='';
-  if(c.historico){
-    for(var i=0;i<c.historico.length;i++){
-      if(c.historico[i].mes===ma){
-        v=c.historico[i].valor||0;
-        conta=c.historico[i].conta||'';
-        c.historico[i].pago=false;
-        c.historico[i].dataPag=null;
-        break;
+  confirmar('Desfazer pagamento de <b>'+c.nome+'</b> em '+ma+'?<br><span style="font-size:12px;color:var(--mt)">O valor sera estornado na conta bancaria correspondente.</span>',function(){
+    var v=0,conta='',movId=null;
+    if(c.historico){
+      for(var i=0;i<c.historico.length;i++){
+        if(c.historico[i].mes===ma){
+          v=c.historico[i].valor||0;
+          conta=c.historico[i].conta||'';
+          movId=c.historico[i].movId||null;
+          c.historico[i].pago=false;
+          c.historico[i].dataPag=null;
+          c.historico[i].movId=null;
+          break;
+        }
       }
     }
-  }
-  // Remove o lançamento de movimentação correspondente
-  if(v>0){
-    var desc='Pagamento: '+c.nome+' ('+ma+')';
-    for(var i=0;i<DB.movs.length;i++){
-      if(DB.movs[i].desc===desc&&DB.movs[i].tipo==='saida'&&DB.movs[i].valor===v){
-        DB.movs.splice(i,1);
-        // Estorna saldo da conta
-        if(conta){for(var j=0;j<DB.contas.length;j++){if(DB.contas[j].nome===conta){DB.contas[j].saldo=+(DB.contas[j].saldo+v).toFixed(2);break;}}}
-        break;
+    if(v>0){
+      var removido=false;
+      if(movId){
+        for(var i=0;i<DB.movs.length;i++){
+          if(DB.movs[i].id===movId){
+            conta=DB.movs[i].conta||conta;
+            DB.movs.splice(i,1);
+            removido=true;break;
+          }
+        }
+      }
+      if(!removido){
+        var desc='Pagamento: '+c.nome+' ('+ma+')';
+        for(var i=0;i<DB.movs.length;i++){
+          if(DB.movs[i].desc===desc&&DB.movs[i].tipo==='saida'){
+            conta=DB.movs[i].conta||conta;
+            DB.movs.splice(i,1);
+            removido=true;break;
+          }
+        }
+      }
+      if(removido&&conta){
+        for(var j=0;j<DB.contas.length;j++){
+          if(DB.contas[j].nome===conta){DB.contas[j].saldo=+(DB.contas[j].saldo+v).toFixed(2);break;}
+        }
       }
     }
-  }
-  saveDB();
-  document.getElementById('fin-content').innerHTML=_finRender('fixas');
+    saveDB();
+    document.getElementById('fin-content').innerHTML=_finRender('fixas');
+  });
 }
 
 function mPagarCF(id){
@@ -8908,7 +8996,7 @@ function mPagarCF(id){
     +'</div>'
     +(c.tipo==='variavel'?'<button type="button" class="btnO bOgr" style="font-size:11px;width:100%" onclick="closeM();mLancarCF('+id+')">&#9998; Alterar Valor</button>':'')
     +'<div class="fld"><label>Conta para debitar</label><select class="inp" id="cf-pc">'
-    +DB.contas.map(function(ct){return'<option>'+ct.nome+'</option>';}).join('')
+    +DB.contas.map(function(ct){var contaPad=_cfUltimaConta(c);return'<option'+(contaPad===ct.nome?' selected':'')+'>'+ct.nome+'</option>';}).join('')
     +'</select></div>'
     +'<input type="hidden" id="cf-pc-mes" value="'+ma+'">'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="confirmarPagCF('+id+')">Confirmar Pagamento</button></div>'
@@ -8922,15 +9010,56 @@ function confirmarPagCF(id){
   var v=_cfValorMesRef(c,ma);
   var conta=document.getElementById('cf-pc').value;
   if(!c.historico)c.historico=[];
+  var _movId=nid();
   var found=false;
-  for(var i=0;i<c.historico.length;i++){if(c.historico[i].mes===ma){c.historico[i].pago=true;c.historico[i].dataPag=hj();c.historico[i].conta=conta;found=true;break;}}
-  if(!found)c.historico.unshift({mes:ma,valor:v,pago:true,dataPag:hj(),conta:conta});
-  DB.movs.unshift({id:nid(),data:hj(),desc:'Pagamento: '+c.nome+' ('+ma+')',tipo:'saida',cat:'Fixo',valor:v,conta:conta});
+  for(var i=0;i<c.historico.length;i++){if(c.historico[i].mes===ma){c.historico[i].pago=true;c.historico[i].dataPag=hj();c.historico[i].conta=conta;c.historico[i].movId=_movId;found=true;break;}}
+  if(!found)c.historico.unshift({mes:ma,valor:v,pago:true,dataPag:hj(),conta:conta,movId:_movId});
+  DB.movs.unshift({id:_movId,data:hj(),desc:'Pagamento: '+c.nome+' ('+ma+')',tipo:'saida',cat:c.cat||'Fixo',valor:v,conta:conta});
   for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo-v).toFixed(2);break;}}
   closeM();saveDB();
   document.getElementById('fin-content').innerHTML=_finRender('fixas');
 }
 
+// Retorna a última conta bancária usada para pagar esta despesa (do histórico),
+// ou a última conta usada em qualquer pagamento de conta fixa.
+function _cfUltimaConta(c){
+  // Prioridade 1: conta padrão cadastrada na conta fixa
+  if(c.contaPadrao)return c.contaPadrao;
+  // Prioridade 2: última conta usada no histórico desta despesa
+  if(c.historico){
+    for(var i=0;i<c.historico.length;i++){
+      if(c.historico[i].pago&&c.historico[i].conta)return c.historico[i].conta;
+    }
+  }
+  // Fallback: última conta usada em qualquer conta fixa
+  for(var i=0;i<DB.contasFixas.length;i++){
+    var h=DB.contasFixas[i].historico||[];
+    for(var j=0;j<h.length;j++){if(h[j].pago&&h[j].conta)return h[j].conta;}
+  }
+  // Fallback final: primeira conta cadastrada
+  return DB.contas&&DB.contas.length?DB.contas[0].nome:'';
+}
+// Pagamento rápido — usa a última conta sem abrir modal
+function pagarCFRapido(id){
+  var c=null;for(var i=0;i<DB.contasFixas.length;i++){if(DB.contasFixas[i].id===id){c=DB.contasFixas[i];break;}}
+  if(!c)return;
+  var ma=_mesComOffset(_fixasMesOffset);
+  var v=_cfValorMesRef(c,ma);
+  var conta=_cfUltimaConta(c);
+  if(!v){alert('Sem valor definido para este mes.');return;}
+  if(!conta){alert('Nenhuma conta bancária encontrada.');return;}
+  confirmar('Pagar <b>'+fR(v)+'</b> de "<b>'+c.nome+'</b>" via <b>'+conta+'</b>?',function(){
+    if(!c.historico)c.historico=[];
+    var _movId=nid();
+    var found=false;
+    for(var i=0;i<c.historico.length;i++){if(c.historico[i].mes===ma){c.historico[i].pago=true;c.historico[i].dataPag=hj();c.historico[i].conta=conta;c.historico[i].valor=v;c.historico[i].movId=_movId;found=true;break;}}
+    if(!found)c.historico.unshift({mes:ma,valor:v,pago:true,dataPag:hj(),conta:conta,movId:_movId});
+    DB.movs.unshift({id:_movId,data:hj(),desc:'Pagamento: '+c.nome+' ('+ma+')',tipo:'saida',cat:c.cat||'Fixo',valor:v,conta:conta});
+    for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo-v).toFixed(2);break;}}
+    saveDB();
+    document.getElementById('fin-content').innerHTML=_finRender('fixas');
+  });
+}
 function mHistCF(id){
   var c=null;for(var i=0;i<DB.contasFixas.length;i++){if(DB.contasFixas[i].id===id){c=DB.contasFixas[i];break;}}
   if(!c)return;
