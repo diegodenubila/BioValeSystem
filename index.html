@@ -1635,7 +1635,7 @@ function renderPesagem(){
     +'<span class="pdd-arr">&#9660;</span>'
     +'</button>'
     +'<div class="pdd-panel' +(ab.pddOpen?' open':'')+'">'
-    +'<div class="pdd-search" style="display:flex;align-items:center;gap:6px"><input type="text" id="prod-search" placeholder="&#128269; Buscar material..." oninput="filtrarProd()" autocomplete="off" style="flex:1;border:none;background:transparent;color:var(--tx);font-size:13px;outline:none;padding:2px 0"><button onclick="abrirCameraPes(&apos;mat&apos;)" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:6px;padding:3px 9px;font-size:16px;cursor:pointer;flex-shrink:0" title="Ler código de barras">&#128247;</button></div>'
+    +'<div class="pdd-search" style="display:flex;align-items:center;gap:6px"><input type="text" id="prod-search" placeholder="&#128269; Buscar material..." oninput="filtrarProd()" onkeydown="_pesSearchKeydown(event)" autocomplete="off" style="flex:1;border:none;background:transparent;color:var(--tx);font-size:13px;outline:none;padding:2px 0"><button onclick="abrirCameraPes(&apos;mat&apos;)" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:6px;padding:3px 9px;font-size:16px;cursor:pointer;flex-shrink:0" title="Ler código de barras">&#128247;</button></div>'
     +'<div class="pdd-list" id="prod-cards-list">'+prodCards+'</div>'
     +'</div></div></div>';
   // Build unit cards for pdd dropdown
@@ -1921,9 +1921,72 @@ function filtrarProd(){
   _pddFocusIdx=-1;
   for(var i=0;i<cards.length;i++){
     var nome=cards[i].getAttribute('data-nome')||'';
-    cards[i].style.display=(q===''||nome.indexOf(q)>=0)?'flex':'none';
+    var cod=cards[i].getAttribute('data-cod')||'';
+    var match=q===''||nome.indexOf(q)>=0||cod.indexOf(q)>=0;
+    cards[i].style.display=match?'flex':'none';
     cards[i].classList.remove('pdd-focus');
   }
+}
+
+// Detecta Enter do leitor USB de código de barras no campo de busca da pesagem.
+// O leitor envia os dígitos rapidamente e termina com Enter.
+// Se o valor for numérico (código de barras), busca em materiais E em revenda.
+var _pesBarrasTimer=null;
+function _pesSearchKeydown(e){
+  if(e.key==='Enter'){
+    e.preventDefault();
+    var val=(document.getElementById('prod-search').value||'').trim();
+    if(!val)return;
+    // Tenta encontrar por código de barras de material (barras) ou revenda (EAN)
+    if(/^\d{6,}$/.test(val)){
+      _pesBuscarPorCodigoBarras(val);
+    } else {
+      // Busca textual normal — seleciona o primeiro visível
+      _pddSelectFocused('prod-cards-list');
+    }
+  }
+}
+function _pesBuscarPorCodigoBarras(cod){
+  var codNorm=cod.replace(/^0+/,'');
+  // 1. Busca em materiais de estoque (campo barras)
+  for(var i=0;i<DB.produtos.length;i++){
+    var p=DB.produtos[i];
+    if(p.barras&&(p.barras===cod||p.barras===codNorm)){
+      // Preenche o campo de busca com o nome e filtra
+      var s=document.getElementById('prod-search');
+      if(s){s.value=p.nome;filtrarProd();}
+      // Seleciona automaticamente se for o único resultado
+      setTimeout(function(){_pddSelectFocused('prod-cards-list');},100);
+      return;
+    }
+  }
+  // 2. Busca em unidades de revenda pelo código EAN gerado
+  var ab=pesAbas[pesAtiva];
+  if(ab&&ab.tipo==='Venda'){
+    for(var i=0;i<DB.revenda.length;i++){
+      var rv=DB.revenda[i];
+      if(rv.status!=='Disponivel')continue;
+      // Usa o código do grupo (nome-base), não o ID individual
+      var nomeBase=(rv.prod||'').replace(/\s*#\d+\s*$/,'');
+      var grupoId=_revCodigoGrupo(nomeBase,rv.cond);
+      var rc=_revCodigo(grupoId);
+      if(rc===cod||rc.replace(/^0+/,'')===codNorm||String(rv.id)===cod){
+        // Encontrou unidade — dispara seleção diretamente
+        selUnit(rv.id);
+        return;
+      }
+    }
+  }
+  // 3. Nada encontrado — mostra aviso sutil
+  var s=document.getElementById('prod-search');
+  if(s){s.value=cod;filtrarProd();}
+  setTimeout(function(){
+    var vis=document.querySelectorAll('#prod-cards-list .prod-card[style*="flex"]');
+    if(!vis.length){
+      var s2=document.getElementById('prod-search');
+      if(s2){s2.style.borderColor='var(--rd)';setTimeout(function(){s2.style.borderColor='';},1500);}
+    }
+  },100);
 }
 
 function _pddGetVisible(listId){
@@ -2525,8 +2588,9 @@ function _gerarHTMLBoleto(ab, recMethods, pagMethods, obs, num){
       pgtoH+='<div class="center small bold" style="margin-top:4px">A pagar (compras):</div>';
       for(var i=0;i<pagMethods.length;i++){somaPag+=pagMethods[i].valor;pgtoH+='<div class="center small">'+pagMethods[i].label+': '+fR(pagMethods[i].valor)+'</div>';}
     }
-    var saldo=+(somaRec-somaPag).toFixed(2);
-    pgtoH+='<div class="dash"></div><div class="center small bold">Saldo líquido: '+(saldo>=0?'receber ':'pagar ')+fR(Math.abs(saldo))+'</div>';
+    // Saldo líquido usa os totais reais de venda e compra — independente de forma de pagamento registrada
+    var saldoLiq=+(totalVenda-totalCompra).toFixed(2);
+    pgtoH+='<div class="dash"></div><div class="center small bold">Saldo líquido: '+(saldoLiq>=0?'receber ':'pagar ')+fR(Math.abs(saldoLiq))+'</div>';
   } else {
     var allMethods=recMethods.concat(pagMethods);
     if(allMethods.length>0){
@@ -6434,6 +6498,17 @@ function _revCodigo(id){
   var cod12=str.slice(-12);
   return cod12+_ean13Check(cod12); // 13 dígitos com dígito verificador
 }
+
+// Gera um código de grupo estável baseado no nome-base e condição do produto.
+// Unidades idênticas (mesmo nome-base + mesma condição) compartilham o mesmo código,
+// permitindo que o leitor de código de barras encontre qualquer unidade disponível do grupo.
+function _revCodigoGrupo(nomeBase, cond){
+  // Hash simples do nome+condição para gerar um ID numérico estável
+  var str=(nomeBase+'|'+(cond||'')).toLowerCase();
+  var hash=0;
+  for(var i=0;i<str.length;i++){hash=((hash<<5)-hash+str.charCodeAt(i))|0;}
+  return Math.abs(hash)%999999999999; // garante 12 dígitos no máximo
+}
 function _gerarCode128(codigo){
   var C128B=[
     [2,1,2,2,2,2],[2,2,2,1,2,2],[2,2,2,2,2,1],[1,2,1,2,2,3],[1,2,1,3,2,2],
@@ -6741,16 +6816,21 @@ function buscarPorCodigo(val){
   val=(val||'').trim();if(!val)return;
   var found=null;
   var valNorm=val.replace(/^0+/,'');
+  // Busca pelo código de grupo (nome-base + condição) — unidades idênticas compartilham o mesmo código
   for(var i=0;i<DB.revenda.length;i++){
     var p=DB.revenda[i];
-    var cod=_revCodigo(p.id);       // agora retorna 13 dígitos EAN-13
+    if(p.status!=='Disponivel')continue;
+    var nomeBase=(p.prod||'').replace(/\s*#\d+\s*$/,'');
+    var grupoId=_revCodigoGrupo(nomeBase,p.cond);
+    var cod=_revCodigo(grupoId);
     var codNorm=cod.replace(/^0+/,'');
-    if(cod===val||codNorm===valNorm||String(p.id)===val){found=p;break;}
+    // Também aceita o código antigo pelo ID individual (compatibilidade)
+    var codAntigo=_revCodigo(p.id);
+    if(cod===val||codNorm===valNorm||codAntigo===val||codAntigo.replace(/^0+/,'')===valNorm||String(p.id)===val){found=p;break;}
   }
   if(!found){
     var inp=document.getElementById('rev-barcode-inp');
     if(inp){inp.value='';inp.style.borderColor='var(--rd)';}
-    // Show "not found" message
     var st=document.getElementById('rev-notfound-msg');
     if(!st){
       st=document.createElement('div');st.id='rev-notfound-msg';
@@ -6769,7 +6849,8 @@ function buscarPorCodigo(val){
 function mVerProdRevenda(id){
   var p=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){p=DB.revenda[i];break;}}
   if(!p)return;
-  var cod=_revCodigo(p.id);
+  var nomeBase=(p.prod||'').replace(/\s*#\d+\s*$/,'');
+  var cod=_revCodigo(_revCodigoGrupo(nomeBase,p.cond));
   var catCL=getRevCatChecklist(p.cat);var aprovados=p.testesAprovados||[];
   var testesH='';
   if(catCL.length){
@@ -6814,7 +6895,12 @@ function mVerProdRevenda(id){
 function imprimirEtiqueta(id){
   var p=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){p=DB.revenda[i];break;}}
   if(!p)return;
-  var cod=_revCodigo(p.id);var bars=_gerarBarcodeTipo(cod);
+  // Usa código de grupo (nome-base + condição) para que todas as unidades idênticas
+  // tenham o mesmo código de barras na etiqueta e possam ser lidas pelo scanner
+  var nomeBase=(p.prod||'').replace(/\s*#\d+\s*$/,'');
+  var grupoId=_revCodigoGrupo(nomeBase,p.cond);
+  var cod=_revCodigo(grupoId);
+  var bars=_gerarBarcodeTipo(cod);
   var conteudo='<!DOCTYPE html><html><head><meta charset="UTF-8">'
     +'<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>'
     +'<style>*{margin:0;padding:0;box-sizing:border-box}@page{size:80mm auto;margin:4mm}'
@@ -7787,11 +7873,12 @@ function _finRelatorio(){
   for(var _ci=0;_ci<_allCats.length;_ci++)catCores[_allCats[_ci].nome]=_allCats[_ci].cor;
   catCores['Sangria']='#f97316';catCores['Funcionarios']='#3b82f6';
 
-  // Agrupa categorias
+  // Agrupa categorias — exclui transferências entre contas (não são receita nem despesa)
   var despCats={},recCats={};
   var totalDesp=0,totalRec=0;
   for(var i=0;i<_movs.length;i++){
     var m=_movs[i];
+    if(m.cat==='Transferencia')continue; // transferência entre contas não entra no DRE
     if(m.tipo==='saida'){despCats[m.cat]=(despCats[m.cat]||0)+m.valor;totalDesp+=m.valor;}
     else{recCats[m.cat]=(recCats[m.cat]||0)+m.valor;totalRec+=m.valor;}
   }
@@ -8326,8 +8413,10 @@ function _finContas(){
       cUltH+='<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--bd)">'
         +'<div style="flex:1;min-width:0"><div style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+mv.desc+'</div>'
         +'<div style="font-size:10px;color:var(--mt)">'+mv.data+' · '+(mv.cat||'')+'</div></div>'
-        +'<span style="font-size:12px;font-weight:700;color:'+(mEnt?'var(--gr)':'var(--rd)')+';font-family:monospace;margin-left:8px;flex-shrink:0">'+(mEnt?'+':'-')+fR(mv.valor)+'</span>'
-        +'</div>';
+        +'<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
+        +'<span style="font-size:12px;font-weight:700;color:'+(mEnt?'var(--gr)':'var(--rd)')+';font-family:monospace">'+(mEnt?'+':'-')+fR(mv.valor)+'</span>'
+        +(mv.transfId&&mv.tipo==='saida'?'<button onclick="desfazerTransfConta('+mv.transfId+')" style="background:none;border:none;color:var(--mt);font-size:10px;cursor:pointer;text-decoration:underline">↩</button>':'')
+        +'</div></div>';
     }
     contH+='<div style="background:var(--s2);border-radius:var(--r);margin-bottom:10px;border:1px solid var(--bd);overflow:hidden">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 13px;cursor:pointer" onclick="this.parentElement.querySelector(\'.cx-mov-list\').style.display=this.parentElement.querySelector(\'.cx-mov-list\').style.display===\'none\'?\'block\':\'none\'">'
@@ -8355,11 +8444,92 @@ function _finContas(){
     +'<div class="card">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
     +'<div class="stl" style="margin-bottom:0"><div class="stb"></div><div class="stx">Minhas Contas</div></div>'
+    +'<div style="display:flex;gap:6px">'
+    +'<button class="btnO bOb" style="font-size:12px;padding:6px 12px" onclick="mTransfConta()">&#8646; Transferir</button>'
     +'<button class="btn" style="font-size:12px;padding:6px 12px" onclick="mNovaConta()">+ Nova Conta</button>'
+    +'</div>'
     +'</div>'+contH+'</div>'
     +'</div>';
 }
 
+// ── TRANSFERÊNCIA ENTRE CONTAS ────────────────────────────────────────────
+// Registra a movimentação como saída na origem e entrada no destino,
+// com categoria "Transferência" para não distorcer o DRE (receita/despesa).
+function mTransfConta(){
+  if(DB.contas.length<2){alert('Você precisa de pelo menos 2 contas para transferir.');return;}
+  var opts=DB.contas.map(function(c){return'<option value="'+c.nome+'">'+c.ic+' '+c.nome+' ('+fR(c.saldo)+')</option>';}).join('');
+  openM('&#8646; Transferência entre Contas','<div class="mf">'
+    +'<div class="fld"><label>De (origem)</label><select class="inp" id="trc-orig">'+opts+'</select></div>'
+    +'<div class="fld"><label>Para (destino)</label><select class="inp" id="trc-dest">'+opts+'</select></div>'
+    +'<div class="fld"><label>Valor R$</label><input class="inp" type="number" inputmode="decimal" id="trc-val" placeholder="0,00" autofocus></div>'
+    +'<div class="fld"><label>Descrição (opcional)</label><input class="inp" id="trc-desc" placeholder="Ex: Saque para troco, Investimento Inter..."></div>'
+    +'<div id="trc-aviso" style="font-size:11px;color:var(--mt);margin-bottom:8px"></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
+    +'<button class="btn" onclick="saveTransfConta()">Transferir</button></div></div>',440);
+  setTimeout(function(){
+    // Pré-seleciona destino diferente da origem
+    var sel=document.getElementById('trc-dest');
+    if(sel&&DB.contas.length>1)sel.selectedIndex=1;
+    document.getElementById('trc-val').focus();
+  },80);
+}
+function saveTransfConta(){
+  var orig=document.getElementById('trc-orig').value;
+  var dest=document.getElementById('trc-dest').value;
+  var val=parseFloat(document.getElementById('trc-val').value)||0;
+  var desc=(document.getElementById('trc-desc').value||'').trim();
+  if(!orig||!dest){alert('Selecione as contas.');return;}
+  if(orig===dest){alert('Origem e destino não podem ser a mesma conta.');return;}
+  if(val<=0){alert('Informe um valor maior que zero.');return;}
+  var cOrig=null,cDest=null;
+  for(var i=0;i<DB.contas.length;i++){
+    if(DB.contas[i].nome===orig)cOrig=DB.contas[i];
+    if(DB.contas[i].nome===dest)cDest=DB.contas[i];
+  }
+  if(!cOrig||!cDest){alert('Conta não encontrada.');return;}
+  if(cOrig.saldo<val){
+    // Avisa mas permite (saldo pode ficar negativo em algumas situações)
+    if(!window._transfForcar){
+      document.getElementById('trc-aviso').innerHTML='<span style="color:var(--or)">&#9888; Saldo insuficiente em <b>'+orig+'</b> ('+fR(cOrig.saldo)+'). Clique em Transferir novamente para confirmar mesmo assim.</span>';
+      window._transfForcar=true;return;
+    }
+  }
+  window._transfForcar=false;
+  var _desc=desc||(orig+' → '+dest);
+  var _id=nid();
+  // Débito na origem
+  cOrig.saldo=+(cOrig.saldo-val).toFixed(2);
+  DB.movs.unshift({id:_id,data:hj(),desc:'Transferência: '+_desc,tipo:'saida',cat:'Transferencia',valor:val,conta:orig,transfId:_id,transfDest:dest});
+  // Crédito no destino
+  cDest.saldo=+(cDest.saldo+val).toFixed(2);
+  DB.movs.unshift({id:nid(),data:hj(),desc:'Transferência: '+_desc,tipo:'entrada',cat:'Transferencia',valor:val,conta:dest,transfId:_id,transfOrig:orig});
+  _auditLog('Transferência entre contas',orig+' → '+dest+': '+fR(val)+(desc?' ('+desc+')':''));
+  saveDB();closeM();
+  document.getElementById('fin-content').innerHTML=_finRender('contas');
+}
+// Desfaz uma transferência pelo transfId — remove os dois lançamentos e estorna saldos
+function desfazerTransfConta(transfId){
+  confirmar('Desfazer esta transferência? Os saldos serão estornados.',function(){
+    var idxs=[];
+    for(var i=0;i<DB.movs.length;i++){
+      if(DB.movs[i].transfId===transfId) idxs.push(i);
+    }
+    for(var j=0;j<idxs.length;j++){
+      var mv=DB.movs[idxs[j]];
+      for(var k=0;k<DB.contas.length;k++){
+        if(DB.contas[k].nome===mv.conta){
+          if(mv.tipo==='saida') DB.contas[k].saldo=+(DB.contas[k].saldo+mv.valor).toFixed(2);
+          else DB.contas[k].saldo=+(DB.contas[k].saldo-mv.valor).toFixed(2);
+          break;
+        }
+      }
+    }
+    idxs.sort(function(a,b){return b-a;});
+    for(var j=0;j<idxs.length;j++) DB.movs.splice(idxs[j],1);
+    saveDB();
+    document.getElementById('fin-content').innerHTML=_finRender('contas');
+  });
+}
 var _CONTA_ICONS=['&#127974;','&#128181;','&#127968;','&#128176;','&#128179;','&#128180;','&#9729;','&#128202;'];
 function mNovaConta(){
   var icH='<div style="display:flex;flex-wrap:wrap;gap:6px">';
@@ -9808,6 +9978,9 @@ function pgAgenda(){
         '<span style="font-size:10px;font-weight:700;color:var(--gr);text-transform:uppercase;letter-spacing:2px">'+diasSemSel[dtFS.getDay()]+' '+agDiaFiltro+'</span>'+
         '<button onclick="agDiaFiltro=null;go(\'agenda\')" style="background:var(--s2);border:1px solid var(--bd);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--mt)">✕ Fechar</button>'+
         '<div style="height:1px;flex:1;background:var(--bd)"></div></div>';
+      if(colFiltroSem.length>1){
+        html+='<div style="text-align:center;margin-bottom:8px"><button onclick="abrirRotaDia(\''+agDiaFiltro+'\')" style="background:rgba(26,115,232,.12);color:#1a73e8;border:1px solid rgba(26,115,232,.3);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer">&#128506; Rota do Dia no Maps</button></div>';
+      }
       if(!colFiltroSem.length)html+='<div style="text-align:center;padding:18px;color:var(--mt)">Nenhuma coleta neste dia</div>';
       else{for(var i=0;i<colFiltroSem.length;i++)html+=_cardColeta(colFiltroSem[i]);}
       html+='</div>';
@@ -9890,6 +10063,12 @@ function pgAgenda(){
     html+='<div style="text-align:center;flex:1"><div style="font-size:14px;font-weight:800">'+labelDia+'</div></div>';
     html+='<button onclick="agNavDia(1)" style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:6px 18px;color:var(--tx);font-size:20px;line-height:1;flex-shrink:0">&#8250;</button>';
     html+='</div>';
+    // Botão de rota do dia
+    if(DB.coletas.filter(function(c){return c.data===diaRef&&c.status!=='Cancelada';}).length>1){
+      html+='<div style="text-align:center;margin-bottom:10px">'
+        +'<button onclick="abrirRotaDia(\''+diaRef+'\')" style="background:rgba(26,115,232,.12);color:#1a73e8;border:1px solid rgba(26,115,232,.3);border-radius:8px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer">&#128506; Abrir Rota do Dia no Maps</button>'
+        +'</div>';
+    }
 
     var colsDia=DB.coletas.filter(function(c){return c.data===diaRef;}).sort(function(a,b){return (a.hora||'99:99').localeCompare(b.hora||'99:99');});
 
@@ -10003,35 +10182,73 @@ function mMDFe(colId){
 }
 
 function _buildColForm(c){
-  var mO='';for(var i=0;i<DB.funcs.length;i++){if(DB.funcs[i].cargo==='Motorista')mO+='<option'+(c&&c.mot===DB.funcs[i].nome?' selected':'')+'>'+DB.funcs[i].nome+'</option>';}
-  var statusO='';var stats=['Agendada','Confirmada','Em Rota','Coletada','Pendente','Cancelada'];for(var i=0;i<stats.length;i++)statusO+='<option'+(c&&c.status===stats[i]?' selected':'')+'>'+stats[i]+'</option>';
+  var mO='<option value="">— Nenhum —</option>';
+  for(var i=0;i<DB.funcs.length;i++){
+    if(DB.funcs[i].cargo==='Motorista')
+      mO+='<option'+(c&&c.mot===DB.funcs[i].nome?' selected':'')+'>'+DB.funcs[i].nome+'</option>';
+  }
+  var statusO='';var stats=['Agendada','Confirmada','Em Rota','Coletada','Pendente','Cancelada'];
+  for(var i=0;i<stats.length;i++)statusO+='<option'+(c&&c.status===stats[i]?' selected':'')+'>'+stats[i]+'</option>';
   var daVal='';if(c&&c.data){try{var pts=c.data.split('/');daVal=pts[2]+'-'+pts[1]+'-'+pts[0];}catch(e){}}
-  var perO='<option value="Manha"'+(c&&c.periodo==='Manha'?' selected':'')+'>🌅 Manhã (até 12h)</option>'
-    +'<option value="Tarde"'+(c&&c.periodo==='Tarde'?' selected':'')+'>🌇 Tarde (após 12h)</option>';
+  // Clientes cadastrados para autocompletar
+  var cliOpts=DB.clientes&&DB.clientes.length
+    ?'<datalist id="nc-cli-list">'+DB.clientes.map(function(cl){return'<option value="'+cl.nome+'">';}).join('')+'</datalist>':'';;
   // Bairros já usados para sugestão
   var bairrosUsados=[...new Set(DB.coletas.map(function(col){return col.bairro||'';}).filter(Boolean))];
   var bairroSugest=bairrosUsados.length?'<datalist id="bairros-list">'+bairrosUsados.map(function(b){return'<option value="'+b+'">';}).join('')+'</datalist>':'';
+  // Recorrência
+  var recO='<option value="">Não repetir</option>'
+    +'<option value="diaria"'+(c&&c.recorrencia==='diaria'?' selected':'')+'>Todo dia</option>'
+    +'<option value="semanal"'+(c&&c.recorrencia==='semanal'?' selected':'')+'>Toda semana (mesmo dia)</option>'
+    +'<option value="quinzenal"'+(c&&c.recorrencia==='quinzenal'?' selected':'')+'>A cada 15 dias</option>'
+    +'<option value="mensal"'+(c&&c.recorrencia==='mensal'?' selected':'')+'>Todo mês (mesmo dia)</option>';
   return '<div class="mf">'
-    +'<div class="fld"><label>Cliente *</label><input class="inp" id="nc-cl" value="'+(c?c.cli:'')+'"></div>'
+    +cliOpts+bairroSugest
+    // Cliente com autocompletar
+    +'<div class="fld"><label>Cliente *</label>'
+    +'<input class="inp" id="nc-cl" list="nc-cli-list" value="'+(c?c.cli:'')+'" placeholder="Digite ou selecione..." oninput="_agAutoFillCli(this.value)">'
+    +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>Telefone</label><input class="inp" id="nc-te" value="'+(c&&c.tel?c.tel:'')+'" placeholder="(11) 99999-0000"></div>'
+    +'<div class="fld"><label>Telefone</label><input class="inp" id="nc-te" value="'+(c&&c.tel?c.tel:'')+'" placeholder="(31) 99999-0000"></div>'
     +'<div class="fld"><label>Status</label><select class="inp" id="nc-st">'+statusO+'</select></div>'
     +'</div>'
-    +bairroSugest
+    +'<div class="fld"><label>Endereço</label><input class="inp" id="nc-en" value="'+(c&&c.end?c.end:'')+'" placeholder="Rua, número, bairro..."></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>Bairro *</label><input class="inp" id="nc-bairro" list="bairros-list" value="'+(c&&c.bairro?c.bairro:'')+'" placeholder="Ex: Centro, Bethania..." oninput="verificarVagaBairro()"></div>'
-    +'<div class="fld"><label>Periodo *</label><select class="inp" id="nc-per" onchange="verificarVagaBairro()">'+perO+'</select></div>'
-    +'</div>'
-    +'<div id="nc-vaga-info" style="margin-top:-8px;margin-bottom:8px;font-size:11px"></div>'
-    +'<div class="fld"><label>Endereco</label><input class="inp" id="nc-en" value="'+(c&&c.end?c.end:'')+'"></div>'
+    +'<div class="fld"><label>Bairro <span style="font-size:10px;color:var(--mt)">(opcional)</span></label>'
+    +'<input class="inp" id="nc-bairro" list="bairros-list" value="'+(c&&c.bairro?c.bairro:'')+'" placeholder="Ex: Centro, Bethania..."></div>'
     +'<div class="fld"><label>Material</label><input class="inp" id="nc-ma" value="'+(c&&c.mat?c.mat:'')+'"></div>'
+    +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>Data *</label><input class="inp" type="date" id="nc-da" value="'+daVal+'" onchange="verificarVagaBairro()"></div>'
-    +'<div class="fld"><label>Horario</label><input class="inp" type="time" id="nc-ho" value="'+(c&&c.hora?c.hora:'')+'"></div>'
+    +'<div class="fld"><label>Data *</label><input class="inp" type="date" id="nc-da" value="'+daVal+'"></div>'
+    +'<div class="fld"><label>Horário</label><input class="inp" type="time" id="nc-ho" value="'+(c&&c.hora?c.hora:'')+'"></div>'
     +'<div class="fld"><label>Peso est. kg</label><input class="inp" type="number" inputmode="decimal" id="nc-pe" value="'+(c&&c.peso?c.peso:'')+'"></div>'
     +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Motorista</label><select class="inp" id="nc-mo">'+mO+'</select></div>'
+    +(c?''
+      :'<div class="fld"><label>Repetir</label><select class="inp" id="nc-rec">'+recO+'</select></div>')
+    +'</div>'
     +'<div class="fld"><label>Obs</label><textarea class="inp" id="nc-ob" rows="2">'+(c&&c.obs?c.obs:'')+'</textarea></div>';
+}
+
+// Preenche telefone e endereço automaticamente ao selecionar um cliente cadastrado
+function _agAutoFillCli(nome){
+  if(!nome||!DB.clientes)return;
+  var cli=null;
+  for(var i=0;i<DB.clientes.length;i++){
+    if(DB.clientes[i].nome.toLowerCase()===nome.toLowerCase()){cli=DB.clientes[i];break;}
+  }
+  if(!cli)return;
+  var te=document.getElementById('nc-te');
+  var en=document.getElementById('nc-en');
+  if(te&&!te.value&&cli.tel)te.value=cli.tel;
+  if(en&&!en.value){
+    var end='';
+    if(cli.logradouro)end+=cli.logradouro;
+    if(cli.numero)end+=(end?', ':'')+cli.numero;
+    if(cli.bairro)end+=(end?', ':'')+cli.bairro;
+    if(end)en.value=end;
+  }
 }
 
 function verificarVagaBairro(editId){
@@ -10064,6 +10281,20 @@ function verificarVagaBairro(editId){
   }
 }
 
+
+// Abre o Google Maps com todas as coletas do dia em sequência como paradas de rota
+function abrirRotaDia(diaStr){
+  var cols=DB.coletas.filter(function(c){return c.data===diaStr&&c.status!=='Cancelada';})
+    .sort(function(a,b){return (a.hora||'99:99').localeCompare(b.hora||'99:99');});
+  if(!cols.length){alert('Nenhuma coleta neste dia.');return;}
+  var enderecos=cols.map(function(c){return c.end||c.bairro||c.cli;}).filter(Boolean);
+  if(!enderecos.length){alert('Nenhum endereço cadastrado nas coletas do dia.');return;}
+  // Monta URL do Maps com waypoints
+  var base='https://www.google.com/maps/dir/';
+  var url=base+enderecos.map(encodeURIComponent).join('/');
+  var w=window.open(url,'_blank');
+  if(!w)alert('Permita pop-ups para abrir o Maps.');
+}
 
 function abrirMapsCol(id){
   var col=null;for(var i=0;i<DB.coletas.length;i++){if(DB.coletas[i].id===id){col=DB.coletas[i];break;}}
@@ -10102,18 +10333,43 @@ function mNovaCol(){
 function saveCol(){
   var cl=document.getElementById('nc-cl').value.trim();
   var da=document.getElementById('nc-da').value;
-  var bairro=(document.getElementById('nc-bairro').value||'').trim();
-  var per=document.getElementById('nc-per').value;
   if(!cl||!da){alert('Preencha cliente e data!');return;}
-  if(!bairro){alert('Informe o bairro!');return;}
   var data=new Date(da+'T00:00').toLocaleDateString('pt-BR');
-  // Valida limite de 3 por bairro/periodo
-  var coletasNoBairro=DB.coletas.filter(function(c){return c.data===data&&(c.bairro||'').toLowerCase()===bairro.toLowerCase()&&c.periodo===per;});
-  if(coletasNoBairro.length>=3){alert('Lotado! Já tem 3 coletas no período da '+per.toLowerCase()+' em '+bairro+' neste dia.');return;}
-  // Valida bairro único por periodo
-  var outroBairro=DB.coletas.filter(function(c){return c.data===data&&c.periodo===per&&(c.bairro||'').toLowerCase()!==bairro.toLowerCase();});
-  if(outroBairro.length>0){alert('Já tem coleta no bairro '+outroBairro[0].bairro+' neste período. Cada período tem um bairro só.');return;}
-  DB.coletas.push({id:nid(),data:data,hora:document.getElementById('nc-ho').value,cli:cl,tel:document.getElementById('nc-te').value,bairro:bairro,periodo:per,end:document.getElementById('nc-en').value,peso:parseFloat(document.getElementById('nc-pe').value)||0,mat:document.getElementById('nc-ma').value,mot:document.getElementById('nc-mo').value,status:document.getElementById('nc-st')?document.getElementById('nc-st').value:'Agendada',obs:document.getElementById('nc-ob').value});
+  var hora=document.getElementById('nc-ho').value;
+  // Determina período automaticamente pelo horário (só para compatibilidade visual)
+  var per=hora&&hora<'12:00'?'Manha':'Tarde';
+  var novaCol={
+    id:nid(),data:data,hora:hora,
+    cli:cl,tel:document.getElementById('nc-te').value,
+    bairro:(document.getElementById('nc-bairro').value||'').trim(),
+    periodo:per,
+    end:document.getElementById('nc-en').value,
+    peso:parseFloat(document.getElementById('nc-pe').value)||0,
+    mat:document.getElementById('nc-ma').value,
+    mot:(document.getElementById('nc-mo')&&document.getElementById('nc-mo').value)||'',
+    status:(document.getElementById('nc-st')&&document.getElementById('nc-st').value)||'Agendada',
+    obs:document.getElementById('nc-ob').value
+  };
+  var rec=(document.getElementById('nc-rec')&&document.getElementById('nc-rec').value)||'';
+  if(rec){novaCol.recorrencia=rec;}
+  DB.coletas.push(novaCol);
+  // Cria coletas recorrentes (próximas 12 ocorrências)
+  if(rec){
+    var _addDaysLocal=function(d,n){var nd=new Date(d);nd.setDate(nd.getDate()+n);return nd;};
+    var _intervalo={diaria:1,semanal:7,quinzenal:15,mensal:30}[rec]||7;
+    var _dataBase=new Date(da+'T00:00');
+    for(var r=1;r<12;r++){
+      var _nd=_addDaysLocal(_dataBase,_intervalo*r);
+      var _dataStr=_nd.toLocaleDateString('pt-BR');
+      DB.coletas.push({
+        id:nid(),data:_dataStr,hora:hora,
+        cli:cl,tel:novaCol.tel,bairro:novaCol.bairro,periodo:per,
+        end:novaCol.end,peso:novaCol.peso,mat:novaCol.mat,
+        mot:novaCol.mot,status:'Agendada',obs:novaCol.obs,
+        recorrencia:rec,recOrigemId:novaCol.id
+      });
+    }
+  }
   saveDB();closeM();go('agenda');
 }
 function mEditCol(id){
@@ -10129,25 +10385,20 @@ function mEditCol(id){
 }
 function saveEditCol(id){
   var cl=document.getElementById('nc-cl').value.trim(),da=document.getElementById('nc-da').value;
-  var bairro=(document.getElementById('nc-bairro').value||'').trim();
-  var per=document.getElementById('nc-per').value;
   if(!cl||!da){alert('Preencha cliente e data!');return;}
-  if(!bairro){alert('Informe o bairro!');return;}
+  var hora=document.getElementById('nc-ho').value;
+  var per=hora&&hora<'12:00'?'Manha':'Tarde';
   var data=new Date(da+'T00:00').toLocaleDateString('pt-BR');
-  // Valida limite (excluindo o próprio)
-  var coletasNoBairro=DB.coletas.filter(function(c){return c.id!==id&&c.data===data&&(c.bairro||'').toLowerCase()===bairro.toLowerCase()&&c.periodo===per;});
-  if(coletasNoBairro.length>=3){alert('Lotado! Já tem 3 coletas neste período e bairro.');return;}
-  var outroBairro=DB.coletas.filter(function(c){return c.id!==id&&c.data===data&&c.periodo===per&&(c.bairro||'').toLowerCase()!==bairro.toLowerCase();});
-  if(outroBairro.length>0){alert('Já tem coleta no bairro '+outroBairro[0].bairro+' neste período.');return;}
   for(var i=0;i<DB.coletas.length;i++){
     if(DB.coletas[i].id===id){
       DB.coletas[i].cli=cl;DB.coletas[i].tel=document.getElementById('nc-te').value;
-      DB.coletas[i].data=data;DB.coletas[i].hora=document.getElementById('nc-ho').value;
-      DB.coletas[i].bairro=bairro;DB.coletas[i].periodo=per;
+      DB.coletas[i].data=data;DB.coletas[i].hora=hora;
+      DB.coletas[i].bairro=(document.getElementById('nc-bairro').value||'').trim();
+      DB.coletas[i].periodo=per;
       DB.coletas[i].end=document.getElementById('nc-en').value;
       DB.coletas[i].peso=parseFloat(document.getElementById('nc-pe').value)||0;
       DB.coletas[i].mat=document.getElementById('nc-ma').value;
-      DB.coletas[i].mot=document.getElementById('nc-mo').value;
+      DB.coletas[i].mot=(document.getElementById('nc-mo')&&document.getElementById('nc-mo').value)||'';
       DB.coletas[i].status=document.getElementById('nc-st').value;
       DB.coletas[i].obs=document.getElementById('nc-ob').value;
       break;
