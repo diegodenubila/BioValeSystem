@@ -1562,9 +1562,8 @@ function mComprovantePes(){
     '<div style="margin-top:24px;font-size:11px;color:#6b7280;text-align:center">Recibo provisório — sujeito a alteração até a finalização da pesagem</div>'+
     '<div class="noprint" style="text-align:center;margin-top:18px"><button onclick="window.print()" style="background:#15803d;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;cursor:pointer;font-weight:700">&#128196; Imprimir</button></div>'+
     '<'+'script>setTimeout(function(){window.print();},400);<\/script></body></html>';
-  var w=window.open('','_blank');
-  if(w){w.document.write(html);w.document.close();}
-  else alert('Permita pop-ups para visualizar o recibo.');
+  _printHTML(html);
+
 }
 
 function novaPesAba(){
@@ -1872,22 +1871,34 @@ function setPesTipo(t){
 }
 function setPesVw(v){pesAbas[pesAtiva].showUnit=v;savePesState();renderPesagem();}
 function quickNovoCli(){
-  var tipoAtual=pesAbas[pesAtiva].tipo==='Venda'?'venda':'compra';
-  var tabOpts='<option value="">-- Nenhuma (Padrão) --</option>';
-  for(var i=0;i<DB.tabelas.length;i++){
-    var t=DB.tabelas[i];
-    if(t.tipo===tipoAtual)tabOpts+='<option value="'+t.id+'">'+t.nome+'</option>';
-  }
+  var tipoAtual=pesAbas[pesAtiva].tipo==='Venda'?'cliente':'fornecedor';
   openM('+ Cadastro Rápido','<div class="mf">'
     +'<div class="fld"><label>Nome *</label><input class="inp" id="qc-nome" placeholder="Nome completo ou empresa" autocomplete="off"></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Telefone</label><input class="inp" id="qc-tel" placeholder="(00) 00000-0000" inputmode="tel"></div>'
-    +'<div class="fld"><label>Tipo</label><select class="inp" id="qc-tipo"><option value="cliente">Cliente</option><option value="fornecedor">Fornecedor</option></select></div>'
+    +'<div class="fld"><label>Tipo</label><select class="inp" id="qc-tipo" onchange="_quickAtualizarTabelas(this.value)">'
+    +'<option value="cliente"'+(tipoAtual==='cliente'?' selected':'')+'>Cliente</option>'
+    +'<option value="fornecedor"'+(tipoAtual==='fornecedor'?' selected':'')+'>Fornecedor</option>'
+    +'</select></div>'
     +'</div>'
-    +'<div class="fld"><label>Tabela de Preços</label><select class="inp" id="qc-tab">'+tabOpts+'</select></div>'
+    +'<div class="fld"><label>Tabela de Preços</label><select class="inp" id="qc-tab"></select></div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
     +'<button class="btn" onclick="quickSalvarCli()">Salvar e Selecionar</button></div></div>',400);
-  setTimeout(function(){var n=document.getElementById('qc-nome');if(n)n.focus();},80);
+  setTimeout(function(){
+    _quickAtualizarTabelas(tipoAtual);
+    var n=document.getElementById('qc-nome');if(n)n.focus();
+  },80);
+}
+function _quickAtualizarTabelas(tipo){
+  var tipoTab=tipo==='cliente'?'venda':'compra';
+  var sel=document.getElementById('qc-tab');
+  if(!sel)return;
+  var opts='<option value="">-- Nenhuma (Padrão) --</option>';
+  for(var i=0;i<DB.tabelas.length;i++){
+    var t=DB.tabelas[i];
+    if(t.tipo===tipoTab)opts+='<option value="'+t.id+'">'+t.nome+'</option>';
+  }
+  sel.innerHTML=opts;
 }
 function quickSalvarCli(){
   var nome=(document.getElementById('qc-nome').value||'').trim();
@@ -1902,6 +1913,21 @@ function quickSalvarCli(){
   pesAbas[pesAtiva].cliId=novo.id;
   if(tabId)pesAbas[pesAtiva].tabId=tabId;
   savePesState();renderPesagem();
+}
+function _cliFiltrarDOM(q){
+  window._cliBusca=q;
+  var ql=q.toLowerCase();
+  var cards=document.querySelectorAll('.cli-card');
+  var vis=0;
+  for(var i=0;i<cards.length;i++){
+    var busca=cards[i].getAttribute('data-busca')||'';
+    var show=!ql||busca.indexOf(ql)>=0;
+    cards[i].style.display=show?'':'none';
+    if(show)vis++;
+  }
+  // Atualiza mensagem de vazio
+  var empty=document.getElementById('cli-empty-msg');
+  if(empty)empty.style.display=vis===0?'block':'none';
 }
 function setPesCli(v){pesAbas[pesAtiva].cliId=v;if(v){for(var i=0;i<DB.clientes.length;i++){if(DB.clientes[i].id==v&&DB.clientes[i].tabId){pesAbas[pesAtiva].tabId=DB.clientes[i].tabId;break;}}}savePesState();renderPesagem();}
 // Detecta quando o usuário escolheu um cliente no campo de busca (datalist)
@@ -2651,8 +2677,8 @@ function _gerarHTMLBoleto(ab, recMethods, pagMethods, obs, num){
     +'html,body{width:'+_largura+';margin:0;padding:0}'
     +'body{font-family:"Courier New",Courier,monospace;font-size:'+Math.round(12*_escala/90)+'px;background:#fff;color:#000;padding:6px 4px}'
     +'.center{text-align:center}.bold{font-weight:700}.big{font-size:14px;margin:2px 0}.small{font-size:10px}'
-    +'.logo-area{text-align:center;background:#000;padding:7px 4px;margin-bottom:5px}'
-    +'.logo-area img{max-width:58mm;max-height:13mm;object-fit:contain}'
+    +'.logo-area{text-align:center;background:#000;margin-bottom:5px;line-height:0}'
+    +'.logo-area img{width:100%;max-height:16mm;object-fit:cover;display:block}'
     +'.info-box{border:1px solid #000;padding:4px 6px;margin-bottom:3px;font-size:12px;font-weight:700;text-align:center}'
     +'.info-box.num{font-size:14px}'
     +'.info-row{display:flex;border:1px solid #000;margin-bottom:3px;font-size:11px}'
@@ -2667,7 +2693,7 @@ function _gerarHTMLBoleto(ab, recMethods, pagMethods, obs, num){
     +'td{padding:4px 3px;border-bottom:1px solid #ddd;vertical-align:top}'
     +'td:first-child{text-align:left;max-width:30mm}'
     +'td:not(:first-child){text-align:center}'
-    +'@media print{@page{size:80mm auto;margin:0mm}html,body{width:80mm;padding:2px}}';
+    +'@media print{@page{size:'+_largura+' auto;margin:2mm}html,body{width:'+_largura+';padding:2px;margin:0}}';
 
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Boleto #'+num+'</title>'
     +'<style>'+css+'</style></head><body>'
@@ -2707,8 +2733,7 @@ function imprimirNota(){
   var nfInp=document.getElementById('fin-nf');if(nfInp&&nfInp.value)ab.nfNum=nfInp.value;
   var num=ab.numAtend||gerarNum();ab.numAtend=num;
   var html=_gerarHTMLBoleto(ab,recMethods,pagMethods,obs,num);
-  var nw=window.open('','_blank','width=350,height=750');
-  if(nw){nw.document.write(html);nw.document.close();}else alert('Permita pop-ups para visualizar o boleto.');
+  _printHTML(html);
 }
 
 function confirmarFin(){
@@ -3077,8 +3102,7 @@ function imprimirDoCaixa(numAtend,fromHistIdx){
   var html=_gerarHTMLBoleto(abSnap,recMethods,pagMethods,snap.obs||'',snap.num);
   // Substitui a hora pelo horário original do atendimento
   html=html.replace(new RegExp(hj()+', [0-9]{2}:[0-9]{2}'),hj()+', '+(_horaOrig||'--:--'));
-  var nw=window.open('','_blank','width=350,height=750');
-  if(nw){nw.document.write(html);nw.document.close();}else alert('Permita pop-ups para imprimir.');
+  _printHTML(html);
 }
 
 function pgCaixaDia(){return '<div id="cxd-ct"></div>';}
@@ -3251,13 +3275,49 @@ function renderCaixaDia(){
   var _cxDataStr=cd.data||hj();
   for(var i=0;i<DB.movs.length;i++){var _mv=DB.movs[i];if(_mv.tipo==='saida'&&_mv.data===_cxDataStr&&(!_mv.desc||_mv.desc.indexOf('#')<0)&&_contasDinheiro[_mv.conta])_estim=+(_estim-_mv.valor).toFixed(2);}
   _estim=+(_estim+refor-sang).toFixed(2);
-  var extras='';if(sang>0)extras+=sc('&#128182;','Sangrias',fR(sang),'Retiradas','var(--rd)');if(refor>0)extras+=sc('&#128176;','Reforcos',fR(refor),'Adicoes','var(--bl)');
+  var extras='';
+  if(cd.sangrias&&cd.sangrias.length){
+    var _sRows='';
+    for(var _si=0;_si<cd.sangrias.length;_si++){
+      var _s=cd.sangrias[_si];
+      _sRows+='<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--bd)">'
+        +'<span style="font-size:11px;color:var(--mt);flex-shrink:0">'+(_s.hora||'')+'</span>'
+        +'<div style="flex:1;font-size:12px;font-weight:600">'+_s.cat+(_s.dest?' → '+_s.dest:'')+'</div>'
+        +'<span style="font-size:13px;font-weight:700;font-family:monospace;color:var(--rd);flex-shrink:0">-'+fR(_s.valor)+'</span>'
+        +'<button onclick="desfazerSangria('+_si+')" title="Desfazer" style="background:none;border:none;color:var(--mt);font-size:13px;cursor:pointer;padding:2px 6px;flex-shrink:0">&#8629;</button>'
+        +'</div>';
+    }
+    extras+='<div class="card" style="padding:0;overflow:hidden">'
+      +'<div style="padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--rd)">&#128182; Sangrias ('+cd.sangrias.length+')</div>'
+      +'<span style="font-size:13px;font-weight:700;font-family:monospace;color:var(--rd)">-'+fR(sang)+'</span></div>'
+      +_sRows+'</div>';
+  }
+  if(cd.reforcos&&cd.reforcos.length){
+    var _rRows='';
+    for(var _ri=0;_ri<cd.reforcos.length;_ri++){
+      var _r=cd.reforcos[_ri];
+      _rRows+='<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--bd)">'
+        +'<span style="font-size:11px;color:var(--mt);flex-shrink:0">'+(_r.hora||'')+'</span>'
+        +'<div style="flex:1;font-size:12px;font-weight:600">'+_r.cat+(_r.orig?' ← '+_r.orig:'')+'</div>'
+        +'<span style="font-size:13px;font-weight:700;font-family:monospace;color:var(--bl);flex-shrink:0">+'+fR(_r.valor)+'</span>'
+        +'<button onclick="desfazerReforco('+_ri+')" title="Desfazer" style="background:none;border:none;color:var(--mt);font-size:13px;cursor:pointer;padding:2px 6px;flex-shrink:0">&#8629;</button>'
+        +'</div>';
+    }
+    extras+='<div class="card" style="padding:0;overflow:hidden">'
+      +'<div style="padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--bl)">&#128176; Reforços ('+cd.reforcos.length+')</div>'
+      +'<span style="font-size:13px;font-weight:700;font-family:monospace;color:var(--bl)">+'+fR(refor)+'</span></div>'
+      +_rRows+'</div>';
+  }
 
   // ── Despesas do dia ──
+  // Exclui Sangria, Reforço, Transferência e Ajuste (são movimentações internas, não despesas operacionais)
+  var _catsExcluirDesp={'Sangria':1,'Reforco':1,'Transferencia':1,'Ajuste de Caixa':1,'Outros Recebimentos':1};
   var _hjStr3=_cxDataStr;var _despDia=[];var _totDesp=0;
   for(var i=0;i<DB.movs.length;i++){
     var _mv=DB.movs[i];
-    if(_mv.tipo==='saida'&&_mv.data===_hjStr3&&(!_mv.desc||_mv.desc.indexOf('#')<0)){
+    if(_mv.tipo==='saida'&&_mv.data===_hjStr3&&(!_mv.desc||_mv.desc.indexOf('#')<0)&&!_catsExcluirDesp[_mv.cat]){
       _despDia.push(_mv);_totDesp+=_mv.valor;
     }
   }
@@ -3304,7 +3364,7 @@ function renderCaixaDia(){
     +'</div>'
     +sc('&#128176;','Saldo Caixa',_mask(fR(_estim)),'Estimado','var(--gr)')
     +(_totDesp>0?sc('&#127869;','Despesas',_mask(fR(_totDesp)),_despDia.length+' lancamento(s)','var(--or)'):'')
-    +(extras?'<div class="g2">'+extras+'</div>':'')
+    +(extras?extras:'')
     +'<div class="card" style="padding:0;overflow:hidden"><div style="padding:13px 16px;border-bottom:1px solid var(--bd)"><div class="stl" style="margin-bottom:0"><div class="stb"></div><div class="stx">Atendimentos ('+movsDia.length+')</div></div></div>'+movsH+'</div>'
     +despCard
     +histH+'</div>';
@@ -3426,8 +3486,7 @@ function imprimirRelatorioDia(){
     +'<script>window.onload=function(){window.print();}<\/script>'
     +'</body></html>';
 
-  var nw=window.open('','_blank','width=794,height=1123');
-  if(nw){nw.document.write(html);nw.document.close();}else{alert('Permita pop-ups para imprimir. Toque no ícone de pop-up bloqueado na barra de endereço.');}
+  _printHTML(html);
 }
 function excluirCaixaHist(hi){
   var hc=DB.caixasHist[hi];if(!hc)return;
@@ -3574,6 +3633,46 @@ function _getCatVal(prefix){
   var inp=document.getElementById(prefix+'-cat-val');
   return inp?inp.value.trim():'';
 }
+function desfazerSangria(idx){
+  var cd=DB.caixaDia;if(!cd||!cd.sangrias||!cd.sangrias[idx])return;
+  var s=cd.sangrias[idx];
+  confirmar('Desfazer sangria de <b>'+fR(s.valor)+'</b> ('+s.cat+')?',function(){
+    // Estorna conta Caixa
+    for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){DB.contas[i].saldo=+(DB.contas[i].saldo+s.valor).toFixed(2);break;}}
+    // Estorna conta de destino se havia
+    if(s.dest){for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===s.dest){DB.contas[i].saldo=+(DB.contas[i].saldo-s.valor).toFixed(2);break;}}}
+    // Remove lançamentos financeiros relacionados
+    var descSangria='Sangria: '+s.cat+(s.dest?' → '+s.dest:'');
+    for(var i=DB.movs.length-1;i>=0;i--){
+      var m=DB.movs[i];
+      if((m.desc===descSangria||(s.dest&&m.desc==='Transferencia recebida (Sangria): '+s.cat&&m.conta===s.dest))&&m.valor===s.valor){
+        DB.movs.splice(i,1);
+      }
+    }
+    cd.sangrias.splice(idx,1);
+    autoSave();renderCaixaDia();
+  });
+}
+function desfazerReforco(idx){
+  var cd=DB.caixaDia;if(!cd||!cd.reforcos||!cd.reforcos[idx])return;
+  var r=cd.reforcos[idx];
+  confirmar('Desfazer reforço de <b>'+fR(r.valor)+'</b> ('+r.cat+')?',function(){
+    // Estorna conta Caixa
+    for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){DB.contas[i].saldo=+(DB.contas[i].saldo-r.valor).toFixed(2);break;}}
+    // Estorna conta de origem se havia
+    if(r.orig){for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===r.orig){DB.contas[i].saldo=+(DB.contas[i].saldo+r.valor).toFixed(2);break;}}}
+    // Remove lançamentos financeiros relacionados
+    var descReforco='Reforco: '+r.cat+(r.orig?' ← '+r.orig:'');
+    for(var i=DB.movs.length-1;i>=0;i--){
+      var m=DB.movs[i];
+      if((m.desc===descReforco||(r.orig&&m.desc==='Transferencia enviada (Reforco): '+r.cat&&m.conta===r.orig))&&m.valor===r.valor){
+        DB.movs.splice(i,1);
+      }
+    }
+    cd.reforcos.splice(idx,1);
+    autoSave();renderCaixaDia();
+  });
+}
 function mSangria(){
   var cats=DB.cats.saida;
   var catsH=_buildCatBtns(cats,'sg');
@@ -3607,7 +3706,8 @@ function confSangria(){
   for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){DB.contas[i].saldo=+(DB.contas[i].saldo-v).toFixed(2);break;}}
   var descFin='Sangria: '+cat+(dest?' → '+dest:'');
   var _cxD=DB.caixaDia&&DB.caixaDia.data?DB.caixaDia.data:hj();
-  DB.movs.unshift({id:nid(),data:_cxD,desc:descFin,tipo:'saida',cat:cat,valor:v,conta:'Caixa'});
+  // Sangria sem destino é uma retirada de sócio/operacional — categoria 'Sangria' para não entrar no DRE como despesa
+  DB.movs.unshift({id:nid(),data:_cxD,desc:descFin,tipo:'saida',cat:dest?cat:'Sangria',valor:v,conta:'Caixa'});
   if(dest){
     for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===dest){DB.contas[i].saldo=+(DB.contas[i].saldo+v).toFixed(2);break;}}
     DB.movs.unshift({id:nid(),data:_cxD,desc:'Transferencia recebida (Sangria): '+cat,tipo:'entrada',cat:'Transferencia',valor:v,conta:dest,transfId:nid()});
@@ -3936,7 +4036,38 @@ function confirmarFech(esp){
 }
 
 
-// ── DASHBOARD HELPERS ────────────────────────────────────────
+// ── IMPRESSÃO CENTRAL VIA IFRAME ─────────────────────────────────────────
+// Substitui window.open para evitar bloqueio de popup no celular/GitHub Pages.
+// Cria um iframe invisível, insere o HTML e dispara window.print() nele.
+function _printHTML(html){
+  var old=document.getElementById('_print_frame');
+  if(old)old.remove();
+  var iframe=document.createElement('iframe');
+  iframe.id='_print_frame';
+  // Largura do iframe baseada no formato de papel configurado
+  var _fmt=(CFG&&CFG.sistema)?(CFG.sistema.fmtMob||CFG.sistema.fmtPc)||'termico58':'termico58';
+  var _w=_fmt.indexOf('58')>=0?'220px':_fmt.indexOf('80')>=0?'302px':'794px';
+  iframe.style.cssText='position:fixed;top:-9999px;left:-9999px;width:'+_w+';height:600px;border:none;opacity:0;pointer-events:none';
+  document.body.appendChild(iframe);
+  try{
+    var doc=iframe.contentDocument||iframe.contentWindow.document;
+    doc.open();doc.write(html);doc.close();
+    iframe.contentWindow.onload=function(){
+      try{iframe.contentWindow.focus();iframe.contentWindow.print();}catch(e){
+        var nw=window.open('','_blank');
+        if(nw){nw.document.write(html);nw.document.close();}
+        else alert('Nao foi possivel imprimir.');
+      }
+    };
+    setTimeout(function(){try{if(iframe.contentWindow)iframe.contentWindow.print();}catch(e){}},600);
+  }catch(e){
+    var nw=window.open('','_blank');
+    if(nw){nw.document.write(html);nw.document.close();}
+    else alert('Nao foi possivel imprimir.');
+  }
+}
+
+
 var _dashPer='mes';
 var _dashPerD1='';var _dashPerD2='';
 function swDashPer(p){_dashPer=p;go('dashboard');}
@@ -5567,8 +5698,7 @@ function exportarPrecosPDF(){
   }
   var hoje=hj();
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tabela de Precos BioVale</title>'    +'<style>body{font-family:Arial,sans-serif;padding:30px;max-width:700px;margin:0 auto}'    +'table{width:100%;border-collapse:collapse;margin-top:16px}'    +'th{background:#15803d;color:#fff;padding:10px 12px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:1px}'    +'</style></head><body>'    +_empresaHeaderPDFLargo()    +'<div style="font-size:13px;color:#666;margin-bottom:4px">Tabela de Precos — emitida em '+hoje+'</div>'    +'<table><thead><tr><th>Material</th><th>Categoria</th><th style="text-align:right">Venda R$/kg</th><th style="text-align:right">Compra R$/kg</th></tr></thead>'    +'<tbody>'+rows+'</tbody></table>'    +'<div style="margin-top:20px;font-size:10px;color:#999;text-align:right">'+(CFG.empresa.nome||'BioVale')+' &mdash; Precos sujeitos a alteracao sem aviso previo</div>'    +'<'+'script>window.print();setTimeout(function(){window.close();},1500);<\/script></body></html>';
-  var nw=window.open('','_blank','width=750,height=600');
-  if(nw){nw.document.write(html);nw.document.close();}else alert('Permita pop-ups para exportar.');
+  _printHTML(html);
 }
 
 function salvarTodosPrecos(){
@@ -10369,8 +10499,8 @@ function mMDFe(colId){
   var col=null;for(var i=0;i<DB.coletas.length;i++){if(DB.coletas[i].id===colId){col=DB.coletas[i];break;}}
   if(!col)return;
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>MDF-e Coleta BioVale</title>'    +'<style>body{font-family:Arial,sans-serif;padding:30px;max-width:680px;margin:0 auto;color:#111}'    +'.header{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:16px;border-bottom:2px solid #16a34a}'    +'.logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#16a34a,#22c55e);display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff}'    +'.badge{display:inline-block;background:#7c3aed18;color:#7c3aed;border:1px solid #7c3aed55;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:12px}'    +'.campo{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid #e5e7eb;font-size:13px}'    +'.campo label{min-width:160px;color:#666;font-size:12px}'    +'.campo strong{color:#111}'    +'.aviso{background:#fffbeb;border:1px solid #d97706;border-radius:6px;padding:10px 14px;font-size:12px;color:#92400e;margin-top:16px}'    +'</style></head><body>'    +'<div class="header"><div class="logo">&#9850;</div><div><div style="font-size:20px;font-weight:700">'+(CFG.empresa.nome||'BioVale')+'</div>'    +(CFG.empresa.exibirCnpj&&CFG.empresa.cnpj?'<div style="font-size:11px;color:#666">CNPJ: '+CFG.empresa.cnpj+'</div>':'')    +(CFG.empresa.exibirEndereco&&CFG.empresa.cidade?'<div style="font-size:11px;color:#666">'+CFG.empresa.cidade+(CFG.empresa.estado?' / '+CFG.empresa.estado:'')+'</div>':'')    +'</div></div>'    +'<div class="badge">MDF-e — MANIFESTO DE DOCUMENTO FISCAL</div>'    +'<div class="campo"><label>Numero Manifesto:</label><strong>MDF-'+String(colId).padStart(6,'0')+'</strong></div>'    +'<div class="campo"><label>Data Coleta:</label><strong>'+col.data+'</strong></div>'    +'<div class="campo"><label>Hora:</label><strong>'+(col.hora||'--')+'</strong></div>'    +'<div class="campo"><label>Destinatario:</label><strong>'+col.cli+'</strong></div>'    +'<div class="campo"><label>Endereco Coleta:</label><strong>'+col.end+'</strong></div>'    +'<div class="campo"><label>Material:</label><strong>'+col.mat+'</strong></div>'    +'<div class="campo"><label>Peso Estimado:</label><strong>'+(col.peso?fKg(col.peso)+' kg':'Nao informado')+'</strong></div>'    +'<div class="campo"><label>Motorista:</label><strong>'+(col.mot||'Nao atribuido')+'</strong></div>'    +'<div class="campo"><label>Status:</label><strong>'+col.status+'</strong></div>'    +'<div class="campo"><label>Obs:</label><strong>'+(col.obs||'—')+'</strong></div>'    +'<div class="aviso">&#9888; Este documento e um manifesto simplificado para controle interno. Para emissao oficial do MDF-e junto a SEFAZ, utilize software fiscal homologado.</div>'    +'<'+'script>window.print();setTimeout(function(){window.close();},1500);<\/script></body></html>';
-  var nw=window.open('','_blank','width=720,height=650');
-  if(nw){nw.document.write(html);nw.document.close();}else alert('Permita pop-ups para gerar o MDF-e.');
+  _printHTML(html);
+
 }
 
 function _buildColForm(c){
@@ -10722,8 +10852,7 @@ function imprimirHolerite(fi){
     adRows+='<tr><td style="padding:5px 8px;border-bottom:1px solid #e5e7eb">'+ad.data+'</td><td colspan="2" style="padding:5px 8px;border-bottom:1px solid #e5e7eb">'+ad.obs+'</td><td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-family:monospace;color:#ef4444">– R$ '+parseFloat(ad.val||0).toFixed(2).replace('.',',')+'</td><td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center">'+(ad.descontado?'✓':'–')+'</td></tr>';
   }
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Holerite '+f.nome+'</title>'    +'<style>body{font-family:Arial,sans-serif;padding:30px;max-width:680px;margin:0 auto;color:#111}h2{margin:0}table{width:100%;border-collapse:collapse}th{background:#15803d;color:#fff;padding:7px 8px;font-size:11px;text-align:left;text-transform:uppercase;letter-spacing:.5px}.total-row{background:#f0fdf4;font-weight:700}.deduct-row{background:#fef2f2}.net-row{background:#1e3a2f;color:#fff;font-size:15px;font-weight:700}@media print{.noprint{display:none}}</style>'    +'</head><body>'    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #15803d;padding-bottom:14px;margin-bottom:18px">'    +'<div><h2 style="color:#15803d">HOLERITE</h2><div style="font-size:13px;color:#666;margin-top:4px">'+mesLabel+'</div></div>'    +'<div style="text-align:right"><div style="font-size:15px;font-weight:700">'+(emp.nome||'BioVale')+'</div>'+(emp.cnpj?'<div style="font-size:11px;color:#666">CNPJ: '+emp.cnpj+'</div>':'')+'</div>'    +'</div>'    +'<div style="background:#f9fafb;border-radius:8px;padding:12px 16px;margin-bottom:18px;display:grid;grid-template-columns:1fr 1fr;gap:8px">'    +'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Funcionário</div><div style="font-size:15px;font-weight:700">'+f.nome+'</div></div>'    +'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Cargo</div><div style="font-size:14px">'+f.cargo+'</div></div>'    +(f.cpf?'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">CPF</div><div style="font-size:13px">'+f.cpf+'</div></div>':'')    +'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Valor/hora</div><div style="font-size:13px;font-family:monospace">R$ '+parseFloat(f.vHora||0).toFixed(2).replace('.',',')+'</div></div>'    +'</div>'    +'<table><thead><tr><th>Data</th><th>Período</th><th>Horário</th><th style="text-align:right">Valor</th><th style="text-align:center">Pago</th></tr></thead>'    +'<tbody>'+rows+'<tr class="total-row"><td colspan="3" style="padding:7px 8px;font-size:13px">Total Trabalhado</td><td style="padding:7px 8px;text-align:right;font-family:monospace">R$ '+parseFloat(totalBruto).toFixed(2).replace('.',',')+'</td><td></td></tr>'    +(adRows?adRows+'<tr class="deduct-row"><td colspan="3" style="padding:7px 8px;font-size:13px;color:#ef4444">Total Adiantamentos</td><td style="padding:7px 8px;text-align:right;font-family:monospace;color:#ef4444">– R$ '+parseFloat(totalAdiant).toFixed(2).replace('.',',')+'</td><td></td></tr>':'')    +'<tr class="net-row"><td colspan="3" style="padding:10px 8px">TOTAL LÍQUIDO A PAGAR</td><td colspan="2" style="padding:10px 8px;text-align:right;font-size:18px;font-family:monospace">R$ '+parseFloat(totalLiq).toFixed(2).replace('.',',')+'</td></tr>'    +'</tbody></table>'    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:30px;padding-top:16px;border-top:1px solid #e5e7eb">'    +'<div><div style="font-size:11px;color:#6b7280;margin-bottom:20px">Assinatura do Funcionário</div><div style="border-top:1px solid #374151;padding-top:4px;font-size:11px;color:#6b7280">'+f.nome+'</div></div>'    +'<div><div style="font-size:11px;color:#6b7280;margin-bottom:20px">Assinatura do Empregador</div><div style="border-top:1px solid #374151;padding-top:4px;font-size:11px;color:#6b7280">'+(emp.nome||'BioVale')+'</div></div>'    +'</div>'    +'<div style="text-align:center;font-size:10px;color:#9ca3af;margin-top:16px">Emitido em '+new Date().toLocaleDateString("pt-BR")+' • '+((emp.nome)||"BioVale")+'</div>'    +'<div class="noprint" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#15803d;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;cursor:pointer;font-weight:700">🖨️ Imprimir</button></div>'    +'<'+'script>setTimeout(function(){window.print();},500);<\/script></body></html>';
-  var w=window.open('','_blank');
-  if(w){w.document.write(html);w.document.close();}
+  _printHTML(html);
 }
 
 function pgFuncs(){
@@ -11575,7 +11704,7 @@ function pgClis(){
     for(var _i=0;_i<atendHist.length;_i++){var _ah=atendHist[_i];if((String(_ah.cliId)===String(c.id)||(c.nome&&_ah.label&&_ah.label.indexOf(c.nome)>=0))&&_ah.tipo==='Venda')tot+=_ah.total||0;}
     for(var _i=0;_i<DB.caixasHist.length;_i++){var _cx=DB.caixasHist[_i];var _mvs=_cx.movimentos||[];for(var _j=0;_j<_mvs.length;_j++){var _mv=_mvs[_j];if((String(_mv.cliId)===String(c.id)||(c.nome&&_mv.label&&_mv.label.indexOf(c.nome)>=0))&&_mv.tipo==='Venda')tot+=_mv.total||0;}}
     var nivel=tot>=5000?'🥇 Ouro':tot>=1000?'🥈 Prata':tot>=200?'🥉 Bronze':'';
-    cards+='<div class="card" style="position:relative">'
+    cards+='<div class="card cli-card" data-busca="'+c.nome.toLowerCase()+(c.tel?' '+c.tel:'')+( c.cnpj?' '+c.cnpj.toLowerCase():'')+'" style="position:relative">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px">'
       +'<div style="display:flex;gap:9px;align-items:center">'
       +'<div style="width:37px;height:37px;border-radius:7px;background:'+(cTab==='c'?'var(--blb)':'var(--orb)')+';display:flex;align-items:center;justify-content:center;font-size:18px">'+(cTab==='c'?'&#127970;':'&#128666;')+'</div>'
@@ -11598,15 +11727,18 @@ function pgClis(){
       +'</div>'
       +'</div>';
   }
-  if(!cards)cards='<p style="color:var(--mt);padding:20px;text-align:center;grid-column:1/-1">'+(lista.length===0&&_cliBusca?'Nenhum resultado para "'+_cliBusca+'"':'Nenhum cadastrado.')+'</p>';
+  if(!cards)cards='<p class="cli-card" style="color:var(--mt);padding:20px;text-align:center;grid-column:1/-1">Nenhum cadastrado.</p>';
+  // Mensagem de "sem resultado na busca" — controlada via DOM
+  var emptyMsg='<p id="cli-empty-msg" style="display:none;color:var(--mt);padding:20px;text-align:center;grid-column:1/-1">Nenhum resultado encontrado.</p>';
 
   var total=DB.clientes.filter(function(c){return c.tipo===(cTab==='c'?'cliente':'fornecedor');}).length;
-  return '<div class="fc">'
+  var _pgClisHtml = '<div class="fc">'
     +'<div class="ptop"><div><div class="pl">Cadastros</div><div class="pt">Clientes e Fornecedores</div></div><button class="btn" onclick="mNovoCli()">+ Novo</button></div>'
     +'<div class="tabs"><button class="tabbtn'+(cTab==='c'?' on':'')+'" onclick="window._cliBusca=\'\';swCT(\&apos;c\&apos;)">&#127970; Clientes</button><button class="tabbtn'+(cTab==='f'?' on':'')+'" onclick="window._cliBusca=\'\';swCT(\&apos;f\&apos;)">&#128666; Fornecedores</button></div>'
-    // Campo de busca
-    +'<input class="inp" placeholder="&#128269; Buscar por nome, telefone ou CNPJ... ('+total+' cadastrados)" value="'+_cliBusca.replace(/"/g,'&quot;')+'" oninput="window._cliBusca=this.value;go(\'clientes\')" style="margin-bottom:10px">'
-    +'<div class="g2">'+(cards)+'</div></div>';
+    +'<input class="inp" id="cli-busca-inp" placeholder="&#128269; Buscar por nome, telefone ou CNPJ... ('+total+' cadastrados)" value="'+_cliBusca.replace(/"/g,'&quot;')+'" oninput="_cliFiltrarDOM(this.value)" style="margin-bottom:10px">'
+    +'<div class="g2">'+cards+emptyMsg+'</div></div>';
+  if(_cliBusca)setTimeout(function(){_cliFiltrarDOM(_cliBusca);},0);
+  return _pgClisHtml;
 }
 var cTab='c';
 function swCT(t){cTab=t;go('clientes');}
@@ -13363,8 +13495,7 @@ function _exportPDF(titulo,htmlContent){
     +'<div class="footer"><span>'+nomeEmp+'</span><span>Gerado em: '+new Date().toLocaleString('pt-BR')+'</span></div>'
     +'<script>window.onload=function(){window.print();}</'+'script>'
     +'</body></html>';
-  var nw=window.open('','_blank','width=794,height=1123');
-  if(nw){nw.document.write(html);nw.document.close();}else{alert('Permita pop-ups para imprimir.');}
+  _printHTML(html);
 }
 function exportarRelatorioEstoque(fmt){
   var compMap={},vendMap={};
@@ -13409,9 +13540,8 @@ function _exportFinPDF(titulo, htmlContent){
     +htmlContent
     +'<script>window.onload=function(){window.print();}<\/script>'
     +'</body></html>';
-  var w=window.open('','_blank');
-  if(w){w.document.write(html);w.document.close();}
-  else alert('Permita pop-ups para exportar.');
+  _printHTML(html);
+
 }
 
 function exportarResumoFinanceiroPDF(){
@@ -13593,8 +13723,7 @@ function printTab(idx){
     +'<script>window.onload=function(){window.print();}</'+'script>'
     +'</body></html>';
 
-  var nw=window.open('','_blank','width=794,height=1123');
-  if(nw){nw.document.write(html);nw.document.close();}else{alert('Permita pop-ups para imprimir. Toque no ícone de pop-up bloqueado na barra de endereço.');}
+  _printHTML(html);
 }
 
 
@@ -16182,9 +16311,7 @@ function _pclImprimirManual(){
     +cards
     +'<script>window.onload=function(){window.print();}<\/script>'
     +'</body></html>';
-  var w=window.open('','_blank');
-  if(w){w.document.write(html);w.document.close();}
-  else{alert('Permita pop-ups para imprimir.');}
+  _printHTML(html);
 }
 
 function _pclAbrirCatDoManual(catId){
