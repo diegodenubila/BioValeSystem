@@ -305,7 +305,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.5.7';
+var APP_VERSION='5.6';
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[],
@@ -2677,8 +2677,8 @@ function _gerarHTMLBoleto(ab, recMethods, pagMethods, obs, num){
     +'html,body{width:'+_largura+';margin:0;padding:0}'
     +'body{font-family:"Courier New",Courier,monospace;font-size:'+Math.round(12*_escala/90)+'px;background:#fff;color:#000;padding:6px 4px}'
     +'.center{text-align:center}.bold{font-weight:700}.big{font-size:14px;margin:2px 0}.small{font-size:10px}'
-    +'.logo-area{text-align:center;background:#000;margin-bottom:5px;line-height:0}'
-    +'.logo-area img{width:100%;max-height:16mm;object-fit:cover;display:block}'
+    +'.logo-area{text-align:center;background:#000;margin-bottom:5px;line-height:0;padding:0}'
+    +'.logo-area img{max-width:100%;height:18mm;object-fit:contain;display:block;margin:0 auto}'
     +'.info-box{border:1px solid #000;padding:4px 6px;margin-bottom:3px;font-size:12px;font-weight:700;text-align:center}'
     +'.info-box.num{font-size:14px}'
     +'.info-row{display:flex;border:1px solid #000;margin-bottom:3px;font-size:11px}'
@@ -2768,6 +2768,12 @@ function _finalizarPesagem(){
           DB.revenda[j].status='Vendido';
           DB.revenda[j].dataVenda=hj();
           DB.revenda[j].precoVenda=it.preco||DB.revenda[j].preco||0;
+          DB.revenda[j].atendNum=ab.numAtend||null;
+          // Custo estimado = peso × preço do material de origem (se vinculado)
+          if(DB.revenda[j].estProdId&&DB.revenda[j].peso){
+            var _ep=null;for(var _k=0;_k<DB.produtos.length;_k++){if(_normId(DB.produtos[_k].id)===_normId(DB.revenda[j].estProdId)){_ep=DB.produtos[_k];break;}}
+            if(_ep&&_ep.precoC)DB.revenda[j].custoEst=+(DB.revenda[j].peso*_ep.precoC).toFixed(2);
+          }
           break;
         }
       }
@@ -3110,7 +3116,7 @@ function _renderAtendRow(m,fromHistCaixaIdx){
   var totalColor=m.total>=0?'var(--gr)':'var(--rd)';
   var temItens=m.itensList&&m.itensList.length>0;
   var cliNome='';if(m.cliId){for(var ci=0;ci<DB.clientes.length;ci++){if(DB.clientes[ci].id==m.cliId){cliNome=DB.clientes[ci].nome;break;}}}
-  var pesoTot=0;if(m.itensList){for(var pi=0;pi<m.itensList.length;pi++){var itp=m.itensList[pi];if(!itp.uni&&itp.peso)pesoTot+=itp.peso;}}
+  var pesoTot=0;if(m.itensList){for(var pi=0;pi<m.itensList.length;pi++){var itp=m.itensList[pi];if(itp.peso)pesoTot+=itp.peso;}}
   var pesoStr=pesoTot>0?fKg(pesoTot)+' kg':'';
   var pgParts=[];if(m.methods){for(var mi=0;mi<m.methods.length;mi++){var mt=m.methods[mi];if(mt.valor>0)pgParts.push(mt.label+': '+fR(mt.valor));}}
   var pgStr=pgParts.length?pgParts.join(' \u2022 '):'';
@@ -3273,7 +3279,8 @@ function renderCaixaDia(){
   // despesas do dia — subtrai as pagas em conta tipo Dinheiro (caixa físico)
   var _contasDinheiro={};for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].tipo==='Dinheiro')_contasDinheiro[DB.contas[i].nome]=true;}
   var _cxDataStr=cd.data||hj();
-  for(var i=0;i<DB.movs.length;i++){var _mv=DB.movs[i];if(_mv.tipo==='saida'&&_mv.data===_cxDataStr&&(!_mv.desc||_mv.desc.indexOf('#')<0)&&_contasDinheiro[_mv.conta])_estim=+(_estim-_mv.valor).toFixed(2);}
+  var _catsExcluirEstim={'Transferencia':1,'Ajuste de Caixa':1,'Outros Recebimentos':1,'Sangria':1,'Reforco':1};
+  for(var i=0;i<DB.movs.length;i++){var _mv=DB.movs[i];if(_mv.tipo==='saida'&&_mv.data===_cxDataStr&&(!_mv.desc||_mv.desc.indexOf('#')<0)&&_contasDinheiro[_mv.conta]&&!_catsExcluirEstim[_mv.cat]&&!(_mv.desc&&(_mv.desc.indexOf('Sangria:')==0||_mv.desc.indexOf('Reforco:')==0||_mv.desc.indexOf('Transferencia')==0)))_estim=+(_estim-_mv.valor).toFixed(2);}
   _estim=+(_estim+refor-sang).toFixed(2);
   var extras='';
   if(cd.sangrias&&cd.sangrias.length){
@@ -3317,7 +3324,10 @@ function renderCaixaDia(){
   var _hjStr3=_cxDataStr;var _despDia=[];var _totDesp=0;
   for(var i=0;i<DB.movs.length;i++){
     var _mv=DB.movs[i];
-    if(_mv.tipo==='saida'&&_mv.data===_hjStr3&&(!_mv.desc||_mv.desc.indexOf('#')<0)&&!_catsExcluirDesp[_mv.cat]){
+    var _descMv=_mv.desc||'';
+    if(_mv.tipo==='saida'&&_mv.data===_hjStr3&&(!_mv.desc||_mv.desc.indexOf('#')<0)
+       &&!_catsExcluirDesp[_mv.cat]
+       &&_descMv.indexOf('Sangria:')<0&&_descMv.indexOf('Reforco:')<0&&_descMv.indexOf('Transferencia')<0){
       _despDia.push(_mv);_totDesp+=_mv.valor;
     }
   }
@@ -3388,11 +3398,15 @@ function imprimirRelatorioDia(){
   var sang=0;if(cd.sangrias)for(var i=0;i<cd.sangrias.length;i++)sang+=cd.sangrias[i].valor;
   var refor=0;if(cd.reforcos)for(var i=0;i<cd.reforcos.length;i++)refor+=cd.reforcos[i].valor;
 
-  // Despesas
+  // Despesas — exclui Sangria, Reforco, Transferencia e Ajuste (movimentações internas)
+  var _catsExcRelCx={'Sangria':1,'Reforco':1,'Transferencia':1,'Ajuste de Caixa':1,'Outros Recebimentos':1};
   var despDia=[];var totDesp=0;
   for(var i=0;i<DB.movs.length;i++){
     var mv=DB.movs[i];
-    if(mv.tipo==='saida'&&mv.data===cd.data&&(!mv.desc||mv.desc.indexOf('#')<0)){
+    var _d=mv.desc||'';
+    if(mv.tipo==='saida'&&mv.data===cd.data&&(!mv.desc||mv.desc.indexOf('#')<0)
+       &&!_catsExcRelCx[mv.cat]
+       &&_d.indexOf('Sangria:')<0&&_d.indexOf('Reforco:')<0&&_d.indexOf('Transferencia')<0){
       despDia.push(mv);totDesp+=mv.valor;
     }
   }
@@ -3674,7 +3688,12 @@ function desfazerReforco(idx){
   });
 }
 function mSangria(){
-  var cats=DB.cats.saida;
+  var cats=CFG.motivosSangria&&CFG.motivosSangria.length?CFG.motivosSangria:[
+    {id:1,nome:'Deposito no banco',cor:'#3b82f6'},
+    {id:2,nome:'Pagamento fornecedor',cor:'#ef4444'},
+    {id:3,nome:'Despesa operacional',cor:'#f59e0b'},
+    {id:4,nome:'Retirada do socio',cor:'#a855f7'},
+    {id:5,nome:'Outros',cor:'#64748b'}];
   var catsH=_buildCatBtns(cats,'sg');
   // Destino inclui Caixa (ex: devolver troco para o proprio caixa) e demais contas
   var destOpts='<option value="">-- Nenhum (saida sem destino) --</option>';
@@ -3715,7 +3734,12 @@ function confSangria(){
   closeM();autoSave();renderCaixaDia();
 }
 function mReforco(){
-  var cats=DB.cats.entrada;
+  var cats=CFG.motivosReforco&&CFG.motivosReforco.length?CFG.motivosReforco:[
+    {id:1,nome:'Troco do banco',cor:'#22c55e'},
+    {id:2,nome:'Aporte do socio',cor:'#3b82f6'},
+    {id:3,nome:'Recebimento externo',cor:'#06b6d4'},
+    {id:4,nome:'Devolucao',cor:'#a855f7'},
+    {id:5,nome:'Outros',cor:'#64748b'}];
   var catsH=_buildCatBtns(cats,'rf');
   var origOpts='<option value="">-- Nenhuma (entrada externa) --</option>';
   for(var i=0;i<DB.contas.length;i++){
@@ -3866,6 +3890,13 @@ function confDespesaRapida(){
 }
 
 function mConfigCaixa(){
+  // Garante que os campos existem mesmo em CFG antigo (antes desta versão)
+  if(!CFG.motivosSangria||!CFG.motivosSangria.length)CFG.motivosSangria=[
+    {id:1,nome:'Deposito no banco',cor:'#3b82f6'},{id:2,nome:'Pagamento fornecedor',cor:'#ef4444'},
+    {id:3,nome:'Despesa operacional',cor:'#f59e0b'},{id:4,nome:'Retirada do socio',cor:'#a855f7'},{id:5,nome:'Outros',cor:'#64748b'}];
+  if(!CFG.motivosReforco||!CFG.motivosReforco.length)CFG.motivosReforco=[
+    {id:1,nome:'Troco do banco',cor:'#22c55e'},{id:2,nome:'Aporte do socio',cor:'#3b82f6'},
+    {id:3,nome:'Recebimento externo',cor:'#06b6d4'},{id:4,nome:'Devolucao',cor:'#a855f7'},{id:5,nome:'Outros',cor:'#64748b'}];
   function _catRowsCaixa(){
     var arr=DB.cats.saida;var h='';
     for(var i=0;i<arr.length;i++){
@@ -3974,7 +4005,14 @@ function mFecharCaixa(){
   var _sang=0;if(cd&&cd.sangrias)for(var i=0;i<cd.sangrias.length;i++)_sang+=cd.sangrias[i].valor;
   for(var i=0;i<movsDia.length;i++){var mv=movsDia[i];if(mv.recMethods){for(var j=0;j<mv.recMethods.length;j++){if(mv.recMethods[j].conta==='Caixa'||mv.recMethods[j].label==='Dinheiro')_fe=+(_fe+mv.recMethods[j].valor).toFixed(2);}}if(mv.pagMethods){for(var j=0;j<mv.pagMethods.length;j++){if(mv.pagMethods[j].conta==='Caixa'||mv.pagMethods[j].label==='Dinheiro')_fe=+(_fe-mv.pagMethods[j].valor).toFixed(2);}}if(mv.liquidadoPendencia&&mv.methods){for(var j=0;j<mv.methods.length;j++){var _lm=mv.methods[j];if(_lm.conta==='Caixa'||_lm.label==='Dinheiro'){if(mv.tipo==='Compra')_fe=+(_fe-_lm.valor).toFixed(2);else _fe=+(_fe+_lm.valor).toFixed(2);}}}}
   var _fContasDin={};for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].tipo==='Dinheiro')_fContasDin[DB.contas[i].nome]=true;}
-  var _fCxDataStr=DB.caixaDia&&DB.caixaDia.data?DB.caixaDia.data:hj();for(var i=0;i<DB.movs.length;i++){var _mv=DB.movs[i];if(_mv.tipo==='saida'&&_mv.data===_fCxDataStr&&(!_mv.desc||_mv.desc.indexOf('#')<0)&&_fContasDin[_mv.conta])_fe=+(_fe-_mv.valor).toFixed(2);}
+  var _fCxDataStr=DB.caixaDia&&DB.caixaDia.data?DB.caixaDia.data:hj();
+  var _catsExcluirFech={'Transferencia':1,'Ajuste de Caixa':1,'Outros Recebimentos':1,'Sangria':1,'Reforco':1};
+  for(var i=0;i<DB.movs.length;i++){
+    var _mv=DB.movs[i];
+    if(_mv.tipo==='saida'&&_mv.data===_fCxDataStr&&(!_mv.desc||_mv.desc.indexOf('#')<0)
+       &&_fContasDin[_mv.conta]&&!_catsExcluirFech[_mv.cat])
+      _fe=+(_fe-_mv.valor).toFixed(2);
+  }
   _fe=+(_fe+_refor-_sang).toFixed(2);
   saldoAt=_fe; // usa o estimado reconstruído
   openM('Fechar Caixa','<div class="mf"><div class="al aly">Voce esta prestes a fechar o caixa de hoje.</div><div style="background:var(--s2);border-radius:var(--r);padding:13px"><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--bd)"><span style="color:var(--mt)">Abertura</span><span style="font-family:monospace">'+fR(DB.caixaDia.saldoAbertura)+'</span></div><div style="display:flex;justify-content:space-between;padding:7px 0;font-size:15px;font-weight:700"><span>Saldo esperado</span><span style="color:var(--gr);font-family:monospace">'+fR(saldoAt)+'</span></div></div><div class="fld"><label>Valor contado R$</label><input class="inp" type="number" inputmode="decimal" id="fc-v" value="'+saldoAt+'" style="font-size:20px;text-align:center;font-family:monospace" oninput="calcFD('+saldoAt+')"></div><div id="fc-dif"></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-rd" onclick="confirmarFech('+saldoAt+')">Fechar Caixa</button></div></div>');}
@@ -7101,34 +7139,148 @@ function _buildRevVendidos(){
   var vendidos=DB.revenda.filter(function(p){
     if(p.status==='Disponivel')return false;
     var data=p.dataVenda||'';
-    if(!data)return per==='tudo'; // sem data, só mostra em "Todos"
+    if(!data)return per==='tudo';
     return _perFiltro(data,per,_revRelD1,_revRelD2);
   });
-  var totalVend=0;for(var i=0;i<vendidos.length;i++)totalVend+=vendidos[i].precoVenda||vendidos[i].preco||0;
-  var resumo='<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">'
-    +'<div class="card" style="flex:1;padding:10px 14px"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Unidades Vendidas</div>'
-    +'<div style="font-size:20px;font-weight:800;color:var(--bl);font-family:monospace">'+vendidos.length+' un</div></div>'
-    +'<div class="card" style="flex:1;padding:10px 14px"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Total Recebido</div>'
-    +'<div style="font-size:20px;font-weight:800;color:var(--gr);font-family:monospace">'+fR(totalVend)+'</div></div>'
+
+  // Busca textual
+  var _busca=window._revVendBusca||'';
+  var vendidosFilt=_busca?vendidos.filter(function(p){
+    var q=_busca.toLowerCase();
+    return (p.prod||'').toLowerCase().indexOf(q)>=0||(p.cat||'').toLowerCase().indexOf(q)>=0||(p.cond||'').toLowerCase().indexOf(q)>=0;
+  }):vendidos;
+
+  // Totais
+  var totalVend=0,totalCusto=0,totalPeso=0;
+  for(var i=0;i<vendidosFilt.length;i++){
+    var _p=vendidosFilt[i];
+    totalVend+=_p.precoVenda||_p.preco||0;
+    totalCusto+=_p.custoEst||0;
+    totalPeso+=_p.peso||0;
+  }
+  var totalLucro=totalVend-totalCusto;
+
+  var resumo='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'
+    +'<div class="card" style="flex:1;padding:10px 12px;min-width:80px"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Unidades</div>'
+    +'<div style="font-size:18px;font-weight:800;color:var(--bl);font-family:monospace">'+vendidosFilt.length+' un</div></div>'
+    +'<div class="card" style="flex:1;padding:10px 12px;min-width:80px"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Peso Total</div>'
+    +'<div style="font-size:18px;font-weight:800;color:var(--bl);font-family:monospace">'+fKg(totalPeso)+' kg</div></div>'
+    +'<div class="card" style="flex:1;padding:10px 12px;min-width:80px"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Recebido</div>'
+    +'<div style="font-size:18px;font-weight:800;color:var(--gr);font-family:monospace">'+fR(totalVend)+'</div></div>'
+    +(totalCusto>0?'<div class="card" style="flex:1;padding:10px 12px;min-width:80px"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Lucro Est.</div>'
+    +'<div style="font-size:18px;font-weight:800;color:'+(totalLucro>=0?'var(--gr)':'var(--rd)')+';font-family:monospace">'+fR(totalLucro)+'</div></div>':'')
     +'</div>';
-  if(!vendidos.length)return perBar+resumo+'<div class="card" style="text-align:center;color:var(--mt);padding:30px">Nenhum produto vendido neste período.</div>';
+
+  // Barra de busca + botão PDF
+  var buscaBar='<div style="display:flex;gap:8px;margin-bottom:10px">'
+    +'<input class="inp" id="rev-vend-busca" placeholder="&#128269; Buscar por nome, categoria ou condição..." value="'+_busca.replace(/"/g,'&quot;')+'" oninput="window._revVendBusca=this.value;_revVendFiltrarDOM(this.value)" style="flex:1">'
+    +'<button onclick="_revVendPDF()" class="btn" style="font-size:12px;padding:6px 12px;flex-shrink:0">&#128196; PDF</button>'
+    +'</div>';
+
+  if(!vendidosFilt.length)return perBar+resumo+buscaBar+'<div class="card" style="text-align:center;color:var(--mt);padding:30px">Nenhum produto vendido neste período.</div>';
+
   var rows='';
-  for(var i=0;i<vendidos.length;i++){
-    var p=vendidos[i];var val=p.precoVenda||p.preco||0;
-    rows+='<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--bd)">'
+  for(var i=0;i<vendidosFilt.length;i++){
+    var p=vendidosFilt[i];
+    var val=p.precoVenda||p.preco||0;
+    var custo=p.custoEst||0;
+    var lucro=custo>0?val-custo:null;
+    // Busca cliente do atendimento
+    var cliNome='';
+    if(p.atendNum){
+      // Procura no caixaHist ou movsDia
+      for(var _ci=0;_ci<DB.caixasHist.length&&!cliNome;_ci++){
+        var _movs=DB.caixasHist[_ci].movimentos||[];
+        for(var _mi=0;_mi<_movs.length&&!cliNome;_mi++){
+          if(_movs[_mi].num==p.atendNum&&_movs[_mi].cliId){
+            for(var _cli=0;_cli<DB.clientes.length;_cli++){if(DB.clientes[_cli].id==_movs[_mi].cliId){cliNome=DB.clientes[_cli].nome;break;}}
+          }
+        }
+      }
+    }
+    rows+='<div class="rev-vend-row" data-busca="'+(p.prod||'').toLowerCase()+' '+(p.cat||'').toLowerCase()+' '+(p.cond||'').toLowerCase()+'" style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--bd)">'
       +'<div style="flex:1;min-width:0">'
-      +'<div style="font-size:13px;font-weight:600;margin-bottom:2px">'+p.prod+'</div>'
-      +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+      +'<div style="font-size:13px;font-weight:600;margin-bottom:3px">'+p.prod+'</div>'
+      +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:2px">'
       +(p.cat?'<span style="font-size:10px;color:var(--bl)">'+p.cat+'</span>':'')
       +(p.cond?'<span style="font-size:10px;color:var(--pu)">'+p.cond+'</span>':'')
+      +(p.peso?'<span style="font-size:10px;color:var(--mt)">&#9878; '+fKg(p.peso)+'kg</span>':'')
       +(p.dataVenda?'<span style="font-size:10px;color:var(--mt)">'+p.dataVenda+'</span>':'')
-      +'</div></div>'
+      +'</div>'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+      +(cliNome?'<span style="font-size:10px;color:var(--tx)">&#128100; '+cliNome+'</span>':'')
+      +(p.atendNum?'<span style="font-size:10px;color:var(--mt)">#'+p.atendNum+'</span>':'')
+      +(custo>0?'<span style="font-size:10px;color:var(--mt)">Custo: '+fR(custo)+'</span>':'')
+      +'</div>'
+      +'</div>'
       +'<div style="text-align:right;flex-shrink:0">'
       +'<div style="font-size:14px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(val)+'</div>'
-      +'<div style="font-size:10px;color:var(--mt)">'+p.status+'</div>'
+      +(lucro!==null?'<div style="font-size:11px;font-weight:600;color:'+(lucro>=0?'var(--gr)':'var(--rd)')+'">Lucro: '+fR(lucro)+'</div>':'')
+      +'<button onclick="_revVendReverter(\''+p.id+'\')" title="Reverter para Disponível" style="background:none;border:none;color:var(--mt);font-size:11px;cursor:pointer;text-decoration:underline;margin-top:3px;display:block">↩ Reverter</button>'
       +'</div></div>';
   }
-  return perBar+resumo+'<div class="card" style="padding:0;overflow:hidden">'+rows+'</div>';
+  return perBar+resumo+buscaBar+'<div class="card" style="padding:0;overflow:hidden" id="rev-vend-lista">'+rows+'</div>';
+}
+
+function _revVendFiltrarDOM(q){
+  var ql=q.toLowerCase();
+  var rows=document.querySelectorAll('.rev-vend-row');
+  for(var i=0;i<rows.length;i++){
+    var busca=rows[i].getAttribute('data-busca')||'';
+    rows[i].style.display=(!ql||busca.indexOf(ql)>=0)?'flex':'none';
+  }
+}
+function _revVendReverter(id){
+  var p=null;
+  for(var i=0;i<DB.revenda.length;i++){if(String(DB.revenda[i].id)===String(id)){p=DB.revenda[i];break;}}
+  if(!p)return;
+  // Verifica se o atendimento ainda está no caixa do dia (pode ser reaberto)
+  var numAtend=p.atendNum;
+  var snapAtual=null;
+  if(numAtend&&DB.caixaDia&&DB.caixaDia.movimentos){
+    for(var j=0;j<DB.caixaDia.movimentos.length;j++){
+      if(String(DB.caixaDia.movimentos[j].num)===String(numAtend)){snapAtual=DB.caixaDia.movimentos[j];break;}
+    }
+  }
+  if(snapAtual){
+    // Atendimento ainda no caixa — oferece reabrir (estorna tudo corretamente)
+    confirmar('Para reverter <b>'+p.prod+'</b>, o atendimento <b>#'+numAtend+'</b> precisa ser reaberto.<br><span style="font-size:12px;color:var(--mt)">Isso estornará o financeiro e o estoque. Você poderá corrigir e finalizar novamente.</span><br><span style="font-size:12px;color:var(--or)">Deseja reabrir o atendimento agora?</span>',function(){
+      closeM();
+      go('pesagem');
+      setTimeout(function(){reabrirDoCaixa(numAtend);},300);
+    });
+  } else {
+    // Atendimento já fechado ou sem atendNum — só reverte o status do produto
+    confirmar('Reverter <b>'+p.prod+'</b> para Disponível?'+(numAtend?'<br><span style="font-size:12px;color:var(--or)">⚠ O atendimento #'+numAtend+' já foi fechado. O financeiro NÃO será estornado automaticamente — verifique as movimentações manualmente.</span>':'<br><span style="font-size:12px;color:var(--mt)">O produto voltará para o estoque de revenda.</span>'),function(){
+      p.status='Disponivel';
+      p.dataVenda=null;p.precoVenda=null;p.atendNum=null;p.custoEst=null;
+      saveDB();go('revenda');
+    });
+  }
+}
+function _revVendPDF(){
+  var per=_revRelPer;
+  var vendidos=DB.revenda.filter(function(p){
+    if(p.status==='Disponivel')return false;
+    var data=p.dataVenda||'';
+    if(!data)return per==='tudo';
+    return _perFiltro(data,per,_revRelD1,_revRelD2);
+  });
+  var _busca=window._revVendBusca||'';
+  if(_busca)vendidos=vendidos.filter(function(p){var q=_busca.toLowerCase();return(p.prod||'').toLowerCase().indexOf(q)>=0||(p.cat||'').toLowerCase().indexOf(q)>=0;});
+  var totalVend=0,totalLucro=0;
+  for(var i=0;i<vendidos.length;i++){totalVend+=vendidos[i].precoVenda||vendidos[i].preco||0;totalLucro+=(vendidos[i].precoVenda||vendidos[i].preco||0)-(vendidos[i].custoEst||0);}
+  var rows=vendidos.map(function(p){
+    var val=p.precoVenda||p.preco||0;var custo=p.custoEst||0;
+    return '<tr><td>'+p.prod+'</td><td>'+p.cat+'</td><td>'+p.cond+'</td><td>'+(p.dataVenda||'')+'</td><td style="text-align:right">'+fR(custo)+'</td><td style="text-align:right">'+fR(val)+'</td><td style="text-align:right;color:'+(val-custo>=0?'green':'red')+'">'+fR(val-custo)+'</td></tr>';
+  }).join('');
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:monospace;font-size:11px;padding:15px}h2{font-size:14px;margin-bottom:8px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:4px 7px;font-size:11px}th{background:#f0f0f0;text-align:left}.tot{font-weight:700;text-align:right}@media print{@page{size:A4;margin:10mm}}</style></head><body>'
+    +'<h2>Revenda — Produtos Vendidos</h2>'
+    +'<table><tr><th>Produto</th><th>Cat.</th><th>Cond.</th><th>Data</th><th>Custo</th><th>Venda</th><th>Lucro</th></tr>'
+    +rows
+    +'<tr><td class="tot" colspan="4">Total ('+vendidos.length+' un)</td><td class="tot" style="text-align:right"></td><td class="tot" style="text-align:right">'+fR(totalVend)+'</td><td class="tot" style="text-align:right;color:'+(totalLucro>=0?'green':'red')+'">'+fR(totalLucro)+'</td></tr>'
+    +'</table></body></html>';
+  _printHTML(html);
 }
 function swRevRelPer(p){_revRelPer=p;go('revenda');}
 function swRevRelPerCustom(){
