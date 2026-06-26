@@ -1530,40 +1530,50 @@ function mComprovantePes(){
   if(!ab.itens||!ab.itens.length){alert('Carrinho vazio!');return;}
   var emp=CFG.empresa||{};
   var cli=null;for(var i=0;i<DB.clientes.length;i++){if(String(DB.clientes[i].id)===String(ab.cliId)){cli=DB.clientes[i];break;}}
-  var totBruto=0;var rows='';
+  // Separa itens por tipo
+  var isMisto=ab.itens.some(function(it){return it.tipo==='Venda';})&&ab.itens.some(function(it){return it.tipo==='Compra';});
+  var rowsC='',rowsV='',totC=0,totV=0,pesoTotal=0;
   for(var i=0;i<ab.itens.length;i++){
     var it=ab.itens[i];
-    var vLiq=+(it.peso-it.tara)*it.preco;
-    totBruto+=vLiq;
-    var prod=null;for(var j=0;j<DB.produtos.length;j++){if(String(DB.produtos[j].id)===String(it.pId)){prod=DB.produtos[j];break;}}
-    rows+='<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:7px 8px">'+(prod?prod.ic+' '+prod.nome:'Material')+'</td>'+
-      '<td style="padding:7px 8px;text-align:right;font-family:monospace">'+fKg(it.peso)+'kg</td>'+
-      (it.tara>0?'<td style="padding:7px 8px;text-align:right;font-family:monospace;color:#6b7280">-'+fKg(it.tara)+'kg</td>':'<td style="padding:7px 8px;text-align:right;color:#6b7280">—</td>')+
-      '<td style="padding:7px 8px;text-align:right;font-family:monospace">R$ '+parseFloat(it.preco).toFixed(2).replace('.',',')+'</td>'+
-      '<td style="padding:7px 8px;text-align:right;font-family:monospace;font-weight:700">R$ '+parseFloat(vLiq).toFixed(2).replace('.',',')+'</td></tr>';
+    var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:(it.peso||0);
+    var vLiq=it.uni?it.preco:+(pesoEf*it.preco).toFixed(2);
+    if(!it.uni)pesoTotal+=pesoEf;
+    var nomeProd=it.nome||(it.ic?it.ic+' ':'')+'Material';
+    var row='<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:7px 8px">'+nomeProd+'</td>'
+      +'<td style="padding:7px 8px;text-align:right;font-family:monospace">'+(it.uni?'1 un':fKg(pesoEf)+'kg')+'</td>'
+      +(it.tara>0?'<td style="padding:7px 8px;text-align:right;font-family:monospace;color:#6b7280">-'+fKg(it.tara)+'kg</td>':'<td style="padding:7px 8px;text-align:right;color:#6b7280">—</td>')
+      +'<td style="padding:7px 8px;text-align:right;font-family:monospace">'+fR(it.preco)+'</td>'
+      +'<td style="padding:7px 8px;text-align:right;font-family:monospace;font-weight:700">'+fR(vLiq)+'</td></tr>';
+    if(it.tipo==='Venda'){rowsV+=row;totV+=vLiq;}else{rowsC+=row;totC+=vLiq;}
   }
+  var saldoLiq=isMisto?totV-totC:(ab.tipo==='Venda'?totV:totC);
+  var saldoLabel=isMisto?(saldoLiq>=0?'Saldo a receber':'Saldo a pagar'):(ab.tipo==='Venda'?'Total a receber':'Total a pagar');
+  var saldoCor=saldoLiq>=0?'#16a34a':'#dc2626';
+  var cabecalho='<thead><tr><th>Material</th><th style="text-align:right">Peso</th><th style="text-align:right">Tara</th><th style="text-align:right">Preço</th><th style="text-align:right">Total</th></tr></thead>';
+  var tabelaC=isMisto?('<div style="font-size:12px;font-weight:700;color:#dc2626;margin:12px 0 4px">Itens comprados:</div><table>'+cabecalho+'<tbody>'+rowsC+'<tr style="background:#fef2f2;font-weight:700"><td colspan="4" style="padding:8px;text-align:right">Subtotal compras</td><td style="padding:8px;text-align:right;font-family:monospace">'+fR(totC)+'</td></tr></tbody></table>')
+    :('<table>'+cabecalho+'<tbody>'+rowsC+'</tbody></table>');
+  var tabelaV=isMisto?('<div style="font-size:12px;font-weight:700;color:#16a34a;margin:12px 0 4px">Itens vendidos:</div><table>'+cabecalho+'<tbody>'+rowsV+'<tr style="background:#f0fdf4;font-weight:700"><td colspan="4" style="padding:8px;text-align:right">Subtotal vendas</td><td style="padding:8px;text-align:right;font-family:monospace">'+fR(totV)+'</td></tr></tbody></table>'):'';
   var dataHora=new Date().toLocaleDateString('pt-BR')+' '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Recibo de Pesagem</title>'+
-    '<style>body{font-family:Arial,sans-serif;padding:24px;max-width:680px;margin:0 auto;color:#111}h2{margin:0;color:#15803d}table{width:100%;border-collapse:collapse}th{background:#15803d;color:#fff;padding:7px 8px;font-size:11px;text-align:left;text-transform:uppercase}.total-row{background:#f0fdf4;font-weight:700}@media print{.noprint{display:none}}</style>'+
-    '</head><body>'+
-    '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #15803d;padding-bottom:14px;margin-bottom:18px">'+
-    '<div><h2>RECIBO DE PESAGEM</h2><div style="font-size:12px;color:#6b7280;margin-top:3px">'+dataHora+'</div></div>'+
-    '<div style="text-align:right"><div style="font-size:15px;font-weight:700">'+(emp.nome||'BioVale')+'</div>'+(emp.cnpj?'<div style="font-size:11px;color:#6b7280">CNPJ: '+emp.cnpj+'</div>':'')+'</div>'+
-    '</div>'+
-    '<div style="background:#f9fafb;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between">'+
-    '<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Tipo</div><div style="font-size:15px;font-weight:700;color:'+(ab.tipo==='Compra'?'#dc2626':'#16a34a')+'">'+ab.tipo+'</div></div>'+
-    (cli?'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Cliente/Fornecedor</div><div style="font-size:14px;font-weight:600">'+cli.nome+'</div>'+(cli.tel?'<div style="font-size:11px;color:#6b7280">'+cli.tel+'</div>':'')+'</div>':'<div></div>')+
-    '<div style="text-align:right"><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Status</div><div style="font-size:13px;font-weight:600;color:#f59e0b">Pendente de Finalização</div></div>'+
-    '</div>'+
-    '<table><thead><tr><th>Material</th><th style="text-align:right">Peso Bruto</th><th style="text-align:right">Tara</th><th style="text-align:right">Preço/kg</th><th style="text-align:right">Total</th></tr></thead>'+
-    '<tbody>'+rows+
-    '<tr class="total-row"><td colspan="4" style="padding:8px;text-align:right;font-size:13px">TOTAL</td><td style="padding:8px;text-align:right;font-family:monospace;font-size:15px">R$ '+parseFloat(totBruto).toFixed(2).replace('.',',')+'</td></tr>'+
-    '</tbody></table>'+
-    '<div style="margin-top:24px;font-size:11px;color:#6b7280;text-align:center">Recibo provisório — sujeito a alteração até a finalização da pesagem</div>'+
-    '<div class="noprint" style="text-align:center;margin-top:18px"><button onclick="window.print()" style="background:#15803d;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;cursor:pointer;font-weight:700">&#128196; Imprimir</button></div>'+
-    '<'+'script>setTimeout(function(){window.print();},400);<\/script></body></html>';
-  _printHTML(html);
-
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Recibo de Pesagem</title>'
+    +'<style>body{font-family:Arial,sans-serif;padding:20px;max-width:680px;margin:0 auto;color:#111}h2{margin:0;color:#15803d}table{width:100%;border-collapse:collapse}th{background:#15803d;color:#fff;padding:7px 8px;font-size:11px;text-align:left;text-transform:uppercase}.noprint{display:none}@media print{.noprint{display:none}}</style>'
+    +'</head><body>'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #15803d;padding-bottom:14px;margin-bottom:16px">'
+    +'<div><h2>RECIBO DE PESAGEM</h2><div style="font-size:12px;color:#6b7280;margin-top:3px">'+dataHora+'</div></div>'
+    +'<div style="text-align:right"><div style="font-size:15px;font-weight:700">'+(emp.nome||'BioVale')+'</div>'+(emp.cnpj?'<div style="font-size:11px;color:#6b7280">CNPJ: '+emp.cnpj+'</div>':'')+'</div>'
+    +'</div>'
+    +'<div style="background:#f9fafb;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+    +'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Tipo</div><div style="font-size:14px;font-weight:700;color:'+(ab.tipo==='Compra'?'#dc2626':'#16a34a')+'">'+(isMisto?'Misto (Compra+Venda)':ab.tipo)+'</div></div>'
+    +(cli?'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Cliente/Fornecedor</div><div style="font-size:13px;font-weight:600">'+cli.nome+'</div>'+(cli.tel?'<div style="font-size:11px;color:#6b7280">'+cli.tel+'</div>':'')+'</div>':'')
+    +'<div style="text-align:right"><div style="font-size:10px;color:#6b7280;text-transform:uppercase">Peso Total</div><div style="font-size:14px;font-weight:700">'+fKg(pesoTotal)+' kg</div></div>'
+    +'</div>'
+    +(isMisto?tabelaC+tabelaV:((ab.tipo==='Venda'?tabelaV||tabelaC:tabelaC)))
+    +'<div style="background:'+(saldoLiq>=0?'#f0fdf4':'#fef2f2')+';border-radius:8px;padding:14px 18px;margin-top:16px;text-align:center">'
+    +'<div style="font-size:11px;color:#6b7280;text-transform:uppercase;margin-bottom:4px">'+saldoLabel+'</div>'
+    +'<div style="font-size:22px;font-weight:800;color:'+saldoCor+';font-family:monospace">'+fR(Math.abs(saldoLiq))+'</div>'
+    +'</div>'
+    +'<div style="margin-top:16px;font-size:11px;color:#6b7280;text-align:center">Recibo provisório — sujeito a alteração até a finalização</div>'
+    +'</body></html>';
+  _viewHTML(html);
 }
 
 function novaPesAba(){
@@ -2435,7 +2445,7 @@ function mFinPes(){
     +'<button class="btn" style="width:100%;background:var(--or);color:#000;font-weight:700" onclick="suspenderAtendimento()">&#9203; Suspender (Ficar em Aberto)</button>'
     +'</div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +(CFG.sistema.showVisualizarBoleto!==false?'<button class="btn btn-bl" style="flex:1" onclick="imprimirNota()">&#128196; Visualizar Boleto</button>':'')
+    +(CFG.sistema.showVisualizarBoleto!==false?'<button class="btn btn-bl" style="flex:1" onclick="visualizarNota()">&#128065; Visualizar</button><button class="btn" style="flex:1" onclick="imprimirNota()">&#128424; Imprimir</button>':'')
     +'<button class="btn" style="flex:1" onclick="confirmarFin()">&#10003; Finalizar e Liquidar</button>'
     +'</div></div>',520);
 }
@@ -2734,6 +2744,16 @@ function imprimirNota(){
   var num=ab.numAtend||gerarNum();ab.numAtend=num;
   var html=_gerarHTMLBoleto(ab,recMethods,pagMethods,obs,num);
   _printHTML(html);
+}
+function visualizarNota(){
+  var ab=pesAbas[pesAtiva];
+  var pg=getPgMethods();
+  var recMethods=pg.recMethods;var pagMethods=pg.pagMethods;
+  var obs=document.getElementById('fin-obs')?document.getElementById('fin-obs').value||'':'';
+  var nfInp=document.getElementById('fin-nf');if(nfInp&&nfInp.value)ab.nfNum=nfInp.value;
+  var num=ab.numAtend||gerarNum();ab.numAtend=num;
+  var html=_gerarHTMLBoleto(ab,recMethods,pagMethods,obs,num);
+  _viewHTML(html);
 }
 
 function confirmarFin(){
@@ -4082,27 +4102,76 @@ function _printHTML(html){
   if(old)old.remove();
   var iframe=document.createElement('iframe');
   iframe.id='_print_frame';
-  // Largura do iframe baseada no formato de papel configurado
   var _fmt=(CFG&&CFG.sistema)?(CFG.sistema.fmtMob||CFG.sistema.fmtPc)||'termico58':'termico58';
   var _w=_fmt.indexOf('58')>=0?'220px':_fmt.indexOf('80')>=0?'302px':'794px';
   iframe.style.cssText='position:fixed;top:-9999px;left:-9999px;width:'+_w+';height:600px;border:none;opacity:0;pointer-events:none';
   document.body.appendChild(iframe);
+  var _printed=false; // flag para evitar duplo print (onload + setTimeout)
   try{
     var doc=iframe.contentDocument||iframe.contentWindow.document;
     doc.open();doc.write(html);doc.close();
     iframe.contentWindow.onload=function(){
-      try{iframe.contentWindow.focus();iframe.contentWindow.print();}catch(e){
-        var nw=window.open('','_blank');
-        if(nw){nw.document.write(html);nw.document.close();}
-        else alert('Nao foi possivel imprimir.');
-      }
+      if(_printed)return;_printed=true;
+      try{iframe.contentWindow.focus();iframe.contentWindow.print();}catch(e){_viewHTML(html);}
     };
-    setTimeout(function(){try{if(iframe.contentWindow)iframe.contentWindow.print();}catch(e){}},600);
-  }catch(e){
-    var nw=window.open('','_blank');
-    if(nw){nw.document.write(html);nw.document.close();}
-    else alert('Nao foi possivel imprimir.');
+    setTimeout(function(){
+      if(_printed)return;_printed=true;
+      try{if(iframe.contentWindow)iframe.contentWindow.print();}catch(e){_viewHTML(html);}
+    },800);
+  }catch(e){_viewHTML(html);}
+}
+// Abre o HTML em overlay para visualizar/salvar como PDF — sem disparar impressão
+function _viewHTML(html){
+  var oldO=document.getElementById('_view_overlay');
+  if(oldO)oldO.remove();
+  // Detecta se é notinha térmica (58mm/80mm) ou documento A4
+  var _isThermal=html.indexOf('width:58mm')>=0||html.indexOf('width:80mm')>=0||html.indexOf('width: 58mm')>=0||html.indexOf('width: 80mm')>=0;
+  var _fmt=(CFG&&CFG.sistema)?(CFG.sistema.fmtMob||CFG.sistema.fmtPc)||'termico58':'termico58';
+  // Para térmica: exibe em largura real mas centralizada; para A4: largura total
+  var _containerW=_isThermal?(_fmt.indexOf('80')>=0?'320px':'260px'):'min(680px,97vw)';
+  var overlay=document.createElement('div');
+  overlay.id='_view_overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:10px;overflow-y:auto';
+  var container=document.createElement('div');
+  container.style.cssText='display:flex;flex-direction:column;width:'+_containerW+';gap:8px;margin:0 auto;padding-bottom:16px';
+  var toolbar=document.createElement('div');
+  toolbar.style.cssText='display:flex;gap:8px;position:sticky;top:0;z-index:1';
+  var btnImp=document.createElement('button');
+  btnImp.innerHTML='&#128424; Imprimir / Salvar PDF';
+  btnImp.style.cssText='flex:1;background:#22c55e;color:#fff;border:none;border-radius:8px;padding:11px 14px;font-size:13px;font-weight:700;cursor:pointer';
+  var btnFechar=document.createElement('button');
+  btnFechar.innerHTML='&#10005; Fechar';
+  btnFechar.style.cssText='background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:8px;padding:11px 14px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0';
+  var iframe=document.createElement('iframe');
+  iframe.id='_view_frame';
+  iframe.style.cssText='width:100%;min-height:200px;border:none;border-radius:8px;background:#fff;display:block';
+  function fechar(){var o=document.getElementById('_view_overlay');if(o)o.remove();}
+  function ajustarAltura(){
+    try{
+      var body=iframe.contentDocument.body;
+      var h=body.scrollHeight+24;
+      var w=body.scrollWidth+4;
+      if(h>100)iframe.style.height=h+'px';
+      if(_isThermal&&w>100){
+        iframe.style.width=w+'px';
+        container.style.width=w+'px';
+      }
+    }catch(e){}
   }
+  btnImp.onclick=function(){var f=document.getElementById('_view_frame');if(f&&f.contentWindow)try{f.contentWindow.focus();f.contentWindow.print();}catch(e){}};
+  btnFechar.onclick=fechar;
+  overlay.onclick=function(e){if(e.target===overlay)fechar();};
+  toolbar.appendChild(btnImp);toolbar.appendChild(btnFechar);
+  container.appendChild(toolbar);container.appendChild(iframe);
+  overlay.appendChild(container);
+  document.body.appendChild(overlay);
+  try{
+    var doc=iframe.contentDocument||iframe.contentWindow.document;
+    doc.open();doc.write(html);doc.close();
+    iframe.onload=function(){ajustarAltura();};
+    setTimeout(ajustarAltura,200);
+    setTimeout(ajustarAltura,600);
+  }catch(e){}
 }
 
 
@@ -7107,7 +7176,7 @@ function imprimirEtiqueta(id){
     +'    var code=el.getAttribute("data-code")||"";'
     +'    try{JsBarcode(el,code,{format:fmt,width:2,height:60,displayValue:true,fontSize:14,margin:8});}catch(e){}'
     +'  }'
-    +'  setTimeout(function(){window.print();},400);'
+    
     +'};'
     +'<\/script>'
     +'</body></html>';
@@ -11003,7 +11072,7 @@ function imprimirHolerite(fi){
     var ad=adMes[i];
     adRows+='<tr><td style="padding:5px 8px;border-bottom:1px solid #e5e7eb">'+ad.data+'</td><td colspan="2" style="padding:5px 8px;border-bottom:1px solid #e5e7eb">'+ad.obs+'</td><td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-family:monospace;color:#ef4444">– R$ '+parseFloat(ad.val||0).toFixed(2).replace('.',',')+'</td><td style="padding:5px 8px;border-bottom:1px solid #e5e7eb;text-align:center">'+(ad.descontado?'✓':'–')+'</td></tr>';
   }
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Holerite '+f.nome+'</title>'    +'<style>body{font-family:Arial,sans-serif;padding:30px;max-width:680px;margin:0 auto;color:#111}h2{margin:0}table{width:100%;border-collapse:collapse}th{background:#15803d;color:#fff;padding:7px 8px;font-size:11px;text-align:left;text-transform:uppercase;letter-spacing:.5px}.total-row{background:#f0fdf4;font-weight:700}.deduct-row{background:#fef2f2}.net-row{background:#1e3a2f;color:#fff;font-size:15px;font-weight:700}@media print{.noprint{display:none}}</style>'    +'</head><body>'    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #15803d;padding-bottom:14px;margin-bottom:18px">'    +'<div><h2 style="color:#15803d">HOLERITE</h2><div style="font-size:13px;color:#666;margin-top:4px">'+mesLabel+'</div></div>'    +'<div style="text-align:right"><div style="font-size:15px;font-weight:700">'+(emp.nome||'BioVale')+'</div>'+(emp.cnpj?'<div style="font-size:11px;color:#666">CNPJ: '+emp.cnpj+'</div>':'')+'</div>'    +'</div>'    +'<div style="background:#f9fafb;border-radius:8px;padding:12px 16px;margin-bottom:18px;display:grid;grid-template-columns:1fr 1fr;gap:8px">'    +'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Funcionário</div><div style="font-size:15px;font-weight:700">'+f.nome+'</div></div>'    +'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Cargo</div><div style="font-size:14px">'+f.cargo+'</div></div>'    +(f.cpf?'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">CPF</div><div style="font-size:13px">'+f.cpf+'</div></div>':'')    +'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Valor/hora</div><div style="font-size:13px;font-family:monospace">R$ '+parseFloat(f.vHora||0).toFixed(2).replace('.',',')+'</div></div>'    +'</div>'    +'<table><thead><tr><th>Data</th><th>Período</th><th>Horário</th><th style="text-align:right">Valor</th><th style="text-align:center">Pago</th></tr></thead>'    +'<tbody>'+rows+'<tr class="total-row"><td colspan="3" style="padding:7px 8px;font-size:13px">Total Trabalhado</td><td style="padding:7px 8px;text-align:right;font-family:monospace">R$ '+parseFloat(totalBruto).toFixed(2).replace('.',',')+'</td><td></td></tr>'    +(adRows?adRows+'<tr class="deduct-row"><td colspan="3" style="padding:7px 8px;font-size:13px;color:#ef4444">Total Adiantamentos</td><td style="padding:7px 8px;text-align:right;font-family:monospace;color:#ef4444">– R$ '+parseFloat(totalAdiant).toFixed(2).replace('.',',')+'</td><td></td></tr>':'')    +'<tr class="net-row"><td colspan="3" style="padding:10px 8px">TOTAL LÍQUIDO A PAGAR</td><td colspan="2" style="padding:10px 8px;text-align:right;font-size:18px;font-family:monospace">R$ '+parseFloat(totalLiq).toFixed(2).replace('.',',')+'</td></tr>'    +'</tbody></table>'    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:30px;padding-top:16px;border-top:1px solid #e5e7eb">'    +'<div><div style="font-size:11px;color:#6b7280;margin-bottom:20px">Assinatura do Funcionário</div><div style="border-top:1px solid #374151;padding-top:4px;font-size:11px;color:#6b7280">'+f.nome+'</div></div>'    +'<div><div style="font-size:11px;color:#6b7280;margin-bottom:20px">Assinatura do Empregador</div><div style="border-top:1px solid #374151;padding-top:4px;font-size:11px;color:#6b7280">'+(emp.nome||'BioVale')+'</div></div>'    +'</div>'    +'<div style="text-align:center;font-size:10px;color:#9ca3af;margin-top:16px">Emitido em '+new Date().toLocaleDateString("pt-BR")+' • '+((emp.nome)||"BioVale")+'</div>'    +'<div class="noprint" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#15803d;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;cursor:pointer;font-weight:700">🖨️ Imprimir</button></div>'    +'<'+'script>setTimeout(function(){window.print();},500);<\/script></body></html>';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Holerite '+f.nome+'</title>'    +'<style>body{font-family:Arial,sans-serif;padding:30px;max-width:680px;margin:0 auto;color:#111}h2{margin:0}table{width:100%;border-collapse:collapse}th{background:#15803d;color:#fff;padding:7px 8px;font-size:11px;text-align:left;text-transform:uppercase;letter-spacing:.5px}.total-row{background:#f0fdf4;font-weight:700}.deduct-row{background:#fef2f2}.net-row{background:#1e3a2f;color:#fff;font-size:15px;font-weight:700}@media print{.noprint{display:none}}</style>'    +'</head><body>'    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #15803d;padding-bottom:14px;margin-bottom:18px">'    +'<div><h2 style="color:#15803d">HOLERITE</h2><div style="font-size:13px;color:#666;margin-top:4px">'+mesLabel+'</div></div>'    +'<div style="text-align:right"><div style="font-size:15px;font-weight:700">'+(emp.nome||'BioVale')+'</div>'+(emp.cnpj?'<div style="font-size:11px;color:#666">CNPJ: '+emp.cnpj+'</div>':'')+'</div>'    +'</div>'    +'<div style="background:#f9fafb;border-radius:8px;padding:12px 16px;margin-bottom:18px;display:grid;grid-template-columns:1fr 1fr;gap:8px">'    +'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Funcionário</div><div style="font-size:15px;font-weight:700">'+f.nome+'</div></div>'    +'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Cargo</div><div style="font-size:14px">'+f.cargo+'</div></div>'    +(f.cpf?'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">CPF</div><div style="font-size:13px">'+f.cpf+'</div></div>':'')    +'<div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Valor/hora</div><div style="font-size:13px;font-family:monospace">R$ '+parseFloat(f.vHora||0).toFixed(2).replace('.',',')+'</div></div>'    +'</div>'    +'<table><thead><tr><th>Data</th><th>Período</th><th>Horário</th><th style="text-align:right">Valor</th><th style="text-align:center">Pago</th></tr></thead>'    +'<tbody>'+rows+'<tr class="total-row"><td colspan="3" style="padding:7px 8px;font-size:13px">Total Trabalhado</td><td style="padding:7px 8px;text-align:right;font-family:monospace">R$ '+parseFloat(totalBruto).toFixed(2).replace('.',',')+'</td><td></td></tr>'    +(adRows?adRows+'<tr class="deduct-row"><td colspan="3" style="padding:7px 8px;font-size:13px;color:#ef4444">Total Adiantamentos</td><td style="padding:7px 8px;text-align:right;font-family:monospace;color:#ef4444">– R$ '+parseFloat(totalAdiant).toFixed(2).replace('.',',')+'</td><td></td></tr>':'')    +'<tr class="net-row"><td colspan="3" style="padding:10px 8px">TOTAL LÍQUIDO A PAGAR</td><td colspan="2" style="padding:10px 8px;text-align:right;font-size:18px;font-family:monospace">R$ '+parseFloat(totalLiq).toFixed(2).replace('.',',')+'</td></tr>'    +'</tbody></table>'    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:30px;padding-top:16px;border-top:1px solid #e5e7eb">'    +'<div><div style="font-size:11px;color:#6b7280;margin-bottom:20px">Assinatura do Funcionário</div><div style="border-top:1px solid #374151;padding-top:4px;font-size:11px;color:#6b7280">'+f.nome+'</div></div>'    +'<div><div style="font-size:11px;color:#6b7280;margin-bottom:20px">Assinatura do Empregador</div><div style="border-top:1px solid #374151;padding-top:4px;font-size:11px;color:#6b7280">'+(emp.nome||'BioVale')+'</div></div>'    +'</div>'    +'<div style="text-align:center;font-size:10px;color:#9ca3af;margin-top:16px">Emitido em '+new Date().toLocaleDateString("pt-BR")+' • '+((emp.nome)||"BioVale")+'</div>'    +'<div class="noprint" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#15803d;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;cursor:pointer;font-weight:700">🖨️ Imprimir</button></div>'    +'</body></html>';
   _printHTML(html);
 }
 
