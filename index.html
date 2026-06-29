@@ -1438,8 +1438,20 @@ function _applySnap(s){
   if(s.revendaStates!==undefined)DB.revendaStates=s.revendaStates;
   if(s.entradas)DB.entradas=s.entradas;
   if(s.gerarTabsCustom!==undefined)DB.gerarTabsCustom=s.gerarTabsCustom;
-  if(s.pclCatsCustom!==undefined){DB.pclCatsCustom=s.pclCatsCustom;_pclCatsCustom=s.pclCatsCustom;}
-  if(s.pclCatOrder!==undefined){DB.pclCatOrder=s.pclCatOrder;_pclCatOrder=s.pclCatOrder;}
+  if(s.pclCatsCustom!==undefined){
+    // Merge: preserva categorias locais não enviadas ainda se a nuvem não as tem
+    var _localCustom=_pclCatsCustom||{};
+    var _cloudCustom=s.pclCatsCustom||{};
+    // Une os dois — nuvem tem prioridade para chaves existentes, local preserva as novas
+    var _merged=Object.assign({},_localCustom,_cloudCustom);
+    DB.pclCatsCustom=_merged;_pclCatsCustom=_merged;
+  }
+  if(s.pclCatOrder!==undefined){
+    // Se a nuvem tem uma ordem definida usa ela; se não, preserva a local
+    if(s.pclCatOrder&&s.pclCatOrder.length>0){DB.pclCatOrder=s.pclCatOrder;_pclCatOrder=s.pclCatOrder;}
+    else if(_pclCatOrder&&_pclCatOrder.length>0){DB.pclCatOrder=_pclCatOrder;}
+    else{DB.pclCatOrder=s.pclCatOrder||[];_pclCatOrder=s.pclCatOrder||[];}
+  }
   if(s.atendHistLS)atendHist=s.atendHistLS;
   if(s.pesagensEmAberto)DB.pesagensEmAberto=s.pesagensEmAberto;
   if(s.transf)DB.transf=s.transf;
@@ -10733,9 +10745,9 @@ function _buildColForm(c){
   var statusO='';var stats=['Agendada','Confirmada','Em Rota','Coletada','Pendente','Cancelada'];
   for(var i=0;i<stats.length;i++)statusO+='<option'+(c&&c.status===stats[i]?' selected':'')+'>'+stats[i]+'</option>';
   var daVal='';if(c&&c.data){try{var pts=c.data.split('/');daVal=pts[2]+'-'+pts[1]+'-'+pts[0];}catch(e){}}
-  // Clientes cadastrados para autocompletar
-  var cliOpts=DB.clientes&&DB.clientes.length
-    ?'<datalist id="nc-cli-list">'+DB.clientes.map(function(cl){return'<option value="'+cl.nome+'">';}).join('')+'</datalist>':'';;
+  // Fornecedores primeiro, depois clientes
+  var forn=(DB.clientes||[]).filter(function(cl){return cl.tipo==='fornecedor';}).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+  var clis=(DB.clientes||[]).filter(function(cl){return cl.tipo==='cliente';}).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
   // Bairros já usados para sugestão
   var bairrosUsados=[...new Set(DB.coletas.map(function(col){return col.bairro||'';}).filter(Boolean))];
   var bairroSugest=bairrosUsados.length?'<datalist id="bairros-list">'+bairrosUsados.map(function(b){return'<option value="'+b+'">';}).join('')+'</datalist>':'';
@@ -10745,12 +10757,40 @@ function _buildColForm(c){
     +'<option value="semanal"'+(c&&c.recorrencia==='semanal'?' selected':'')+'>Toda semana (mesmo dia)</option>'
     +'<option value="quinzenal"'+(c&&c.recorrencia==='quinzenal'?' selected':'')+'>A cada 15 dias</option>'
     +'<option value="mensal"'+(c&&c.recorrencia==='mensal'?' selected':'')+'>Todo mês (mesmo dia)</option>';
+  // Monta itens do dropdown
+  var dropRows='<div onclick="_agCliSel(\'\',\'\')" onmousedown="event.preventDefault()" style="padding:9px 13px;font-size:12px;color:var(--mt);cursor:pointer;border-bottom:1px solid var(--bd)">— Avulso (sem cadastro) —</div>';
+  if(forn.length){
+    dropRows+='<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;padding:5px 13px;background:var(--s2)">Fornecedores</div>';
+    forn.forEach(function(cl){
+      dropRows+='<div onclick="_agCliSel(\''+cl.nome.replace(/'/g,"\\'")+'\')" onmousedown="event.preventDefault()" data-nome="'+cl.nome.toLowerCase()+'" style="padding:9px 13px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--bd)'+(c&&c.cli===cl.nome?';background:rgba(34,197,94,.1);color:var(--gr);font-weight:600':'')+'">'
+        +cl.nome+(cl.tel?'<span style="font-size:10px;color:var(--mt);margin-left:8px">'+cl.tel+'</span>':'')
+        +(c&&c.cli===cl.nome?' ✓':'')+'</div>';
+    });
+  }
+  if(clis.length){
+    dropRows+='<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;padding:5px 13px;background:var(--s2)">Clientes</div>';
+    clis.forEach(function(cl){
+      dropRows+='<div onclick="_agCliSel(\''+cl.nome.replace(/'/g,"\\'")+'\')" onmousedown="event.preventDefault()" data-nome="'+cl.nome.toLowerCase()+'" style="padding:9px 13px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--bd)'+(c&&c.cli===cl.nome?';background:rgba(34,197,94,.1);color:var(--gr);font-weight:600':'')+'">'
+        +cl.nome+(c&&c.cli===cl.nome?' ✓':'')+'</div>';
+    });
+  }
+  if(!forn.length&&!clis.length){
+    dropRows+='<div style="padding:12px 13px;font-size:12px;color:var(--mt)">Nenhum cadastrado. Use o + para adicionar.</div>';
+  }
   return '<div class="mf">'
-    +cliOpts+bairroSugest
-    // Cliente com autocompletar
-    +'<div class="fld"><label>Cliente *</label>'
-    +'<input class="inp" id="nc-cl" list="nc-cli-list" value="'+(c?c.cli:'')+'" placeholder="Digite ou selecione..." oninput="_agAutoFillCli(this.value)">'
-    +'</div>'
+    +bairroSugest
+    // Dropdown pesquisável de fornecedor/cliente
+    +'<div class="fld"><label>Fornecedor / Cliente *</label>'
+    +'<div style="display:flex;gap:6px">'
+    +'<div style="position:relative;flex:1" id="ag-cli-wrap">'
+    +'<input class="inp" id="nc-cl" value="'+(c?c.cli:'')+'" placeholder="Toque para ver a lista..." autocomplete="off"'
+    +' onfocus="_agCliAbrir()" onblur="setTimeout(function(){_agCliFechar();},200)"'
+    +' oninput="_agCliFiltrar(this.value)">'
+    +'<div id="ag-cli-drop" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:999;background:var(--s1);border:1px solid var(--bd);border-radius:0 0 var(--r) var(--r);max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.3)">'
+    +dropRows
+    +'</div></div>'
+    +'<button type="button" onclick="_agNovoFornecedor()" title="Cadastrar novo fornecedor" style="background:var(--grb);border:1px solid rgba(34,197,94,.3);color:var(--gr);border-radius:var(--r);padding:0 12px;font-size:18px;cursor:pointer;flex-shrink:0">+</button>'
+    +'</div></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Telefone</label><input class="inp" id="nc-te" value="'+(c&&c.tel?c.tel:'')+'" placeholder="(31) 99999-0000"></div>'
     +'<div class="fld"><label>Status</label><select class="inp" id="nc-st">'+statusO+'</select></div>'
@@ -10774,6 +10814,83 @@ function _buildColForm(c){
     +'<div class="fld"><label>Obs</label><textarea class="inp" id="nc-ob" rows="2">'+(c&&c.obs?c.obs:'')+'</textarea></div>';
 }
 
+// Abre modal rápido para cadastrar novo fornecedor direto da agenda
+function _agNovoFornecedor(){
+  var tabsForn=DB.tabelas.filter(function(t){return t.tipo==='compra';});
+  var tabOpts='<option value="">— Nenhuma (Padrão) —</option>'+tabsForn.map(function(t){return'<option value="'+t.id+'">'+t.nome+'</option>';}).join('');
+  openM('+ Novo Fornecedor','<div class="mf">'
+    +'<div class="fld"><label>Nome *</label><input class="inp" id="agf-nome" placeholder="Nome completo ou empresa"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Telefone</label><input class="inp" id="agf-tel" placeholder="(31) 99999-0000" inputmode="tel"></div>'
+    +'<div class="fld"><label>Tabela de preços</label><select class="inp" id="agf-tab">'+tabOpts+'</select></div>'
+    +'</div>'
+    +'<div class="fld"><label>Endereço</label><input class="inp" id="agf-end" placeholder="Rua, número, cidade"></div>'
+    +'<div class="brow">'
+    +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
+    +'<button class="btn" onclick="_agSalvarFornecedor()">Salvar e Selecionar</button>'
+    +'</div></div>',400);
+  setTimeout(function(){var n=document.getElementById('agf-nome');if(n)n.focus();},80);
+}
+
+function _agSalvarFornecedor(){
+  var nome=(document.getElementById('agf-nome').value||'').trim();
+  if(!nome){alert('Digite o nome do fornecedor.');return;}
+  var tel=document.getElementById('agf-tel').value||'';
+  var end=document.getElementById('agf-end').value||'';
+  var tabId=document.getElementById('agf-tab').value||'';
+  // Verifica se já existe
+  var existe=DB.clientes.find(function(c){return c.nome.toLowerCase()===nome.toLowerCase();});
+  if(existe){alert('Já existe um cadastro com este nome.');return;}
+  DB.clientes.push({id:nid(),tipo:'fornecedor',nome:nome,tel:tel,end:end,tabId:tabId,obs:''});
+  autoSave();
+  closeM();
+  // Preenche o campo de fornecedor na agenda com o nome recém-cadastrado
+  setTimeout(function(){
+    var inp=document.getElementById('nc-cl');
+    var te=document.getElementById('nc-te');
+    var en=document.getElementById('nc-en');
+    if(inp)inp.value=nome;
+    if(te&&tel)te.value=tel;
+    if(en&&end)en.value=end;
+  },100);
+  alert('Fornecedor "'+nome+'" cadastrado e selecionado!');
+}
+
+function _agCliAbrir(){
+  var d=document.getElementById('ag-cli-drop');
+  if(d)d.style.display='block';
+}
+function _agCliFechar(){
+  var d=document.getElementById('ag-cli-drop');
+  if(d)d.style.display='none';
+}
+function _agCliFiltrar(q){
+  var d=document.getElementById('ag-cli-drop');
+  if(!d)return;
+  d.style.display='block';
+  var ql=q.toLowerCase();
+  var items=d.querySelectorAll('[data-nome]');
+  items.forEach(function(el){
+    el.style.display=(!ql||el.getAttribute('data-nome').indexOf(ql)>=0)?'':'none';
+  });
+  // Esconde headers de grupo se não tiver itens visíveis
+  var headers=d.querySelectorAll('div[style*="letter-spacing"]');
+  headers.forEach(function(h){
+    var next=h.nextSibling;var tem=false;
+    while(next&&next.getAttribute&&next.getAttribute('data-nome')!==null){
+      if(next.style.display!=='none')tem=true;
+      next=next.nextSibling;
+    }
+    h.style.display=tem?'':'none';
+  });
+}
+function _agCliSel(nome){
+  var inp=document.getElementById('nc-cl');
+  if(inp)inp.value=nome;
+  _agCliFechar();
+  if(nome)_agAutoFillCli(nome);
+}
+
 // Preenche telefone e endereço automaticamente ao selecionar um cliente cadastrado
 function _agAutoFillCli(nome){
   if(!nome||!DB.clientes)return;
@@ -10784,14 +10901,20 @@ function _agAutoFillCli(nome){
   if(!cli)return;
   var te=document.getElementById('nc-te');
   var en=document.getElementById('nc-en');
+  var ba=document.getElementById('nc-bairro');
+  // Telefone
   if(te&&!te.value&&cli.tel)te.value=cli.tel;
+  // Endereço — monta endereço completo a partir dos campos separados
   if(en&&!en.value){
-    var end='';
-    if(cli.logradouro)end+=cli.logradouro;
-    if(cli.numero)end+=(end?', ':'')+cli.numero;
-    if(cli.bairro)end+=(end?', ':'')+cli.bairro;
-    if(end)en.value=end;
+    var endCompleto='';
+    if(cli.end)endCompleto+=cli.end;
+    if(cli.num)endCompleto+=(endCompleto?', ':'')+cli.num;
+    if(cli.cidade)endCompleto+=(endCompleto?', ':'')+cli.cidade;
+    if(cli.uf)endCompleto+=(endCompleto?' - ':'')+cli.uf;
+    if(endCompleto)en.value=endCompleto;
   }
+  // Bairro
+  if(ba&&!ba.value&&cli.bairro)ba.value=cli.bairro;
 }
 
 
@@ -11937,10 +12060,13 @@ function pgClis(){
       +'<button onclick="mEditCli('+dbIdx+')" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer">&#9998;</button>'
       +'<button onclick="delCli('+dbIdx+')" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer">&#128465;</button>'
       +'</div></div>'
+      +(c.contato?'<div style="font-size:11px;color:var(--mt);margin-bottom:3px">&#128100; Contato: <span style="color:var(--tx);font-weight:600">'+c.contato+'</span></div>':'')
       +(c.email?'<div style="font-size:11px;color:var(--mt);margin-bottom:3px">&#128140; '+c.email+'</div>':'')
       +(c.pix?'<div style="font-size:11px;color:var(--mt);margin-bottom:3px">&#128176; PIX: <span style="color:var(--gr);font-weight:600">'+c.pix+'</span></div>':'')
       +(c.cnpj?'<div style="font-size:11px;color:var(--mt);margin-bottom:3px">&#128196; '+c.cnpj+'</div>':'')
-      +(c.end?'<div style="font-size:11px;color:var(--mt);margin-bottom:3px">&#128205; '+c.end+'</div>':'')
+      +((c.end||c.bairro||c.cidade)?'<div style="font-size:11px;color:var(--mt);margin-bottom:3px">&#128205; '
+        +[c.end+(c.num?', '+c.num:''),c.bairro,(c.cidade?(c.cidade+(c.uf?' - '+c.uf:'')):c.uf)].filter(Boolean).join(', ')
+        +'</div>':'')
       +(c.obs?'<div style="font-size:11px;color:var(--mt);margin-bottom:7px">&#128172; '+c.obs+'</div>':'')
       +'<div style="background:var(--bg);border-radius:6px;padding:5px 9px;font-size:11px"><span style="color:var(--mt)">Tabela: </span><span style="color:var(--or);font-weight:600">'+(t?t.nome:'--')+'</span></div>'
       +'<div class="brow"><button class="btnO bOb" style="flex:1;font-size:12px" onclick="mHistCli('+dbIdx+')">&#128203; Historico</button>'
@@ -12096,20 +12222,76 @@ function _buildCliForm(c,tipo){
   }
   var labelTab=tipoForm==='cliente'?'Tabela de Venda (opcional)':'Tabela de Compra (opcional)';
   return '<div class="mf">'
-    +'<div class="fld"><label>Nome *</label><input class="inp" id="nc2-n" value="'+(c?c.nome:'')+'" placeholder="Nome completo"></div>'
+    +'<div class="fld"><label>Nome *</label><input class="inp" id="nc2-n" value="'+(c?c.nome:'')+'" placeholder="Nome completo ou empresa"></div>'
+    +'<div class="fld"><label>Contato (pessoa com quem fala)</label><input class="inp" id="nc2-contato" value="'+(c&&c.contato?c.contato:'')+'" placeholder="Ex: João, Maria..."></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>Telefone (opcional)</label><input class="inp" id="nc2-t" value="'+(c&&c.tel?c.tel:'')+'" placeholder="(11) 99999-0000"></div>'
-    +'<div class="fld"><label>E-mail (opcional)</label><input class="inp" id="nc2-e" value="'+(c&&c.email?c.email:'')+'" placeholder="email@exemplo.com"></div>'
+    +'<div class="fld"><label>Telefone</label><input class="inp" id="nc2-t" value="'+(c&&c.tel?c.tel:'')+'" placeholder="(11) 99999-0000"></div>'
+    +'<div class="fld"><label>E-mail</label><input class="inp" id="nc2-e" value="'+(c&&c.email?c.email:'')+'" placeholder="email@exemplo.com"></div>'
     +'</div>'
-    +'<div class="fld"><label>Chave PIX (opcional)</label><input class="inp" id="nc2-pix" value="'+(c&&c.pix?c.pix:'')+'" placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória"></div>'
+    +'<div class="fld"><label>Chave PIX</label><input class="inp" id="nc2-pix" value="'+(c&&c.pix?c.pix:'')+'" placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória"></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>CNPJ/CPF (opcional)</label><input class="inp" id="nc2-cnpj" value="'+(c&&c.cnpj?c.cnpj:'')+'" placeholder="00.000.000/0001-00"></div>'
+    +'<div class="fld"><label>CNPJ/CPF</label><input class="inp" id="nc2-cnpj" value="'+(c&&c.cnpj?c.cnpj:'')+'" placeholder="00.000.000/0001-00"></div>'
     +'<div class="fld"><label>'+labelTab+'</label><select class="inp" id="nc2-tb">'+tO+'</select></div>'
     +'</div>'
     +(tabelasFiltradas.length===0?'<div class="al aly" style="font-size:11px">&#9888; Nenhuma tabela de '+tipoTabEsperado+' cadastrada. Crie em Tabelas primeiro.</div>':'')
-    +'<div class="fld"><label>Endereco (opcional)</label><input class="inp" id="nc2-end" value="'+(c&&c.end?c.end:'')+'" placeholder="Rua, numero, cidade"></div>'
-    +'<div class="fld"><label>Obs (opcional)</label><textarea class="inp" id="nc2-o" rows="2" placeholder="Observacoes...">'+(c&&c.obs?c.obs:'')+'</textarea></div>';
+    // Endereço separado
+    // Endereço separado com CEP
+    +'<div class="fld"><label>CEP</label>'
+    +'<div style="display:flex;gap:6px">'
+    +'<input class="inp" id="nc2-cep" value="'+(c&&c.cep?c.cep:'')+'" placeholder="00000-000" inputmode="numeric" maxlength="9" oninput="_buscarCEP(this.value)" style="flex:1">'
+    +'<div id="nc2-cep-status" style="display:flex;align-items:center;font-size:12px;color:var(--mt);flex-shrink:0;min-width:20px"></div>'
+    +'</div></div>'
+    +'<div style="display:grid;grid-template-columns:1fr auto;gap:9px">'
+    +'<div class="fld"><label>Logradouro (Rua / Av.)</label><input class="inp" id="nc2-end" value="'+(c&&c.end?c.end:'')+'" placeholder="Ex: Rua das Flores"></div>'
+    +'<div class="fld"><label>Número</label><input class="inp" id="nc2-num" value="'+(c&&c.num?c.num:'')+'" placeholder="123" style="width:80px"></div>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Bairro</label><input class="inp" id="nc2-bairro" value="'+(c&&c.bairro?c.bairro:'')+'" placeholder="Centro"></div>'
+    +'<div class="fld"><label>Cidade</label><input class="inp" id="nc2-cidade" value="'+(c&&c.cidade?c.cidade:'')+'" placeholder="Ipatinga"></div>'
+    +'<div class="fld"><label>UF</label><input class="inp" id="nc2-uf" value="'+(c&&c.uf?c.uf:'')+'" placeholder="MG" maxlength="2" style="text-transform:uppercase"></div>'
+    +'</div>'
+    +'<div class="fld"><label>Obs</label><textarea class="inp" id="nc2-o" rows="2" placeholder="Observacoes...">'+(c&&c.obs?c.obs:'')+'</textarea></div>';
 }
+// Busca endereço pelo CEP via ViaCEP (gratuito, sem chave)
+var _cepTimer=null;
+function _buscarCEP(val){
+  // Formata CEP
+  var cep=val.replace(/\D/g,'');
+  var inp=document.getElementById('nc2-cep');
+  if(inp&&cep.length===8&&val.indexOf('-')<0)inp.value=cep.slice(0,5)+'-'+cep.slice(5);
+  var st=document.getElementById('nc2-cep-status');
+  if(cep.length<8){if(st)st.innerHTML='';return;}
+  if(cep.length!==8){if(st)st.innerHTML='';return;}
+  if(st)st.innerHTML='<span style="color:var(--or)">&#8987;</span>';
+  clearTimeout(_cepTimer);
+  _cepTimer=setTimeout(function(){
+    fetch('https://viacep.com.br/ws/'+cep+'/json/')
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d.erro){
+          if(st)st.innerHTML='<span style="color:var(--rd)" title="CEP não encontrado">&#10007;</span>';
+          return;
+        }
+        // Preenche os campos — só se estiverem vazios
+        var end=document.getElementById('nc2-end');
+        var ba=document.getElementById('nc2-bairro');
+        var ci=document.getElementById('nc2-cidade');
+        var uf=document.getElementById('nc2-uf');
+        if(end&&!end.value&&d.logradouro)end.value=d.logradouro;
+        if(ba&&!ba.value&&d.bairro)ba.value=d.bairro;
+        if(ci&&!ci.value&&d.localidade)ci.value=d.localidade;
+        if(uf&&!uf.value&&d.uf)uf.value=d.uf;
+        if(st)st.innerHTML='<span style="color:var(--gr)" title="CEP encontrado">&#10003;</span>';
+        // Foca no campo Número para digitar após o CEP preencher o endereço
+        var num=document.getElementById('nc2-num');
+        if(num)setTimeout(function(){num.focus();},100);
+      })
+      .catch(function(){
+        if(st)st.innerHTML='<span style="color:var(--rd)" title="Erro ao buscar CEP">&#10007;</span>';
+      });
+  },600);
+}
+
 function mNovoCli(){
   var tipo=cTab==='c'?'cliente':'fornecedor';
   openM('Novo '+(tipo==='cliente'?'Cliente':'Fornecedor'),
@@ -12127,7 +12309,7 @@ function saveCli(tipo){
     for(var _ti=0;_ti<DB.tabelas.length;_ti++){if(String(DB.tabelas[_ti].id)===String(tbVal)){tabIdSalvo=DB.tabelas[_ti].id;break;}}
     if(tabIdSalvo===null)tabIdSalvo=isNaN(Number(tbVal))?tbVal:Number(tbVal);
   }
-  DB.clientes.push({id:nid(),tipo:tipo,nome:n,tel:document.getElementById('nc2-t').value,email:document.getElementById('nc2-e').value,pix:(document.getElementById('nc2-pix')&&document.getElementById('nc2-pix').value)||'',cnpj:document.getElementById('nc2-cnpj').value,end:document.getElementById('nc2-end').value,tabId:tabIdSalvo,obs:document.getElementById('nc2-o').value});
+  DB.clientes.push({id:nid(),tipo:tipo,nome:n,contato:document.getElementById('nc2-contato').value,tel:document.getElementById('nc2-t').value,email:document.getElementById('nc2-e').value,pix:(document.getElementById('nc2-pix')&&document.getElementById('nc2-pix').value)||'',cnpj:document.getElementById('nc2-cnpj').value,cep:document.getElementById('nc2-cep').value,end:document.getElementById('nc2-end').value,num:document.getElementById('nc2-num').value,bairro:document.getElementById('nc2-bairro').value,cidade:document.getElementById('nc2-cidade').value,uf:(document.getElementById('nc2-uf').value||'').toUpperCase(),tabId:tabIdSalvo,obs:document.getElementById('nc2-o').value});
   saveDB();closeM();go('clientes');
 }
 function mEditCli(idx){
@@ -12151,9 +12333,12 @@ function saveEditCli(idx){
     if(tabIdSalvo===null)tabIdSalvo=isNaN(Number(tbVal))?tbVal:Number(tbVal);
   }
   var c=DB.clientes[idx];
-  c.nome=n;c.tel=document.getElementById('nc2-t').value;c.email=document.getElementById('nc2-e').value;
+  c.nome=n;c.contato=document.getElementById('nc2-contato').value;c.tel=document.getElementById('nc2-t').value;c.email=document.getElementById('nc2-e').value;
   c.pix=(document.getElementById('nc2-pix')&&document.getElementById('nc2-pix').value)||'';
-  c.cnpj=document.getElementById('nc2-cnpj').value;c.end=document.getElementById('nc2-end').value;
+  c.cnpj=document.getElementById('nc2-cnpj').value;c.cep=document.getElementById('nc2-cep').value;
+  c.end=document.getElementById('nc2-end').value;c.num=document.getElementById('nc2-num').value;
+  c.bairro=document.getElementById('nc2-bairro').value;c.cidade=document.getElementById('nc2-cidade').value;
+  c.uf=(document.getElementById('nc2-uf').value||'').toUpperCase();
   c.tabId=tabIdSalvo;c.obs=document.getElementById('nc2-o').value;
   saveDB();closeM();go('clientes');
 }
@@ -13039,7 +13224,7 @@ async function _imtAiPreview(input){
   var file=input.files[0];if(!file)return;
   var status=document.getElementById('imt-ai-status');
   var result=document.getElementById('imt-ai-result');
-  status.innerHTML='<div class="al alb" style="font-size:12px">⏳ Enviando para o Gemini AI... aguarde.</div>';
+  status.innerHTML='<div class="al alb" style="font-size:12px">⏳ Enviando para o Claude AI... aguarde.</div>';
   result.className='H';
   document.getElementById('imt-btn-salvar').disabled=true;
   _imtAiItens=[];
@@ -13052,16 +13237,21 @@ async function _imtAiPreview(input){
     });
     var mimeType=file.type||'image/jpeg';
     if(file.name.toLowerCase().endsWith('.pdf'))mimeType='application/pdf';
-    var key=DB.geminiKey||CFG.sistema.geminiKey||'';
-    if(!key){status.innerHTML='<div class="al alr">Chave do Gemini não configurada!</div>';return;}
+    var key=CFG.sistema.anthropicKey||'';
+    if(!key){status.innerHTML='<div class="al alr">Chave API Anthropic não configurada! Vá em Configurações → Inteligência Artificial.</div>';return;}
     var prompt='Você é um extrator de dados de tabelas de preços de materiais recicláveis. Analise este arquivo e extraia TODOS os produtos e seus preços. Retorne APENAS um JSON válido neste formato, sem markdown, sem explicação:\n{"itens":[{"nome":"Nome do produto","preco":0.00}]}\nSe um preço estiver em formato brasileiro (vírgula), converta para número decimal com ponto. Extraia todos os itens visíveis.';
-    var resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+key,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:mimeType,data:b64}},{text:prompt}]}],generationConfig:{temperature:0,maxOutputTokens:2048}})
+    var msgContent=mimeType==='application/pdf'
+      ?[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}]
+      :[{type:'image',source:{type:'base64',media_type:mimeType,data:b64}},{type:'text',text:prompt}];
+    var resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:2048,messages:[{role:'user',content:msgContent}]})
     });
     if(!resp.ok){var err=await resp.json();status.innerHTML='<div class="al alr">Erro: '+(err.error&&err.error.message?err.error.message:resp.status)+'</div>';return;}
     var data=await resp.json();
-    var text=data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts[0]?data.candidates[0].content.parts[0].text:'';
+    if(data.error)throw new Error('API: '+(data.error.message||JSON.stringify(data.error)));
+    var text=data.content&&data.content[0]?data.content[0].text:'';
     text=text.replace(/```json|```/g,'').trim();
     var parsed=JSON.parse(text);
     _imtAiItens=parsed.itens||[];
@@ -16132,21 +16322,20 @@ function _pclLoadCatsCustom(){
 function _pclSaveCatsCustom(){
   DB.pclCatsCustom=_pclCatsCustom;
   try{localStorage.setItem(_PCL_CUSTOM_KEY,JSON.stringify(_pclCatsCustom));}catch(e){}
-  autoSave(); // sincroniza com a nuvem
+  saveDB();
 }
 function _pclLoadOrder(){
-  // Prioridade: DB (nuvem) > localStorage (migração)
   if(DB.pclCatOrder && Array.isArray(DB.pclCatOrder)){
     _pclCatOrder=DB.pclCatOrder;
   } else {
     try{var r=localStorage.getItem(_PCL_ORDER_KEY);_pclCatOrder=r?JSON.parse(r):[];}catch(e){_pclCatOrder=[];}
-    DB.pclCatOrder=_pclCatOrder; // migra para o DB
+    DB.pclCatOrder=_pclCatOrder;
   }
 }
 function _pclSaveOrder(){
   DB.pclCatOrder=_pclCatOrder;
   try{localStorage.setItem(_PCL_ORDER_KEY,JSON.stringify(_pclCatOrder));}catch(e){}
-  autoSave(); // sincroniza com a nuvem
+  saveDB();
 }
 function _pclGetCat(id){
   // custom override takes priority (includes edited defaults)
