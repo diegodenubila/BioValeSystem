@@ -12472,7 +12472,7 @@ function _gAddCustomModal(){
     '<div class="mf">'
     +'<div class="al aly" style="margin-bottom:10px;font-size:12px">Crie uma tabela com qualquer cor da paleta, para usar com clientes específicos. As 5 tabelas padrão não são alteradas.</div>'
     +'<div class="fld"><label>Nome da Tabela</label><input class="inp" id="gct-nome" placeholder="Ex: Roxa, VIP, Atacado..." maxlength="20"></div>'
-    +'<div class="fld"><label>Desconto padrão (% do preço de venda)</label><input class="inp" type="number" inputmode="decimal" id="gct-val" value="20"></div>'
+    +'<div class="fld"><label>Lucro padrão (% do preço de venda)</label><input class="inp" type="number" inputmode="decimal" id="gct-val" value="20"></div>'
     +'<div class="fld">'+buildCorPicker('roxo','gct-cor')+'</div>'
     +'<div class="brow" style="margin-top:12px"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="_gSaveCustom()">Criar Tabela</button></div>'
     +'</div>',460);
@@ -12539,7 +12539,9 @@ function _gCalcPreco(tabIdx, pId, precoVenda){
     val=parseFloat(t.valGeral)||0;
   }
   if(tipoVal==='pct'){
-    return precoVenda*(1-val/100);
+    // Lucro % sobre o custo (preço de compra): venda = compra * (1 + lucro/100)
+    // Logo: compra = venda / (1 + lucro/100). Permite 100%+ de lucro sem zerar o preço.
+    return precoVenda/(1+val/100);
   } else {
     return precoVenda-val;
   }
@@ -12673,13 +12675,13 @@ function buildGerarTabelas(){
         if(precoNovo<0)precoNovo=0;
         var diff=precoAtual!==null?precoNovo-precoAtual:null;
         var diffColor=diff===null?'var(--mt)':diff>0?'#86efac':diff<0?'#fca5a5':'var(--mt)';
-        var pctAtual=precoAtual!==null&&bprod.preco>0?((1-(precoAtual/bprod.preco))*100):null;
-        var pctNovo=bprod.preco>0?((1-(precoNovo/bprod.preco))*100):null;
+        var pctAtual=precoAtual!==null&&precoAtual>0?(((bprod.preco-precoAtual)/precoAtual)*100):null;
+        var pctNovo=precoNovo>0?(((bprod.preco-precoNovo)/precoNovo)*100):null;
         var rowH='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:6px;align-items:center;padding:5px 8px;background:rgba(0,0,0,.15);border-radius:6px">'
           +'<span style="font-size:12px;color:var(--tx)">'+bprod.ic+' '+bprod.nome+'</span>'
-          +(precoAtual!==null?'<span style="font-size:11px;font-family:monospace;color:var(--mt)">Atual: R$ '+precoAtual.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+(pctAtual!==null?' (−'+pctAtual.toFixed(1)+'%)':'')+'</span>':'<span style="font-size:11px;color:var(--mt)">— não estava</span>')
+          +(precoAtual!==null?'<span style="font-size:11px;font-family:monospace;color:var(--mt)">Atual: R$ '+precoAtual.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+(pctAtual!==null?' (+'+pctAtual.toFixed(1)+'%)':'')+'</span>':'<span style="font-size:11px;color:var(--mt)">— não estava</span>')
           +'<span style="font-size:13px;color:var(--mt)">→</span>'
-          +'<span style="font-size:11px;font-family:monospace;color:#86efac">Novo: R$ '+precoNovo.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+(pctNovo!==null?' (−'+pctNovo.toFixed(1)+'%)':'')+'</span>'
+          +'<span style="font-size:11px;font-family:monospace;color:#86efac">Novo: R$ '+precoNovo.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+(pctNovo!==null?' (+'+pctNovo.toFixed(1)+'%)':'')+'</span>'
           +(diff!==null?'<span style="font-size:11px;font-family:monospace;color:'+diffColor+';font-weight:700">'+(diff>=0?'+':'')+diff.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'</span>':'<span></span>')
           +'</div>';
         if(bi<ALIM)atualRowsVis+=rowH;
@@ -12711,9 +12713,9 @@ function buildGerarTabelas(){
         // Preço atual na tabela existente (por produto)
         var precoAtualProd=null;
         if(jaExiste){for(var ki=0;ki<tabExistObj.itens.length;ki++){if(tabExistObj.itens[ki].pId===bprod.pId){precoAtualProd=tabExistObj.itens[ki].preco;break;}}}
-        var pctAtualProd=precoAtualProd!==null&&bprod.preco>0?((1-(precoAtualProd/bprod.preco))*100):null;
+        var pctAtualProd=precoAtualProd!==null&&precoAtualProd>0?(((bprod.preco-precoAtualProd)/precoAtualProd)*100):null;
         prodRows+='<div style="display:grid;grid-template-columns:1fr 80px 90px auto;gap:5px;align-items:center;background:rgba(0,0,0,.2);padding:6px 8px;border-radius:7px">'
-          +'<span style="font-size:12px;color:var(--tx)">'+bprod.ic+' '+bprod.nome+'<br><span style="color:var(--mt);font-size:10px">Venda: R$ '+bprod.preco.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+(jaExiste&&precoAtualProd!==null?' · Atual: R$ '+precoAtualProd.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+(pctAtualProd!==null?' (−'+pctAtualProd.toFixed(1)+'%)':''):'')+'</span></span>'
+          +'<span style="font-size:12px;color:var(--tx)">'+bprod.ic+' '+bprod.nome+'<br><span style="color:var(--mt);font-size:10px">Venda: R$ '+bprod.preco.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+(jaExiste&&precoAtualProd!==null?' · Atual: R$ '+precoAtualProd.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+(pctAtualProd!==null?' (+'+pctAtualProd.toFixed(1)+'%)':''):'')+'</span></span>'
           +'<select class="inp" style="padding:4px 6px;font-size:11px" onchange="_gSetProdVal(\''+cfg.key+'\','+bprod.pId+',\'tipo\',this.value)">'
           +'<option value="pct"'+(ppconf.tipo==='pct'?' selected':'')+'>%</option>'
           +'<option value="rs"'+(ppconf.tipo==='rs'?' selected':'')+'>R$</option>'
@@ -12732,10 +12734,10 @@ function buildGerarTabelas(){
       for(var bi2=0;bi2<base.length;bi2++){
         var pc=_gCalcPreco(ti,base[bi2].pId,base[bi2].preco);
         if(pc<0)pc=0;
-        avgLucro+=(base[bi2].preco-pc)/base[bi2].preco*100;
+        avgLucro+=pc>0?(base[bi2].preco-pc)/pc*100:0;
       }
       avgLucro=avgLucro/base.length;
-      margemInfo='<span style="font-size:11px;font-family:monospace;color:#86efac;margin-left:8px">≈ '+avgLucro.toFixed(1)+'% lucro médio</span>';
+      margemInfo='<span style="font-size:11px;font-family:monospace;color:#86efac;margin-left:8px">≈ '+avgLucro.toFixed(1)+'% lucro médio (sobre o custo)</span>';
     }
 
     tabCards+='<div style="background:var(--s2);border:2px solid '+(isAtivo?cfg.cor:'var(--bd)')+';border-radius:var(--r2);padding:12px;transition:border-color .2s,opacity .2s;opacity:'+(isAtivo?'1':'0.45')+'">'
@@ -12765,7 +12767,7 @@ function buildGerarTabelas(){
         +'</div>'
         +'<div style="display:flex;align-items:center;gap:6px;flex:1;min-width:120px">'
         +'<input class="inp" type="number" inputmode="decimal" style="width:90px;text-align:center;font-size:14px;font-weight:700" value="'+cfg.valGeral+'" onchange="_gSetValGeral(\''+cfg.key+'\',this.value)">'
-        +'<span style="font-size:13px;color:var(--mt)">'+(isTipoPct?'% de desconto':'R$ de desconto')+'</span>'
+        +'<span style="font-size:13px;color:var(--mt)">'+(isTipoPct?'% de lucro':'R$ de lucro/kg')+'</span>'
         +margemInfo
         +'</div></div>'
         +atualBlock
@@ -12775,7 +12777,7 @@ function buildGerarTabelas(){
 
   var secTabs='<div class="card" style="padding:14px;margin-bottom:10px">'
     +'<div class="stl" style="margin-bottom:10px"><div class="stb" style="background:var(--or)"></div><div class="stx" style="color:var(--or)">2. Configurar Tabelas</div></div>'
-    +'<div class="al aly" style="margin-bottom:10px;font-size:12px">Ative as tabelas que deseja gerar/atualizar e defina o desconto — em % do preço de venda ou valor fixo em R$/kg. Tabelas marcadas com ⚡ já existem e serão atualizadas.</div>'
+    +'<div class="al aly" style="margin-bottom:10px;font-size:12px">Ative as tabelas que deseja gerar/atualizar e defina o lucro — em % do preço de venda ou valor fixo em R$/kg. O preço de compra será calculado descontando esse lucro do preço de venda. Tabelas marcadas com ⚡ já existem e serão atualizadas.</div>'
     +'<div style="display:flex;flex-direction:column;gap:8px">'+tabCards+'</div>'
     +'<button class="btnO bOgr" style="width:100%;margin-top:10px;border-style:dashed" onclick="_gAddCustomModal()">&#10133; Nova Tabela Personalizada</button>'
     +'</div>';
