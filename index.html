@@ -15570,19 +15570,7 @@ window.addEventListener('DOMContentLoaded', function(){
   });
 });
 // ── CONFIGURAÇÕES IA ──────────────────────────────────────────────────────────
-function _cfgIA(){
-  return '<div class="card">'
-    +'<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd)">'
-    +'<div style="font-size:22px">&#129302;</div>'
-    +'<div><div style="font-size:14px;font-weight:700">Inteligencia Artificial</div>'
-    +'<div style="font-size:11px;color:var(--mt);margin-top:1px">Configure a chave da API Anthropic para o Classificador de Placas PCB</div></div></div>'
-    +'<div style="padding:16px;display:flex;flex-direction:column;gap:14px">'
-    +'<div class="fld"><label>Chave API Anthropic (para Classificador PCB)</label>'
-    +'<input class="inp" id="cfg-anthropic-key" type="password" placeholder="sk-ant-..." value="'+(CFG.sistema.anthropicKey||'')+'" style="font-family:monospace;letter-spacing:1px"></div>'
-    +'<div class="al alb" style="font-size:12px">&#128274; A chave fica salva apenas no seu navegador (localStorage). Nunca enviada para terceiros.</div>'
-    +'<button class="btn" onclick="_saveCfgIA()">Salvar Chave</button>'
-    +'</div></div>';
-}
+var _PCL_GLOSSARIO_PADRAO='CHIP 7 = Circuito integrado grande (corpo preto ou cinza, formato quadrado/retangular, muitos pinos metalicos nas laterais) que possui uma FAIXA/TRACO METALICO DOURADO em uma das pontas/bordas do encapsulamento. Sem essa faixa dourada, nao conta como chip 7, mesmo sendo um CI grande.\nMATERIAIS BONS (alto valor, contem ouro/paladio): chips e CIs em geral, conectores e sockets de qualquer tipo (RAM, processador, placa de video), filamentos/trilhas/contatos com banho dourado visivel (borda de pente de memoria, conector de placa de video, pinos de processador).\nMATERIAIS CONTAMINANTES (baixo valor, depreciam a placa): dissipadores de calor, transformadores, bobinas (aneis de ferrite ou cilindros enrolados), pecas de ferro, plasticos, capacitores, telas de LCD/display.\nRegra geral: "% de componentes bons" = proporcao da superficie da placa ocupada por chips/CIs/conectores/filamentos dourados, DESCONTANDO a area ocupada por dissipadores, transformadores, bobinas, ferro, plastico, capacitores e displays.';
 function _cfgIA(){
   return '<div class="card">'
     +'<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd)">'
@@ -15595,6 +15583,30 @@ function _cfgIA(){
     +'<div class="al alb" style="font-size:12px">&#128274; A chave fica salva apenas no seu navegador (localStorage). Nunca enviada para terceiros.</div>'
     +'<button class="btn" onclick="_saveCfgIA()">Salvar Chave</button>'
     +'</div></div>'
+    +'<div class="card" style="margin-top:12px">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd)">'
+    +'<div style="font-size:22px">&#128218;</div>'
+    +'<div><div style="font-size:14px;font-weight:700">Glossario Tecnico do Classificador PCB</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-top:1px">Enviado para a IA antes de analisar cada placa. Nao aparece na aba Manual.</div></div></div>'
+    +'<div style="padding:16px;display:flex;flex-direction:column;gap:12px">'
+    +'<div class="al alb" style="font-size:12px">Este texto ensina a IA a reconhecer detalhes tecnicos (ex: o que conta como "chip 7", quais materiais sao bons ou contaminantes). Edite livremente conforme aprender mais sobre as placas.</div>'
+    +'<textarea class="inp" id="cfg-pcl-glossario" rows="10" style="font-family:monospace;font-size:12px;line-height:1.5">'+(CFG.sistema.pclGlossario!==undefined?CFG.sistema.pclGlossario:_PCL_GLOSSARIO_PADRAO)+'</textarea>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button class="btn" onclick="_saveCfgPclGlossario()" style="flex:1">Salvar Glossario</button>'
+    +'<button class="btnO bOgr" onclick="_resetCfgPclGlossario()">Restaurar Padrao</button>'
+    +'</div></div></div>'
+    +'<div class="card" style="margin-top:12px">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd)">'
+    +'<div style="font-size:22px">&#128221;</div>'
+    +'<div><div style="font-size:14px;font-weight:700">Critérios Técnicos por Categoria</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-top:1px">Texto detalhado de cada categoria enviado para a IA — não aparece na aba Manual</div></div></div>'
+    +'<div style="padding:16px;display:flex;flex-direction:column;gap:10px">'
+    +'<div class="al alb" style="font-size:12px">Cada categoria do Manual tem um critério técnico mais detalhado, visível apenas para a IA. Edite aqui se quiser refinar a identificação de alguma categoria específica.</div>'
+    +_buildCfgPclCriteria()
+    +'<div style="display:flex;gap:8px;margin-top:6px">'
+    +'<button class="btn" onclick="_saveCfgPclCriteria()" style="flex:1">Salvar Critérios</button>'
+    +'<button class="btnO bOgr" onclick="_resetCfgPclCriteria()">Restaurar Todos</button>'
+    +'</div></div></div>'
     +'<div class="card" style="margin-top:12px">'
     +'<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd)">'
     +'<div style="font-size:22px">&#128196;</div>'
@@ -15611,6 +15623,55 @@ function _cfgIA(){
     +'<div style="background:#fff;border-radius:8px;padding:12px;text-align:center" id="cfg-bc-preview"></div>'
     +'<button class="btn" onclick="_saveCfgBarcode()">Salvar</button>'
     +'</div></div>';
+}
+function _buildCfgPclCriteria(){
+  var ativos=(CFG.sistema.pclCriteria&&Object.keys(CFG.sistema.pclCriteria).length>0)?CFG.sistema.pclCriteria:{};
+  var ids=Object.keys(PCL_CATS);
+  var rows='';
+  for(var i=0;i<ids.length;i++){
+    var cid=ids[i];
+    var cat=PCL_CATS[cid];
+    var val=ativos[cid]!==undefined?ativos[cid]:(_PCL_CRITERIA_PADRAO[cid]||'');
+    rows+='<div style="border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:6px">'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+      +'<span style="background:'+cat.color+';color:#000;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px">'+cat.badge+'</span>'
+      +'<span style="font-size:12px;font-weight:600">'+cat.label+'</span></div>'
+      +'<textarea class="inp" id="cfg-pclcrit-'+cid+'" rows="2" style="font-size:12px;line-height:1.4">'+val+'</textarea>'
+      +'</div>';
+  }
+  return '<div style="max-height:420px;overflow-y:auto;padding-right:4px">'+rows+'</div>';
+}
+function _saveCfgPclCriteria(){
+  var ids=Object.keys(PCL_CATS);
+  var novo={};
+  for(var i=0;i<ids.length;i++){
+    var el=document.getElementById('cfg-pclcrit-'+ids[i]);
+    if(el)novo[ids[i]]=el.value;
+  }
+  CFG.sistema.pclCriteria=novo;
+  _saveCFG();
+  var btn=event.target;var orig=btn.textContent;btn.textContent='✓ Salvo!';setTimeout(function(){btn.textContent=orig;},2000);
+}
+function _resetCfgPclCriteria(){
+  confirmar('Restaurar todos os critérios para o texto padrão? As suas edições serão perdidas.',function(){
+    CFG.sistema.pclCriteria={};
+    _saveCFG();
+    go('configuracoes','ia');
+  });
+}
+function _saveCfgPclGlossario(){
+  var t=document.getElementById('cfg-pcl-glossario');
+  if(!t)return;
+  CFG.sistema.pclGlossario=t.value;
+  _saveCFG();
+  var btn=event.target;var orig=btn.textContent;btn.textContent='✓ Salvo!';setTimeout(function(){btn.textContent=orig;},2000);
+}
+function _resetCfgPclGlossario(){
+  confirmar('Restaurar o glossário para o texto padrão? As suas edições serão perdidas.',function(){
+    CFG.sistema.pclGlossario=_PCL_GLOSSARIO_PADRAO;
+    _saveCFG();
+    go('configuracoes','ia');
+  });
 }
 function _saveCfgIA(){
   var k=document.getElementById('cfg-anthropic-key');
@@ -15695,46 +15756,98 @@ var _pclStream=null;
 var _pclCameraAtiva=false;
 
 var PCL_CATS={
-  telefonia_especial:{id:'telefonia_especial',label:'Telefonia Especial',color:'#FFD700',badge:'★ ESPECIAL',criteria:'2 processadores de louça com banho + acima de 10 chip 7',desc:'Placa de altíssimo valor. 2 processadores dourados com banho de ouro + mais de 10 chips tipo 7.'},
-  telefonia_ponteira:{id:'telefonia_ponteira',label:'Telefonia com Ponteira',color:'#FFA500',badge:'TELEF.+',criteria:'75–100% componentes bons + ponteira (borda de conexão)',desc:'Placa de telefonia com borda de conexão (ponteira). 75–100% de bons componentes.'},
-  telefonia:{id:'telefonia',label:'Telefonia',color:'#FF8C00',badge:'TELEF.',criteria:'75–100% componentes bons (CIs, chip 7, processador integrado) sem ponteira',desc:'Placa de telefonia sem ponteira. 75–100% de bons componentes.'},
-  leve_ponta:{id:'leve_ponta',label:'Leve com Ponta',color:'#4CAF50',badge:'LEVE+',criteria:'50–75% componentes bons + ponteira, pouco depreciador',desc:'Placa com 50–75% de bons componentes e ponteira.'},
-  leve:{id:'leve',label:'Leve',color:'#66BB6A',badge:'LEVE',criteria:'50–75% componentes bons',desc:'Placa com 50–75% de componentes bons.'},
-  intermediaria_mais:{id:'intermediaria_mais',label:'Intermediária Mais',color:'#26C6DA',badge:'INTERM.+',criteria:'Impressora com saída + chip 7 (sem chip 7 = intermediária)',desc:'Placas de impressora com saída E chip 7. Inclui Cisco e similares.'},
-  intermediaria:{id:'intermediaria',label:'Intermediária',color:'#42A5F5',badge:'INTERM.',criteria:'20–50% componentes bons (CIs, chip 7, processador)',desc:'Placa com 20–50% de bons componentes.'},
-  intermediaria_menos:{id:'intermediaria_menos',label:'Intermediária Menos',color:'#29B6F6',badge:'INTERM.-',criteria:'Modems, roteadores — componentes de baixa qualidade',desc:'Modems, roteadores e similares.'},
-  pesada_ponta:{id:'pesada_ponta',label:'Pesada com Ponta',color:'#EF5350',badge:'PESADA+',criteria:'Poucos bons, maioria depreciadores + ponteira',desc:'Placa com poucos bons componentes, predominância de depreciadores e ponteira.'},
-  pesada:{id:'pesada',label:'Pesada',color:'#E53935',badge:'PESADA',criteria:'Pouco componente bom, maioria depreciadores (bobinas, transformadores, relés)',desc:'Predominância de depreciadores: bobinas, transformadores, relés.'},
-  mae_a:{id:'mae_a',label:'Mãe A',color:'#AB47BC',badge:'MÃE A',criteria:'Soquete grande plástico (soquete 462, 370 ou 7)',desc:'Placa-mãe antiga com soquete grande de plástico.'},
-  mae_b:{id:'mae_b',label:'Mãe B',color:'#9C27B0',badge:'MÃE B',criteria:'2 chip 7, independente do soquete',desc:'Placa-mãe com 2 chips tipo 7.'},
-  mae_c:{id:'mae_c',label:'Mãe C',color:'#7B1FA2',badge:'MÃE C',criteria:'1 chip 7 + processador integrado',desc:'Placa-mãe com 1 chip 7 e processador integrado.'},
-  mae_d:{id:'mae_d',label:'Mãe D',color:'#6A1B9A',badge:'MÃE D',criteria:'1 ou 2 processadores integrados, sem chip 7',desc:'Placa-mãe moderna com processador(es) integrado(s).'},
-  mae_1chip7:{id:'mae_1chip7',label:'Mãe 1 Chip 7',color:'#4A148C',badge:'MÃE 1C7',criteria:'Placa menor sem soquete externo, só processadores integrados',desc:'Placa-mãe pequena sem soquete externo.'},
-  mae_notebook_a:{id:'mae_notebook_a',label:'Mãe Notebook A',color:'#00897B',badge:'NB-A',criteria:'Notebook com 2 chip 7',desc:'Placa-mãe de notebook com 2 chips tipo 7.'},
-  mae_notebook_b:{id:'mae_notebook_b',label:'Mãe Notebook B',color:'#00796B',badge:'NB-B',criteria:'Notebook com 1 chip 7 + processador integrado',desc:'Placa-mãe de notebook com 1 chip 7 e CPU soldada.'},
-  mae_notebook_c:{id:'mae_notebook_c',label:'Mãe Notebook C',color:'#00695C',badge:'NB-C',criteria:'Notebook com apenas processadores integrados (sem chip 7)',desc:'Placa-mãe de notebook moderna sem chip 7.'},
-  hd_completo:{id:'hd_completo',label:'HD (com placa atrás)',color:'#78909C',badge:'HD',criteria:'Hard disk completo com placa eletrônica na traseira',desc:'HD completo com placa de controle eletrônico.'},
-  placa_hd:{id:'placa_hd',label:'Placa de HD',color:'#546E7A',badge:'PL.HD',criteria:'Placa eletrônica retirada de HD (separada do disco)',desc:'Placa de controle de HD separada do disco.'},
-  marrom:{id:'marrom',label:'Marrom (Fenolite)',color:'#795548',badge:'MARROM',criteria:'Substrato marrom, sem componentes bons, maioria depreciadores',desc:'Placa de fenolite sem componentes de valor.'},
-  memoria_dourada:{id:'memoria_dourada',label:'Memória Dourada',color:'#F9A825',badge:'MEM.OURO',criteria:'Pentes de memória RAM com contatos dourados',desc:'Pentes de RAM com contatos dourados.'},
-  processador_slot:{id:'processador_slot',label:'Processador Slot',color:'#FF8F00',badge:'PROC.SLOT',criteria:'Processador em formato de placa (slot)',desc:'Processador no formato slot 1/slot A.'},
-  processador_louca:{id:'processador_louca',label:'Processador Louça',color:'#E65100',badge:'PROC.LOUÇA',criteria:'Processador cerâmico com pinos dourados (PGA)',desc:'Processador cerâmico com pinos dourados.'},
-  processador_louca_dourado:{id:'processador_louca_dourado',label:'Processador Louça Dourado',color:'#FF6F00',badge:'PROC.OURO',criteria:'Processador cerâmico com tampa totalmente dourada (Pentium Pro)',desc:'Pentium Pro — altíssima concentração de ouro.'},
-  processador_fibra_negro:{id:'processador_fibra_negro',label:'Processador Fibra Negro',color:'#424242',badge:'PROC.FIBRA',criteria:'Processador de fibra preta com pinos',desc:'Processador em substrato de fibra de vidro preto.'},
-  placa_tablet:{id:'placa_tablet',label:'Placa de Tablet',color:'#43A047',badge:'TABLET',criteria:'Placa principal retirada de tablet',desc:'Placa-mãe de tablet com processador ARM integrado.'},
-  placa_celular:{id:'placa_celular',label:'Placa de Celular',color:'#2E7D32',badge:'CELULAR',criteria:'Placa principal retirada de celular/smartphone',desc:'Placa-mãe de celular com SoC integrado.'},
-  celular_chines:{id:'celular_chines',label:'Celular Chinês',color:'#388E3C',badge:'CEL.CN',criteria:'Celular de marca chinesa simples (sem marca conhecida)',desc:'Celular genérico chinês.'},
-  celular_teclado:{id:'celular_teclado',label:'Celular Teclado',color:'#1B5E20',badge:'CEL.TEC',criteria:'Celular com teclado físico (feature phone)',desc:'Feature phone/tijolão com teclado físico.'},
-  smartphone:{id:'smartphone',label:'Smartphone',color:'#0D47A1',badge:'SMARTPH.',criteria:'Smartphone touchscreen moderno (Android/iOS)',desc:'Smartphone moderno com tela touchscreen.'},
-  celular_com_chip:{id:'celular_com_chip',label:'Celular com Chip',color:'#1565C0',badge:'CEL.CHIP',criteria:'Celular antigo de marca com chip visível (Sony Ericsson, Motorola)',desc:'Celular antigo com chip de processador visível.'},
-  tela_celular:{id:'tela_celular',label:'Tela de Celular',color:'#37474F',badge:'TELA',criteria:'Display retirado de celular (LCD/OLED com flat cable)',desc:'Tela LCD ou OLED com flat cable.'},
-  bateria_celular_tablet:{id:'bateria_celular_tablet',label:'Bateria Celular/Tablet',color:'#D84315',badge:'BAT.CEL',criteria:'Bateria Li-ion de celular ou tablet',desc:'Bateria de lítio de celular/tablet.'},
-  bateria_notebook:{id:'bateria_notebook',label:'Bateria Notebook',color:'#BF360C',badge:'BAT.NB',criteria:'Bateria Li-ion de notebook',desc:'Bateria de notebook com células cilíndricas.'},
-  placa_servidor:{id:'placa_servidor',label:'Placa de Servidor',color:'#C62828',badge:'SERVIDOR',criteria:'Placa-mãe de servidor com 2 soquetes',desc:'Placa-mãe de servidor com 2 soquetes de CPU.'},
-  placa_drive_cd:{id:'placa_drive_cd',label:'Placa de Drive CD',color:'#9E9E9E',badge:'DRIVE CD',criteria:'Placa retirada de drive de CD/DVD',desc:'Placa de controle de drive de CD/DVD.'},
-  placa_lisa:{id:'placa_lisa',label:'Placa Lisa',color:'#616161',badge:'LISA',criteria:'Placa sem componentes (só trilhas e conectores)',desc:'PCB praticamente sem componentes eletrônicos.'},
-  tabete_a:{id:'tabete_a',label:'Tabete A',color:'#FFD54F',badge:'TABETE A',criteria:'75–100% dos pinos com banho dourado visível',desc:'Barra de conectores com 75–100% de pinos dourados.'},
-  tapete_c:{id:'tapete_c',label:'Tapete C',color:'#FFB300',badge:'TAPETE C',criteria:'Conexões mais novas com baixo banho dourado',desc:'Barra de conectores com banho de qualidade inferior.'},
+  telefonia_especial:{id:'telefonia_especial',label:'Telefonia Especial',color:'#FFD700',badge:'★ ESPECIAL',desc:'Placa de altíssimo valor. 2 processadores dourados com banho de ouro + mais de 10 chips tipo 7.'},
+  telefonia_ponteira:{id:'telefonia_ponteira',label:'Telefonia com Ponteira',color:'#FFA500',badge:'TELEF.+',desc:'Placa de telefonia com borda de conexão (ponteira). 75–100% de bons componentes.'},
+  telefonia:{id:'telefonia',label:'Telefonia',color:'#FF8C00',badge:'TELEF.',desc:'Placa de telefonia sem ponteira. 75–100% de bons componentes.'},
+  leve_ponta:{id:'leve_ponta',label:'Leve com Ponta',color:'#4CAF50',badge:'LEVE+',desc:'Placa com 50–75% de bons componentes e ponteira.'},
+  leve:{id:'leve',label:'Leve',color:'#66BB6A',badge:'LEVE',desc:'Placa com 50–75% de componentes bons.'},
+  intermediaria_mais:{id:'intermediaria_mais',label:'Intermediária Mais',color:'#26C6DA',badge:'INTERM.+',desc:'Placas de impressora com saída E chip 7. Inclui Cisco e similares.'},
+  intermediaria:{id:'intermediaria',label:'Intermediária',color:'#42A5F5',badge:'INTERM.',desc:'Placa com 20–50% de bons componentes.'},
+  intermediaria_menos:{id:'intermediaria_menos',label:'Intermediária Menos',color:'#29B6F6',badge:'INTERM.-',desc:'Modems, roteadores e similares.'},
+  pesada_ponta:{id:'pesada_ponta',label:'Pesada com Ponta',color:'#EF5350',badge:'PESADA+',desc:'Placa com poucos bons componentes, predominância de depreciadores e ponteira.'},
+  pesada:{id:'pesada',label:'Pesada',color:'#E53935',badge:'PESADA',desc:'Predominância de depreciadores: bobinas, transformadores, relés.'},
+  mae_a:{id:'mae_a',label:'Mãe A',color:'#AB47BC',badge:'MÃE A',desc:'Placa-mãe antiga com soquete grande de plástico.'},
+  mae_b:{id:'mae_b',label:'Mãe B',color:'#9C27B0',badge:'MÃE B',desc:'Placa-mãe com 2 chips tipo 7.'},
+  mae_c:{id:'mae_c',label:'Mãe C',color:'#7B1FA2',badge:'MÃE C',desc:'Placa-mãe com 1 chip 7 e processador integrado.'},
+  mae_d:{id:'mae_d',label:'Mãe D',color:'#6A1B9A',badge:'MÃE D',desc:'Placa-mãe moderna com processador(es) integrado(s).'},
+  mae_1chip7:{id:'mae_1chip7',label:'Mãe 1 Chip 7',color:'#4A148C',badge:'MÃE 1C7',desc:'Placa-mãe pequena sem soquete externo.'},
+  mae_notebook_a:{id:'mae_notebook_a',label:'Mãe Notebook A',color:'#00897B',badge:'NB-A',desc:'Placa-mãe de notebook com 2 chips tipo 7.'},
+  mae_notebook_b:{id:'mae_notebook_b',label:'Mãe Notebook B',color:'#00796B',badge:'NB-B',desc:'Placa-mãe de notebook com 1 chip 7 e CPU soldada.'},
+  mae_notebook_c:{id:'mae_notebook_c',label:'Mãe Notebook C',color:'#00695C',badge:'NB-C',desc:'Placa-mãe de notebook moderna sem chip 7.'},
+  hd_completo:{id:'hd_completo',label:'HD (com placa atrás)',color:'#78909C',badge:'HD',desc:'HD completo com placa de controle eletrônico.'},
+  placa_hd:{id:'placa_hd',label:'Placa de HD',color:'#546E7A',badge:'PL.HD',desc:'Placa de controle de HD separada do disco.'},
+  marrom:{id:'marrom',label:'Marrom (Fenolite)',color:'#795548',badge:'MARROM',desc:'Placa de fenolite sem componentes de valor.'},
+  memoria_dourada:{id:'memoria_dourada',label:'Memória Dourada A',color:'#F9A825',badge:'MEM.OURO A',desc:'Pente de RAM com contatos dourados espessos e bem visíveis.'},
+  memoria_dourada_b:{id:'memoria_dourada_b',label:'Memória Dourada B',color:'#FBC02D',badge:'MEM.OURO B',desc:'Pente de RAM com contatos dourados mais finos ou parciais que a Memória A.'},
+  placa_dourada_a:{id:'placa_dourada_a',label:'Placa Dourada A',color:'#FFC107',badge:'PL.OURO A',desc:'Placa com alta concentração de pontos e trilhas com banho dourado espesso.'},
+  placa_dourada_b:{id:'placa_dourada_b',label:'Placa Dourada B',color:'#FFB74D',badge:'PL.OURO B',desc:'Placa com pontos e trilhas douradas, em menor concentração que a Placa Dourada A.'},
+  processador_slot:{id:'processador_slot',label:'Processador Slot',color:'#FF8F00',badge:'PROC.SLOT',desc:'Processador no formato slot 1/slot A.'},
+  processador_louca:{id:'processador_louca',label:'Processador Louça',color:'#E65100',badge:'PROC.LOUÇA',desc:'Processador cerâmico com pinos dourados.'},
+  processador_louca_dourado:{id:'processador_louca_dourado',label:'Processador Louça Dourado',color:'#FF6F00',badge:'PROC.OURO',desc:'Pentium Pro — altíssima concentração de ouro.'},
+  processador_fibra_negro:{id:'processador_fibra_negro',label:'Processador Fibra Negro',color:'#424242',badge:'PROC.FIBRA',desc:'Processador em substrato de fibra de vidro preto.'},
+  placa_tablet:{id:'placa_tablet',label:'Placa de Tablet',color:'#43A047',badge:'TABLET',desc:'Placa-mãe de tablet com processador ARM integrado.'},
+  placa_celular:{id:'placa_celular',label:'Placa de Celular',color:'#2E7D32',badge:'CELULAR',desc:'Placa-mãe de celular com SoC integrado.'},
+  celular_chines:{id:'celular_chines',label:'Celular Chinês',color:'#388E3C',badge:'CEL.CN',desc:'Celular genérico chinês.'},
+  celular_teclado:{id:'celular_teclado',label:'Celular Teclado',color:'#1B5E20',badge:'CEL.TEC',desc:'Feature phone/tijolão com teclado físico.'},
+  smartphone:{id:'smartphone',label:'Smartphone',color:'#0D47A1',badge:'SMARTPH.',desc:'Smartphone moderno com tela touchscreen.'},
+  celular_com_chip:{id:'celular_com_chip',label:'Celular com Chip',color:'#1565C0',badge:'CEL.CHIP',desc:'Celular antigo com chip de processador visível.'},
+  tela_celular:{id:'tela_celular',label:'Tela de Celular',color:'#37474F',badge:'TELA',desc:'Tela LCD ou OLED com flat cable.'},
+  bateria_celular_tablet:{id:'bateria_celular_tablet',label:'Bateria Celular/Tablet',color:'#D84315',badge:'BAT.CEL',desc:'Bateria de lítio de celular/tablet.'},
+  bateria_notebook:{id:'bateria_notebook',label:'Bateria Notebook',color:'#BF360C',badge:'BAT.NB',desc:'Bateria de notebook com células cilíndricas.'},
+  placa_servidor:{id:'placa_servidor',label:'Placa de Servidor',color:'#C62828',badge:'SERVIDOR',desc:'Placa-mãe de servidor com 2 soquetes de CPU.'},
+  placa_drive_cd:{id:'placa_drive_cd',label:'Placa de Drive CD',color:'#9E9E9E',badge:'DRIVE CD',desc:'Placa de controle de drive de CD/DVD.'},
+  placa_lisa:{id:'placa_lisa',label:'Placa Lisa',color:'#616161',badge:'LISA',desc:'PCB praticamente sem componentes eletrônicos.'},
+  tabete_a:{id:'tabete_a',label:'Tabete A',color:'#FFD54F',badge:'TABETE A',desc:'Barra de conectores com 75–100% de pinos dourados.'},
+  tapete_b:{id:'tapete_b',label:'Tapete B',color:'#FFC107',badge:'TAPETE B',desc:'Barra de conectores com densidade média de pinos dourados, entre o Tapete A e o Tapete C.'},
+  tapete_c:{id:'tapete_c',label:'Tapete C',color:'#FFB300',badge:'TAPETE C',desc:'Barra de conectores com banho de qualidade inferior.'},
+};
+
+// Criterios tecnicos detalhados - usados SOMENTE no prompt da IA, nunca exibidos na tela
+var _PCL_CRITERIA_PADRAO={
+  telefonia_especial:'2 processadores de louca (ceramicos, com pinos dourados) + mais de 10 chip 7 (CI com faixa dourada na ponta)',
+  telefonia_ponteira:'Borda de conexao dourada (tipo memoria RAM) + 75-100% de materiais bons (chips, CIs, conectores), sem contaminantes volumosos',
+  telefonia:'Sem ponteira + 75-100% de materiais bons (chips, CIs, conectores, processador integrado)',
+  leve_ponta:'Borda de conexao dourada + 50-75% de materiais bons, poucos contaminantes',
+  leve:'Sem ponteira + 50-75% de materiais bons',
+  intermediaria_mais:'Placa de impressora/rede (Cisco, switch) com conector de saida de dados + pelo menos 1 chip 7',
+  intermediaria:'20-50% de materiais bons (chips, CIs, conectores), sem ser placa-mae nem telefonia',
+  intermediaria_menos:'Modem DSL, roteador domestico ou equipamento de rede simples; poucos chips/CIs, predominio de plastico, antenas e conectores RJ45/USB',
+  pesada_ponta:'Borda de conexao dourada, mas predominio de contaminantes (dissipadores, transformadores, bobinas, capacitores grandes); poucos chips/CIs visiveis',
+  pesada:'Predominio de contaminantes (dissipadores, transformadores, bobinas, ferro, capacitores); poucos ou nenhum chip/CI; sem ponteira',
+  mae_a:'Soquete grande de plastico para CPU (tipo 462, 370 ou 7), com dezenas/centenas de furos para pinos',
+  mae_b:'2 chip 7 (CIs com faixa dourada na ponta), independente do tipo de soquete',
+  mae_c:'1 chip 7 + processador soldado ou em soquete pequeno',
+  mae_d:'1 ou 2 processadores integrados (soldados ou em soquete), sem nenhum chip 7',
+  mae_1chip7:'Placa compacta (Mini-ITX ou similar), sem soquete externo de CPU, processador integrado direto na placa',
+  mae_notebook_a:'2 chip 7 em placa de notebook (formato alongado, conectores flat cable)',
+  mae_notebook_b:'1 chip 7 + processador soldado (BGA, sem pinos visiveis, geralmente com dissipador colado)',
+  mae_notebook_c:'Nenhum chip 7; apenas SoC/processador soldado (BGA), muito compacta',
+  hd_completo:'Caixa metalica (2.5 ou 3.5 polegadas) com placa de circuito fixada atras, conector SATA/IDE',
+  placa_hd:'Apenas a placa retirada do HD, com chip controlador (CI grande) e conector SATA/IDE',
+  marrom:'Substrato marrom/baquelite (nao verde); poucos ou nenhum chip/CI; pode ter contaminantes grandes',
+  memoria_dourada:'Pente de memoria RAM com filamento/contato dourado espesso e brilhante, banho denso visivel na borda inferior (SIMM ou DIMM)',
+  memoria_dourada_b:'Pente de memoria RAM com banho dourado mais fino/opaco ou parcial na borda inferior (SIMM ou DIMM)',
+  placa_dourada_a:'Placa com grande quantidade de pontos/trilhas/conectores com banho dourado espesso e brilhante visivel, alta densidade de ouro',
+  placa_dourada_b:'Placa com pontos/trilhas/conectores com banho dourado visivel, porem menos denso ou mais fino que Placa Dourada A',
+  processador_slot:'Processador em formato de placa comprida e estreita (Slot 1/Slot A), com conector de borda',
+  processador_louca:'Corpo ceramico (bege/cinza/verde-musgo), pinos dourados na face inferior (PGA)',
+  processador_louca_dourado:'Corpo ceramico com tampa superior totalmente dourada e brilhante (ex: Pentium Pro)',
+  processador_fibra_negro:'Substrato de fibra de vidro escuro (nao ceramico), pinos metalicos na face inferior',
+  placa_tablet:'Placa compacta com SoC ARM soldado (BGA), multiplos flat cables (tela, bateria, camera), sem soquetes',
+  placa_celular:'Placa fina e compacta com SoC soldado, geralmente coberto por blindagem metalica (EMI), conectores ZIF/FPC minusculos',
+  celular_chines:'Aparelho completo, marca generica/chinesa sem logo reconhecivel',
+  celular_teclado:'Aparelho completo com teclado fisico de botoes (feature phone), tela pequena sem touch',
+  smartphone:'Aparelho completo com tela touchscreen grande, sem teclado fisico, marca reconhecivel',
+  celular_com_chip:'Celular antigo de marca com CI de processador ou memoria visivel (nao-BGA), com pinos/balls aparentes',
+  tela_celular:'Painel LCD/OLED com flat cable saindo da borda, sem carcaca',
+  bateria_celular_tablet:'Pacote fino retangular, plastico ou aluminio, 2-3 fios saindo, pequena placa de protecao',
+  bateria_notebook:'Invólucro plastico maior (retangular ou em L) com conector de encaixe, celulas cilindricas internas',
+  placa_servidor:'Placa grande com 2 soquetes de CPU (LGA), multiplos bancos de RAM e chips de chipset',
+  placa_drive_cd:'Placa pequena e estreita retirada de drive optico, com CI de leitura e conector IDE/SATA',
+  placa_lisa:'Substrato com trilhas de cobre, praticamente sem chips/CIs/capacitores soldados',
+  tabete_a:'Regua de conectores com 75-100% dos pinos com banho dourado espesso e brilhante',
+  tapete_b:'Regua de conectores com 40-75% dos pinos com banho dourado, densidade intermediaria entre Tapete A e Tapete C',
+  tapete_c:'Regua de conectores com banho dourado fino, opaco ou parcial',
 };
 
 function _pclComprimir(base64,mime,cb){
@@ -16025,7 +16138,7 @@ function _pclRenderClassificar(){
         +'border-radius:8px;padding:9px 12px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .15s">'
         +_pclBadge(cls.id,false)
         +'<div style="flex:1"><div style="font-size:12px;font-weight:600;color:'+(sel?cls.color:'var(--tx)')+'">'+cls.label+'</div>'
-        +'<div style="font-size:11px;color:var(--mt)">'+cls.criteria+'</div></div>'
+        +'<div style="font-size:11px;color:var(--mt)">'+cls.desc+'</div></div>'
         +(sel?'<span style="color:'+cls.color+';font-size:14px">&#10003;</span>':'')
         +'</div>';
     }
@@ -16099,7 +16212,8 @@ async function _pclAnalisar(){
     var base64=_pclImgData.split(',')[1];
     var mime=_pclImgData.split(';')[0].replace('data:','')||_pclImgMime;
     var ids=Object.keys(PCL_CATS).join(', ');
-    var lista=Object.values(PCL_CATS).map(function(c){return c.id+'|'+c.criteria;}).join('\n');
+    var criteriaAtivos=(CFG.sistema.pclCriteria&&Object.keys(CFG.sistema.pclCriteria).length>0)?CFG.sistema.pclCriteria:_PCL_CRITERIA_PADRAO;
+    var lista=Object.keys(PCL_CATS).map(function(cid){return cid+'|'+(criteriaAtivos[cid]||_PCL_CRITERIA_PADRAO[cid]||'');}).join('\n');
 
     // Contexto do banco: quantas placas por categoria
     var bancoCats={};
@@ -16111,8 +16225,10 @@ async function _pclAnalisar(){
       ? 'Placas já classificadas no banco: '+Object.keys(bancoCats).map(function(k){return k+'('+bancoCats[k]+')';}).join(', ')
       : 'Banco de dados ainda vazio.';
 
+    var glossario=(CFG.sistema.pclGlossario!==undefined&&CFG.sistema.pclGlossario!=='')?CFG.sistema.pclGlossario:_PCL_GLOSSARIO_PADRAO;
     var prompt='Você é especialista em classificação de placas eletrônicas para reciclagem.\n'
       +'Analise a imagem e classifique pelo manual BioVale.\n\n'
+      +'GLOSSÁRIO TÉCNICO:\n'+glossario+'\n\n'
       +'CONTEXTO DO BANCO DE DADOS DO USUÁRIO:\n'+bancoInfo+'\n\n'
       +'CATEGORIAS DISPONÍVEIS (id|critério):\n'+lista+'\n\n'
       +'INSTRUÇÕES:\n'
@@ -16270,7 +16386,7 @@ function _pclReclassificar(id){
       +'border-radius:8px;padding:9px 12px;cursor:pointer;display:flex;align-items:center;gap:10px">'
       +_pclBadge(cls.id,false)
       +'<div style="flex:1"><div style="font-size:12px;font-weight:600;color:'+(sel?cls.color:'var(--tx)')+'">'+cls.label+'</div>'
-      +'<div style="font-size:10px;color:var(--mt)">'+cls.criteria+'</div></div>'
+      +'<div style="font-size:10px;color:var(--mt)">'+cls.desc+'</div></div>'
       +(sel?'<span style="color:'+cls.color+'">&#10003; atual</span>':'')
       +'</div>';
   }
@@ -16403,7 +16519,7 @@ function _pclRenderCategorias(){
       +'<span style="font-size:12px;font-weight:600;color:var(--tx)">'+cls.label+'</span>'
       +(isCustom?'<span style="background:var(--grb);color:var(--gr);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700">personalizada</span>':'')
       +'</div>'
-      +'<div style="font-size:10px;color:var(--mt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+cls.criteria+'</div>'
+      +'<div style="font-size:10px;color:var(--mt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+cls.desc+'</div>'
       +'</div>'
       // Contador + ações
       +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">'
@@ -16625,7 +16741,6 @@ function _pclRenderManual(){
         ?'<span style="background:'+cls.color+';color:#fff;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700">'+count+'</span>'
         :'<span style="background:var(--s3);color:var(--mt);border-radius:20px;padding:2px 9px;font-size:10px">0</span>')
       +'</div>'
-      +'<div style="font-size:10px;color:var(--mt);font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">'+cls.criteria+'</div>'
       +'<div style="font-size:12px;color:var(--tx);line-height:1.5">'+cls.desc+'</div>';
     if(refImg){html+='</div></div>';}
     html+='</div>';
@@ -16694,7 +16809,6 @@ function _pclImprimirManual(){
       +'<span style="font-size:13px;font-weight:700;color:#111">'+cls.label+'</span>'
       +(count>0?'<span style="margin-left:auto;background:#e8f5e9;color:#2e7d32;border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700">'+count+' no banco</span>':'')
       +'</div>'
-      +'<div style="font-size:9.5px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">'+cls.criteria+'</div>'
       +'<div style="font-size:11px;color:#333;line-height:1.5">'+cls.desc+'</div>'
       +'</div></div></div>';
   }
