@@ -16211,9 +16211,11 @@ async function _pclAnalisar(){
   try{
     var base64=_pclImgData.split(',')[1];
     var mime=_pclImgData.split(';')[0].replace('data:','')||_pclImgMime;
-    var ids=Object.keys(PCL_CATS).join(', ');
+    _pclLoadOcultas();
+    var idsAtivos=Object.keys(PCL_CATS).filter(function(cid){return _pclCatsOcultas.indexOf(cid)<0;});
+    var ids=idsAtivos.join(', ');
     var criteriaAtivos=(CFG.sistema.pclCriteria&&Object.keys(CFG.sistema.pclCriteria).length>0)?CFG.sistema.pclCriteria:_PCL_CRITERIA_PADRAO;
-    var lista=Object.keys(PCL_CATS).map(function(cid){return cid+'|'+(criteriaAtivos[cid]||_PCL_CRITERIA_PADRAO[cid]||'');}).join('\n');
+    var lista=idsAtivos.map(function(cid){return cid+'|'+(criteriaAtivos[cid]||_PCL_CRITERIA_PADRAO[cid]||'');}).join('\n');
 
     // Contexto do banco: quantas placas por categoria
     var bancoCats={};
@@ -16376,7 +16378,8 @@ function _pclDetalhe(id){
 function _pclReclassificar(id){
   var e=null;for(var i=0;i<_pclEntradas.length;i++){if(String(_pclEntradas[i].id)===String(id)){e=_pclEntradas[i];break;}}
   if(!e)return;
-  var allCats=Object.values(PCL_CATS).concat(Object.values(_pclCatsCustom));
+  _pclLoadOcultas();
+  var allCats=Object.values(PCL_CATS).filter(function(c){return _pclCatsOcultas.indexOf(c.id)<0||c.id===e.classeId;}).concat(Object.values(_pclCatsCustom));
   var lista='<div style="display:flex;flex-direction:column;gap:5px;padding:16px;max-height:60vh;overflow-y:auto">';
   for(var i=0;i<allCats.length;i++){
     var cls=allCats[i];
@@ -16425,6 +16428,20 @@ var _PCL_CUSTOM_KEY='bv_pcl_custom_cats'; // mantido para migração do localSto
 var _PCL_ORDER_KEY='bv_pcl_order';        // mantido para migração do localStorage
 var _pclCatsCustom={};
 var _pclCatOrder=[]; // array de ids na ordem definida
+var _pclCatsOcultas=[]; // ids de categorias padrão (PCL_CATS) que o usuário excluiu
+
+function _pclLoadOcultas(){
+  if(DB.pclCatsOcultas && Array.isArray(DB.pclCatsOcultas)){
+    _pclCatsOcultas=DB.pclCatsOcultas;
+  } else {
+    _pclCatsOcultas=[];
+    DB.pclCatsOcultas=_pclCatsOcultas;
+  }
+}
+function _pclSaveOcultas(){
+  DB.pclCatsOcultas=_pclCatsOcultas;
+  saveDB();
+}
 
 function _pclLoadCatsCustom(){
   // Prioridade: DB (nuvem) > localStorage (migração)
@@ -16460,10 +16477,11 @@ function _pclGetCat(id){
 }
 // Retorna todas as categorias na ordem definida pelo usuário
 function _pclGetAllCatsOrdenadas(){
-  _pclLoadCatsCustom();_pclLoadOrder();
+  _pclLoadCatsCustom();_pclLoadOrder();_pclLoadOcultas();
   var todas=Object.assign({},PCL_CATS,_pclCatsCustom);
+  // Remove categorias padrao marcadas como ocultas (excluidas pelo usuario)
+  _pclCatsOcultas.forEach(function(id){if(PCL_CATS[id]&&!_pclCatsCustom[id])delete todas[id];});
   var ids=Object.keys(todas);
-  // Adiciona ao order ids que ainda não estão lá
   var order=_pclCatOrder.filter(function(id){return todas[id];});
   ids.forEach(function(id){if(order.indexOf(id)<0)order.push(id);});
   _pclCatOrder=order;
@@ -16484,19 +16502,19 @@ function _pclMoverCategoria(id,direcao){
 }
 
 function _pclRenderCategorias(){
-  _pclLoadCatsCustom();
+  _pclLoadCatsCustom();_pclLoadOcultas();
   var todasOrdenadas=_pclGetAllCatsOrdenadas();
-  var customCount=Object.keys(_pclCatsCustom).length;
   var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">'
     +'<div><div style="font-size:16px;font-weight:700">Categorias</div>'
-    +'<div style="font-size:12px;color:var(--mt)">'+todasOrdenadas.length+' total &bull; '+customCount+' personalizada'+(customCount!==1?'s':'')+'</div></div>'
+    +'<div style="font-size:12px;color:var(--mt)">'+todasOrdenadas.length+' ativa'+(todasOrdenadas.length!==1?'s':'')+(_pclCatsOcultas.length>0?' &bull; '+_pclCatsOcultas.length+' excluída'+(_pclCatsOcultas.length!==1?'s':''):'')+'</div></div>'
     +'<button class="btn" onclick="_pclNovaCategoria()" style="font-size:12px;padding:8px 14px">+ Nova</button>'
     +'</div>'
-    +'<div class="al alb" style="margin-bottom:12px;font-size:12px">Use as setas ↑↓ para definir a ordem no Manual e na lista de classificação.</div>';
+    +'<div class="al alb" style="margin-bottom:12px;font-size:12px">Use as setas ↑↓ para definir a ordem no Manual e na lista de classificação.</div>'
+    +(_pclCatsOcultas.length>0?'<div style="margin-bottom:12px"><button class="btnO bOgr" style="font-size:11px;padding:6px 12px" onclick="_pclVerOcultas()">&#128065; Ver '+_pclCatsOcultas.length+' categoria'+(_pclCatsOcultas.length!==1?'s':'')+' excluída'+(_pclCatsOcultas.length!==1?'s':'')+'</button></div>':'');
 
   for(var i=0;i<todasOrdenadas.length;i++){
     var cls=todasOrdenadas[i];
-    var isCustom=!!_pclCatsCustom[cls.id];
+    var isCustom=!!_pclCatsCustom[cls.id]&&!PCL_CATS[cls.id];
     var count=_pclEntradas.filter(function(e){return e.classeId===cls.id;}).length;
     var isFirst=i===0;var isLast=i===todasOrdenadas.length-1;
     html+='<div id="pclcard-'+cls.id+'" draggable="true" '
@@ -16517,21 +16535,17 @@ function _pclRenderCategorias(){
       +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">'
       +_pclBadge(cls.id,false)
       +'<span style="font-size:12px;font-weight:600;color:var(--tx)">'+cls.label+'</span>'
-      +(isCustom?'<span style="background:var(--grb);color:var(--gr);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700">personalizada</span>':'')
       +'</div>'
       +'<div style="font-size:10px;color:var(--mt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+cls.desc+'</div>'
       +'</div>'
       // Contador + ações
       +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">'
       +'<span style="font-size:10px;color:var(--mt)">'+count+' placa'+(count!==1?'s':'')+'</span>'
-      +(isCustom
-        ?'<div style="display:flex;gap:4px">'
-          +'<button class="bsm bsmr" onclick="_pclDeletarCategoria(\''+cls.id+'\')">&#128465;</button>'
-          +'<button class="bsm bsmg" onclick="_pclEditarCategoria(\''+cls.id+'\')">&#9998;</button>'
-        +'</div>'
-        :'<button class="bsm bsmg" onclick="_pclEditarCategoria(\''+cls.id+'\')">&#9998;</button>'
-        +(_pclCatsCustom[cls.id]&&_pclCatsCustom[cls.id].overrideDefault?'<button class="bsm" style="background:var(--s3);color:var(--mt);font-size:9px" onclick="_pclResetarPadrao(\''+cls.id+'\')">&#8635;</button>':'')
-      )
+      +'<div style="display:flex;gap:4px">'
+      +'<button class="bsm bsmr" onclick="_pclDeletarCategoria(\''+cls.id+'\')">&#128465;</button>'
+      +'<button class="bsm bsmg" onclick="_pclEditarCategoria(\''+cls.id+'\')">&#9998;</button>'
+      +(!isCustom&&_pclCatsCustom[cls.id]&&_pclCatsCustom[cls.id].overrideDefault?'<button class="bsm" style="background:var(--s3);color:var(--mt);font-size:9px" onclick="_pclResetarPadrao(\''+cls.id+'\')">&#8635;</button>':'')
+      +'</div>'
       +'</div>'
       +'</div>';
   }
@@ -16654,13 +16668,41 @@ function _pclResetarPadrao(id){
   });
 }
 
+function _pclVerOcultas(){
+  var rows=_pclCatsOcultas.map(function(id){
+    var cat=PCL_CATS[id];
+    if(!cat)return '';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--bd);border-radius:8px;margin-bottom:6px">'
+      +'<div style="display:flex;align-items:center;gap:8px">'+_pclBadge(id,false)+'<span style="font-size:12px">'+cat.label+'</span></div>'
+      +'<button class="bsm bsmg" onclick="_pclRestaurarOculta(\''+id+'\')">&#8635; Restaurar</button>'
+      +'</div>';
+  }).join('');
+  openM('Categorias Excluídas','<div class="mf">'+(rows||'<div style="text-align:center;color:var(--mt);padding:20px">Nenhuma categoria excluída.</div>')+'</div>',420);
+}
+function _pclRestaurarOculta(id){
+  _pclCatsOcultas=_pclCatsOcultas.filter(function(x){return x!==id;});
+  _pclSaveOcultas();
+  closeM();
+  toast('Categoria restaurada.');
+  go('classificador_pcb','categorias');
+}
+
 function _pclDeletarCategoria(id){
-  var cls=_pclCatsCustom[id];
+  var isCustomReal=!!_pclCatsCustom[id]&&!PCL_CATS[id];
+  var cls=PCL_CATS[id]||_pclCatsCustom[id];
   var count=_pclEntradas.filter(function(e){return e.classeId===id;}).length;
   confirmar((cls?cls.label:'Categoria')+': confirmar exclusão?'+(count>0?' ('+count+' placa'+(count>1?'s':'')+' no banco não serão excluídas)':''),function(){
-    _pclLoadCatsCustom();
-    delete _pclCatsCustom[id];
-    _pclSaveCatsCustom();
+    if(isCustomReal){
+      // Categoria criada do zero pelo usuário — apaga de verdade
+      delete _pclCatsCustom[id];
+      _pclSaveCatsCustom();
+    } else {
+      // Categoria padrão do sistema — marca como oculta (não pode apagar a constante)
+      if(_pclCatsOcultas.indexOf(id)<0)_pclCatsOcultas.push(id);
+      _pclSaveOcultas();
+      // Se também tinha edições customizadas nela, remove também
+      if(_pclCatsCustom[id]){delete _pclCatsCustom[id];_pclSaveCatsCustom();}
+    }
     toast('Categoria excluída.');
     _pclRender();
   });
