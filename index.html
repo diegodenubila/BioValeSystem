@@ -1225,6 +1225,7 @@ function saveDB(){
       pclCatOrder:DB.pclCatOrder||[],
       tabelas:DB.tabelas,contasFixas:DB.contasFixas,contasReceber:DB.contasReceber,centroCusto:DB.centroCusto,cotacoesHist:DB.cotacoesHist,metas:DB.metas,filtrosMat:DB.filtrosMat,
       concorrentes:DB.concorrentes,
+      cfgSistema:CFG.sistema, // sincroniza configurações do sistema (inclui chave Anthropic, glossário PCB, critérios)
       pesAbasCloud:pesAbas,pesAtivaCloud:pesAtiva,pesAbasTs:Date.now()
     };
     // 1. Salva local como fallback imediato (sempre — nunca perde dado local)
@@ -1438,6 +1439,11 @@ function _applySnap(s){
   if(s.revendaStates!==undefined)DB.revendaStates=s.revendaStates;
   if(s.entradas)DB.entradas=s.entradas;
   if(s.gerarTabsCustom!==undefined)DB.gerarTabsCustom=s.gerarTabsCustom;
+  if(s.cfgSistema!==undefined&&s.cfgSistema){
+    // Merge: nuvem tem prioridade, mas preserva chaves locais que a nuvem ainda não tem
+    Object.assign(CFG.sistema,s.cfgSistema);
+    try{localStorage.setItem('bv_cfg',JSON.stringify(CFG));}catch(e){}
+  }
   if(s.pclCatsCustom!==undefined){
     // Merge: preserva categorias locais não enviadas ainda se a nuvem não as tem
     var _localCustom=_pclCatsCustom||{};
@@ -15650,12 +15656,14 @@ function _saveCfgPclCriteria(){
   }
   CFG.sistema.pclCriteria=novo;
   _saveCFG();
+  saveDB();
   var btn=event.target;var orig=btn.textContent;btn.textContent='✓ Salvo!';setTimeout(function(){btn.textContent=orig;},2000);
 }
 function _resetCfgPclCriteria(){
   confirmar('Restaurar todos os critérios para o texto padrão? As suas edições serão perdidas.',function(){
     CFG.sistema.pclCriteria={};
     _saveCFG();
+    saveDB();
     go('configuracoes','ia');
   });
 }
@@ -15664,12 +15672,14 @@ function _saveCfgPclGlossario(){
   if(!t)return;
   CFG.sistema.pclGlossario=t.value;
   _saveCFG();
+  saveDB();
   var btn=event.target;var orig=btn.textContent;btn.textContent='✓ Salvo!';setTimeout(function(){btn.textContent=orig;},2000);
 }
 function _resetCfgPclGlossario(){
   confirmar('Restaurar o glossário para o texto padrão? As suas edições serão perdidas.',function(){
     CFG.sistema.pclGlossario=_PCL_GLOSSARIO_PADRAO;
     _saveCFG();
+    saveDB();
     go('configuracoes','ia');
   });
 }
@@ -15678,6 +15688,7 @@ function _saveCfgIA(){
   if(!k)return;
   CFG.sistema.anthropicKey=k.value.trim();
   _saveCFG();
+  saveDB(); // sincroniza com a nuvem para funcionar em todos os dispositivos
   var btn=event.target;btn.textContent='&#10003; Salvo!';setTimeout(function(){btn.textContent='Salvar Chave';},2000);
 }
 function _prevCfgBarcode(){
@@ -15705,6 +15716,7 @@ function _saveCfgBarcode(){
   if(!sel)return;
   CFG.sistema.tipoBarcode=sel.value;
   _saveCFG();
+  saveDB();
   var btn=event.target;btn.textContent='&#10003; Salvo!';setTimeout(function(){btn.textContent='Salvar';},2000);
 }
 // ── Geração de código de barras via JsBarcode ───────────────────────────────
