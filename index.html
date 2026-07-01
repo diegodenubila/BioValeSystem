@@ -12395,17 +12395,24 @@ var TAB_CORES=[
 
 function getTabCor(t){
   var cId=t.cor||'padrao';
+  // Se for um hex customizado, cria objeto de cor dinamicamente
+  if(cId.startsWith('#')){
+    return {id:cId,hex:cId,label:'Personalizada',text:'#ffffff'};
+  }
   for(var i=0;i<TAB_CORES.length;i++){if(TAB_CORES[i].id===cId)return TAB_CORES[i];}
   return TAB_CORES[0];
 }
 
 function buildCorPicker(selectedId, inputId){
+  // Verifica se a cor selecionada é um hex customizado (não está nas cores padrão)
+  var isCustomHex=selectedId&&selectedId.startsWith('#');
+  var customHex=isCustomHex?selectedId:'#888888';
   var h='<div style="display:flex;flex-direction:column;gap:5px">'
     +'<label style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Cor do Card</label>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px" id="'+inputId+'-wrap">';
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center" id="'+inputId+'-wrap">';
   for(var i=0;i<TAB_CORES.length;i++){
     var c=TAB_CORES[i];
-    var isSel=(c.id===(selectedId||'padrao'));
+    var isSel=!isCustomHex&&(c.id===(selectedId||'padrao'));
     h+='<button type="button" onclick="selCorPicker(\&apos;'+inputId+'\&apos;,\&apos;'+c.id+'\&apos;)" '
       +'title="'+c.label+'" '
       +'style="width:32px;height:32px;border-radius:7px;background:'+c.hex+';border:2px solid '+(isSel?c.text:'transparent')+';cursor:pointer;position:relative;transition:all .15s" '
@@ -12413,15 +12420,38 @@ function buildCorPicker(selectedId, inputId){
       +(isSel?'<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;color:'+c.text+'">✓</span>':'')
       +'</button>';
   }
-  h+='</div>'
+  // Botão de cor personalizada com color picker nativo
+  h+='<div style="position:relative;display:inline-flex;align-items:center">'
+    +'<input type="color" id="'+inputId+'-custom-input" value="'+customHex+'" '
+    +'style="width:32px;height:32px;border-radius:7px;border:2px solid '+(isCustomHex?'#fff':'transparent')+';cursor:pointer;padding:2px;background:transparent" '
+    +'oninput="selCorPickerCustom(\&apos;'+inputId+'\&apos;,this.value)" '
+    +'title="Cor personalizada (clique para abrir o seletor)">'
+    +(isCustomHex?'<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;pointer-events:none;text-shadow:0 1px 2px #000">✓</span>':'')
+    +'</div>'
+  +'</div>'
     +'<input type="hidden" id="'+inputId+'" value="'+(selectedId||'padrao')+'">'
     +'</div>';
   return h;
 }
 
+function selCorPickerCustom(inputId, hexValue){
+  // Marca o input hidden com o valor hex
+  document.getElementById(inputId).value=hexValue;
+  // Desmarca todos os botões de cores padrão
+  var wrap=document.getElementById(inputId+'-wrap');
+  var btns=wrap.querySelectorAll('button[id^="cpbtn-"]');
+  btns.forEach(function(btn){btn.style.border='2px solid transparent';btn.innerHTML='';});
+  // Marca o picker customizado
+  var ci=document.getElementById(inputId+'-custom-input');
+  if(ci){ci.style.border='2px solid #fff';}
+}
+
 function selCorPicker(inputId, corId){
   document.getElementById(inputId).value=corId;
   var wrap=document.getElementById(inputId+'-wrap');
+  // Desmarca o picker customizado
+  var ci=document.getElementById(inputId+'-custom-input');
+  if(ci)ci.style.border='2px solid transparent';
   var btns=wrap.querySelectorAll('button');
   for(var i=0;i<TAB_CORES.length;i++){
     var c=TAB_CORES[i];
@@ -14348,10 +14378,10 @@ function printTab(idx){
     +'.banner{background:'+corHex+';-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:8px 5mm;display:flex;align-items:center;justify-content:space-between}'
     +'.banner-date{font-size:9px;color:rgba(255,255,255,.85);font-weight:600}'
     +'.stripe{background:#fff;height:5px}'
-    +'table{width:100%;border-collapse:collapse;font-size:9px}'
+    +'table{width:100%;border-collapse:collapse;font-size:11px}'
     +'thead tr{background:'+corHex+';-webkit-print-color-adjust:exact;print-color-adjust:exact}'
-    +'th{padding:4px 6px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#fff}'
-    +'td{padding:2px 6px;border-bottom:1px solid #ebebeb}'
+    +'th{padding:5px 6px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#fff}'
+    +'td{padding:5px 6px;border-bottom:1px solid #ebebeb}'
     +'tr:nth-child(even) td{background:'+corHex+'18;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
     +'td.num{text-align:center;color:#777;width:22px;white-space:nowrap}'
     +'td.desc{font-weight:600;white-space:nowrap}'
