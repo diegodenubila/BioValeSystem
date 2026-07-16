@@ -2090,8 +2090,8 @@ function _pesTemDuplicatas(){
   var vistos={};
   for(var i=0;i<ab.itens.length;i++){
     var it=ab.itens[i];
-    if(it.uni)continue; // ignora itens de revenda
-    var key=it.prodId||it.nome;
+    if(it.uni)continue;
+    var key=(it.prodId||it.nome)+'|'+it.preco;
     if(vistos[key])return true;
     vistos[key]=true;
   }
@@ -2101,26 +2101,35 @@ function _pesTemDuplicatas(){
 function _pesJuntarDuplicatas(){
   var ab=pesAbas[pesAtiva];
   var grupos={};var ordem=[];
+  var vistosProd={};var diferentes=[];
   for(var i=0;i<ab.itens.length;i++){
     var it=ab.itens[i];
     if(it.uni)continue;
-    var key=it.prodId||it.nome;
-    if(!grupos[key]){grupos[key]={base:it,total:0,totalLiq:0,count:0};ordem.push(key);}
-    grupos[key].total+=it.peso||0;
-    grupos[key].totalLiq+=it.pesoLiquido||0;
-    grupos[key].count++;
+    var prodKey=it.prodId||it.nome;
+    var fullKey=prodKey+'|'+it.preco;
+    if(!grupos[fullKey]){grupos[fullKey]={base:it,total:0,totalLiq:0,count:0};ordem.push(fullKey);}
+    grupos[fullKey].total+=it.peso||0;
+    grupos[fullKey].totalLiq+=it.pesoLiquido||0;
+    grupos[fullKey].count++;
+    if(vistosProd[prodKey]!==undefined&&vistosProd[prodKey]!==it.preco){
+      if(diferentes.indexOf(it.nome)<0)diferentes.push(it.nome);
+    }
+    if(vistosProd[prodKey]===undefined)vistosProd[prodKey]=it.preco;
   }
   var temDup=false;
   for(var k in grupos){if(grupos[k].count>1){temDup=true;break;}}
-  if(!temDup){toast('Nenhum material repetido encontrado.');return;}
-
-  openM('🔄 Juntar materiais repetidos',
+  if(!temDup){toast('Nenhum material com mesmo preço para juntar.');return;}
+  var aviso=diferentes.length>0
+    ?'<div class="al aly" style="font-size:12px;margin-top:10px">&#9888; <strong>'+diferentes.join(', ')+'</strong> aparece com preços diferentes e não será juntado.</div>'
+    :'';
+  openM('&#128260; Juntar materiais repetidos',
     '<div class="mf">'
-    +'<div class="al alb" style="font-size:13px;line-height:1.6">Os pesos de materiais repetidos serão <strong>somados</strong> e cada material ficará como uma única linha.<br><br>Itens de revenda (por unidade) não são afetados.</div>'
+    +'<div class="al alb" style="font-size:13px;line-height:1.6">Materiais com <strong>mesmo produto e mesmo preço</strong> terão os pesos somados em uma única linha.</div>'
+    +aviso
     +'<div class="brow">'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="_pesJuntarConfirmar()">🔄 Juntar</button>'
-    +'</div></div>',380);
+    +'<button class="btn" onclick="_pesJuntarConfirmar()">&#128260; Juntar</button>'
+    +'</div></div>',400);
 }
 
 function _pesJuntarConfirmar(){
@@ -2129,7 +2138,7 @@ function _pesJuntarConfirmar(){
   for(var i=0;i<ab.itens.length;i++){
     var it=ab.itens[i];
     if(it.uni)continue;
-    var key=it.prodId||it.nome;
+    var key=(it.prodId||it.nome)+'|'+it.preco;
     if(!grupos[key]){grupos[key]={base:it,total:0,totalLiq:0,count:0};ordem.push(key);}
     grupos[key].total+=it.peso||0;
     grupos[key].totalLiq+=it.pesoLiquido||0;
@@ -2148,7 +2157,7 @@ function _pesJuntarConfirmar(){
   }
   ab.itens=novosItens.concat(revendas);
   closeM();savePesState();autoSave();renderPesagem();
-  toast('✅ Materiais juntados com sucesso!');
+  toast('\u2705 Materiais juntados com sucesso!');
 }
 var _pddFocusIdx=-1;
 function filtrarProd(){
@@ -2963,9 +2972,15 @@ function suspenderAtendimento(){
   var obs=document.getElementById('fin-obs')?document.getElementById('fin-obs').value||'':'';
   var num=ab.numAtend||gerarNum();
   ab.numAtend=num;ab.obs=obs;
-  var valTotal=0;
-  for(var i=0;i<ab.itens.length;i++){var it=ab.itens[i];valTotal+=it.uni?it.preco:(it.pesoLiquido!=null?it.pesoLiquido:it.peso)*it.preco;}
-  valTotal=+valTotal.toFixed(2);
+  var valReceb=0,valPagei=0;
+  for(var i=0;i<ab.itens.length;i++){
+    var it=ab.itens[i];
+    var v=it.uni?it.preco:(it.pesoLiquido!=null?it.pesoLiquido:it.peso)*it.preco;
+    if(it.tipo==='Venda'||it.tipo==='Logistica Reversa')valReceb+=v;
+    else valPagei+=v;
+  }
+  var valTotal=+(Math.abs(valReceb-valPagei)).toFixed(2);
+  var valTotalLiq=+(valReceb-valPagei).toFixed(2); // positivo = a receber, negativo = a pagar
   for(var i=0;i<ab.itens.length;i++){
     var it=ab.itens[i];
     if(it.uni){for(var j=0;j<DB.revenda.length;j++){if(DB.revenda[j].id===it.uid){DB.revenda[j].status='Reservado';break;}}}
@@ -2973,7 +2988,7 @@ function suspenderAtendimento(){
     else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(2);}
   }
   if(!DB.pesagensEmAberto)DB.pesagensEmAberto=[];
-  DB.pesagensEmAberto.unshift({id:nid(),num:num,label:ab.label,tipo:ab.tipo,cliId:ab.cliId,tabId:ab.tabId,itens:ab.itens.slice(),obs:obs,valTotal:valTotal,suspendoEm:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),suspendoData:hj(),nfNum:ab.nfNum||''});
+  DB.pesagensEmAberto.unshift({id:nid(),num:num,label:ab.label,tipo:ab.tipo,cliId:ab.cliId,tabId:ab.tabId,itens:ab.itens.slice(),obs:obs,valTotal:valTotal,valTotalLiq:valTotalLiq,suspendoEm:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),suspendoData:hj(),nfNum:ab.nfNum||''});
   closeM();pesAbas.splice(pesAtiva,1);
   if(!pesAbas.length){clearPesState();novaPesAba();}else{pesAtiva=Math.min(pesAtiva,pesAbas.length-1);savePesState();renderPesagem();}
   autoSave();
@@ -3008,10 +3023,16 @@ function pgPendencias(){
         +'<div style="background:var(--bg);border-radius:var(--r);padding:9px 11px;margin-bottom:10px;display:flex;flex-direction:column;gap:3px">'+itensSumario+'</div>'
         +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
         +'<div style="font-size:11px;color:var(--mt)">'+at.itens.length+' item(s)'+(at.obs?' &middot; '+at.obs:'')+'</div>'
-        +'<div style="font-size:16px;font-weight:800;font-family:monospace;color:var(--or)">~'+_mask(fR(at.valTotal))+'</div></div>'
-        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
-        +'<button class="btn" style="background:var(--bl)" onclick="reabrirPendencia('+at.id+')">&#9998; Reabrir p/ Ajuste</button>'
-        +'<button class="btn" style="background:var(--gr2)" onclick="liquidarPendencia('+at.id+')">&#10003; Liquidar (Concluir)</button>'
+        +'<div style="text-align:right">'
+        +(at.valTotalLiq!==undefined
+          ?'<div style="font-size:10px;color:var(--mt)">'+(at.valTotalLiq>=0?'A receber':'A pagar')+'</div>'
+          +'<div style="font-size:16px;font-weight:800;font-family:monospace;color:'+(at.valTotalLiq>=0?'var(--gr)':'var(--rd)')+'">~'+_mask(fR(Math.abs(at.valTotalLiq)))+'</div>'
+          :'<div style="font-size:16px;font-weight:800;font-family:monospace;color:var(--or)">~'+_mask(fR(at.valTotal))+'</div>')
+        +'</div></div>'
+        +'<div style="display:grid;grid-template-columns:auto 1fr 1fr;gap:8px">'
+        +'<button class="btn" style="background:var(--s2);color:var(--tx);font-size:11px;padding:8px 10px" onclick="verNotaPendencia('+at.id+')">&#128196; Nota</button>'
+        +'<button class="btn" style="background:var(--bl)" onclick="reabrirPendencia('+at.id+')">&#9998; Reabrir</button>'
+        +'<button class="btn" style="background:var(--gr2)" onclick="liquidarPendencia('+at.id+')">&#10003; Liquidar</button>'
         +'</div></div>';
     }
   }
@@ -3023,6 +3044,18 @@ function pgPendencias(){
     +(list.length>0?'<div class="al aly" style="font-size:12px">&#9888; Estes atendimentos tiveram o estoque movimentado mas o financeiro ainda nao foi registrado. Liquide-os assim que o pagamento for confirmado.</div>':'')
     +'<div class="fc">'+cards+'</div></div>';
 }
+function verNotaPendencia(pendId){
+  var pend=null;
+  for(var i=0;i<DB.pesagensEmAberto.length;i++){if(String(DB.pesagensEmAberto[i].id)===String(pendId)){pend=DB.pesagensEmAberto[i];break;}}
+  if(!pend){alert('Pendência não encontrada!');return;}
+  // Monta uma aba temporária só para gerar a nota
+  var abTemp={tipo:pend.tipo,itens:pend.itens,cliId:pend.cliId,tabId:pend.tabId,obs:pend.obs,numAtend:pend.num,label:pend.label,nfNum:pend.nfNum||''};
+  var pesAbasOrig=pesAbas;var pesAtivaOrig=pesAtiva;
+  pesAbas=[abTemp];pesAtiva=0;
+  try{visualizarNota();}catch(e){alert('Erro ao gerar nota: '+e.message);}
+  pesAbas=pesAbasOrig;pesAtiva=pesAtivaOrig;
+}
+
 function reabrirPendencia(pendId){
   if(!DB.pesagensEmAberto)DB.pesagensEmAberto=[];
   var pend=null,pendIdx=-1;
