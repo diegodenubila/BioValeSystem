@@ -1751,6 +1751,13 @@ function renderPesagem(){
   var cartH='';
   if(!ab.itens.length){cartH='<div style="text-align:center;padding:26px;color:var(--mt);font-size:13px">Selecione produtos da lista</div>';}
   else{
+    // Botão de juntar duplicatas — aparece só quando há repetição
+    if(_pesTemDuplicatas()){
+      cartH+='<div style="margin-bottom:8px">'
+        +'<button onclick="_pesJuntarDuplicatas()" style="width:100%;background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.3);color:#eab308;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">'
+        +'&#128260; Juntar materiais repetidos'
+        +'</button></div>';
+    }
     for(var i=0;i<ab.itens.length;i++){
       var it=ab.itens[i];var ic=tipoCol(it.tipo);
       var ibg=it.tipo==='Venda'?'rgba(239,68,68,.1)':it.tipo==='Compra'?'rgba(34,197,94,.1)':it.tipo==='Logistica Reversa'?'rgba(168,85,247,.1)':'rgba(59,130,246,.1)';
@@ -2069,6 +2076,80 @@ function updIPLiq(i,v){pesAbas[pesAtiva].itens[i].pesoLiquido=parseFloat(v)||0;s
 function updIPr(i,v){pesAbas[pesAtiva].itens[i].preco=parseFloat(v)||0;savePesState();renderPesagem();}
 function updIObs(i,v){pesAbas[pesAtiva].itens[i].obs=v.trim();savePesState();}
 function delIP(i){pesAbas[pesAtiva].itens.splice(i,1);savePesState();autoSave();renderPesagem();}
+
+function toast(msg,cor){
+  var el=document.createElement('div');
+  el.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:'+(cor||'var(--gr)')+';color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 14px rgba(0,0,0,.4);pointer-events:none';
+  el.textContent=msg;
+  document.body.appendChild(el);
+  setTimeout(function(){el.remove();},2500);
+}
+
+function _pesTemDuplicatas(){
+  var ab=pesAbas[pesAtiva];
+  var vistos={};
+  for(var i=0;i<ab.itens.length;i++){
+    var it=ab.itens[i];
+    if(it.uni)continue; // ignora itens de revenda
+    var key=it.prodId||it.nome;
+    if(vistos[key])return true;
+    vistos[key]=true;
+  }
+  return false;
+}
+
+function _pesJuntarDuplicatas(){
+  var ab=pesAbas[pesAtiva];
+  var grupos={};var ordem=[];
+  for(var i=0;i<ab.itens.length;i++){
+    var it=ab.itens[i];
+    if(it.uni)continue;
+    var key=it.prodId||it.nome;
+    if(!grupos[key]){grupos[key]={base:it,total:0,totalLiq:0,count:0};ordem.push(key);}
+    grupos[key].total+=it.peso||0;
+    grupos[key].totalLiq+=it.pesoLiquido||0;
+    grupos[key].count++;
+  }
+  var temDup=false;
+  for(var k in grupos){if(grupos[k].count>1){temDup=true;break;}}
+  if(!temDup){toast('Nenhum material repetido encontrado.');return;}
+
+  openM('🔄 Juntar materiais repetidos',
+    '<div class="mf">'
+    +'<div class="al alb" style="font-size:13px;line-height:1.6">Os pesos de materiais repetidos serão <strong>somados</strong> e cada material ficará como uma única linha.<br><br>Itens de revenda (por unidade) não são afetados.</div>'
+    +'<div class="brow">'
+    +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
+    +'<button class="btn" onclick="_pesJuntarConfirmar()">🔄 Juntar</button>'
+    +'</div></div>',380);
+}
+
+function _pesJuntarConfirmar(){
+  var ab=pesAbas[pesAtiva];
+  var grupos={};var ordem=[];
+  for(var i=0;i<ab.itens.length;i++){
+    var it=ab.itens[i];
+    if(it.uni)continue;
+    var key=it.prodId||it.nome;
+    if(!grupos[key]){grupos[key]={base:it,total:0,totalLiq:0,count:0};ordem.push(key);}
+    grupos[key].total+=it.peso||0;
+    grupos[key].totalLiq+=it.pesoLiquido||0;
+    grupos[key].count++;
+  }
+  var revendas=ab.itens.filter(function(it){return it.uni;});
+  var novosItens=[];
+  for(var ki=0;ki<ordem.length;ki++){
+    var g=grupos[ordem[ki]];
+    var merged=Object.assign({},g.base);
+    merged.peso=Math.round(g.total*1000)/1000;
+    merged.pesoLiquido=Math.round(g.totalLiq*1000)/1000;
+    merged.tara=0;merged.desconto=0;
+    merged.obs=(g.count>1?'('+g.count+'x juntados) ':'')+(g.base.obs||'');
+    novosItens.push(merged);
+  }
+  ab.itens=novosItens.concat(revendas);
+  closeM();savePesState();autoSave();renderPesagem();
+  toast('✅ Materiais juntados com sucesso!');
+}
 var _pddFocusIdx=-1;
 function filtrarProd(){
   var q=(document.getElementById('prod-search').value||'').toLowerCase();
@@ -14241,6 +14322,22 @@ function _exportFinPDF(titulo, htmlContent){
 
 }
 
+// Verifica se uma movimentacao e interna (reforco, transferencia entre contas, sangria, ajuste de caixa)
+// e portanto NAO deve entrar no calculo de receita/despesa operacional (DRE, percentuais, margem).
+// Usa categoria + prefixo da descricao porque o campo "cat" de reforcos guarda o MOTIVO escolhido
+// (ex: "Outros", "Recebimento externo"), nao um valor fixo — por isso a categoria sozinha nao e confiavel.
+function _isMovInterna(mv){
+  var _catsInternas={'Transferencia':1,'Ajuste de Caixa':1,'Outros Recebimentos':1,'Sangria':1};
+  if(_catsInternas[mv.cat])return true;
+  var d=mv.desc||'';
+  if(d.indexOf('Reforco:')===0)return true;
+  if(d.indexOf('Sangria:')===0)return true;
+  if(d.indexOf('Transferencia')===0)return true;
+  if(d.indexOf('Transferência')===0)return true;
+  if(d.indexOf('Ajuste de Caixa')===0)return true;
+  return false;
+}
+
 function exportarResumoFinanceiroPDF(){
   var _movs=_filtrarMovsPeriodo(DB.movs);
   var ent=0,sai=0;
@@ -14251,13 +14348,32 @@ function exportarResumoFinanceiroPDF(){
   var resultado=ent-sai;
   var tmV=vendas.length?vendas.reduce(function(a,m){return a+m.valor;},0)/vendas.length:0;
   var tmC=compras.length?compras.reduce(function(a,m){return a+m.valor;},0)/compras.length:0;
-  var h='<h3>Resumo Financeiro</h3>'
+
+  // ── Desempenho operacional real: exclui reforcos, transferencias entre contas, sangrias e ajustes ──
+  var recOp=0,despOp=0;
+  for(var i=0;i<_movs.length;i++){
+    var m=_movs[i];
+    if(_isMovInterna(m))continue;
+    if(m.tipo==='entrada')recOp+=m.valor;else despOp+=m.valor;
+  }
+  var lucroOp=recOp-despOp;
+  var margemOp=recOp>0?(lucroOp/recOp*100):0;
+
+  var h='<h3>Movimentação de Caixa (bruta)</h3>'
     +'<table><tbody>'
     +'<tr><td>Total de Entradas</td><td class="positive">'+fR(ent)+'</td></tr>'
     +'<tr><td>Total de Saídas</td><td class="negative">'+fR(sai)+'</td></tr>'
     +'<tr class="total-row"><td>Resultado do Período</td><td class="'+(resultado>=0?'positive':'negative')+'">'+fR(resultado)+'</td></tr>'
     +'<tr><td>Saldo Total em Contas</td><td class="positive">'+fR(sal)+'</td></tr>'
     +'</tbody></table>'
+    +'<div style="font-size:11px;color:#888;margin:4px 0 14px">Inclui reforços de caixa e transferências entre contas — usar para conferência de saldo.</div>'
+    +'<h3>Desempenho Operacional Real</h3>'
+    +'<table><tbody>'
+    +'<tr><td>Receita Operacional (Vendas)</td><td class="positive">'+fR(recOp)+'</td></tr>'
+    +'<tr><td>Custos e Despesas Operacionais</td><td class="negative">'+fR(despOp)+'</td></tr>'
+    +'<tr class="total-row"><td>Lucro Operacional</td><td class="'+(lucroOp>=0?'positive':'negative')+'">'+fR(lucroOp)+' ('+margemOp.toFixed(1)+'%)</td></tr>'
+    +'</tbody></table>'
+    +'<div style="font-size:11px;color:#888;margin:4px 0 14px">Exclui reforços de caixa, transferências entre contas e sangrias — use estes números para calcular margem.</div>'
     +'<h3>Ticket Médio</h3>'
     +'<table><tbody>'
     +'<tr><td>Ticket Médio de Compra</td><td>'+fR(tmC)+'</td></tr>'
