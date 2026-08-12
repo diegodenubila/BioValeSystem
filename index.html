@@ -297,7 +297,7 @@ var ALLPAGES=[
   {id:'estoque_vis', label:'Estoque',     icon:'&#9964;'},
   {id:'revenda',     label:'Revenda',     icon:'&#127991;'},
   {id:'financeiro',  label:'Financeiro',  icon:'&#128176;'},
-  {id:'agenda',      label:'Agenda',      icon:'&#128197;'},
+  {id:'agenda',      label:'Agenda de Coletas',icon:'&#128197;'},
   {id:'funcionarios',label:'Funcionarios',icon:'&#128119;'},
   {id:'clientes',    label:'Clientes',    icon:'&#127970;'},
   {id:'tabelas',     label:'Tabelas',     icon:'&#128203;'},
@@ -368,6 +368,8 @@ var DB={
   centroCusto:[],
   funcs:[],
   coletas:[],
+  preAgenda:[],
+  preAgendaLimite:3,
   clientes:[],
   tabelas:[
     {id:1,nome:'Padrao',tipo:'venda', itens:[]},
@@ -789,7 +791,7 @@ function setNav(pid){
   }
 }
 
-var _LABELS={dashboard:'Dashboard',pesagem:'Pesagem',pendencias:'Em Aberto',caixa_dia:'Caixa',estoque:'Estoque',estoque_vis:'Estoque',revenda:'Revenda',financeiro:'Financeiro',agenda:'Agenda',funcionarios:'Funcionarios',clientes:'Clientes',tabelas:'Tabelas',mercado:'Mercado',classificador:'Classificador PCB',configuracoes:'Configuracoes'};
+var _LABELS={dashboard:'Dashboard',pesagem:'Pesagem',pendencias:'Em Aberto',caixa_dia:'Caixa',estoque:'Estoque',estoque_vis:'Estoque',revenda:'Revenda',financeiro:'Financeiro',agenda:'Agenda de Coletas',funcionarios:'Funcionarios',clientes:'Clientes',tabelas:'Tabelas',mercado:'Mercado',classificador:'Classificador PCB',configuracoes:'Configuracoes'};
 function _breadcrumb(pid){
   var lbl=_LABELS[pid]||pid;
   return '<div class="breadcrumb">&#127968; Inicio <span class="sep">&#8250;</span> <span>'+lbl+'</span></div>';
@@ -1220,7 +1222,7 @@ function saveDB(){
       atendNum:DB.atendNum,produtos:DB.produtos,movs:DB.movs,contas:DB.contas,
       revenda:DB.revenda,revendaCats:DB.revendaCats,revendaStates:DB.revendaStates,
       entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
-      transf:DB.transf,coletas:DB.coletas,funcs:DB.funcs,clientes:DB.clientes,
+      transf:DB.transf,coletas:DB.coletas,preAgenda:DB.preAgenda,preAgendaLimite:DB.preAgendaLimite,funcs:DB.funcs,clientes:DB.clientes,
       gerarTabsCustom:DB.gerarTabsCustom,
       pclCatsCustom:DB.pclCatsCustom||{},
       pclCatOrder:DB.pclCatOrder||[],
@@ -1463,6 +1465,8 @@ function _applySnap(s){
   if(s.pesagensEmAberto)DB.pesagensEmAberto=s.pesagensEmAberto;
   if(s.transf)DB.transf=s.transf;
   if(s.coletas)DB.coletas=s.coletas;
+  if(s.preAgenda)DB.preAgenda=s.preAgenda;
+  if(s.preAgendaLimite)DB.preAgendaLimite=s.preAgendaLimite;
   if(s.funcs)DB.funcs=s.funcs;
   if(s.clientes)DB.clientes=s.clientes;
   if(s.tabelas)DB.tabelas=s.tabelas;
@@ -8064,6 +8068,7 @@ function pgFin(){
     {id:'receber',     ic:'&#128200;',lbl:'A Receber'},
     {id:'centros',     ic:'&#127991;',lbl:'Centro de Custo'},
     {id:'categorias',  ic:'&#127991;',lbl:'Categorias'},
+    {id:'gestora',     ic:'&#128188;',lbl:'Gestora IA'},
   ];
   var tabH='';
   for(var i=0;i<tabs.length;i++){
@@ -8084,7 +8089,7 @@ function finTab(t){
   if(t==='fixas')_fixasMesOffset=0;
   // Reconstrói o highlight das abas
   var tabsEl=document.querySelectorAll('#fin-tabs .tabbtn');
-  var order=['resumo','relatorio','fluxo','conciliacao','contas','movs','fixas','receber','centros','categorias'];
+  var order=['resumo','relatorio','fluxo','conciliacao','contas','movs','fixas','receber','centros','categorias','gestora'];
   for(var i=0;i<tabsEl.length;i++){
     tabsEl[i].classList.remove('on');
     if(i<order.length&&order[i]===t)tabsEl[i].classList.add('on');
@@ -8104,10 +8109,489 @@ function _finRender(t){
     if(t==='receber')    return _finReceber();
     if(t==='centros')    return _finCentros();
     if(t==='categorias') return _finCategorias();
+    if(t==='gestora')    return _finGestora();
   }catch(e){
     return '<div class="al alr" style="margin:16px">Erro ao carregar: '+e.message+'<br><small>'+e.stack+'</small></div>';
   }
   return '';
+}
+
+function _finGestora(){
+  var key=CFG.sistema.anthropicKey||'';
+  if(!key){
+    return '<div class="fc"><div class="al alr" style="margin:16px">Chave API Anthropic não configurada.<br><br>'
+      +'<button class="btn" onclick="go(\'configuracoes\',\'ia\')">⚙️ Ir para Configurações → IA</button></div></div>';
+  }
+  var periodos=[
+    {id:'hoje',lbl:'Hoje'},
+    {id:'semana',lbl:'Esta Semana'},
+    {id:'mes',lbl:'Este Mês'},
+    {id:'trimestre',lbl:'Trimestre'},
+    {id:'ano',lbl:'Este Ano'}
+  ];
+  var perAtual=_finPeriodo||'mes';
+  var perH=periodos.map(function(p){
+    var sel=p.id===perAtual;
+    return '<button onclick="_gestorSetPeriodo(\''+p.id+'\')" style="padding:6px 14px;border-radius:20px;border:1px solid '+(sel?'#d4af37':'var(--bd)')+';background:'+(sel?'rgba(212,175,55,.15)':'var(--s2)')+';color:'+(sel?'#d4af37':'var(--mt)')+';font-size:12px;cursor:pointer;font-family:inherit;font-weight:'+(sel?'700':'400')+'">'+p.lbl+'</button>';
+  }).join('');
+  return '<div class="fc" id="gestora-wrap" style="padding-bottom:100px">'
+    // Header
+    +'<div style="background:linear-gradient(135deg,#0d1b2a,#1a2a1a);border:1px solid rgba(212,175,55,.2);border-radius:var(--r2);padding:20px;margin-bottom:12px">'
+    +'<div style="font-size:10px;color:#d4af37;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">&#128188; IA · Financeiro</div>'
+    +'<div style="font-size:17px;font-weight:800;margin-bottom:4px">Gestora Financeira BioVale</div>'
+    +'<div style="font-size:12px;color:var(--mt)">Análise profissional com dados reais do sistema</div>'
+    +'</div>'
+    // Seletor de período
+    +'<div style="background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:12px;margin-bottom:12px">'
+    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Período de análise</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px" id="gestora-per">'+perH+'</div>'
+    +'</div>'
+    // Botão analisar
+    +'<div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:16px">'
+    +'<button id="gestora-btn" onclick="_gestorAnalisar()" style="background:linear-gradient(135deg,#b8860b,#d4af37);color:#000;font-size:14px;font-weight:800;padding:14px;border:none;border-radius:var(--r);cursor:pointer;font-family:inherit">&#128188; Analisar Financeiro Completo</button>'
+    +'<button onclick="_gestorEmitirRelatorio()" style="background:var(--s1);border:1px solid var(--bd);color:var(--tx);font-size:12px;font-weight:700;padding:14px 16px;border-radius:var(--r);cursor:pointer;font-family:inherit;white-space:nowrap">&#128196; Emitir Relatório</button>'
+    +'</div>'
+    // Área de resultado
+    +'<div id="gestora-result"></div>'
+    // Perguntas rápidas
+    +'<div id="gestora-quick" style="display:none;margin-top:16px">'
+    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Perguntas rápidas</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+    +['Quais materiais têm margem abaixo do ideal?','Como está meu fluxo de caixa?','Onde estou perdendo dinheiro?','Top 3 ações para essa semana','Projeção para o próximo mês','Posso aumentar o pró-labore?'].map(function(q){
+      return '<button onclick="_gestoraPergunta(\''+q.replace(/'/g,"\\'")+'\',true)" style="background:var(--s2);border:1px solid var(--bd);color:var(--mt);border-radius:20px;padding:6px 14px;font-size:11px;cursor:pointer;font-family:inherit">'+q+'</button>';
+    }).join('')+'</div></div>'
+    // Chat follow-up
+    +'<div id="gestora-chat" style="margin-top:12px"></div>'
+    // Input livre
+    +'<div id="gestora-ask" style="display:none;margin-top:12px">'
+    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Pergunta livre</div>'
+    +'<div style="display:flex;gap:8px"><textarea class="inp" id="gestora-inp" rows="2" style="flex:1;resize:none" placeholder="Ex: Devo comprar mais Telefonia Especial?" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();_gestoraPergunta(\'\',false)}"></textarea>'
+    +'<button onclick="_gestoraPergunta(\'\',false)" class="btn" style="background:var(--gr);color:#000;height:60px;padding:0 16px;align-self:flex-end">Enviar</button>'
+    +'</div></div></div>';
+}
+
+function _gestorEmitirRelatorio(){
+  var dados=_gestorColetarDados();
+  var d=window._gestoraDadosCache;
+  if(!d){alert('Clique em Analisar primeiro para carregar os dados.');return;}
+
+  var e=CFG.empresa||{};
+  var nomeEmp=e.nome||'BioVale';
+  var endEmp='';
+  if(e.logradouro)endEmp+=e.logradouro+(e.numero?', '+e.numero:'');
+  if(e.cidade)endEmp+=(endEmp?', ':'')+e.cidade+(e.uf?' - '+e.uf:'');
+  var periodo=_finPeriodo||'mes';
+  var periodoLabel={'mes':'Este Mês','trimestre':'Trimestre','semestre':'Semestre','ano':'Este Ano','tudo':'Todo o Tempo'}[periodo]||periodo;
+  var hoje=new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+
+  // Ticket médio
+  var totalVendas=0,numVendas=0,totalCompras=0,numCompras=0;
+  var movsOp=_filtrarMovsPeriodo(DB.movs).filter(function(m){return!_isMovInterna(m);});
+  movsOp.forEach(function(m){
+    if(m.tipo==='entrada'){totalVendas+=m.valor;numVendas++;}
+    else{totalCompras+=m.valor;numCompras++;}
+  });
+  var ticketVenda=numVendas>0?totalVendas/numVendas:0;
+  var ticketCompra=numCompras>0?totalCompras/numCompras:0;
+
+  // Desempenho mensal (do histórico)
+  var hist=d.hist||[];
+
+  // Estrutura de custos
+  var cats=d.catsArr||[];
+  var totalOp=d.saiOp||d.sai||0;
+
+  function fR2(v){return'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function pct(v,base){return base>0?((v/base)*100).toFixed(1)+'%':'—';}
+
+  var corPrimaria='#C8860A';
+
+  var html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'
+    +'<style>'
+    +'*{box-sizing:border-box;margin:0;padding:0}'
+    +'@page{size:A4 portrait;margin:15mm 14mm}'
+    +'html,body{font-family:Arial,Helvetica,sans-serif;font-size:9.5px;color:#111;background:#fff}'
+    +'.page{width:100%;max-width:182mm}'
+    // Header
+    +'.hdr{display:flex;justify-content:space-between;align-items:flex-start;padding:0 0 10px;border-bottom:2px solid '+corPrimaria+';margin-bottom:14px}'
+    +'.hdr-logo{font-size:22px;font-weight:900;color:#111;letter-spacing:-1px}'
+    +'.hdr-logo span{color:'+corPrimaria+'}'
+    +'.hdr-sub{font-size:8px;color:#666;text-transform:uppercase;letter-spacing:1.5px;margin-top:2px}'
+    +'.hdr-right{text-align:right;font-size:8px;color:#555;line-height:1.7}'
+    // Título do relatório
+    +'.rel-titulo{font-size:13px;font-weight:800;color:'+corPrimaria+';margin-bottom:2px}'
+    +'.rel-sub{font-size:8.5px;color:#666;margin-bottom:14px}'
+    // Cards KPI
+    +'.kpi-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:14px}'
+    +'.kpi{border:1px solid #e0e0e0;border-radius:6px;padding:10px 12px}'
+    +'.kpi-label{font-size:7.5px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}'
+    +'.kpi-val{font-size:15px;font-weight:900;font-family:monospace}'
+    +'.kpi-desc{font-size:7.5px;color:#888;margin-top:2px}'
+    +'.kpi-green .kpi-val{color:#16a34a}'
+    +'.kpi-red .kpi-val{color:#dc2626}'
+    +'.kpi-gold .kpi-val{color:'+corPrimaria+'}'
+    +'.kpi-blue .kpi-val{color:#2563eb}'
+    // Seções
+    +'.sec{margin-bottom:14px}'
+    +'.sec-title{font-size:10px;font-weight:800;color:'+corPrimaria+';text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #f0c040;padding-bottom:4px;margin-bottom:8px}'
+    +'.sec-note{font-size:7.5px;color:#888;margin-bottom:6px;font-style:italic}'
+    // Tabelas
+    +'table{width:100%;border-collapse:collapse;font-size:8.5px}'
+    +'th{background:'+corPrimaria+';color:#fff;padding:5px 8px;text-align:left;font-weight:700;font-size:8px;text-transform:uppercase;letter-spacing:.5px}'
+    +'th.r{text-align:right}'
+    +'td{padding:5px 8px;border-bottom:1px solid #f0f0f0}'
+    +'td.r{text-align:right;font-family:monospace;font-weight:700}'
+    +'td.pct{text-align:right;font-size:8px;color:#555}'
+    +'tr:nth-child(even) td{background:#fafafa}'
+    +'tr.total td{background:#fef9e7;font-weight:800;border-top:2px solid '+corPrimaria+'}'
+    // Barra de progresso
+    +'.bar-wrap{display:flex;align-items:center;gap:6px}'
+    +'.bar{flex:1;height:5px;background:#f0f0f0;border-radius:3px;overflow:hidden}'
+    +'.bar-fill{height:100%;border-radius:3px}'
+    // Rodapé
+    +'.footer{border-top:1px solid #e0e0e0;padding-top:6px;margin-top:16px;display:flex;justify-content:space-between;font-size:7px;color:#999}'
+    +'</style></head><body><div class="page">'
+
+    // HEADER
+    +'<div class="hdr">'
+    +'<div><div class="hdr-logo"><span>Bio</span>Vale</div>'
+    +'<div class="hdr-sub">Reciclagem de Eletrônicos</div></div>'
+    +'<div class="hdr-right">'
+    +'<div style="font-weight:700;color:#111;font-size:9px">Relatório de Gestão Financeira</div>'
+    +'<div>Período: '+periodoLabel+'</div>'
+    +'<div>Emitido em: '+hoje+'</div>'
+    +(endEmp?'<div>'+endEmp+'</div>':'')
+    +'</div></div>'
+
+    // RESUMO KPIs
+    +'<div class="sec-title">Resumo do Período</div>'
+    +'<div class="sec-note">Receita e despesa operacionais reais, excluindo reforços de caixa e transferências entre contas.</div>'
+    +'<div class="kpi-row">'
+    +'<div class="kpi kpi-green"><div class="kpi-label">Receita Operacional</div><div class="kpi-val">'+fR2(d.entOp)+'</div></div>'
+    +'<div class="kpi kpi-red"><div class="kpi-label">Despesa Operacional</div><div class="kpi-val">'+fR2(d.saiOp)+'</div></div>'
+    +'<div class="kpi '+(d.entOp-d.saiOp>=0?'kpi-gold':'kpi-red')+'"><div class="kpi-label">Lucro Operacional</div><div class="kpi-val">'+fR2(d.entOp-d.saiOp)+'</div><div class="kpi-desc">('+pct(d.entOp-d.saiOp,d.entOp)+')</div></div>'
+    +'<div class="kpi kpi-blue"><div class="kpi-label">Saldo em Contas</div><div class="kpi-val">'+fR2(d.sal)+'</div></div>'
+    +'</div>'
+
+    // DESEMPENHO MENSAL
+    +(hist.length>0?'<div class="sec"><div class="sec-title">Desempenho Mensal</div>'
+    +(hist[hist.length-1]&&hist[hist.length-1].label?'<div class="sec-note">'+hist[hist.length-1].label+' pode estar em andamento (dados parciais).</div>':'')
+    +'<table><thead><tr><th>Mês</th><th class="r">Receita</th><th class="r">Despesa</th><th class="r">Lucro</th><th class="r">Margem</th></tr></thead><tbody>'
+    +hist.map(function(m){
+      return '<tr><td>'+m.label+'</td><td class="r">'+fR2(m.entOp||m.ent)+'</td><td class="r">'+fR2(m.saiOp||m.sai)+'</td>'
+        +'<td class="r" style="color:'+(m.resultado>=0?'#16a34a':'#dc2626')+'">'+fR2(m.resultado)+'</td>'
+        +'<td class="pct">'+m.margemOp+'%</td></tr>';
+    }).join('')
+    +'</tbody></table></div>':'')
+
+    // ESTRUTURA DE CUSTOS
+    +(cats.length>0?'<div class="sec"><div class="sec-title">Estrutura de Custos (Período Total)</div>'
+    +'<div class="sec-note">Percentual sobre a receita operacional de '+fR2(d.entOp)+'.</div>'
+    +'<table><thead><tr><th>Item</th><th class="r">Valor</th><th class="r">% Receita</th><th style="width:80px">Proporção</th></tr></thead><tbody>'
+    +cats.map(function(c){
+      var pp=d.entOp>0?((c.val/d.entOp)*100).toFixed(1):0;
+      var barW=Math.min(pp,100);
+      return '<tr><td>'+c.cat+'</td><td class="r">'+fR2(c.val)+'</td><td class="pct">'+pp+'%</td>'
+        +'<td><div class="bar"><div class="bar-fill" style="width:'+barW+'%;background:'+corPrimaria+'"></div></div></td></tr>';
+    }).join('')
+    +'<tr class="total"><td>Lucro Operacional</td><td class="r">'+fR2(d.entOp-d.saiOp)+'</td><td class="pct">'+pct(d.entOp-d.saiOp,d.entOp)+'</td><td></td></tr>'
+    +'</tbody></table></div>':'')
+
+    // TICKET MÉDIO
+    +'<div class="sec"><div class="sec-title">Ticket Médio (Período Total)</div>'
+    +'<table><thead><tr><th>Item</th><th class="r">Valor Médio</th><th class="r">Quantidade</th></tr></thead><tbody>'
+    +'<tr><td>Ticket Médio de Venda</td><td class="r">'+fR2(ticketVenda)+'</td><td class="r">'+numVendas+' vendas</td></tr>'
+    +'<tr><td>Ticket Médio de Compra</td><td class="r">'+fR2(ticketCompra)+'</td><td class="r">'+numCompras+' compras</td></tr>'
+    +'</tbody></table></div>'
+
+    // TOP MATERIAIS
+    +(d.matList&&d.matList.length?'<div class="sec"><div class="sec-title">Top Materiais Comprados</div>'
+    +'<table><thead><tr><th>#</th><th>Material</th><th class="r">Kg</th><th class="r">R$/kg</th><th class="r">Total Investido</th></tr></thead><tbody>'
+    +d.matList.slice(0,8).map(function(m,i){
+      return '<tr><td style="color:#888">'+(i+1)+'</td><td>'+m.nome+'</td><td class="r">'+m.peso.toFixed(2)+'</td><td class="r">'+fR2(m.preco)+'</td><td class="r">'+fR2(m.val)+'</td></tr>';
+    }).join('')
+    +'</tbody></table></div>':'')
+
+    // RODAPÉ
+    +'<div class="footer">'
+    +'<span>'+nomeEmp+' - Reciclagem de Eletrônicos'+(endEmp?' | '+endEmp:'')+'</span>'
+    +'<span>Gerado pelo BioVale em '+hoje+'</span>'
+    +'</div>'
+
+    +'</div>'
+    +'<script>window.onload=function(){window.print();}</'+'script>'
+    +'</body></html>';
+
+  _printHTML(html);
+}
+
+function _gestorSetPeriodo(p){
+  swFinPeriodo(p);
+  var perBtns=document.getElementById('gestora-per');
+  if(!perBtns)return;
+  var btns=perBtns.querySelectorAll('button');
+  var labels={'hoje':'Hoje','semana':'Esta Semana','mes':'Este Mês','trimestre':'Trimestre','ano':'Este Ano'};
+  var keys=Object.keys(labels);
+  btns.forEach(function(btn,i){
+    var sel=keys[i]===p;
+    btn.style.border='1px solid '+(sel?'#d4af37':'var(--bd)');
+    btn.style.background=sel?'rgba(212,175,55,.15)':'var(--s2)';
+    btn.style.color=sel?'#d4af37':'var(--mt)';
+    btn.style.fontWeight=sel?'700':'400';
+  });
+}
+
+function _gestorColetarHistorico(){
+  var hoje=new Date();
+  var numMeses={'mes':6,'trimestre':6,'semestre':9,'ano':13,'tudo':13}[_finPeriodo]||6;
+  var meses=[];
+  for(var i=numMeses-1;i>=0;i--){
+    var d=new Date(hoje.getFullYear(),hoje.getMonth()-i,1);
+    var mes=d.getMonth();var ano=d.getFullYear();
+    var label=d.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'});
+    var movsM=(DB.movs||[]).filter(function(m){
+      var dm=_parseDataBR(m.data);
+      return dm&&dm.getMonth()===mes&&dm.getFullYear()===ano;
+    });
+    var entM=0,saiM=0,entOpM=0,saiOpM=0;
+    for(var j=0;j<movsM.length;j++){
+      var mv=movsM[j];
+      if(mv.tipo==='entrada')entM+=mv.valor;else saiM+=mv.valor;
+      if(!_isMovInterna(mv)){if(mv.tipo==='entrada')entOpM+=mv.valor;else saiOpM+=mv.valor;}
+    }
+    if(entM>0||saiM>0){
+      meses.push({label:label,ent:entM,sai:saiM,resultado:entM-saiM,
+        margem:entM>0?(((entM-saiM)/entM)*100).toFixed(1):0,
+        entOp:entOpM,saiOp:saiOpM,
+        margemOp:entOpM>0?(((entOpM-saiOpM)/entOpM)*100).toFixed(1):0});
+    }
+  }
+  return meses;
+}
+
+function _gestorHistoricoStr(meses){
+  if(!meses||!meses.length)return 'Sem histórico disponível.';
+  return meses.map(function(m){
+    return '  '+m.label+': Receita '+fR(m.ent)+' | Resultado '+fR(m.resultado)+' | Margem '+m.margem+'% | Margem Op. '+m.margemOp+'%';
+  }).join('\n');
+}
+
+function _gestorHistoricoGrafico(meses){
+  if(!meses||!meses.length)return '';
+  var maxVal=Math.max.apply(null,meses.map(function(m){return m.ent||0;}));
+  if(!maxVal)return '';
+  var h='<div style="background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:12px">'
+    +'<div style="font-size:12px;font-weight:700;margin-bottom:14px">📈 Evolução por Mês</div>'
+    +'<div style="display:flex;align-items:flex-end;gap:3px;height:80px;border-bottom:1px solid var(--bd);padding-bottom:4px">';
+  meses.forEach(function(m){
+    var hEnt=Math.round(((m.ent||0)/maxVal)*72);
+    var hRes=m.resultado>=0?Math.round(((m.resultado||0)/maxVal)*72):0;
+    var corRes=m.resultado>=0?'var(--gr)':'var(--rd)';
+    h+='<div style="flex:1;display:flex;flex-direction:column;align-items:center">'
+      +'<div title="Receita: '+fR(m.ent)+' | Resultado: '+fR(m.resultado)+'" style="width:100%;max-width:32px;height:'+hEnt+'px;background:rgba(59,130,246,.35);border-radius:3px 3px 0 0;position:relative;cursor:pointer">'
+      +(hRes>0?'<div style="position:absolute;bottom:0;left:0;right:0;height:'+hRes+'px;background:'+corRes+';opacity:.85;border-radius:3px 3px 0 0"></div>':'')
+      +'</div></div>';
+  });
+  h+='</div><div style="display:flex;gap:3px;margin-top:5px">';
+  meses.forEach(function(m){
+    h+='<div style="flex:1;text-align:center;font-size:8px;color:var(--mt);overflow:hidden">'+m.label+'</div>';
+  });
+  h+='</div><div style="display:flex;gap:14px;margin-top:8px;font-size:10px;color:var(--mt)">'
+    +'<span><span style="display:inline-block;width:10px;height:6px;background:rgba(59,130,246,.35);border-radius:2px;margin-right:3px;vertical-align:middle"></span>Receita</span>'
+    +'<span><span style="display:inline-block;width:10px;height:6px;background:var(--gr);border-radius:2px;margin-right:3px;vertical-align:middle"></span>Resultado</span>'
+    +'</div></div>';
+  return h;
+}
+
+function _gestorColetarDados(){
+  var periodo=_finPeriodo||'mes';
+  var movs=_filtrarMovsPeriodo(DB.movs);
+  var ent=0,sai=0;
+  for(var i=0;i<movs.length;i++){if(movs[i].tipo==='entrada')ent+=movs[i].valor;else sai+=movs[i].valor;}
+  var sal=0;for(var i=0;i<DB.contas.length;i++)sal+=DB.contas[i].saldo;
+  var resultado=ent-sai;
+  var movsOp=movs.filter(function(m){return!_isMovInterna(m);});
+  var entOp=movsOp.filter(function(m){return m.tipo==='entrada';}).reduce(function(a,m){return a+m.valor;},0);
+  var saiOp=movsOp.filter(function(m){return m.tipo==='saida';}).reduce(function(a,m){return a+m.valor;},0);
+  var cats={};
+  for(var i=0;i<movs.length;i++){var m=movs[i];if(m.tipo!=='saida')continue;var c=m.cat||'Outros';cats[c]=(cats[c]||0)+m.valor;}
+  var catsArr=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];}).map(function(c){return {cat:c,val:cats[c],pct:sai>0?((cats[c]/sai)*100).toFixed(1):0};});
+  var catsStr=catsArr.map(function(x){return '  '+x.cat+': '+fR(x.val)+' ('+x.pct+'% das saídas)';}).join('\n');
+  var pendentes=DB.pesagensEmAberto||[];
+  var totPend=pendentes.reduce(function(a,p){return a+Math.abs(p.valTotalLiq||p.valTotal||0);},0);
+  var totalFixas=0,fixasVenc=0;
+  for(var i=0;i<DB.contasFixas.length;i++){var cf=DB.contasFixas[i];var v=_cfValorMes(cf);totalFixas+=v;if(_cfStatusMes(cf)==='Vencida')fixasVenc+=v;}
+  var totalRevenda=0,qtdRevenda=0;
+  for(var i=0;i<DB.revenda.length;i++){var r=DB.revenda[i];if(r.status==='disponivel'){qtdRevenda++;totalRevenda+=(r.precoVenda||0);}}
+  var matMap={};
+  function _procAtend(atend){
+    if(atend.tipo!=='Compra'&&atend.tipo!=='Logistica Reversa')return;
+    var itens=atend.itensList||atend.itens||[];
+    for(var k=0;k<itens.length;k++){var it=itens[k];if(it.uni)continue;var nm=it.nome||it.prod||'?';var peso=it.pesoLiquido||it.peso||0;var val=(peso*(it.preco||0));if(!matMap[nm])matMap[nm]={peso:0,val:0};matMap[nm].peso+=peso;matMap[nm].val+=val;}
+  }
+  for(var i=0;i<atendHist.length;i++)_procAtend(atendHist[i]);
+  if(DB.caixasHist){for(var i=0;i<DB.caixasHist.length;i++){var mvs2=DB.caixasHist[i].movimentos||[];for(var j=0;j<mvs2.length;j++)_procAtend(mvs2[j]);}}
+  var matList=Object.keys(matMap).map(function(k){return{nome:k,peso:matMap[k].peso,val:matMap[k].val,preco:matMap[k].peso>0?matMap[k].val/matMap[k].peso:0};}).sort(function(a,b){return b.val-a.val;}).slice(0,10);
+  var matStr=matList.map(function(m,i){return '  '+(i+1)+'. '+m.nome+': '+m.peso.toFixed(2)+'kg | R$/kg: '+m.preco.toFixed(2)+' | Total: '+fR(m.val);}).join('\n');
+  var periodoLabel={'hoje':'Hoje','semana':'Esta Semana','mes':'Este Mês','trimestre':'Este Trimestre','ano':'Este Ano'}[periodo]||periodo;
+  var empresa=CFG.empresa||{};
+  // Guarda dados estruturados para gráficos
+  var hist=_gestorColetarHistorico();
+  window._gestoraDadosCache={catsArr:catsArr,matList:matList,ent:ent,sai:sai,entOp:entOp,saiOp:saiOp,sal:sal,resultado:resultado,hist:hist};
+  return 'RELATÓRIO FINANCEIRO — '+(empresa.nome||'BIOVALE')+'\nPeríodo: '+periodoLabel+'\nData: '+(new Date().toLocaleDateString('pt-BR'))+'\n'
+    +'\n=== RESULTADO GERAL ===\nReceita bruta: '+fR(ent)+'\nTotal saídas: '+fR(sai)+'\nResultado: '+fR(resultado)+' ('+(resultado>=0?'Superávit':'Déficit')+')\nMargem geral: '+(ent>0?((resultado/ent)*100).toFixed(1):0)+'%\n'
+    +'\n=== OPERACIONAL (sem movimentações internas) ===\nReceita operacional: '+fR(entOp)+'\nDespesa operacional: '+fR(saiOp)+'\nResultado operacional: '+fR(entOp-saiOp)+'\n'+(entOp>0?'Margem operacional: '+(((entOp-saiOp)/entOp)*100).toFixed(1)+'%\n':'')
+    +'\n=== CAIXA ===\nSaldo atual: '+fR(sal)+'\nPendências em aberto: '+fR(totPend)+' ('+pendentes.length+' atendimento(s))\nContas fixas do mês: '+fR(totalFixas)+(fixasVenc>0?' | Vencidas: '+fR(fixasVenc):'')+'\n'
+    +'\n=== ESTRUTURA DE GASTOS ===\n'+catsStr+'\n'
+    +'\n=== TOP 10 MATERIAIS COMPRADOS ===\n'+matStr+'\n'
+    +'\n=== ESTOQUE REVENDA ===\nUnidades disponíveis: '+qtdRevenda+'\nValor estimado: '+fR(totalRevenda)+'\n'
+    +'\n=== HISTÓRICO MENSAL ===\n'+_gestorHistoricoStr(hist)+'\n'
+    +'\n=== EMPRESA ===\nNome: '+(empresa.nome||'BioVale')+'\nLocalização: Ipatinga/MG\nSetor: Reciclagem de eletrônicos\n';
+}
+
+function _gestorRenderDados(){
+  var d=window._gestoraDadosCache;if(!d)return '';
+  var margGeral=d.ent>0?((d.resultado/d.ent)*100).toFixed(1):0;
+  var margOp=d.entOp>0?(((d.entOp-d.saiOp)/d.entOp)*100).toFixed(1):0;
+  // KPI cards
+  var kpiH='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'
+    +_gestoraKPI('Receita Bruta',fR(d.ent),'var(--gr)')
+    +_gestoraKPI('Resultado',fR(d.resultado),(d.resultado>=0?'var(--gr)':'var(--rd)'))
+    +_gestoraKPI('Margem Geral',margGeral+'%',(margGeral>15?'var(--gr)':'var(--rd)'))
+    +_gestoraKPI('Margem Operacional',margOp+'%',(margOp>30?'var(--gr)':'var(--or)'))
+    +_gestoraKPI('Saldo em Caixa',fR(d.sal),'var(--bl)')
+    +_gestoraKPI('Total Saídas',fR(d.sai),'var(--mt)')
+    +'</div>';
+  // Gráfico de barras: top materiais
+  var matH='';
+  if(d.matList&&d.matList.length){
+    var maxMat=d.matList[0].val||1;
+    matH='<div style="background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:12px">'
+      +'<div style="font-size:12px;font-weight:700;margin-bottom:12px">📦 Top Materiais Comprados</div>';
+    for(var i=0;i<Math.min(d.matList.length,8);i++){
+      var m=d.matList[i];var pct=Math.round((m.val/maxMat)*100);
+      var cor=i<3?'#d4af37':i<6?'var(--bl)':'var(--mt)';
+      matH+='<div style="margin-bottom:8px">'
+        +'<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">'
+        +'<span style="font-weight:600">'+m.nome+'</span>'
+        +'<span style="color:var(--mt)">'+fR(m.val)+' · R$'+m.preco.toFixed(0)+'/kg</span></div>'
+        +'<div style="height:6px;background:var(--s2);border-radius:3px;overflow:hidden">'
+        +'<div style="height:100%;width:'+pct+'%;background:'+cor+';border-radius:3px;transition:width .6s ease"></div></div></div>';
+    }
+    matH+='</div>';
+  }
+  // Gráfico de pizza CSS: estrutura de custos
+  var catH='';
+  if(d.catsArr&&d.catsArr.length){
+    var cores=['#d4af37','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#84cc16'];
+    catH='<div style="background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:12px">'
+      +'<div style="font-size:12px;font-weight:700;margin-bottom:12px">💸 Estrutura de Gastos</div>';
+    for(var i=0;i<d.catsArr.length;i++){
+      var c=d.catsArr[i];var cor=cores[i%cores.length];
+      catH+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+        +'<div style="width:10px;height:10px;border-radius:50%;background:'+cor+';flex-shrink:0"></div>'
+        +'<div style="flex:1;font-size:11px">'+c.cat+'</div>'
+        +'<div style="font-size:11px;font-weight:700;color:'+cor+'">'+c.pct+'%</div>'
+        +'<div style="width:80px;height:5px;background:var(--s2);border-radius:3px;overflow:hidden;flex-shrink:0">'
+        +'<div style="height:100%;width:'+c.pct+'%;background:'+cor+';border-radius:3px"></div></div></div>';
+    }
+    catH+='</div>';
+  }
+  var histH=d.hist?_gestorHistoricoGrafico(d.hist):'';return kpiH+histH+matH+catH;
+}
+
+function _gestoraKPI(label,val,cor){
+  return '<div style="background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:12px">'
+    +'<div style="font-size:10px;color:var(--mt);margin-bottom:4px">'+label+'</div>'
+    +'<div style="font-size:16px;font-weight:800;color:'+cor+';font-family:monospace">'+val+'</div>'
+    +'</div>';
+}
+
+var _gestoraHistorico=[];
+
+async function _gestorAnalisar(){
+  var key=CFG.sistema.anthropicKey||'';
+  if(!key){go('configuracoes','ia');return;}
+  var btn=document.getElementById('gestora-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Analisando...';}
+  var dados=_gestorColetarDados();
+  // Renderiza KPIs e gráficos imediatamente
+  var resEl=document.getElementById('gestora-result');
+  if(resEl)resEl.innerHTML=_gestorRenderDados()+'<div id="gestora-analise-texto"></div>';
+  // Loading no texto
+  var textoEl=document.getElementById('gestora-analise-texto');
+  if(textoEl)textoEl.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:14px;background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);color:var(--mt);font-size:13px;margin-top:4px"><span style="display:flex;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:#d4af37;animation:bvPulse .8s ease infinite;display:inline-block"></span><span style="width:7px;height:7px;border-radius:50%;background:#d4af37;animation:bvPulse .8s ease .2s infinite;display:inline-block"></span><span style="width:7px;height:7px;border-radius:50%;background:#d4af37;animation:bvPulse .8s ease .4s infinite;display:inline-block"></span></span>Gestora analisando os dados...</div>';
+  _gestoraHistorico=[];
+  var prompt='Analise os dados financeiros reais da BioVale:\n\n'+dados+'\n\n'
+    +'IMPORTANTE: Os dados visuais (KPIs, gráficos, histórico mensal) já foram exibidos automaticamente. '
+    +'Não repita os números brutos. Foque em INTERPRETAÇÃO e RECOMENDAÇÕES.\n\n'
+    +'Estruture a resposta assim (use exatamente esses títulos):\n\n'
+    +'### Diagnóstico Rápido\n2-3 frases diretas sobre o estado do negócio.\n\n'
+    +'### Pontos de Atenção\nMáximo 3 alertas críticos com ação concreta para cada um.\n\n'
+    +'### Oportunidades Imediatas\nMáximo 3 oportunidades com impacto estimado.\n\n'
+    +'### Plano da Semana\n3 ações específicas para fazer ainda essa semana, em ordem de prioridade.';
+  try{
+    var resp=await _gestoraAPI([{role:'user',content:prompt}]);
+    _gestoraHistorico=[{role:'user',content:prompt},{role:'assistant',content:resp}];
+    if(textoEl)textoEl.innerHTML=_gestoraFormatarMsg(resp);
+    var q=document.getElementById('gestora-quick');if(q)q.style.display='block';
+    var a=document.getElementById('gestora-ask');if(a)a.style.display='block';
+  }catch(e){
+    if(textoEl)textoEl.innerHTML='<div class="al alr">🚨 Erro: '+e.message+'</div>';
+  }
+  if(btn){btn.disabled=false;btn.textContent='&#128188; Analisar Financeiro Completo';}
+}
+
+async function _gestoraPergunta(q,isQuick){
+  if(!_gestoraHistorico.length){alert('Faça a análise completa primeiro.');return;}
+  if(!q){var inp=document.getElementById('gestora-inp');q=inp?inp.value.trim():'';if(q&&inp)inp.value='';}
+  if(!q)return;
+  var chat=document.getElementById('gestora-chat');
+  if(chat){
+    var uDiv=document.createElement('div');
+    uDiv.style.cssText='margin-bottom:10px';
+    uDiv.innerHTML='<div style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:10px 14px;margin-left:30px;font-size:13px">'+q+'</div>';
+    chat.appendChild(uDiv);
+  }
+  var msgs=[..._gestoraHistorico,{role:'user',content:q}];
+  _gestoraHistorico.push({role:'user',content:q});
+  var loadDiv=document.createElement('div');
+  loadDiv.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);color:var(--mt);font-size:12px;margin-bottom:10px"><span style="display:flex;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:#d4af37;animation:bvPulse .8s ease infinite;display:inline-block"></span><span style="width:6px;height:6px;border-radius:50%;background:#d4af37;animation:bvPulse .8s ease .2s infinite;display:inline-block"></span></span>Analisando...</div>';
+  if(chat)chat.appendChild(loadDiv);
+  try{
+    var resp=await _gestoraAPI(msgs);
+    _gestoraHistorico.push({role:'assistant',content:resp});
+    loadDiv.innerHTML='<div style="background:linear-gradient(135deg,rgba(212,175,55,.06),rgba(34,197,94,.04));border:1px solid rgba(212,175,55,.2);border-radius:var(--r);padding:14px;margin-bottom:10px;font-size:13px;line-height:1.7">'+_gestoraFormatarMsg(resp)+'</div>';
+  }catch(e){loadDiv.innerHTML='<div class="al alr" style="margin-bottom:10px">Erro: '+e.message+'</div>';}
+  loadDiv.scrollIntoView({behavior:'smooth',block:'end'});
+}
+
+function _gestoraFormatarMsg(txt){
+  return txt
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/### (.+)/g,'<div style="font-size:13px;font-weight:800;color:#d4af37;margin:16px 0 8px;padding-top:12px;border-top:1px solid var(--bd)">$1</div>')
+    .replace(/^[-•] (.+)/gm,'<div style="display:flex;gap:8px;margin:4px 0;font-size:12px"><span style="color:var(--gr);flex-shrink:0;margin-top:1px">●</span><span>$1</span></div>')
+    .replace(/⚠️ ?(.+)/g,'<div style="background:rgba(245,158,11,.1);border-left:3px solid var(--or);padding:8px 12px;border-radius:0 6px 6px 0;margin:6px 0;font-size:12px;color:#fcd34d">⚠️ $1</div>')
+    .replace(/🚨 ?(.+)/g,'<div style="background:rgba(239,68,68,.1);border-left:3px solid var(--rd);padding:8px 12px;border-radius:0 6px 6px 0;margin:6px 0;font-size:12px;color:#fca5a5">🚨 $1</div>')
+    .replace(/✅ ?(.+)/g,'<div style="background:var(--grb);border-left:3px solid var(--gr);padding:8px 12px;border-radius:0 6px 6px 0;margin:6px 0;font-size:12px;color:#86efac">✅ $1</div>')
+    .replace(/🎯 ?(.+)/g,'<div style="background:rgba(59,130,246,.1);border-left:3px solid var(--bl);padding:8px 12px;border-radius:0 6px 6px 0;margin:6px 0;font-size:12px;color:#93c5fd">🎯 $1</div>')
+    .replace(/\n/g,'<br>');
+}
+
+async function _gestoraAPI(msgs){
+  var key=CFG.sistema.anthropicKey||'';
+  if(!key)throw new Error('Chave API não configurada. Vá em Configurações → IA.');
+  var resp=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2000,
+      system:'Você é uma gestora financeira especializada em empresas de reciclagem e gestão de resíduos eletrônicos (REEE) no Brasil, trabalhando exclusivamente para a BioVale de Ipatinga/MG.\n\nCONTEXTO COMPLETO DO NEGÓCIO:\n\nModelo de operação: A BioVale adquire resíduos eletrônicos (e-lixo) de três formas — (1) compra pagando por kg de pessoas físicas (CPF) e empresas (CNPJ), (2) recebe doações de empresas com CNPJ que precisam de destinação correta com emissão de MTR, e (3) recebe doações de pessoas físicas (CPF). O material recebido é desmontado, triado e limpo internamente. Componentes de valor são vendidos por kg para compradores especializados (fundições, exportadores, recicladores de metais preciosos). Equipamentos funcionais são revendidos por unidade.\n\nNuances críticas do modelo:\n- O preço de compra do material é imediato, mas o retorno vem semanas ou meses depois na venda — há um ciclo financeiro que exige capital de giro\n- O valor real de um lote só é conhecido após desmontagem — uma "placa pesada" pode conter processadores dourados que mudam completamente a rentabilidade\n- Há perdas e descarte — nem todo material comprado gera receita; plásticos, capacitores e materiais sem valor precisam de destinação\n- Volume comprado ≠ volume vendido — a diferença é perda operacional normal do processo\n- Preços de compra são diretamente indexados às cotações internacionais de ouro, cobre, paládio e outros metais\n- O MTR (Manifesto de Transporte de Resíduos) é um diferencial competitivo real — permite atender empresas que exigem conformidade legal no descarte\n\nDois mercados completamente diferentes:\n- FORNECEDORES (quem traz material): pessoas físicas que limpam casa/escritório, pequenas empresas, grandes corporações com programas de descarte\n- COMPRADORES (quem compra o processado): fundições, exportadores, recicladores de metais preciosos, compradores de componentes\n\nSazonalidade:\n- Fim de ano: empresas descartam mais equipamentos (renovação de TI)\n- Janeiro-fevereiro: volume menor, mercado mais fraco\n- Cotação de metais: volatilidade constante impacta margens\n\nDiferenças dos comércios tradicionais:\n- Não existe "estoque de prateleira" — o material processado é commodity\n- Não há markup fixo — a margem depende do preço de compra do material E da cotação dos metais no momento da venda\n- O custo principal (compra de material) é variável e imprevisível\n- A receita de doações tem custo zero de aquisição mas exige gestão de MTR\n- Logística de coleta é custo operacional relevante\n\nSEU PAPEL: Analisar os dados com profundidade considerando TODAS essas especificidades. Nunca dar conselhos genéricos de varejo. Sempre contextualizar com a realidade de reciclagem. Seja direta, honesta e acionável. Use ### para seções, **negrito** para destaques, ⚠️/🚨/✅/🎯 para alertas. Sem repetir dados brutos já exibidos na tela.',
+      messages:msgs})
+  });
+  if(!resp.ok){var e=await resp.text();throw new Error(resp.status+': '+e);}
+  var d=await resp.json();
+  return d.content.map(function(b){return b.type==='text'?b.text:'';}).join('');
 }
 
 function _mvTotal(mv){
@@ -10569,8 +11053,10 @@ function saveMov(tipo){
 
 
 var agVw='semana';
+var agSubTab='cal'; // 'cal' = Calendário | 'pre' = Pré-Agenda
 var agMesRef=null; // {year,month} para visao mensal
 var agSemRef=null; // {year,month,day} início da semana
+var _agConvertPreId=null; // id do item da Pré-Agenda sendo convertido em coleta oficial
 
 // ── STATUS helpers ──────────────────────────────────────────
 // Novo fluxo: Agendada → Confirmada → Em Rota → Coletada | Pendente | Cancelada
@@ -10597,19 +11083,26 @@ function stBadge(s){
   return '<span style="background:'+cor+'20;color:'+cor+';border:1px solid '+cor+'40;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;white-space:nowrap">'+stIcCol(s)+' '+s+'</span>';
 }
 // Botões de ação por status — avança no fluxo
+// Passo anterior no fluxo — usado pelo botão "◀ Voltar" (corrige status marcado errado)
+var _statusVoltarAdmin={'Confirmada':'Agendada','Em Rota':'Confirmada','Coletada':'Em Rota','Cancelada':'Agendada'};
+var _statusVoltarMot={'Em Rota':'Confirmada','Coletada':'Em Rota'};
 function stAcoes(col){
   var id=col.id;var s=col.status;var btns='';
   if(CU.perfil==='motorista'){
     if(s==='Confirmada')btns+='<button class="bsm" style="background:#a855f720;color:#a855f7;border:1px solid #a855f740" onclick="updCol('+id+',\'Em Rota\')">🚛 Iniciar Rota</button>';
-    if(s==='Em Rota')btns+='<button class="bsm bsmg" onclick="updCol('+id+',\'Coletada\')">✔️ Marcar Coletada</button>';
-    if(s==='Em Rota')btns+='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="updCol('+id+',\'Pendente\')">⏳ Pendente</button>';
+    if(s==='Em Rota')btns+='<button class="bsm bsmg" onclick="updCol('+id+',\'Coletada\')">✔️ Coleta Concluída</button>';
+    if(s==='Em Rota')btns+='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="updCol('+id+',\'Pendente\')">⏳ Marcar Pendente</button>';
+    if(s==='Pendente')btns+='<button class="bsm bsmg" onclick="updCol('+id+',\'Em Rota\')">🔄 Voltar pra Rota</button>';
+    if(_statusVoltarMot[s])btns+='<button style="background:var(--s3);color:var(--mt);border:1px solid var(--bd);border-radius:6px;padding:4px 10px;font-size:11px" onclick="updCol('+id+',\''+_statusVoltarMot[s]+'\')" title="Marquei errado, corrigir">◀ Voltar</button>';
     return btns?'<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--bd);display:flex;gap:5px;flex-wrap:wrap">'+btns+'</div>':'';
   }
   // admin/operador
   if(s==='Agendada')btns+='<button class="bsm bsmg" onclick="updCol('+id+',\'Confirmada\')">✅ Confirmar</button>';
-  if(s==='Confirmada')btns+='<button class="bsm" style="background:#a855f720;color:#a855f7;border:1px solid #a855f740" onclick="updCol('+id+',\'Em Rota\')">🚛 Em Rota</button>';
-  if(s==='Em Rota')btns+='<button class="bsm bsmg" onclick="updCol('+id+',\'Coletada\')">✔️ Coletada</button>';
-  if(s!=='Cancelada'&&s!=='Coletada')btns+='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="updCol('+id+',\'Pendente\')">⏳ Pendente</button>';
+  if(s==='Confirmada')btns+='<button class="bsm" style="background:#a855f720;color:#a855f7;border:1px solid #a855f740" onclick="updCol('+id+',\'Em Rota\')">🚛 Iniciar Rota</button>';
+  if(s==='Em Rota')btns+='<button class="bsm bsmg" onclick="updCol('+id+',\'Coletada\')">✔️ Coleta Concluída</button>';
+  if(s==='Pendente')btns+='<button class="bsm bsmg" onclick="updCol('+id+',\'Agendada\')">🔄 Reagendar</button>';
+  if(s!=='Cancelada'&&s!=='Coletada'&&s!=='Pendente')btns+='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="updCol('+id+',\'Pendente\')">⏳ Marcar Pendente</button>';
+  if(_statusVoltarAdmin[s])btns+='<button style="background:var(--s3);color:var(--mt);border:1px solid var(--bd);border-radius:6px;padding:4px 10px;font-size:11px" onclick="updCol('+id+',\''+_statusVoltarAdmin[s]+'\')" title="Marquei errado, corrigir">◀ Voltar</button>';
   btns+='<button style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:6px;padding:4px 10px;font-size:11px" onclick="notifC('+id+')">📲 Notificar</button>';
   btns+='<button style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:4px 10px;font-size:11px" onclick="mEditCol('+id+')">✏️ Editar</button>';
   if(col.end||col.bairro)btns+='<button onclick="abrirMapsCol('+id+')" style="background:#1a73e820;color:#1a73e8;border:1px solid #1a73e840;border-radius:6px;padding:4px 10px;font-size:11px">🗺️ Maps</button>';
@@ -10915,25 +11408,265 @@ function pgAgenda(){
   else if(agVw==='mes')conteudo=buildMes();
   else if(agVw==='dia')conteudo=buildDia();
 
+  // ── SUB-ABAS: Calendário | Pré-Agenda ───────────────
+  var preAtivos=(DB.preAgenda||[]).filter(function(p){return p.status!=='convertido';});
+  var subTabsHTML='<div style="display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--bd)">'+
+    '<button onclick="swAgSub(\'cal\')" style="background:none;border:none;border-bottom:2px solid '+(agSubTab==='cal'?'var(--gr)':'transparent')+';color:'+(agSubTab==='cal'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer;display:flex;align-items:center;gap:5px">🗓️ Calendário</button>'+
+    '<button onclick="swAgSub(\'pre\')" style="background:none;border:none;border-bottom:2px solid '+(agSubTab==='pre'?'var(--gr)':'transparent')+';color:'+(agSubTab==='pre'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer;display:flex;align-items:center;gap:5px">📋 Pré-Agenda'+
+      (preAtivos.length?' <span style="background:var(--or);color:#1a1200;border-radius:10px;padding:1px 7px;font-size:10px">'+preAtivos.length+'</span>':'')+
+    '</button>'+
+    '</div>';
+
+  var acoesTopo=agSubTab==='pre'
+    ? (CU.perfil!=='motorista'?'<button class="btn" onclick="mNovoInteressado()">+ Novo Interessado</button>':'')
+    : '<button class="tabbtn'+(agVw==='dia'?' on':'')+'" onclick="swAg(\'dia\')">📅 Hoje</button>'+
+      '<button class="tabbtn'+(agVw==='semana'?' on':'')+'" onclick="swAg(\'semana\')">📆 Semana</button>'+
+      '<button class="tabbtn'+(agVw==='mes'?' on':'')+'" onclick="swAg(\'mes\')">🗓️ Mês</button>'+
+      '<button class="tabbtn'+(agVw==='lista'?' on':'')+'" onclick="swAg(\'lista\')">☰ Lista</button>'+
+      (CU.perfil!=='motorista'?'<button class="btn" onclick="mNovaCol()">+ Nova Coleta</button>':'');
+
+  var corpo=agSubTab==='pre'
+    ? _buildPreAgenda(preAtivos)
+    : '<div class="g4">'+
+      sc('📅','Agendadas',ag,'aguardando','var(--bl)')+
+      sc('✅','Confirmadas',conf,'','var(--gr)')+
+      sc('🚛','Em Rota',rota,'','var(--pu)')+
+      sc('✔️','Coletadas',col,'','#10b981')+
+      '</div>'+
+      legendaHTML+
+      '<div class="card">'+conteudo+'</div>';
+
   return '<div class="fc">'+
     '<div class="ptop">'+
     '<div><div class="pl">Logistica</div><div class="pt">Agenda de Coletas</div></div>'+
-    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
-    '<button class="tabbtn'+(agVw==='dia'?' on':'')+'" onclick="swAg(\'dia\')">📅 Hoje</button>'+
-    '<button class="tabbtn'+(agVw==='semana'?' on':'')+'" onclick="swAg(\'semana\')">📆 Semana</button>'+
-    '<button class="tabbtn'+(agVw==='mes'?' on':'')+'" onclick="swAg(\'mes\')">🗓️ Mês</button>'+
-    '<button class="tabbtn'+(agVw==='lista'?' on':'')+'" onclick="swAg(\'lista\')">☰ Lista</button>'+
-    (CU.perfil!=='motorista'?'<button class="btn" onclick="mNovaCol()">+ Nova Coleta</button>':'')+
-    '</div></div>'+
-    '<div class="g4">'+
-    sc('📅','Agendadas',ag,'aguardando','var(--bl)')+
-    sc('✅','Confirmadas',conf,'','var(--gr)')+
-    sc('🚛','Em Rota',rota,'','var(--pu)')+
-    sc('✔️','Coletadas',col,'','#10b981')+
-    '</div>'+
-    legendaHTML+
-    '<div class="card">'+conteudo+'</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+acoesTopo+'</div></div>'+
+    subTabsHTML+
+    corpo+
     '</div>';
+}
+function swAgSub(v){agSubTab=v;go('agenda');}
+
+// ══════════════════════════════════════════════════════
+// PRÉ-AGENDA — banco de interessados agrupados por bairro
+// ══════════════════════════════════════════════════════
+function _preTipoBadge(tipo){
+  var pj=tipo==='PJ';
+  return '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:'+(pj?'var(--blb)':'var(--grb)')+';color:'+(pj?'var(--bl)':'var(--gr)')+'">'+(pj?'🏢 Empresa':'🙋 Pessoa')+'</span>';
+}
+
+function _buildPreAgenda(preAtivos){
+  var limite=DB.preAgendaLimite||3;
+  if(!preAtivos.length){
+    return '<div class="card" style="text-align:center;padding:40px;color:var(--mt)">'
+      +'<div style="font-size:32px;margin-bottom:10px">📋</div>'
+      +'<div style="font-weight:700;margin-bottom:4px">Nenhum interessado na Pré-Agenda</div>'
+      +'<div style="font-size:12px">Cadastre pessoas/empresas aguardando coleta para agrupar por bairro e economizar rota.</div></div>';
+  }
+  // Agrupa por bairro
+  var grupos={};
+  preAtivos.forEach(function(p){
+    var b=(p.bairro||'').trim()||'Sem bairro';
+    if(!grupos[b])grupos[b]=[];
+    grupos[b].push(p);
+  });
+  var bairros=Object.keys(grupos).sort(function(a,b){return grupos[b].length-grupos[a].length;});
+  var prontos=bairros.filter(function(b){return grupos[b].length>=limite;}).length;
+
+  var html='<div class="g4">'
+    +sc('📋','Aguardando',preAtivos.length,'','var(--or)')
+    +sc('🗺️','Bairros',bairros.length,'','var(--bl)')
+    +sc('🚛','Rotas prontas',prontos,'atingiram o limite de '+limite,'var(--gr)')
+    +sc('🎯','Limite p/ rota',limite,'configurável','var(--pu)')
+    +'</div>';
+
+  bairros.forEach(function(bairro){
+    var pessoas=grupos[bairro];
+    var pronto=pessoas.length>=limite;
+    html+='<div class="card" style="margin-bottom:12px;'+(pronto?'border-color:var(--gr);box-shadow:0 0 0 1px rgba(34,197,94,.25)':'')+'">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<span style="font-size:15px;font-weight:800">📍 '+bairro+'</span>'
+      +'<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+(pronto?'var(--grb);color:var(--gr)':'var(--s2);color:var(--mt)')+'">'+pessoas.length+' aguardando</span>'
+      +(pronto?'<span style="font-size:10px;color:var(--gr);font-weight:700">✓ pronto pra rota</span>':'')
+      +'</div>'
+      +'<button onclick="mAgendarRotaBairro(\''+bairro.replace(/'/g,"\\'")+'\')" style="background:'+(pronto?'var(--gr)':'var(--s2)')+';color:'+(pronto?'#062':'var(--tx)')+';border:1px solid '+(pronto?'var(--gr)':'var(--bd)')+';border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">🗺️ Agendar Rota deste Bairro</button>'
+      +'</div>';
+    pessoas.forEach(function(p){
+      html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;background:var(--s2);border-radius:8px;padding:9px 12px;margin-bottom:6px">'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+        +'<span style="font-size:13px;font-weight:700">'+p.nome+'</span>'
+        +_preTipoBadge(p.tipo)
+        +'</div>'
+        +'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+(p.mat||'Material não informado')+' &middot; ~'+fKg(p.pesoMedio||0)+'kg'+(p.tel?' &middot; '+p.tel:'')+'</div>'
+        +(p.end?'<div style="font-size:11px;color:var(--mt)">📍 '+p.end+'</div>':'')
+        +(p.obs?'<div style="font-size:11px;color:var(--or);margin-top:2px">⚠ '+p.obs+'</div>':'')
+        +'</div>'
+        +'<div style="display:flex;gap:5px;flex-shrink:0">'
+        +'<button onclick="agendarUmPre('+p.id+')" title="Agendar agora, sozinho" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer">📅</button>'
+        +'<button onclick="mEditPre('+p.id+')" title="Editar" style="background:var(--s3);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer">✏️</button>'
+        +'<button onclick="delPre('+p.id+')" title="Remover" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer">🗑️</button>'
+        +'</div></div>';
+    });
+    html+='</div>';
+  });
+  return html;
+}
+
+function _buildPreForm(p){
+  var bairrosUsados=[...new Set(DB.coletas.map(function(c){return c.bairro||'';}).concat((DB.preAgenda||[]).map(function(x){return x.bairro||'';})).filter(Boolean))];
+  var bairroSugest=bairrosUsados.length?'<datalist id="pre-bairros-list">'+bairrosUsados.map(function(b){return'<option value="'+b+'">';}).join('')+'</datalist>':'';
+  return '<div class="mf">'
+    +bairroSugest
+    +'<div class="fld"><label>Nome *</label><input class="inp" id="pf-nome" value="'+(p&&p.nome?p.nome:'')+'" placeholder="Nome completo ou empresa"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Tipo *</label><select class="inp" id="pf-tipo">'
+    +'<option value="PF"'+(!p||p.tipo==='PF'?' selected':'')+'>🙋 Pessoa (CPF)</option>'
+    +'<option value="PJ"'+(p&&p.tipo==='PJ'?' selected':'')+'>🏢 Empresa (CNPJ)</option>'
+    +'</select></div>'
+    +'<div class="fld"><label>Telefone</label><input class="inp" id="pf-tel" value="'+(p&&p.tel?p.tel:'')+'" placeholder="(31) 99999-0000"></div>'
+    +'</div>'
+    +'<div class="fld"><label>Endereço</label><input class="inp" id="pf-end" value="'+(p&&p.end?p.end:'')+'" placeholder="Rua, número..."></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Bairro</label><input class="inp" id="pf-bairro" list="pre-bairros-list" value="'+(p&&p.bairro?p.bairro:'')+'" placeholder="Ex: Centro, Bethania..."></div>'
+    +'<div class="fld"><label>Material</label><input class="inp" id="pf-mat" value="'+(p&&p.mat?p.mat:'')+'"></div>'
+    +'</div>'
+    +'<div class="fld"><label>Peso médio estimado (kg)</label><input class="inp" type="number" inputmode="decimal" id="pf-peso" value="'+(p&&p.pesoMedio?p.pesoMedio:'')+'"></div>'
+    +'<div class="fld"><label>Obs</label><textarea class="inp" id="pf-obs" rows="2">'+(p&&p.obs?p.obs:'')+'</textarea></div>'
+    +'</div>';
+}
+
+function mNovoInteressado(){
+  openM('+ Novo Interessado — Pré-Agenda',
+    _buildPreForm(null)
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="savePre()">Adicionar</button></div>',560);
+  setTimeout(function(){var n=document.getElementById('pf-nome');if(n)n.focus();},80);
+}
+
+function savePre(){
+  var nome=document.getElementById('pf-nome').value.trim();
+  if(!nome){alert('Digite o nome!');return;}
+  var novo={
+    id:nid(),nome:nome,
+    tipo:document.getElementById('pf-tipo').value||'PF',
+    tel:document.getElementById('pf-tel').value.trim(),
+    end:document.getElementById('pf-end').value.trim(),
+    bairro:document.getElementById('pf-bairro').value.trim(),
+    mat:document.getElementById('pf-mat').value.trim(),
+    pesoMedio:parseFloat(document.getElementById('pf-peso').value)||0,
+    obs:document.getElementById('pf-obs').value.trim(),
+    dataCadastro:_fmtDataBR(_today()),
+    status:'aguardando'
+  };
+  DB.preAgenda.push(novo);
+  saveDB();closeM();agSubTab='pre';go('agenda');
+  toast('Adicionado à Pré-Agenda!','var(--gr)');
+}
+
+function mEditPre(id){
+  var p=null;for(var i=0;i<DB.preAgenda.length;i++){if(DB.preAgenda[i].id===id){p=DB.preAgenda[i];break;}}
+  if(!p)return;
+  openM('Editar Interessado',
+    _buildPreForm(p)
+    +'<div class="brow"><button class="btnO bOr" onclick="delPre('+id+')">🗑️ Remover</button><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveEditPre('+id+')">Salvar</button></div>',560);
+}
+
+function saveEditPre(id){
+  var nome=document.getElementById('pf-nome').value.trim();
+  if(!nome){alert('Digite o nome!');return;}
+  for(var i=0;i<DB.preAgenda.length;i++){
+    if(DB.preAgenda[i].id===id){
+      DB.preAgenda[i].nome=nome;
+      DB.preAgenda[i].tipo=document.getElementById('pf-tipo').value||'PF';
+      DB.preAgenda[i].tel=document.getElementById('pf-tel').value.trim();
+      DB.preAgenda[i].end=document.getElementById('pf-end').value.trim();
+      DB.preAgenda[i].bairro=document.getElementById('pf-bairro').value.trim();
+      DB.preAgenda[i].mat=document.getElementById('pf-mat').value.trim();
+      DB.preAgenda[i].pesoMedio=parseFloat(document.getElementById('pf-peso').value)||0;
+      DB.preAgenda[i].obs=document.getElementById('pf-obs').value.trim();
+      break;
+    }
+  }
+  saveDB();closeM();agSubTab='pre';go('agenda');
+}
+
+function delPre(id){
+  confirmar('Remover este interessado da Pré-Agenda?<br><span style="font-size:12px;color:var(--mt)">Esta ação não pode ser desfeita.</span>',function(){
+    DB.preAgenda=DB.preAgenda.filter(function(p){return p.id!==id;});
+    saveDB();agSubTab='pre';go('agenda');
+  });
+}
+
+// Agenda uma única pessoa da Pré-Agenda (reaproveita o formulário de Nova Coleta)
+function agendarUmPre(preId){
+  var p=null;for(var i=0;i<DB.preAgenda.length;i++){if(DB.preAgenda[i].id===preId){p=DB.preAgenda[i];break;}}
+  if(!p)return;
+  var fake={cli:p.nome,tel:p.tel,end:p.end,bairro:p.bairro,mat:p.mat,peso:p.pesoMedio,obs:p.obs};
+  _agConvertPreId=preId;
+  openM('Agendar Coleta — '+p.nome,
+    _buildColForm(fake)
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM();_agConvertPreId=null;">Cancelar</button><button class="btn" onclick="saveCol()">Agendar</button></div></div>',560);
+}
+
+// Agenda em lote todos os selecionados de um bairro, distribuindo horários
+function mAgendarRotaBairro(bairro){
+  var pessoas=(DB.preAgenda||[]).filter(function(p){return p.status!=='convertido'&&((p.bairro||'').trim()||'Sem bairro')===bairro;});
+  if(!pessoas.length){alert('Nenhum interessado neste bairro.');return;}
+  var mO='<option value="">— Nenhum —</option>';
+  for(var i=0;i<DB.funcs.length;i++){
+    if(DB.funcs[i].cargo==='Motorista')mO+='<option>'+DB.funcs[i].nome+'</option>';
+  }
+  var rows=pessoas.map(function(p){
+    return '<label style="display:flex;align-items:flex-start;gap:9px;padding:9px 11px;border:1px solid var(--bd);border-radius:8px;margin-bottom:6px;cursor:pointer">'
+      +'<input type="checkbox" class="rota-chk" value="'+p.id+'" checked style="width:16px;height:16px;flex-shrink:0;margin-top:2px">'
+      +'<span style="flex:1;min-width:0">'
+      +'<span style="font-size:13px;font-weight:700">'+p.nome+'</span> '+_preTipoBadge(p.tipo)
+      +'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+(p.mat||'—')+' &middot; ~'+fKg(p.pesoMedio||0)+'kg'+(p.end?' &middot; '+p.end:'')+'</div>'
+      +'</span></label>';
+  }).join('');
+  openM('🗺️ Agendar Rota — '+bairro,
+    '<div class="mf">'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:10px">Selecione quem entra na rota. Todos recebem a mesma data; o horário pode ser distribuído automaticamente.</div>'
+    +rows
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px">'
+    +'<div class="fld"><label>Data *</label><input class="inp" type="date" id="rb-da"></div>'
+    +'<div class="fld"><label>Horário inicial</label><input class="inp" type="time" id="rb-ho"></div>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Intervalo entre paradas (min)</label><input class="inp" type="number" id="rb-int" value="20" min="0"></div>'
+    +'<div class="fld"><label>Motorista</label><select class="inp" id="rb-mo">'+mO+'</select></div>'
+    +'</div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="_confirmarRotaBairro(\''+bairro.replace(/'/g,"\\'")+'\')">Agendar Selecionados</button></div>'
+    +'</div>',600);
+}
+
+function _confirmarRotaBairro(bairro){
+  var da=document.getElementById('rb-da').value;
+  if(!da){alert('Informe a data!');return;}
+  var chks=document.querySelectorAll('.rota-chk:checked');
+  if(!chks.length){alert('Selecione ao menos um interessado.');return;}
+  var horaAtual=document.getElementById('rb-ho').value||'';
+  var horaIni=horaAtual;
+  var intervalo=parseInt(document.getElementById('rb-int').value)||0;
+  var mot=(document.getElementById('rb-mo')&&document.getElementById('rb-mo').value)||'';
+  var data=new Date(da+'T00:00').toLocaleDateString('pt-BR');
+  chks.forEach(function(chk){
+    var pid=parseFloat(chk.value);
+    var p=null;for(var i=0;i<DB.preAgenda.length;i++){if(DB.preAgenda[i].id===pid){p=DB.preAgenda[i];break;}}
+    if(!p)return;
+    var per=horaAtual&&horaAtual<'12:00'?'Manha':'Tarde';
+    var novaCol={id:nid(),data:data,hora:horaAtual,cli:p.nome,tel:p.tel||'',bairro:p.bairro||'',periodo:per,end:p.end||'',peso:parseFloat(p.pesoMedio)||0,mat:p.mat||'',mot:mot,status:'Agendada',obs:p.obs||''};
+    DB.coletas.push(novaCol);
+    p.status='convertido';p.coletaId=novaCol.id;
+    if(horaIni&&intervalo){
+      var hp=horaAtual.split(':');var dt=new Date();dt.setHours(parseInt(hp[0])||0,(parseInt(hp[1])||0)+intervalo,0,0);
+      horaAtual=(dt.getHours()<10?'0':'')+dt.getHours()+':'+(dt.getMinutes()<10?'0':'')+dt.getMinutes();
+    }
+  });
+  saveDB();closeM();
+  agSubTab='cal';agVw='dia';agDiaFiltro=data;
+  go('agenda');
+  toast('Rota agendada com sucesso!','var(--gr)');
 }
 
 var agDiaFiltro=null;
@@ -11235,6 +11968,13 @@ function saveCol(){
         recorrencia:rec,recOrigemId:novaCol.id
       });
     }
+  }
+  // Se veio da Pré-Agenda, marca o interessado como convertido
+  if(_agConvertPreId){
+    for(var pi=0;pi<DB.preAgenda.length;pi++){
+      if(DB.preAgenda[pi].id===_agConvertPreId){DB.preAgenda[pi].status='convertido';DB.preAgenda[pi].coletaId=novaCol.id;break;}
+    }
+    _agConvertPreId=null;
   }
   saveDB();closeM();go('agenda');
 }
@@ -15629,6 +16369,8 @@ function _cfgUsabilidade(){
     +'<div style="padding:10px 14px 4px"><div style="font-size:10px;color:var(--gr);text-transform:uppercase;letter-spacing:2px;font-weight:700;display:flex;align-items:center;gap:6px"><span>&#128197;</span> Agenda</div>'
     +'<div style="font-size:11px;color:var(--mt);margin-top:1px">Configuracoes do calendario e agenda</div></div>'
     +_cfgRow('Exibir Feriados','Mostrar feriados nacionais e municipais na agenda.',_cfgToggle('ef',s.exibirFeriados,'cfgToggleSis(\'exibirFeriados\',this.checked)'))
+    +_cfgRow('Limite da Pré-Agenda','Quantas pessoas/empresas no mesmo bairro para o grupo ficar "pronto pra rota".',
+      '<input type="number" min="2" max="20" value="'+(DB.preAgendaLimite||3)+'" onchange="DB.preAgendaLimite=parseInt(this.value)||3;saveDB();" style="background:var(--bg);border:1px solid var(--bd);border-radius:7px;padding:7px 10px;color:var(--tx);font-size:12px;font-family:inherit;width:70px;text-align:center">')
     +'</div>';
 }
 
@@ -15674,7 +16416,7 @@ function _cfgAtalhos(){
     {id:'estoque',     label:'Estoque',       desc:'Navegar para lista de materiais', key:'E'},
     {id:'revenda',     label:'Revenda',       desc:'Abrir tela de revenda',           key:'R'},
     {id:'financeiro',  label:'Financeiro',    desc:'Navegar para financeiro',         key:'F'},
-    {id:'agenda',      label:'Agenda',        desc:'Navegar para a agenda',           key:'A'},
+    {id:'agenda',      label:'Agenda de Coletas',desc:'Navegar para a agenda de coletas',key:'A'},
     {id:'funcionarios',label:'Funcionarios',  desc:'Navegar para funcionarios',       key:'N'},
     {id:'clientes',    label:'Clientes',      desc:'Navegar para clientes',           key:'C'},
     {id:'tabelas',     label:'Tabelas',       desc:'Navegar para tabelas',            key:'T'},
