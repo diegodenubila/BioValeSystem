@@ -283,10 +283,10 @@ var USERS=[
 ];
 var PNOME={adm:'Administrador',caixa:'Caixa',motorista:'Motorista',operador:'Operador'};
 var PPAGES={
-  adm:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','mercado','classificador','configuracoes'],
+  adm:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','eventos','funcionarios','clientes','tabelas','mercado','classificador','configuracoes'],
   caixa:['caixa_dia','pesagem','pendencias','estoque_vis','classificador'],
   motorista:['agenda','classificador'],
-  operador:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','funcionarios','clientes','tabelas','classificador'],
+  operador:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','eventos','funcionarios','clientes','tabelas','classificador'],
 };
 var ALLPAGES=[
   {id:'dashboard',   label:'Dashboard',   icon:'&#8862;'},
@@ -298,6 +298,7 @@ var ALLPAGES=[
   {id:'revenda',     label:'Revenda',     icon:'&#127991;'},
   {id:'financeiro',  label:'Financeiro',  icon:'&#128176;'},
   {id:'agenda',      label:'Agenda de Coletas',icon:'&#128197;'},
+  {id:'eventos',     label:'Agenda de Eventos',icon:'&#127914;'},
   {id:'funcionarios',label:'Funcionarios',icon:'&#128119;'},
   {id:'clientes',    label:'Clientes',    icon:'&#127970;'},
   {id:'tabelas',     label:'Tabelas',     icon:'&#128203;'},
@@ -370,6 +371,7 @@ var DB={
   coletas:[],
   preAgenda:[],
   preAgendaLimite:3,
+  eventos:[],
   clientes:[],
   tabelas:[
     {id:1,nome:'Padrao',tipo:'venda', itens:[]},
@@ -641,7 +643,7 @@ var _MS_GROUPS=[
   {label:'Operações', icon:'⚖️', ids:['pesagem','pendencias','caixa_dia']},
   {label:'Estoque',   icon:'📦', ids:['estoque','estoque_vis','revenda']},
   {label:'Financeiro',icon:'💰', ids:['financeiro']},
-  {label:'Agenda',    icon:'📅', ids:['agenda']},
+  {label:'Agenda',    icon:'📅', ids:['agenda','eventos']},
   {label:'Pessoas',   icon:'👥', ids:['funcionarios','clientes']},
   {label:'Tabelas',   icon:'📋', ids:['tabelas']},
   {label:'PCB',       icon:'♻', ids:['classificador']},
@@ -791,7 +793,7 @@ function setNav(pid){
   }
 }
 
-var _LABELS={dashboard:'Dashboard',pesagem:'Pesagem',pendencias:'Em Aberto',caixa_dia:'Caixa',estoque:'Estoque',estoque_vis:'Estoque',revenda:'Revenda',financeiro:'Financeiro',agenda:'Agenda de Coletas',funcionarios:'Funcionarios',clientes:'Clientes',tabelas:'Tabelas',mercado:'Mercado',classificador:'Classificador PCB',configuracoes:'Configuracoes'};
+var _LABELS={dashboard:'Dashboard',pesagem:'Pesagem',pendencias:'Em Aberto',caixa_dia:'Caixa',estoque:'Estoque',estoque_vis:'Estoque',revenda:'Revenda',financeiro:'Financeiro',agenda:'Agenda de Coletas',eventos:'Agenda de Eventos',funcionarios:'Funcionarios',clientes:'Clientes',tabelas:'Tabelas',mercado:'Mercado',classificador:'Classificador PCB',configuracoes:'Configuracoes'};
 function _breadcrumb(pid){
   var lbl=_LABELS[pid]||pid;
   return '<div class="breadcrumb">&#127968; Inicio <span class="sep">&#8250;</span> <span>'+lbl+'</span></div>';
@@ -804,7 +806,7 @@ function go(pid){
   if(DB&&DB.revenda){for(var _ri=0;_ri<DB.revenda.length;_ri++){if(!DB.revenda[_ri].prod)DB.revenda[_ri].prod=DB.revenda[_ri].nome||'Produto';}}
   try{
     var m={dashboard:pgDash,pesagem:pgPesagem,pendencias:pgPendencias,caixa_dia:pgCaixaDia,estoque:pgEstoque,
-      estoque_vis:pgEstVis,revenda:pgRevenda,financeiro:pgFin,agenda:pgAgenda,
+      estoque_vis:pgEstVis,revenda:pgRevenda,financeiro:pgFin,agenda:pgAgenda,eventos:pgEventos,
       funcionarios:pgFuncs,clientes:pgClis,tabelas:pgTabs,mercado:pgMercado,classificador:pgClassificador,usuarios:pgUsers,configuracoes:pgConfig};
     var _phtml=(m[pid]||function(){return '<p>Pagina nao encontrada</p>';})();
     document.getElementById('ct').innerHTML=_breadcrumb(pid)+_phtml;
@@ -1222,7 +1224,7 @@ function saveDB(){
       atendNum:DB.atendNum,produtos:DB.produtos,movs:DB.movs,contas:DB.contas,
       revenda:DB.revenda,revendaCats:DB.revendaCats,revendaStates:DB.revendaStates,
       entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
-      transf:DB.transf,coletas:DB.coletas,preAgenda:DB.preAgenda,preAgendaLimite:DB.preAgendaLimite,funcs:DB.funcs,clientes:DB.clientes,
+      transf:DB.transf,coletas:DB.coletas,preAgenda:DB.preAgenda,preAgendaLimite:DB.preAgendaLimite,eventos:DB.eventos,funcs:DB.funcs,clientes:DB.clientes,
       gerarTabsCustom:DB.gerarTabsCustom,
       pclCatsCustom:DB.pclCatsCustom||{},
       pclCatOrder:DB.pclCatOrder||[],
@@ -1350,6 +1352,7 @@ function loadDB(){
     if(rawR){var ro=JSON.parse(rawR);
       if(ro.base&&Array.isArray(ro.base))BASE_ROLES=ro.base;
       if(ro.custom&&Array.isArray(ro.custom))CUSTOM_ROLES=ro.custom;
+      _patchRestoredRoles();
       // Rebuilds PPAGES from restored roles
       var _allR=BASE_ROLES.concat(CUSTOM_ROLES);
       for(var _ri=0;_ri<_allR.length;_ri++){PPAGES[_allR[_ri].id]=_allR[_ri].pages;}
@@ -1467,6 +1470,7 @@ function _applySnap(s){
   if(s.coletas)DB.coletas=s.coletas;
   if(s.preAgenda)DB.preAgenda=s.preAgenda;
   if(s.preAgendaLimite)DB.preAgendaLimite=s.preAgendaLimite;
+  if(s.eventos)DB.eventos=s.eventos;
   if(s.funcs)DB.funcs=s.funcs;
   if(s.clientes)DB.clientes=s.clientes;
   if(s.tabelas)DB.tabelas=s.tabelas;
@@ -11453,6 +11457,38 @@ function _preTipoBadge(tipo){
   var pj=tipo==='PJ';
   return '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:'+(pj?'var(--blb)':'var(--grb)')+';color:'+(pj?'var(--bl)':'var(--gr)')+'">'+(pj?'🏢 Empresa':'🙋 Pessoa')+'</span>';
 }
+// Monta "Rua X, 123 - Apto 4" a partir dos campos separados
+function _preEndCompleto(p){
+  var s=p.end||'';
+  if(p.num)s+=(s?', ':'')+p.num;
+  if(p.compl)s+=(s?' - ':'')+p.compl;
+  return s;
+}
+// Vincula ao Fornecedor já existente (por nome) ou cria um novo — só chamado quando a coleta vira oficial
+function _vincularOuCriarFornecedor(p){
+  // 1) Se o funcionário já vinculou manualmente no cadastro, respeita (mais confiável que nome)
+  if(p.fornecedorId){
+    var manual=(DB.clientes||[]).find(function(c){return c.id===p.fornecedorId&&c.tipo==='fornecedor';});
+    if(manual)return manual.id;
+  }
+  var nomeNorm=(p.nome||'').trim().toLowerCase();
+  if(!nomeNorm)return null;
+  var candidatos=(DB.clientes||[]).filter(function(c){return c.tipo==='fornecedor'&&(c.nome||'').trim().toLowerCase()===nomeNorm;});
+  // 2) Só funde automaticamente se houver EXATAMENTE 1 fornecedor com esse nome
+  //    e o telefone bater (ou um dos dois estiver em branco) — evita juntar "Pedro" com "Pedro" errado
+  if(candidatos.length===1){
+    var c0=candidatos[0];
+    var telP=(p.tel||'').replace(/\D/g,'');
+    var telC=(c0.tel||'').replace(/\D/g,'');
+    if(!telP||!telC||telP===telC)return c0.id;
+  }
+  // 3) Nome duplicado com telefone diferente, ou mais de um cadastro com o mesmo nome → cria novo
+  //    (prefere duplicar, fácil de perceber e mesclar depois, a corromper o histórico de outra pessoa)
+  var obsFinal=(p.ref?'🧭 Ref: '+p.ref+(p.obs?' | ':''):'')+(p.obs||'');
+  var novoForn={id:nid(),tipo:'fornecedor',nome:p.nome,tel:p.tel||'',end:_preEndCompleto(p),num:p.num||'',bairro:p.bairro||'',cnpj:'',tabId:'',obs:obsFinal};
+  DB.clientes.push(novoForn);
+  return novoForn.id;
+}
 
 function _buildPreAgenda(preAtivos){
   var limite=DB.preAgendaLimite||3;
@@ -11499,7 +11535,8 @@ function _buildPreAgenda(preAtivos){
         +_preTipoBadge(p.tipo)
         +'</div>'
         +'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+(p.mat||'Material não informado')+' &middot; ~'+fKg(p.pesoMedio||0)+'kg'+(p.tel?' &middot; '+p.tel:'')+'</div>'
-        +(p.end?'<div style="font-size:11px;color:var(--mt)">📍 '+p.end+'</div>':'')
+        +(p.end?'<div style="font-size:11px;color:var(--mt)">📍 '+_preEndCompleto(p)+'</div>':'')
+        +(p.ref?'<div style="font-size:11px;color:var(--mt)">🧭 Ref: '+p.ref+'</div>':'')
         +(p.obs?'<div style="font-size:11px;color:var(--or);margin-top:2px">⚠ '+p.obs+'</div>':'')
         +'</div>'
         +'<div style="display:flex;gap:5px;flex-shrink:0">'
@@ -11516,9 +11553,15 @@ function _buildPreAgenda(preAtivos){
 function _buildPreForm(p){
   var bairrosUsados=[...new Set(DB.coletas.map(function(c){return c.bairro||'';}).concat((DB.preAgenda||[]).map(function(x){return x.bairro||'';})).filter(Boolean))];
   var bairroSugest=bairrosUsados.length?'<datalist id="pre-bairros-list">'+bairrosUsados.map(function(b){return'<option value="'+b+'">';}).join('')+'</datalist>':'';
+  var fornExistentes=(DB.clientes||[]).filter(function(c){return c.tipo==='fornecedor';}).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+  var fornOpts='<option value="">— Novo (ainda não é fornecedor) —</option>'+fornExistentes.map(function(c){
+    return '<option value="'+c.id+'"'+(p&&p.fornecedorId===c.id?' selected':'')+'>'+c.nome+(c.tel?' — '+c.tel:'')+'</option>';
+  }).join('');
   return '<div class="mf">'
     +bairroSugest
     +'<div class="fld"><label>Nome *</label><input class="inp" id="pf-nome" value="'+(p&&p.nome?p.nome:'')+'" placeholder="Nome completo ou empresa"></div>'
+    +'<div class="fld"><label>Já é um fornecedor cadastrado?</label><select class="inp" id="pf-forn">'+fornOpts+'</select>'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Se souber que é a mesma pessoa/empresa, selecione aqui pra não duplicar o cadastro.</div></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Tipo *</label><select class="inp" id="pf-tipo">'
     +'<option value="PF"'+(!p||p.tipo==='PF'?' selected':'')+'>🙋 Pessoa (CPF)</option>'
@@ -11526,7 +11569,12 @@ function _buildPreForm(p){
     +'</select></div>'
     +'<div class="fld"><label>Telefone</label><input class="inp" id="pf-tel" value="'+(p&&p.tel?p.tel:'')+'" placeholder="(31) 99999-0000"></div>'
     +'</div>'
-    +'<div class="fld"><label>Endereço</label><input class="inp" id="pf-end" value="'+(p&&p.end?p.end:'')+'" placeholder="Rua, número..."></div>'
+    +'<div class="fld"><label>Endereço (rua)</label><input class="inp" id="pf-end" value="'+(p&&p.end?p.end:'')+'" placeholder="Rua, Av..."></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Número</label><input class="inp" id="pf-num" value="'+(p&&p.num?p.num:'')+'" placeholder="123"></div>'
+    +'<div class="fld"><label>Complemento</label><input class="inp" id="pf-compl" value="'+(p&&p.compl?p.compl:'')+'" placeholder="Apto, bloco, fundos..."></div>'
+    +'</div>'
+    +'<div class="fld"><label>Ponto de referência</label><input class="inp" id="pf-ref" value="'+(p&&p.ref?p.ref:'')+'" placeholder="Ex: perto do mercado, portão azul..."></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Bairro</label><input class="inp" id="pf-bairro" list="pre-bairros-list" value="'+(p&&p.bairro?p.bairro:'')+'" placeholder="Ex: Centro, Bethania..."></div>'
     +'<div class="fld"><label>Material</label><input class="inp" id="pf-mat" value="'+(p&&p.mat?p.mat:'')+'"></div>'
@@ -11548,9 +11596,13 @@ function savePre(){
   if(!nome){alert('Digite o nome!');return;}
   var novo={
     id:nid(),nome:nome,
+    fornecedorId:document.getElementById('pf-forn').value?parseFloat(document.getElementById('pf-forn').value):null,
     tipo:document.getElementById('pf-tipo').value||'PF',
     tel:document.getElementById('pf-tel').value.trim(),
     end:document.getElementById('pf-end').value.trim(),
+    num:document.getElementById('pf-num').value.trim(),
+    compl:document.getElementById('pf-compl').value.trim(),
+    ref:document.getElementById('pf-ref').value.trim(),
     bairro:document.getElementById('pf-bairro').value.trim(),
     mat:document.getElementById('pf-mat').value.trim(),
     pesoMedio:parseFloat(document.getElementById('pf-peso').value)||0,
@@ -11577,9 +11629,13 @@ function saveEditPre(id){
   for(var i=0;i<DB.preAgenda.length;i++){
     if(DB.preAgenda[i].id===id){
       DB.preAgenda[i].nome=nome;
+      DB.preAgenda[i].fornecedorId=document.getElementById('pf-forn').value?parseFloat(document.getElementById('pf-forn').value):null;
       DB.preAgenda[i].tipo=document.getElementById('pf-tipo').value||'PF';
       DB.preAgenda[i].tel=document.getElementById('pf-tel').value.trim();
       DB.preAgenda[i].end=document.getElementById('pf-end').value.trim();
+      DB.preAgenda[i].num=document.getElementById('pf-num').value.trim();
+      DB.preAgenda[i].compl=document.getElementById('pf-compl').value.trim();
+      DB.preAgenda[i].ref=document.getElementById('pf-ref').value.trim();
       DB.preAgenda[i].bairro=document.getElementById('pf-bairro').value.trim();
       DB.preAgenda[i].mat=document.getElementById('pf-mat').value.trim();
       DB.preAgenda[i].pesoMedio=parseFloat(document.getElementById('pf-peso').value)||0;
@@ -11601,7 +11657,8 @@ function delPre(id){
 function agendarUmPre(preId){
   var p=null;for(var i=0;i<DB.preAgenda.length;i++){if(DB.preAgenda[i].id===preId){p=DB.preAgenda[i];break;}}
   if(!p)return;
-  var fake={cli:p.nome,tel:p.tel,end:p.end,bairro:p.bairro,mat:p.mat,peso:p.pesoMedio,obs:p.obs};
+  var obsFinal=(p.ref?'🧭 Ref: '+p.ref+(p.obs?' | ':''):'')+(p.obs||'');
+  var fake={cli:p.nome,tel:p.tel,end:_preEndCompleto(p),bairro:p.bairro,mat:p.mat,peso:p.pesoMedio,obs:obsFinal};
   _agConvertPreId=preId;
   openM('Agendar Coleta — '+p.nome,
     _buildColForm(fake)
@@ -11655,9 +11712,11 @@ function _confirmarRotaBairro(bairro){
     var p=null;for(var i=0;i<DB.preAgenda.length;i++){if(DB.preAgenda[i].id===pid){p=DB.preAgenda[i];break;}}
     if(!p)return;
     var per=horaAtual&&horaAtual<'12:00'?'Manha':'Tarde';
-    var novaCol={id:nid(),data:data,hora:horaAtual,cli:p.nome,tel:p.tel||'',bairro:p.bairro||'',periodo:per,end:p.end||'',peso:parseFloat(p.pesoMedio)||0,mat:p.mat||'',mot:mot,status:'Agendada',obs:p.obs||''};
+    var obsFinal=(p.ref?'🧭 Ref: '+p.ref+(p.obs?' | ':''):'')+(p.obs||'');
+    var novaCol={id:nid(),data:data,hora:horaAtual,cli:p.nome,tel:p.tel||'',bairro:p.bairro||'',periodo:per,end:_preEndCompleto(p),peso:parseFloat(p.pesoMedio)||0,mat:p.mat||'',mot:mot,status:'Agendada',obs:obsFinal};
     DB.coletas.push(novaCol);
     p.status='convertido';p.coletaId=novaCol.id;
+    p.fornecedorId=_vincularOuCriarFornecedor(p);
     if(horaIni&&intervalo){
       var hp=horaAtual.split(':');var dt=new Date();dt.setHours(parseInt(hp[0])||0,(parseInt(hp[1])||0)+intervalo,0,0);
       horaAtual=(dt.getHours()<10?'0':'')+dt.getHours()+':'+(dt.getMinutes()<10?'0':'')+dt.getMinutes();
@@ -11881,6 +11940,387 @@ function _agAutoFillCli(nome){
 
 
 
+// ══════════════════════════════════════════════════════
+// AGENDA DE EVENTOS — feiras, reuniões corporativas, auditorias, palestras...
+// ══════════════════════════════════════════════════════
+var evVw='semana'; // 'semana'|'mes'|'lista'
+var evSemRef=null; // início da semana exibida
+var evMesRef=null; // {year,month}
+var _EV_TIPOS={
+  'Feira':{label:'Feira',ic:'🎪',cor:'var(--pu)',bg:'var(--pub)'},
+  'Reuniao':{label:'Reunião Corporativa',ic:'🤝',cor:'var(--bl)',bg:'var(--blb)'},
+  'Auditoria':{label:'Auditoria',ic:'🔍',cor:'var(--rd)',bg:'var(--rdb)'},
+  'Palestra':{label:'Palestra',ic:'🎤',cor:'var(--gr)',bg:'var(--grb)'},
+  'Visita':{label:'Visita Técnica',ic:'🏭',cor:'var(--or)',bg:'var(--orb)'},
+  'Outro':{label:'Outro',ic:'📌',cor:'var(--mt)',bg:'var(--s2)'}
+};
+function _evTipoCfg(tipo){return _EV_TIPOS[tipo]||_EV_TIPOS['Outro'];}
+
+function pgEventos(){
+  var hoje=_today();
+  if(!evSemRef)evSemRef=_startOfWeek(hoje);
+  if(!evMesRef)evMesRef={year:hoje.getFullYear(),month:hoje.getMonth()};
+  var lista=DB.eventos||[];
+  var aConfirmar=lista.filter(function(e){return e.status==='A confirmar';}).length;
+  var confirmados=lista.filter(function(e){return e.status==='Confirmado';}).length;
+  var concluidos=lista.filter(function(e){return e.status==='Concluido';}).length;
+  var proximos=lista.filter(function(e){
+    if(e.status==='Cancelado')return false;
+    var fim=_parseDataBR(e.dataFim||e.dataIni);
+    return fim>=new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate());
+  }).length;
+
+  var corpo=evVw==='semana'?buildEvSemana():evVw==='mes'?buildEvMes():buildEvLista();
+
+  return '<div class="fc">'
+    +'<div class="ptop">'
+    +'<div><div class="pl">Logistica</div><div class="pt">Agenda de Eventos</div></div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +'<button class="tabbtn'+(evVw==='semana'?' on':'')+'" onclick="swEv(\'semana\')">📆 Semana</button>'
+    +'<button class="tabbtn'+(evVw==='mes'?' on':'')+'" onclick="swEv(\'mes\')">🗓️ Mês</button>'
+    +'<button class="tabbtn'+(evVw==='lista'?' on':'')+'" onclick="swEv(\'lista\')">☰ Lista</button>'
+    +'<button class="btn" onclick="mNovoEvento()">+ Novo Evento</button>'
+    +'</div></div>'
+    +'<div class="g4">'
+    +sc('📌','A Confirmar',aConfirmar,'','var(--or)')
+    +sc('✅','Confirmados',confirmados,'','var(--bl)')
+    +sc('🏁','Concluídos',concluidos,'','var(--gr)')
+    +sc('📅','Próximos',proximos,'','var(--pu)')
+    +'</div>'
+    +'<div class="card">'+corpo+'</div>'
+    +'</div>';
+}
+function swEv(v){evVw=v;go('eventos');}
+function evNavSemana(dir){evSemRef=_addDays(evSemRef,dir*7);go('eventos');}
+function evNavMes(dir){var m=evMesRef.month+dir,y=evMesRef.year;if(m<0){m=11;y--;}if(m>11){m=0;y++;}evMesRef={year:y,month:m};go('eventos');}
+function evHoje(){evSemRef=_startOfWeek(_today());evMesRef={year:_today().getFullYear(),month:_today().getMonth()};go('eventos');}
+
+// ── VISÃO SEMANA — grade horária estilo Google Agenda ──
+function buildEvSemana(){
+  var hoje=_today();
+  var horaIniGrid=7,horaFimGrid=20;
+  var horas=[];for(var h=horaIniGrid;h<=horaFimGrid;h++)horas.push(h);
+  var semDates=[];for(var d=0;d<7;d++)semDates.push(_addDays(evSemRef,d));
+
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap">'
+    +'<button onclick="evNavSemana(-1)" style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:6px 14px;color:var(--tx);font-size:16px">‹</button>'
+    +'<div style="text-align:center"><div style="font-size:13px;font-weight:800">'+_meses[semDates[0].getMonth()]+' '+semDates[0].getFullYear()+'</div><button onclick="evHoje()" style="background:none;border:none;color:var(--gr);font-size:10px;font-weight:700;cursor:pointer;text-decoration:underline">Hoje</button></div>'
+    +'<button onclick="evNavSemana(1)" style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:6px 14px;color:var(--tx);font-size:16px">›</button>'
+    +'</div>';
+
+  var evsSemana=(DB.eventos||[]).filter(function(e){
+    var ini=_parseDataBR(e.dataIni),fim=_parseDataBR(e.dataFim||e.dataIni);
+    return fim>=semDates[0]&&ini<=semDates[6];
+  });
+  var faixaEv=evsSemana.filter(function(e){return !e.horaIni||e.dataIni!==(e.dataFim||e.dataIni);});
+  var horaEv=evsSemana.filter(function(e){return e.horaIni&&e.dataIni===(e.dataFim||e.dataIni);});
+
+  html+='<div style="overflow-x:auto"><div style="min-width:760px">';
+  // cabeçalho dos dias
+  html+='<div style="display:grid;grid-template-columns:46px repeat(7,1fr);border-bottom:1px solid var(--bd)">';
+  html+='<div></div>';
+  semDates.forEach(function(dia){
+    var isHj=_sameDay(dia,hoje);
+    html+='<div style="text-align:center;padding:6px 2px;border-left:1px solid var(--bd)">'
+      +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase">'+_diasCurtos[dia.getDay()]+'</div>'
+      +'<div style="font-size:15px;font-weight:800;color:'+(isHj?'var(--gr)':'var(--tx)')+'">'+dia.getDate()+'</div>'
+      +'</div>';
+  });
+  html+='</div>';
+  // faixa de eventos sem horário / multi-dia (estilo "dia inteiro")
+  if(faixaEv.length){
+    html+='<div style="display:grid;grid-template-columns:46px repeat(7,1fr);border-bottom:1px solid var(--bd);padding:3px 0">';
+    html+='<div></div>';
+    semDates.forEach(function(dia){
+      var evsHoje=faixaEv.filter(function(e){var ini=_parseDataBR(e.dataIni),fim=_parseDataBR(e.dataFim||e.dataIni);return dia>=ini&&dia<=fim;});
+      html+='<div style="padding:1px 2px;border-left:1px solid var(--bd)">';
+      evsHoje.forEach(function(e){
+        var cfg=_evTipoCfg(e.tipo);
+        html+='<div onclick="mVerEvento('+e.id+')" style="background:'+cfg.cor+';color:#fff;border-radius:4px;padding:2px 5px;margin-bottom:2px;font-size:9px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer">'+cfg.ic+' '+e.nome+'</div>';
+      });
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+  // grade de horas
+  var rowH=46;
+  html+='<div style="position:relative;display:grid;grid-template-columns:46px repeat(7,1fr)">';
+  html+='<div>';
+  horas.forEach(function(h){
+    html+='<div style="height:'+rowH+'px;text-align:right;padding-right:5px;font-size:9px;color:var(--mt);position:relative;top:-6px">'+(h<10?'0':'')+h+':00</div>';
+  });
+  html+='</div>';
+  semDates.forEach(function(dia){
+    var dStr=_fmtDataBR(dia);
+    var isHj=_sameDay(dia,hoje);
+    html+='<div style="position:relative;border-left:1px solid var(--bd)">';
+    horas.forEach(function(){html+='<div style="height:'+rowH+'px;border-bottom:1px solid var(--bd)"></div>';});
+    if(isHj){
+      var nowH=hoje.getHours()+hoje.getMinutes()/60;
+      if(nowH>=horaIniGrid&&nowH<=horaFimGrid){
+        var topNow=(nowH-horaIniGrid)*rowH;
+        html+='<div style="position:absolute;top:'+topNow+'px;left:0;right:0;height:0;border-top:2px solid var(--rd);z-index:2"><div style="width:7px;height:7px;border-radius:50%;background:var(--rd);position:relative;top:-4px"></div></div>';
+      }
+    }
+    var evsDia=horaEv.filter(function(e){return e.dataIni===dStr;});
+    evsDia.forEach(function(e){
+      var cfg=_evTipoCfg(e.tipo);
+      var hp=e.horaIni.split(':');var hIniNum=(+hp[0])+(+hp[1])/60;
+      var hFimNum=hIniNum+1;
+      if(e.horaFim){var hpf=e.horaFim.split(':');hFimNum=(+hpf[0])+(+hpf[1])/60;}
+      if(hFimNum<=hIniNum)hFimNum=hIniNum+0.5;
+      var top=Math.max(0,(hIniNum-horaIniGrid)*rowH);
+      var height=Math.max(20,(hFimNum-hIniNum)*rowH-2);
+      html+='<div onclick="mVerEvento('+e.id+')" style="position:absolute;top:'+top+'px;left:2px;right:2px;height:'+height+'px;background:'+cfg.bg+';border-left:3px solid '+cfg.cor+';border-radius:4px;padding:2px 5px;overflow:hidden;cursor:pointer;z-index:1">'
+        +'<div style="font-size:9px;font-weight:700;color:'+cfg.cor+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+cfg.ic+' '+e.nome+'</div>'
+        +'<div style="font-size:8px;color:var(--mt)">'+e.horaIni+(e.horaFim?'–'+e.horaFim:'')+'</div>'
+        +'</div>';
+    });
+    html+='</div>';
+  });
+  html+='</div></div></div>';
+  if(!evsSemana.length)html+='<div style="text-align:center;padding:18px;color:var(--mt);font-size:12px">Nenhum evento nesta semana</div>';
+  return html;
+}
+
+// ── VISÃO MÊS ────────────────────────────────────────
+function buildEvMes(){
+  var ano=evMesRef.year,mes=evMesRef.month;
+  var hoje=_today();
+  var primDia=new Date(ano,mes,1),ultDia=new Date(ano,mes+1,0);
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+    +'<button onclick="evNavMes(-1)" style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:5px 12px;color:var(--tx);font-size:13px">‹ Ant</button>'
+    +'<span style="font-size:14px;font-weight:800">'+_meses[mes]+' '+ano+'</span>'
+    +'<button onclick="evNavMes(1)" style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:5px 12px;color:var(--tx);font-size:13px">Próx ›</button>'
+    +'</div>';
+  html+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">';
+  for(var d=0;d<7;d++)html+='<div style="text-align:center;font-size:10px;color:var(--mt);font-weight:700;padding:3px">'+_diasCurtos[d]+'</div>';
+  html+='</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">';
+  for(var v=0;v<primDia.getDay();v++)html+='<div></div>';
+  for(var d=1;d<=ultDia.getDate();d++){
+    var dia=new Date(ano,mes,d);
+    var isHj=_sameDay(dia,hoje);
+    var evsDia=(DB.eventos||[]).filter(function(e){
+      var ini=_parseDataBR(e.dataIni),fim=_parseDataBR(e.dataFim||e.dataIni);
+      return dia>=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate())&&dia<=new Date(fim.getFullYear(),fim.getMonth(),fim.getDate());
+    });
+    var tem=evsDia.length>0;
+    html+='<div style="background:'+(isHj?'var(--grb)':tem?'var(--s2)':'transparent')+';border:1px solid '+(isHj?'var(--gr)':tem?'var(--bd)':'transparent')+';border-radius:8px;padding:5px 4px;min-height:56px">'
+      +'<div style="font-size:12px;font-weight:'+(isHj?800:600)+';color:'+(isHj?'var(--gr)':tem?'var(--tx)':'var(--ft)')+';text-align:center">'+d+'</div>';
+    var maxPills=Math.min(evsDia.length,3);
+    for(var i=0;i<maxPills;i++){
+      var cfg=_evTipoCfg(evsDia[i].tipo);
+      html+='<div style="background:'+cfg.cor+';border-radius:3px;height:5px;margin-top:2px;opacity:.85" title="'+evsDia[i].nome+'"></div>';
+    }
+    if(evsDia.length>3)html+='<div style="font-size:9px;color:var(--mt);text-align:center">+'+(evsDia.length-3)+'</div>';
+    html+='</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
+// ── VISÃO LISTA ──────────────────────────────────────
+function buildEvLista(){
+  var todos=(DB.eventos||[]).slice().sort(function(a,b){
+    var da=_parseDataBR(a.dataIni),db=_parseDataBR(b.dataIni);
+    if(da-db!==0)return da-db;
+    return (a.horaIni||'').localeCompare(b.horaIni||'');
+  });
+  if(!todos.length)return '<div style="text-align:center;padding:40px;color:var(--mt)"><div style="font-size:32px;margin-bottom:10px">🎪</div><div style="font-weight:700">Nenhum evento cadastrado</div></div>';
+  var html='';
+  todos.forEach(function(e){html+=_cardEvento(e);});
+  return html;
+}
+function _cardEvento(e){
+  var cfg=_evTipoCfg(e.tipo);
+  var multi=e.dataFim&&e.dataFim!==e.dataIni;
+  var stMap={'A confirmar':{cor:'var(--or)',bg:'var(--orb)'},'Confirmado':{cor:'var(--bl)',bg:'var(--blb)'},'Concluido':{cor:'var(--gr)',bg:'var(--grb)'},'Cancelado':{cor:'var(--rd)',bg:'var(--rdb)'}};
+  var stCfg=stMap[e.status]||{cor:'var(--mt)',bg:'var(--s2)'};
+  return '<div onclick="mVerEvento('+e.id+')" style="cursor:pointer;background:var(--s2);border:1px solid var(--bd);border-left:3px solid '+cfg.cor+';border-radius:8px;padding:10px 12px;margin-bottom:8px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
+    +'<div style="min-width:0">'
+    +'<span style="font-size:13px;font-weight:700">'+cfg.ic+' '+e.nome+'</span>'
+    +'<div style="font-size:11px;color:var(--mt);margin-top:2px">📅 '+e.dataIni+(multi?' → '+e.dataFim:'')+(e.horaIni?' · '+e.horaIni+(e.horaFim?'–'+e.horaFim:''):'')+'</div>'
+    +(e.local?'<div style="font-size:11px;color:var(--mt)">📍 '+e.local+'</div>':'')
+    +'</div>'
+    +'<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:'+stCfg.bg+';color:'+stCfg.cor+';white-space:nowrap">'+e.status+'</span>'
+    +'</div></div>';
+}
+
+// ── FORMULÁRIO (criar/editar) ───────────────────────
+function _buildEventoForm(p){
+  var tiposOpts=Object.keys(_EV_TIPOS).map(function(k){
+    return '<option value="'+k+'"'+((p&&p.tipo===k)||(!p&&k==='Feira')?' selected':'')+'>'+_EV_TIPOS[k].ic+' '+_EV_TIPOS[k].label+'</option>';
+  }).join('');
+  var respOpts='<option value="">— Ninguém definido —</option>'+(DB.funcs||[]).map(function(f){
+    return '<option value="'+f.nome+'"'+(p&&p.responsaveis===f.nome?' selected':'')+'>'+f.nome+'</option>';
+  }).join('');
+  return '<div class="mf">'
+    +'<div class="fld"><label>Nome do evento *</label><input class="inp" id="ef-nome" value="'+(p&&p.nome?p.nome:'')+'" placeholder="Ex: Feira de Sustentabilidade..."></div>'
+    +'<div class="fld"><label>Tipo *</label><select class="inp" id="ef-tipo">'+tiposOpts+'</select></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Data início *</label><input class="inp" type="date" id="ef-dataIni" value="'+(p&&p.dataIni?_isoDateBR(p.dataIni):'')+'"></div>'
+    +'<div class="fld"><label>Data fim (se +1 dia)</label><input class="inp" type="date" id="ef-dataFim" value="'+(p&&p.dataFim?_isoDateBR(p.dataFim):'')+'"></div>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Horário início</label><input class="inp" type="time" id="ef-horaIni" value="'+(p&&p.horaIni?p.horaIni:'')+'"></div>'
+    +'<div class="fld"><label>Horário fim</label><input class="inp" type="time" id="ef-horaFim" value="'+(p&&p.horaFim?p.horaFim:'')+'"></div>'
+    +'</div>'
+    +'<div class="fld"><label>Local</label><input class="inp" id="ef-local" value="'+(p&&p.local?p.local:'')+'" placeholder="Ex: Expominas, Sede da Usiminas..."></div>'
+    +'<div class="fld"><label>Endereço</label><input class="inp" id="ef-endereco" value="'+(p&&p.endereco?p.endereco:'')+'"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Responsável</label><select class="inp" id="ef-resp">'+respOpts+'</select></div>'
+    +'<div class="fld"><label>Contato do organizador</label><input class="inp" id="ef-contato" value="'+(p&&p.contato?p.contato:'')+'"></div>'
+    +'</div>'
+    +'<div class="fld"><label>Link (site, convite...)</label><input class="inp" id="ef-link" value="'+(p&&p.link?p.link:'')+'"></div>'
+    +'<div class="fld"><label>Obs</label><textarea class="inp" id="ef-obs" rows="2">'+(p&&p.obs?p.obs:'')+'</textarea></div>'
+    +'</div>';
+}
+
+function mNovoEvento(){
+  openM('+ Novo Evento',_buildEventoForm(null)
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveEvento()">Adicionar</button></div>',560);
+  setTimeout(function(){var n=document.getElementById('ef-nome');if(n)n.focus();},80);
+}
+
+function saveEvento(){
+  var nome=document.getElementById('ef-nome').value.trim();
+  if(!nome){alert('Digite o nome do evento!');return;}
+  var dIni=document.getElementById('ef-dataIni').value;
+  if(!dIni){alert('Informe a data de início!');return;}
+  var dFim=document.getElementById('ef-dataFim').value;
+  var novo={
+    id:nid(),nome:nome,
+    tipo:document.getElementById('ef-tipo').value||'Outro',
+    dataIni:new Date(dIni+'T00:00').toLocaleDateString('pt-BR'),
+    dataFim:dFim?new Date(dFim+'T00:00').toLocaleDateString('pt-BR'):'',
+    horaIni:document.getElementById('ef-horaIni').value||'',
+    horaFim:document.getElementById('ef-horaFim').value||'',
+    local:document.getElementById('ef-local').value.trim(),
+    endereco:document.getElementById('ef-endereco').value.trim(),
+    responsaveis:document.getElementById('ef-resp').value||'',
+    contato:document.getElementById('ef-contato').value.trim(),
+    link:document.getElementById('ef-link').value.trim(),
+    obs:document.getElementById('ef-obs').value.trim(),
+    status:'A confirmar',
+    checklist:[]
+  };
+  DB.eventos.push(novo);
+  saveDB();closeM();go('eventos');
+  toast('Evento cadastrado!','var(--gr)');
+}
+
+function mEditEvento(id){
+  var e=null;for(var i=0;i<DB.eventos.length;i++)if(DB.eventos[i].id===id){e=DB.eventos[i];break;}
+  if(!e)return;
+  openM('Editar Evento',_buildEventoForm(e)
+    +'<div class="brow"><button class="btnO bOr" onclick="delEvento('+id+')">🗑️ Excluir</button><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveEditEvento('+id+')">Salvar</button></div>',560);
+}
+
+function saveEditEvento(id){
+  var nome=document.getElementById('ef-nome').value.trim();
+  if(!nome){alert('Digite o nome do evento!');return;}
+  var dIni=document.getElementById('ef-dataIni').value;
+  if(!dIni){alert('Informe a data de início!');return;}
+  var dFim=document.getElementById('ef-dataFim').value;
+  for(var i=0;i<DB.eventos.length;i++){
+    if(DB.eventos[i].id===id){
+      DB.eventos[i].nome=nome;
+      DB.eventos[i].tipo=document.getElementById('ef-tipo').value||'Outro';
+      DB.eventos[i].dataIni=new Date(dIni+'T00:00').toLocaleDateString('pt-BR');
+      DB.eventos[i].dataFim=dFim?new Date(dFim+'T00:00').toLocaleDateString('pt-BR'):'';
+      DB.eventos[i].horaIni=document.getElementById('ef-horaIni').value||'';
+      DB.eventos[i].horaFim=document.getElementById('ef-horaFim').value||'';
+      DB.eventos[i].local=document.getElementById('ef-local').value.trim();
+      DB.eventos[i].endereco=document.getElementById('ef-endereco').value.trim();
+      DB.eventos[i].responsaveis=document.getElementById('ef-resp').value||'';
+      DB.eventos[i].contato=document.getElementById('ef-contato').value.trim();
+      DB.eventos[i].link=document.getElementById('ef-link').value.trim();
+      DB.eventos[i].obs=document.getElementById('ef-obs').value.trim();
+      break;
+    }
+  }
+  saveDB();closeM();go('eventos');
+}
+
+function delEvento(id){
+  confirmar('Excluir este evento definitivamente?<br><span style="font-size:12px;color:var(--mt)">Esta ação não pode ser desfeita.</span>',function(){
+    DB.eventos=DB.eventos.filter(function(e){return e.id!==id;});
+    saveDB();go('eventos');
+  });
+}
+
+// ── Status e checklist ───────────────────────────────
+var _evStatusVoltar={'Confirmado':'A confirmar','Concluido':'Confirmado','Cancelado':'A confirmar'};
+function updEvento(id,status){
+  for(var i=0;i<DB.eventos.length;i++)if(DB.eventos[i].id===id){DB.eventos[i].status=status;break;}
+  saveDB();
+  mVerEvento(id);
+}
+function toggleChecklistItem(id,idx){
+  var e=null;for(var i=0;i<DB.eventos.length;i++)if(DB.eventos[i].id===id){e=DB.eventos[i];break;}
+  if(!e||!e.checklist||!e.checklist[idx])return;
+  e.checklist[idx].f=!e.checklist[idx].f;
+  saveDB();mVerEvento(id);
+}
+function addChecklistItem(id){
+  var inp=document.getElementById('cl-novo-'+id);
+  var txt=(inp.value||'').trim();
+  if(!txt)return;
+  var e=null;for(var i=0;i<DB.eventos.length;i++)if(DB.eventos[i].id===id){e=DB.eventos[i];break;}
+  if(!e)return;
+  if(!e.checklist)e.checklist=[];
+  e.checklist.push({t:txt,f:false});
+  saveDB();mVerEvento(id);
+}
+function delChecklistItem(id,idx){
+  var e=null;for(var i=0;i<DB.eventos.length;i++)if(DB.eventos[i].id===id){e=DB.eventos[i];break;}
+  if(!e||!e.checklist)return;
+  e.checklist.splice(idx,1);
+  saveDB();mVerEvento(id);
+}
+
+function mVerEvento(id){
+  var e=null;for(var i=0;i<DB.eventos.length;i++)if(DB.eventos[i].id===id){e=DB.eventos[i];break;}
+  if(!e)return;
+  var cfg=_evTipoCfg(e.tipo);
+  var multi=e.dataFim&&e.dataFim!==e.dataIni;
+  var checklist=e.checklist||[];
+  var feitos=checklist.filter(function(c){return c.f;}).length;
+
+  var stBtns='';
+  if(e.status==='A confirmar')stBtns+='<button class="bsm bsmg" onclick="updEvento('+id+',\'Confirmado\')">✅ Confirmar</button>';
+  if(e.status==='Confirmado')stBtns+='<button class="bsm bsmg" onclick="updEvento('+id+',\'Concluido\')">🏁 Concluir Evento</button>';
+  if(_evStatusVoltar[e.status])stBtns+='<button style="background:var(--s3);color:var(--mt);border:1px solid var(--bd);border-radius:6px;padding:4px 10px;font-size:11px" onclick="updEvento('+id+',\''+_evStatusVoltar[e.status]+'\')">◀ Voltar</button>';
+  if(e.status!=='Cancelado')stBtns+='<button class="bsm bsmr" onclick="updEvento('+id+',\'Cancelado\')">❌ Cancelar</button>';
+
+  var checklistHTML=checklist.map(function(c,idx){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd)">'
+      +'<input type="checkbox" '+(c.f?'checked':'')+' onchange="toggleChecklistItem('+id+','+idx+')" style="width:16px;height:16px;flex-shrink:0">'
+      +'<span style="flex:1;font-size:12px;'+(c.f?'text-decoration:line-through;color:var(--mt)':'')+'">'+c.t+'</span>'
+      +'<button onclick="delChecklistItem('+id+','+idx+')" style="background:none;border:none;color:var(--rd);font-size:12px;cursor:pointer">✕</button>'
+      +'</div>';
+  }).join('');
+
+  openM(cfg.ic+' '+e.nome,
+    '<div class="mf">'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
+    +'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:'+cfg.bg+';color:'+cfg.cor+'">'+cfg.ic+' '+cfg.label+'</span>'
+    +'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:var(--s2);color:var(--tx)">'+e.status+'</span>'
+    +'</div>'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:3px">📅 '+e.dataIni+(multi?' → '+e.dataFim:'')+(e.horaIni?' · '+e.horaIni+(e.horaFim?'–'+e.horaFim:''):'')+'</div>'
+    +(e.local?'<div style="font-size:12px;color:var(--mt);margin-bottom:3px">📍 '+e.local+(e.endereco?' — '+e.endereco:'')+'</div>':'')
+    +(e.responsaveis?'<div style="font-size:12px;color:var(--mt);margin-bottom:3px">👤 Responsável: '+e.responsaveis+'</div>':'')
+    +(e.contato?'<div style="font-size:12px;color:var(--mt);margin-bottom:3px">☎️ '+e.contato+'</div>':'')
+    +(e.link?'<div style="font-size:12px;margin-bottom:3px">🔗 <a href="'+e.link+'" target="_blank" style="color:var(--bl)">'+e.link+'</a></div>':'')
+    +(e.obs?'<div style="font-size:12px;color:var(--or);margin-bottom:3px">⚠ '+e.obs+'</div>':'')
+    +'<div style="margin:10px 0 6px;font-size:12px;font-weight:700">✅ Checklist de preparação ('+feitos+'/'+checklist.length+')</div>'
+    +checklistHTML
+    +'<div style="display:flex;gap:6px;margin-top:8px"><input class="inp" id="cl-novo-'+id+'" placeholder="Adicionar item... (ex: Banner, cartão de visita)" style="flex:1" onkeydown="if(event.key===\'Enter\')addChecklistItem('+id+')"><button class="btn" onclick="addChecklistItem('+id+')" style="padding:8px 12px">+</button></div>'
+    +'<div class="brow" style="margin-top:14px;flex-wrap:wrap">'+stBtns+'<button style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:6px 12px;font-size:12px" onclick="mEditEvento('+id+')">✏️ Editar</button><button class="btnO bOgr" onclick="closeM()">Fechar</button></div>'
+    +'</div>',560);
+}
+
 // Abre o Google Maps com todas as coletas do dia em sequência como paradas de rota
 function abrirRotaDia(diaStr){
   var cols=DB.coletas.filter(function(c){return c.data===diaStr&&c.status!=='Cancelada';})
@@ -11969,10 +12409,15 @@ function saveCol(){
       });
     }
   }
-  // Se veio da Pré-Agenda, marca o interessado como convertido
+  // Se veio da Pré-Agenda, marca o interessado como convertido e vincula/cria o Fornecedor
   if(_agConvertPreId){
     for(var pi=0;pi<DB.preAgenda.length;pi++){
-      if(DB.preAgenda[pi].id===_agConvertPreId){DB.preAgenda[pi].status='convertido';DB.preAgenda[pi].coletaId=novaCol.id;break;}
+      if(DB.preAgenda[pi].id===_agConvertPreId){
+        DB.preAgenda[pi].status='convertido';
+        DB.preAgenda[pi].coletaId=novaCol.id;
+        DB.preAgenda[pi].fornecedorId=_vincularOuCriarFornecedor(DB.preAgenda[pi]);
+        break;
+      }
     }
     _agConvertPreId=null;
   }
@@ -15773,11 +16218,25 @@ function delUser(uid){
 // ── Gestão de Funções ──────────────────────────────────────────
 // Base roles stored separately so we can edit them
 var BASE_ROLES=[
-  {id:'adm',     nome:'Administrador',pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','funcionarios','clientes','tabelas','mercado','classificador','configuracoes']},
+  {id:'adm',     nome:'Administrador',pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','eventos','funcionarios','clientes','tabelas','mercado','classificador','configuracoes']},
   {id:'caixa',   nome:'Caixa',         pages:['caixa_dia','pesagem','pendencias','estoque_vis','classificador']},
   {id:'motorista',nome:'Motorista',    pages:['agenda','classificador']},
-  {id:'operador', nome:'Operador',     pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','funcionarios','clientes','tabelas','classificador']},
+  {id:'operador', nome:'Operador',     pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','eventos','funcionarios','clientes','tabelas','classificador']},
 ];
+// Guarda uma cópia das páginas padrão de cada função ANTES de qualquer restauração de cache/nuvem.
+// Serve pra garantir que páginas novas (como "Agenda de Eventos") sempre apareçam pra quem já
+// tinha o sistema em uso, mesmo com uma versão salva antiga de permissões.
+var _DEFAULT_PAGES_BY_ROLE={};
+BASE_ROLES.forEach(function(r){_DEFAULT_PAGES_BY_ROLE[r.id]=r.pages.slice();});
+function _patchRestoredRoles(){
+  for(var i=0;i<BASE_ROLES.length;i++){
+    var def=_DEFAULT_PAGES_BY_ROLE[BASE_ROLES[i].id];
+    if(!def||!BASE_ROLES[i].pages)continue;
+    for(var j=0;j<def.length;j++){
+      if(BASE_ROLES[i].pages.indexOf(def[j])<0)BASE_ROLES[i].pages.push(def[j]);
+    }
+  }
+}
 function _buildRoleForm(r){
   var pagesH='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
   for(var i=0;i<ALLPAGES.length;i++){
@@ -16417,6 +16876,7 @@ function _cfgAtalhos(){
     {id:'revenda',     label:'Revenda',       desc:'Abrir tela de revenda',           key:'R'},
     {id:'financeiro',  label:'Financeiro',    desc:'Navegar para financeiro',         key:'F'},
     {id:'agenda',      label:'Agenda de Coletas',desc:'Navegar para a agenda de coletas',key:'A'},
+    {id:'eventos',     label:'Agenda de Eventos',desc:'Navegar para a agenda de eventos',key:'V'},
     {id:'funcionarios',label:'Funcionarios',  desc:'Navegar para funcionarios',       key:'N'},
     {id:'clientes',    label:'Clientes',      desc:'Navegar para clientes',           key:'C'},
     {id:'tabelas',     label:'Tabelas',       desc:'Navegar para tabelas',            key:'T'},
@@ -16771,9 +17231,10 @@ window.addEventListener('DOMContentLoaded', function(){
         if(ro && ro.base && Array.isArray(ro.base)){
           BASE_ROLES=ro.base;
           if(ro.custom && Array.isArray(ro.custom)) CUSTOM_ROLES=ro.custom;
+          _patchRestoredRoles();
           var _allR=BASE_ROLES.concat(CUSTOM_ROLES);
           for(var _ri=0;_ri<_allR.length;_ri++){PPAGES[_allR[_ri].id]=_allR[_ri].pages;}
-          localStorage.setItem('bv_roles',JSON.stringify(ro));
+          localStorage.setItem('bv_roles',JSON.stringify({base:BASE_ROLES,custom:CUSTOM_ROLES}));
         }
       });
       // Carrega CFG da nuvem
