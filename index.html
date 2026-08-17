@@ -283,10 +283,10 @@ var USERS=[
 ];
 var PNOME={adm:'Administrador',caixa:'Caixa',motorista:'Motorista',operador:'Operador'};
 var PPAGES={
-  adm:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','eventos','funcionarios','clientes','tabelas','mercado','classificador','configuracoes'],
+  adm:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','eventos','producao','producao_analise','funcionarios','clientes','tabelas','mercado','classificador','configuracoes'],
   caixa:['caixa_dia','pesagem','pendencias','estoque_vis','classificador'],
   motorista:['agenda','classificador'],
-  operador:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','eventos','funcionarios','clientes','tabelas','classificador'],
+  operador:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','eventos','producao','funcionarios','clientes','tabelas','classificador'],
 };
 var ALLPAGES=[
   {id:'dashboard',   label:'Dashboard',   icon:'&#8862;'},
@@ -299,6 +299,7 @@ var ALLPAGES=[
   {id:'financeiro',  label:'Financeiro',  icon:'&#128176;'},
   {id:'agenda',      label:'Agenda de Coletas',icon:'&#128197;'},
   {id:'eventos',     label:'Agenda de Eventos',icon:'&#127914;'},
+  {id:'producao',    label:'Produção',    icon:'&#9881;'},
   {id:'funcionarios',label:'Funcionarios',icon:'&#128119;'},
   {id:'clientes',    label:'Clientes',    icon:'&#127970;'},
   {id:'tabelas',     label:'Tabelas',     icon:'&#128203;'},
@@ -372,6 +373,11 @@ var DB={
   preAgenda:[],
   preAgendaLimite:3,
   eventos:[],
+  producoes:[],       // Controle de Produção
+  prodVinculos:{},    // {materialId: tabelaVendaId} — qual tabela usar pra projetar cada material
+  prodCustoTab:null,  // id da tabela de compra usada como custo de entrada
+  prodMatEntrada:['Eletrônico p/ desmontar','Motor p/ desmontar','Alumínio p/ limpar','Informática','Telecomunicação','Linha Branca','Sucata Geral'],
+  prodCustoEntrada:{}, // {nomeMatEntrada: precoKg} — custo manual por tipo de entrada
   clientes:[],
   tabelas:[
     {id:1,nome:'Padrao',tipo:'venda', itens:[]},
@@ -640,7 +646,7 @@ function doLogout(){
 var pgAtiva='';
 // Grupos do menu superior (cascata)
 var _MS_GROUPS=[
-  {label:'Operações', icon:'⚖️', ids:['pesagem','pendencias','caixa_dia']},
+  {label:'Operações', icon:'⚖️', ids:['pesagem','pendencias','caixa_dia','producao']},
   {label:'Estoque',   icon:'📦', ids:['estoque','estoque_vis','revenda']},
   {label:'Financeiro',icon:'💰', ids:['financeiro']},
   {label:'Agenda',    icon:'📅', ids:['agenda','eventos']},
@@ -793,7 +799,7 @@ function setNav(pid){
   }
 }
 
-var _LABELS={dashboard:'Dashboard',pesagem:'Pesagem',pendencias:'Em Aberto',caixa_dia:'Caixa',estoque:'Estoque',estoque_vis:'Estoque',revenda:'Revenda',financeiro:'Financeiro',agenda:'Agenda de Coletas',eventos:'Agenda de Eventos',funcionarios:'Funcionarios',clientes:'Clientes',tabelas:'Tabelas',mercado:'Mercado',classificador:'Classificador PCB',configuracoes:'Configuracoes'};
+var _LABELS={dashboard:'Dashboard',pesagem:'Pesagem',pendencias:'Em Aberto',caixa_dia:'Caixa',estoque:'Estoque',estoque_vis:'Estoque',revenda:'Revenda',financeiro:'Financeiro',agenda:'Agenda de Coletas',eventos:'Agenda de Eventos',producao:'Produção',funcionarios:'Funcionarios',clientes:'Clientes',tabelas:'Tabelas',mercado:'Mercado',classificador:'Classificador PCB',configuracoes:'Configuracoes'};
 function _breadcrumb(pid){
   var lbl=_LABELS[pid]||pid;
   return '<div class="breadcrumb">&#127968; Inicio <span class="sep">&#8250;</span> <span>'+lbl+'</span></div>';
@@ -806,7 +812,7 @@ function go(pid){
   if(DB&&DB.revenda){for(var _ri=0;_ri<DB.revenda.length;_ri++){if(!DB.revenda[_ri].prod)DB.revenda[_ri].prod=DB.revenda[_ri].nome||'Produto';}}
   try{
     var m={dashboard:pgDash,pesagem:pgPesagem,pendencias:pgPendencias,caixa_dia:pgCaixaDia,estoque:pgEstoque,
-      estoque_vis:pgEstVis,revenda:pgRevenda,financeiro:pgFin,agenda:pgAgenda,eventos:pgEventos,
+      estoque_vis:pgEstVis,revenda:pgRevenda,financeiro:pgFin,agenda:pgAgenda,eventos:pgEventos,producao:pgProducao,
       funcionarios:pgFuncs,clientes:pgClis,tabelas:pgTabs,mercado:pgMercado,classificador:pgClassificador,usuarios:pgUsers,configuracoes:pgConfig};
     var _phtml=(m[pid]||function(){return '<p>Pagina nao encontrada</p>';})();
     document.getElementById('ct').innerHTML=_breadcrumb(pid)+_phtml;
@@ -1224,7 +1230,7 @@ function saveDB(){
       atendNum:DB.atendNum,produtos:DB.produtos,movs:DB.movs,contas:DB.contas,
       revenda:DB.revenda,revendaCats:DB.revendaCats,revendaStates:DB.revendaStates,
       entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
-      transf:DB.transf,coletas:DB.coletas,preAgenda:DB.preAgenda,preAgendaLimite:DB.preAgendaLimite,eventos:DB.eventos,funcs:DB.funcs,clientes:DB.clientes,
+      transf:DB.transf,coletas:DB.coletas,preAgenda:DB.preAgenda,preAgendaLimite:DB.preAgendaLimite,eventos:DB.eventos,producoes:DB.producoes,prodVinculos:DB.prodVinculos,prodCustoTab:DB.prodCustoTab,prodMatEntrada:DB.prodMatEntrada,prodCustoEntrada:DB.prodCustoEntrada,funcs:DB.funcs,clientes:DB.clientes,
       gerarTabsCustom:DB.gerarTabsCustom,
       pclCatsCustom:DB.pclCatsCustom||{},
       pclCatOrder:DB.pclCatOrder||[],
@@ -1470,7 +1476,18 @@ function _applySnap(s){
   if(s.coletas)DB.coletas=s.coletas;
   if(s.preAgenda)DB.preAgenda=s.preAgenda;
   if(s.preAgendaLimite)DB.preAgendaLimite=s.preAgendaLimite;
-  if(s.eventos)DB.eventos=s.eventos;
+  if(s.eventos){DB.eventos=s.eventos;
+    // Sanitiza datas de eventos (corrige formatos inconsistentes entre navegadores)
+    DB.eventos.forEach(function(e){
+      if(e.dataIni){var d=_parseDataBR(e.dataIni);if(d&&d.getFullYear()>2000)e.dataIni=_fmtDataBR(d);}
+      if(e.dataFim){var d=_parseDataBR(e.dataFim);if(d&&d.getFullYear()>2000)e.dataFim=_fmtDataBR(d);}
+    });
+  }
+  if(s.producoes)DB.producoes=s.producoes;
+  if(s.prodVinculos)DB.prodVinculos=s.prodVinculos;
+  if(s.prodCustoTab!=null)DB.prodCustoTab=s.prodCustoTab;
+  if(s.prodMatEntrada)DB.prodMatEntrada=s.prodMatEntrada;
+  if(s.prodCustoEntrada)DB.prodCustoEntrada=s.prodCustoEntrada;
   if(s.funcs)DB.funcs=s.funcs;
   if(s.clientes)DB.clientes=s.clientes;
   if(s.tabelas)DB.tabelas=s.tabelas;
@@ -9224,10 +9241,11 @@ function _finFluxo(){
         var mes=String(d.getMonth()+1).padStart(2,'/')+'/'+d.getFullYear();
         mes=(d.getMonth()+1<10?'0':'')+(d.getMonth()+1)+'/'+d.getFullYear();
         if(_cfAtivaNoMes(c,mes)){
+          var valMes=_cfValorMesRef(c,mes); // respeita valor ajustado especificamente para este mês
           var dVenc=new Date(d.getFullYear(),d.getMonth(),c.venc||1);
           if(dVenc>=dataIni&&dVenc<=dataFim){
             var status=_cfStatusMesRef(c,mes);
-            if(status!=='Pago')total+=val;
+            if(status!=='Pago')total+=valMes;
           }
         }
         d.setMonth(d.getMonth()+1);
@@ -9250,7 +9268,7 @@ function _finFluxo(){
       var c=DB.contasFixas[i];
       if(c.venc===dia.getDate()){
         if(_cfAtivaNoMes(c,mes2)&&_cfStatusMesRef(c,mes2)!=='Pago'){
-          saidas+=c.valor||0;
+          saidas+=_cfValorMesRef(c,mes2)||0;
         }
       }
     }
@@ -9321,15 +9339,18 @@ function _finFluxo(){
   var contasPerH='';
   var contasPer=[];
   for(var i=0;i<DB.contasFixas.length;i++){
-    var c=DB.contasFixas[i];if(!c.valor)continue;
+    var c=DB.contasFixas[i];if(c.tipo==='variavel'&&!c.valor&&!(c.historico&&c.historico.length))continue;
     var dHoz=new Date(hoje);dHoz.setDate(dHoz.getDate()+horizonte);
     var d=new Date(hoje);
     while(d<=dHoz){
       var mes=(d.getMonth()+1<10?'0':'')+(d.getMonth()+1)+'/'+d.getFullYear();
       if(_cfAtivaNoMes(c,mes)&&_cfStatusMesRef(c,mes)!=='Pago'){
-        var dVenc=new Date(d.getFullYear(),d.getMonth(),c.venc||1);
-        if(dVenc>hoje&&dVenc<=dHoz){
-          contasPer.push({nome:c.nome,ic:c.ic||'📅',val:c.valor,data:dVenc.toLocaleDateString('pt-BR')});
+        var valMes=_cfValorMesRef(c,mes);
+        if(valMes>0){
+          var dVenc=new Date(d.getFullYear(),d.getMonth(),c.venc||1);
+          if(dVenc>hoje&&dVenc<=dHoz){
+            contasPer.push({nome:c.nome,ic:c.ic||'📅',val:valMes,data:dVenc.toLocaleDateString('pt-BR')});
+          }
         }
       }
       d.setMonth(d.getMonth()+1);
@@ -9943,6 +9964,24 @@ function _mesParaDate(mes){
   var p=mes.split('/');if(p.length<2)return null;
   return new Date(parseInt(p[1]),parseInt(p[0])-1,1);
 }
+// Data completa (dd/mm/aaaa) da próxima ocorrência de uma conta — usada pra itens agendados no futuro
+function _cfDataCompleta(c){
+  var venc=c.venc||1;
+  if(c.mesInicio){
+    var p=c.mesInicio.split('/');
+    if(p.length===2)return ('0'+venc).slice(-2)+'/'+p[0]+'/'+p[1];
+  }
+  var hoje=new Date();
+  return ('0'+venc).slice(-2)+'/'+('0'+(hoje.getMonth()+1)).slice(-2)+'/'+hoje.getFullYear();
+}
+// true se a conta só começa a valer num mês futuro em relação ao mês atual real (não o mês navegado)
+function _cfAgendadaFuturo(c){
+  if(!c.mesInicio)return false;
+  var dIni=_mesParaDate(c.mesInicio);
+  var dAtual=_mesParaDate(_mesAtual());
+  if(!dIni||!dAtual)return false;
+  return dIni>dAtual;
+}
 function _cfAtivaNoMes(c,mesRef){
   // Retorna false se mesRef é anterior ao mesInicio da conta.
   // Exceção: conta FIXA com valor cadastrado sempre é considerada ativa no mês atual
@@ -10027,6 +10066,9 @@ function _finFixas(){
   var _diaHoje=new Date().getDate();
   for(var i=0;i<_cfOrdenadas.length;i++){
     var c=_cfOrdenadas[i];
+    // Itens agendados pra começar num mês futuro real (ex: extintor que só vence em 2027)
+    // não aparecem misturados na lista do mês atual — ficam num card fixo separado, sempre visível.
+    if(_fixasMesOffset===0&&_cfAgendadaFuturo(c))continue;
     // Para parcelada, pular se nao tem parcela neste mes
     if(c.tipo==='parcelada'&&!_cfHasParcelaNoMes(c,ma))continue;
     var v=_cfValorMesRef(c,ma);
@@ -10070,7 +10112,7 @@ function _finFixas(){
       } else if(s==='Pendente'){
         if(c.tipo==='variavel'&&v===0) acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="mLancarCF('+c.id+')">Lancar Valor</button>';
         else if(c.tipo==='variavel'&&v>0) acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);margin-right:4px" onclick="mLancarCF('+c.id+')">&#9998; Alterar</button><button class="bsm bsmg" onclick="mPagarCF('+c.id+')">Pagar</button>';
-        else if(v>0) acoes='<button class="bsm bsmg" onclick="mPagarCF('+c.id+')">Pagar</button>'
+        else if(v>0) acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);margin-right:4px" onclick="mLancarCF('+c.id+')" title="Ajustar o valor só deste mês (desconto, abatimento, etc.) sem alterar os demais meses">&#9998; Alterar</button><button class="bsm bsmg" onclick="mPagarCF('+c.id+')">Pagar</button>'
           +(_cfUltimaConta(c)?'<button class="bsm" style="background:rgba(34,197,94,.12);color:var(--gr);border:1px solid rgba(34,197,94,.3);font-size:10px" onclick="pagarCFRapido('+c.id+')" title="Pagar rapidamente com '+_cfUltimaConta(c)+'">&#9889; '+_cfUltimaConta(c)+'</button>':'');
         else acoes='<button class="bsm" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3)" onclick="mLancarCF('+c.id+')">Lancar Valor</button>';
       } else {
@@ -10085,7 +10127,7 @@ function _finFixas(){
       +'<div>'
       +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
       +'<span style="font-size:13px;font-weight:600">'+c.nome+'</span>'+tipoTag+_urgBadge+'</div>'
-      +'<div style="font-size:10px;color:var(--mt);margin-top:2px">Vence dia '+c.venc+' &middot; <button onclick="mHistCF('+c.id+')" style="background:none;border:none;color:var(--bl);font-size:10px;cursor:pointer;padding:0">ver historico</button></div>'
+      +'<div style="font-size:10px;color:var(--mt);margin-top:2px">Vence '+('0'+(c.venc||1)).slice(-2)+'/'+ma.replace('/','/')+' &middot; <button onclick="mHistCF('+c.id+')" style="background:none;border:none;color:var(--bl);font-size:10px;cursor:pointer;padding:0">ver historico</button></div>'
       +'</div></div>'
       +'<div style="display:flex;align-items:center;gap:9px">'
       +(v>0?'<span style="font-size:14px;font-weight:700;font-family:monospace;color:'+(isFuturo?'var(--pu)':statusParc==='Pendente'?'var(--rd)':'var(--mt)')+'">'+fR(v)+'</span>':'')
@@ -10120,23 +10162,53 @@ function _finFixas(){
       +'<div style="font-size:20px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(totPago)+'</div></div>';
   }
   sumCards+='</div>';
+  // Card fixo — itens agendados pra começar num mês futuro (ex: renovação de extintor em 2027)
+  var agendadosFuturo=DB.contasFixas.filter(function(c){return _cfAgendadaFuturo(c);});
+  var cardAgendados='';
+  if(_fixasMesOffset===0&&agendadosFuturo.length){
+    cardAgendados='<div class="card" style="cursor:pointer;background:var(--pub);border-color:rgba(168,85,247,.3)" onclick="mVerAgendadosFuturo()">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<span style="font-size:18px">&#128276;</span>'
+      +'<div><div style="font-size:13px;font-weight:700;color:#fff">'+agendadosFuturo.length+' item(ns) agendado(s) para o futuro</div>'
+      +'<div style="font-size:10px;color:rgba(255,255,255,.75)">Toque para ver as datas &mdash; nao aparecem nas contas do mes até chegar a data</div></div>'
+      +'</div><span style="color:#fff;font-size:16px">&#8250;</span></div></div>';
+  }
   return '<div class="fc">'
     +'<div style="display:flex;justify-content:space-between;align-items:center">'
     +'<button onclick="exportarContasAPagarPDF()" class="btn" style="font-size:12px;padding:6px 12px">&#128196; PDF</button>'
     +(_fixasMesOffset===0?'<button class="btn" onclick="mNovaCF()">+ Nova Conta</button>':'<div style="font-size:11px;color:var(--mt)">Navegando meses &mdash; volte ao mes atual para editar</div>')
     +'</div>'
     +navBar
+    +cardAgendados
     +sumCards
     +'<div class="card"><div class="stl"><div class="stb" style="background:'+(isFuturo?'var(--pu)':'var(--gr)')+'"></div><div class="stx">Contas — '+_mesLabel(ma)+'</div></div>'+cfH+'</div>'
     +'</div>';
 }
 
+function mVerAgendadosFuturo(){
+  var lista=DB.contasFixas.filter(function(c){return _cfAgendadaFuturo(c);})
+    .sort(function(a,b){return _mesParaDate(a.mesInicio)-_mesParaDate(b.mesInicio);});
+  var html='<div class="mf"><div style="font-size:12px;color:var(--mt);margin-bottom:10px">Estes itens só entram na lista de contas do mês quando a data de início chegar. Ficam guardados aqui pra você não esquecer.</div>';
+  lista.forEach(function(c){
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;background:var(--s2);border-radius:var(--r);padding:11px 13px;margin-bottom:7px;cursor:pointer" onclick="closeM();mEditCF('+c.id+')">'
+      +'<div style="display:flex;align-items:center;gap:10px">'
+      +'<span style="font-size:20px">'+(c.ic||'&#128197;')+'</span>'
+      +'<div><div style="font-size:13px;font-weight:600">'+c.nome+'</div>'
+      +'<div style="font-size:11px;color:var(--pu);margin-top:2px">&#128197; '+_cfDataCompleta(c)+(c.valor>0?' &middot; '+fR(c.valor):'')+'</div></div>'
+      +'</div><span style="color:var(--mt);font-size:14px">&#9998;</span></div>';
+  });
+  html+='</div>';
+  openM('&#128276; Agendados para o Futuro',html,500);
+}
+
 function pgCF(id){
   var c=null;for(var i=0;i<DB.contasFixas.length;i++){if(DB.contasFixas[i].id===id){c=DB.contasFixas[i];break;}}
   if(!c)return;
+  var ma=_mesAtual();var v=_cfValorMesRef(c,ma);
   c.status='Pago';
-  DB.movs.unshift({id:nid(),data:hj(),desc:'Pagamento: '+c.nome,tipo:'saida',cat:c.cat||'Fixo',valor:c.valor,conta:'Caixa'});
-  for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){DB.contas[i].saldo=+(DB.contas[i].saldo-c.valor).toFixed(2);break;}}
+  DB.movs.unshift({id:nid(),data:hj(),desc:'Pagamento: '+c.nome,tipo:'saida',cat:c.cat||'Fixo',valor:v,conta:'Caixa'});
+  for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){DB.contas[i].saldo=+(DB.contas[i].saldo-v).toFixed(2);break;}}
   go('financeiro');
 }
 
@@ -10434,9 +10506,9 @@ function mPagarCF(id){
     +'<div style="background:var(--s2);border-radius:var(--r);padding:13px;text-align:center">'
     +'<div style="font-size:11px;color:var(--mt);margin-bottom:4px">'+c.nome+' — '+ma+'</div>'
     +'<div style="font-size:24px;font-weight:700;font-family:monospace;color:var(--rd)">'+fR(v)+'</div>'
-    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Vence dia '+c.venc+'</div>'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Vence '+('0'+(c.venc||1)).slice(-2)+'/'+ma+'</div>'
     +'</div>'
-    +(c.tipo==='variavel'?'<button type="button" class="btnO bOgr" style="font-size:11px;width:100%" onclick="closeM();mLancarCF('+id+')">&#9998; Alterar Valor</button>':'')
+    +(c.tipo==='variavel'||c.tipo==='fixa'?'<button type="button" class="btnO bOgr" style="font-size:11px;width:100%" onclick="closeM();mLancarCF('+id+')" title="Ajustar o valor só deste mês (desconto, abatimento, etc.)">&#9998; Alterar Valor deste mês</button>':'')
     +'<div class="fld"><label>Conta para debitar</label><select class="inp" id="cf-pc">'
     +DB.contas.map(function(ct){var contaPad=_cfUltimaConta(c);return'<option'+(contaPad===ct.nome?' selected':'')+'>'+ct.nome+'</option>';}).join('')
     +'</select></div>'
@@ -11119,7 +11191,7 @@ function stAcoes(col){
 // ── date helpers ───────────────────────────────────────────
 function _today(){return new Date();}
 function _fmtDataBR(d){return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();}
-function _parseDataBR(s){var p=s.split('/');return new Date(+p[2],+p[1]-1,+p[0]);}
+function _parseDataBR(s){var p=(s||'').split('/');if(p.length<3)return new Date(0);return new Date(+p[2],+p[1]-1,+p[0]);}
 function _isoDateBR(s){var p=s.split('/');return p[2]+'-'+p[1]+'-'+p[0];}
 function _startOfWeek(d){var dt=new Date(d);dt.setDate(dt.getDate()-dt.getDay());return dt;}
 function _addDays(d,n){var dt=new Date(d);dt.setDate(dt.getDate()+n);return dt;}
@@ -11952,6 +12024,10 @@ var _EV_TIPOS={
   'Auditoria':{label:'Auditoria',ic:'🔍',cor:'var(--rd)',bg:'var(--rdb)'},
   'Palestra':{label:'Palestra',ic:'🎤',cor:'var(--gr)',bg:'var(--grb)'},
   'Visita':{label:'Visita Técnica',ic:'🏭',cor:'var(--or)',bg:'var(--orb)'},
+  'Ausencia':{label:'Ausência / Falta',ic:'🚫',cor:'#ef4444',bg:'rgba(239,68,68,.1)'},
+  'Ferias':{label:'Férias',ic:'🏖️',cor:'#06b6d4',bg:'rgba(6,182,212,.1)'},
+  'Manutencao':{label:'Manutenção',ic:'🔧',cor:'#f97316',bg:'rgba(249,115,22,.1)'},
+  'Lembrete':{label:'Lembrete Interno',ic:'📝',cor:'#eab308',bg:'rgba(234,179,8,.1)'},
   'Outro':{label:'Outro',ic:'📌',cor:'var(--mt)',bg:'var(--s2)'}
 };
 function _evTipoCfg(tipo){return _EV_TIPOS[tipo]||_EV_TIPOS['Outro'];}
@@ -12009,11 +12085,12 @@ function buildEvSemana(){
     +'</div>';
 
   var evsSemana=(DB.eventos||[]).filter(function(e){
+    if(e.status==='Cancelado')return false;
     var ini=_parseDataBR(e.dataIni),fim=_parseDataBR(e.dataFim||e.dataIni);
     return fim>=semDates[0]&&ini<=semDates[6];
   });
-  var faixaEv=evsSemana.filter(function(e){return !e.horaIni||e.dataIni!==(e.dataFim||e.dataIni);});
-  var horaEv=evsSemana.filter(function(e){return e.horaIni&&e.dataIni===(e.dataFim||e.dataIni);});
+  var faixaEv=evsSemana.filter(function(e){return !e.horaIni||(e.dataFim&&e.dataFim!==e.dataIni);});
+  var horaEv=evsSemana.filter(function(e){return e.horaIni&&(!e.dataFim||e.dataFim===e.dataIni);});
 
   html+='<div style="overflow-x:auto"><div style="min-width:760px">';
   // cabeçalho dos dias
@@ -12027,21 +12104,25 @@ function buildEvSemana(){
       +'</div>';
   });
   html+='</div>';
-  // faixa de eventos sem horário / multi-dia (estilo "dia inteiro")
-  if(faixaEv.length){
-    html+='<div style="display:grid;grid-template-columns:46px repeat(7,1fr);border-bottom:1px solid var(--bd);padding:3px 0">';
-    html+='<div></div>';
-    semDates.forEach(function(dia){
-      var evsHoje=faixaEv.filter(function(e){var ini=_parseDataBR(e.dataIni),fim=_parseDataBR(e.dataFim||e.dataIni);return dia>=ini&&dia<=fim;});
-      html+='<div style="padding:1px 2px;border-left:1px solid var(--bd)">';
-      evsHoje.forEach(function(e){
-        var cfg=_evTipoCfg(e.tipo);
-        html+='<div onclick="mVerEvento('+e.id+')" style="background:'+cfg.cor+';color:#fff;border-radius:4px;padding:2px 5px;margin-bottom:2px;font-size:9px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer">'+cfg.ic+' '+e.nome+'</div>';
-      });
-      html+='</div>';
+  // faixa de eventos sem horário / multi-dia (estilo "dia inteiro") — sempre mostra
+  html+='<div style="display:grid;grid-template-columns:46px repeat(7,1fr);border-bottom:1px solid var(--bd);padding:3px 0;min-height:24px">';
+  html+='<div style="font-size:8px;color:var(--mt);text-align:right;padding-right:4px;padding-top:3px">dia<br>todo</div>';
+  semDates.forEach(function(dia){
+    var evsHoje=faixaEv.filter(function(e){var ini=_parseDataBR(e.dataIni),fim=_parseDataBR(e.dataFim||e.dataIni);return dia>=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate())&&dia<=new Date(fim.getFullYear(),fim.getMonth(),fim.getDate());});
+    // Também mostra eventos COM horário que estão nesse dia (pra quem bate o olho rápido)
+    var evsHoraHoje=horaEv.filter(function(e){return e.dataIni===_fmtDataBR(dia);});
+    html+='<div style="padding:1px 2px;border-left:1px solid var(--bd)">';
+    evsHoje.forEach(function(e){
+      var cfg=_evTipoCfg(e.tipo);
+      html+='<div onclick="mVerEvento('+e.id+')" style="background:'+cfg.cor+';color:#fff;border-radius:4px;padding:3px 5px;margin-bottom:2px;font-size:9px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer">'+cfg.ic+' '+e.nome+'</div>';
+    });
+    evsHoraHoje.forEach(function(e){
+      var cfg=_evTipoCfg(e.tipo);
+      html+='<div onclick="mVerEvento('+e.id+')" style="background:'+cfg.bg+';border-left:2px solid '+cfg.cor+';color:'+cfg.cor+';border-radius:4px;padding:2px 5px;margin-bottom:2px;font-size:8px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer">'+e.horaIni+' '+e.nome+'</div>';
     });
     html+='</div>';
-  }
+  });
+  html+='</div>';
   // grade de horas
   var rowH=46;
   html+='<div style="position:relative;display:grid;grid-template-columns:46px repeat(7,1fr)">';
@@ -12105,12 +12186,12 @@ function buildEvMes(){
       return dia>=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate())&&dia<=new Date(fim.getFullYear(),fim.getMonth(),fim.getDate());
     });
     var tem=evsDia.length>0;
-    html+='<div style="background:'+(isHj?'var(--grb)':tem?'var(--s2)':'transparent')+';border:1px solid '+(isHj?'var(--gr)':tem?'var(--bd)':'transparent')+';border-radius:8px;padding:5px 4px;min-height:56px">'
+    html+='<div onclick="'+(tem?'mVerEvento('+evsDia[0].id+')':'mNovoEventoDia('+ano+','+(mes+1)+','+d+')')+'" style="cursor:pointer;background:'+(isHj?'var(--grb)':tem?'var(--s2)':'transparent')+';border:1px solid '+(isHj?'var(--gr)':tem?'var(--bd)':'transparent')+';border-radius:8px;padding:5px 4px;min-height:56px">'
       +'<div style="font-size:12px;font-weight:'+(isHj?800:600)+';color:'+(isHj?'var(--gr)':tem?'var(--tx)':'var(--ft)')+';text-align:center">'+d+'</div>';
     var maxPills=Math.min(evsDia.length,3);
     for(var i=0;i<maxPills;i++){
       var cfg=_evTipoCfg(evsDia[i].tipo);
-      html+='<div style="background:'+cfg.cor+';border-radius:3px;height:5px;margin-top:2px;opacity:.85" title="'+evsDia[i].nome+'"></div>';
+      html+='<div style="background:'+cfg.bg+';border-left:3px solid '+cfg.cor+';border-radius:3px;padding:1px 4px;margin-top:2px;font-size:8px;font-weight:700;color:'+cfg.cor+';overflow:hidden;white-space:nowrap;text-overflow:ellipsis" title="'+evsDia[i].nome+'">'+evsDia[i].nome+'</div>';
     }
     if(evsDia.length>3)html+='<div style="font-size:9px;color:var(--mt);text-align:center">+'+(evsDia.length-3)+'</div>';
     html+='</div>';
@@ -12182,6 +12263,12 @@ function mNovoEvento(){
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveEvento()">Adicionar</button></div>',560);
   setTimeout(function(){var n=document.getElementById('ef-nome');if(n)n.focus();},80);
 }
+function mNovoEventoDia(ano,mes,dia){
+  var iso=ano+'-'+('0'+mes).slice(-2)+'-'+('0'+dia).slice(-2);
+  openM('+ Novo Evento',_buildEventoForm(null)
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveEvento()">Adicionar</button></div>',560);
+  setTimeout(function(){var el=document.getElementById('ef-dataIni');if(el)el.value=iso;var n=document.getElementById('ef-nome');if(n)n.focus();},80);
+}
 
 function saveEvento(){
   var nome=document.getElementById('ef-nome').value.trim();
@@ -12192,8 +12279,8 @@ function saveEvento(){
   var novo={
     id:nid(),nome:nome,
     tipo:document.getElementById('ef-tipo').value||'Outro',
-    dataIni:new Date(dIni+'T00:00').toLocaleDateString('pt-BR'),
-    dataFim:dFim?new Date(dFim+'T00:00').toLocaleDateString('pt-BR'):'',
+    dataIni:_fmtDataBR(new Date(dIni+'T00:00')),
+    dataFim:dFim?_fmtDataBR(new Date(dFim+'T00:00')):'',
     horaIni:document.getElementById('ef-horaIni').value||'',
     horaFim:document.getElementById('ef-horaFim').value||'',
     local:document.getElementById('ef-local').value.trim(),
@@ -12227,8 +12314,8 @@ function saveEditEvento(id){
     if(DB.eventos[i].id===id){
       DB.eventos[i].nome=nome;
       DB.eventos[i].tipo=document.getElementById('ef-tipo').value||'Outro';
-      DB.eventos[i].dataIni=new Date(dIni+'T00:00').toLocaleDateString('pt-BR');
-      DB.eventos[i].dataFim=dFim?new Date(dFim+'T00:00').toLocaleDateString('pt-BR'):'';
+      DB.eventos[i].dataIni=_fmtDataBR(new Date(dIni+'T00:00'));
+      DB.eventos[i].dataFim=dFim?_fmtDataBR(new Date(dFim+'T00:00')):'';
       DB.eventos[i].horaIni=document.getElementById('ef-horaIni').value||'';
       DB.eventos[i].horaFim=document.getElementById('ef-horaFim').value||'';
       DB.eventos[i].local=document.getElementById('ef-local').value.trim();
@@ -12322,6 +12409,391 @@ function mVerEvento(id){
 }
 
 // Abre o Google Maps com todas as coletas do dia em sequência como paradas de rota
+// ══════════════════════════════════════════════════════
+// CONTROLE DE PRODUÇÃO
+// ══════════════════════════════════════════════════════
+var prodVw='registro';
+var prodPeriodo='mes'; // 'hoje'|'semana'|'mes'|'trim'|'ano'|'tudo'
+var _isAdm=function(){var r=getRoleById(CU.perfil);return r&&r.pages&&r.pages.indexOf('producao_analise')>=0;};
+
+function _prodPrecoVenda(prodId){
+  var tabId=DB.prodVinculos[prodId];if(!tabId)return 0;
+  for(var i=0;i<DB.tabelas.length;i++){
+    if(String(DB.tabelas[i].id)===String(tabId)){
+      for(var j=0;j<DB.tabelas[i].itens.length;j++){if(String(DB.tabelas[i].itens[j].pId)===String(prodId))return DB.tabelas[i].itens[j].preco;}
+    }
+  }
+  return 0;
+}
+function _prodCustoEntrada(matNome){return DB.prodCustoEntrada[matNome]||0;}
+function _nomeTab(tabId){for(var i=0;i<DB.tabelas.length;i++)if(String(DB.tabelas[i].id)===String(tabId))return DB.tabelas[i].nome;return '?';}
+
+// Filtro de período
+function _prodFiltrar(lista){
+  if(prodPeriodo==='tudo')return lista;
+  var hj=_today();
+  var ini;
+  if(prodPeriodo==='hoje'){ini=new Date(hj.getFullYear(),hj.getMonth(),hj.getDate());}
+  else if(prodPeriodo==='semana'){ini=new Date(hj);ini.setDate(ini.getDate()-ini.getDay());}
+  else if(prodPeriodo==='mes'){ini=new Date(hj.getFullYear(),hj.getMonth(),1);}
+  else if(prodPeriodo==='trim'){ini=new Date(hj.getFullYear(),hj.getMonth()-2,1);}
+  else if(prodPeriodo==='ano'){ini=new Date(hj.getFullYear(),0,1);}
+  return lista.filter(function(p){
+    var parts=p.data.split('/');var d=new Date(+parts[2],+parts[1]-1,+parts[0]);
+    return d>=ini;
+  });
+}
+
+function pgProducao(){
+  var abertas=(DB.producoes||[]).filter(function(p){return p.status==='aberta';});
+  var fechadas=(DB.producoes||[]).filter(function(p){return p.status==='fechada';});
+  var hjFech=fechadas.filter(function(p){return p.data===_fmtDataBR(_today());});
+  var adm=_isAdm();
+
+  // Sub-abas: Operador vê só Registro; Admin vê tudo
+  var subTabs='<div style="display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--bd)">'
+    +'<button onclick="prodVw=\'registro\';go(\'producao\')" style="background:none;border:none;border-bottom:2px solid '+(prodVw==='registro'?'var(--gr)':'transparent')+';color:'+(prodVw==='registro'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer">👷 Registro</button>';
+  if(adm){
+    subTabs+='<button onclick="prodVw=\'analise\';go(\'producao\')" style="background:none;border:none;border-bottom:2px solid '+(prodVw==='analise'?'var(--gr)':'transparent')+';color:'+(prodVw==='analise'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer">📊 Análise</button>'
+      +'<button onclick="prodVw=\'config\';go(\'producao\')" style="background:none;border:none;border-bottom:2px solid '+(prodVw==='config'?'var(--gr)':'transparent')+';color:'+(prodVw==='config'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer">⚙️ Tabelas</button>';
+  }
+  subTabs+='</div>';
+  // Se não é admin e tenta ver análise/config, volta pra registro
+  if(!adm&&prodVw!=='registro')prodVw='registro';
+
+  var corpo=prodVw==='registro'?_prodRegistro(abertas,hjFech)
+    :prodVw==='analise'?_prodAnalise(fechadas)
+    :_prodConfig();
+
+  return '<div class="fc"><div class="ptop">'
+    +'<div><div class="pl">Operações</div><div class="pt">Controle de Produção</div></div>'
+    +'<div style="display:flex;gap:6px">'
+    +(prodVw==='registro'?'<button class="btn" onclick="mNovaProdBV()">+ Nova Produção</button>':'')
+    +'</div></div>'
+    +subTabs+corpo+'</div>';
+}
+
+// ── REGISTRO ─────────────────────────────────────────
+function _prodRegistro(abertas,hjFech){
+  var html='';
+  if(abertas.length){
+    html+='<div style="font-size:11px;font-weight:700;color:var(--or);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">⏳ Em andamento</div>';
+    abertas.forEach(function(p){
+      var ts=p.saidas.reduce(function(s,x){return s+x.peso;},0);
+      html+='<div class="card" style="border-color:var(--or);cursor:pointer" onclick="mVerProdBV('+p.id+')">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+        +'<div><div style="font-size:14px;font-weight:700">👷 '+p.func+'</div>'
+        +'<div style="font-size:11px;color:var(--mt)">'+p.matEntrada+' · Entrada: '+fKg(p.pesoEntrada)+'kg</div>'
+        +'<div style="font-size:11px;color:var(--mt)">'+p.saidas.length+' material(is) · '+fKg(ts)+'kg gerados</div></div>'
+        +'<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:var(--orb);color:var(--or)">Aberta</span>'
+        +'</div></div>';
+    });
+  }
+  if(hjFech.length){
+    html+='<div style="font-size:11px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;margin-top:14px">✅ Concluídas hoje</div>';
+    hjFech.forEach(function(p){
+      var ts=p.saidas.reduce(function(s,x){return s+x.peso;},0);
+      html+='<div class="card" style="cursor:pointer" onclick="mVerProdBV('+p.id+')">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+        +'<div><div style="font-size:14px;font-weight:700">👷 '+p.func+'</div>'
+        +'<div style="font-size:11px;color:var(--mt)">'+p.matEntrada+' · '+fKg(p.pesoEntrada)+'kg → '+fKg(ts)+'kg · '+p.hora+'</div></div>'
+        +'<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:var(--grb);color:var(--gr)">Fechada</span>'
+        +'</div></div>';
+    });
+  }
+  if(!abertas.length&&!hjFech.length)html+='<div class="card" style="text-align:center;padding:40px;color:var(--mt)"><div style="font-size:32px;margin-bottom:10px">⚙️</div><div style="font-weight:700">Nenhuma produção hoje</div><div style="font-size:12px;margin-top:4px">Toque em "+ Nova Produção" para iniciar</div></div>';
+  return html;
+}
+
+// ── NOVA PRODUÇÃO (usa lista manual de materiais de entrada) ──
+function mNovaProdBV(){
+  var funcOpts=DB.funcs.map(function(f){return '<option value="'+f.nome+'">'+f.nome+'</option>';}).join('');
+  var matOpts=(DB.prodMatEntrada||[]).map(function(m){return '<option value="'+m+'">'+m+'</option>';}).join('');
+  openM('⚙️ Nova Produção',
+    '<div class="mf">'
+    +'<div class="fld"><label>Funcionário *</label><select class="inp" id="np-func">'+funcOpts+'</select></div>'
+    +'<div class="fld"><label>Material de entrada *</label><select class="inp" id="np-mat">'+matOpts+'</select></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Peso bruto (kg) *</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="np-peso"></div>'
+    +'<div class="fld"><label>Tara (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="np-tara"></div>'
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--mt);margin-bottom:12px">Tara = peso do recipiente. Peso líquido = bruto − tara</div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="salvarNovaProdBV()">Iniciar Produção</button></div>'
+    +'</div>',500);
+}
+function salvarNovaProdBV(){
+  var func=document.getElementById('np-func').value;
+  var mat=document.getElementById('np-mat').value;
+  var peso=parseFloat(document.getElementById('np-peso').value)||0;
+  var tara=parseFloat(document.getElementById('np-tara').value)||0;
+  if(!func){toast('Selecione o funcionário!','var(--rd)');return;}
+  if(!mat){toast('Selecione o material!','var(--rd)');return;}
+  if(peso<=0){toast('Informe o peso!','var(--rd)');return;}
+  var h=new Date();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
+  DB.producoes.push({id:nid(),func:func,matEntrada:mat,pesoEntrada:peso-tara,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,saidas:[],status:'aberta'});
+  saveDB();closeM();go('producao');toast('Produção iniciada!','var(--gr)');
+}
+
+// ── DETALHE DA PRODUÇÃO ──────────────────────────────
+function mVerProdBV(id){
+  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===id){p=DB.producoes[i];break;}
+  if(!p)return;
+  var ts=p.saidas.reduce(function(s,x){return s+x.peso;},0);
+  var pct=p.pesoEntrada>0?Math.min(100,(ts/p.pesoEntrada*100)):0;
+
+  var saidasHTML='';
+  p.saidas.forEach(function(s,idx){
+    var prod=gP(s.prodId);var nome=prod?prod.ic+' '+prod.nome:(s.mat||'?');
+    saidasHTML+='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border-radius:8px;margin-bottom:5px">'
+      +'<div style="flex:1;font-size:13px;font-weight:700">'+nome+'</div>'
+      +'<div style="font-size:13px;color:var(--gr);font-weight:700">'+fKg(s.peso)+'kg</div>'
+      +(p.status==='aberta'?'<button onclick="remSaidaProdBV('+p.id+','+idx+')" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer">✕</button>':'')
+      +'</div>';
+  });
+  if(!saidasHTML)saidasHTML='<div style="text-align:center;padding:16px;color:var(--mt);font-size:12px">Nenhum material registrado ainda</div>';
+
+  var prodOpts=DB.produtos.map(function(pr){return '<option value="'+pr.id+'">'+pr.ic+' '+pr.nome+'</option>';}).join('');
+
+  var html='<div class="mf">'
+    +'<div style="font-size:12px;color:var(--mt)">👷 '+p.func+' · '+p.data+' '+p.hora+'</div>'
+    +'<div style="font-size:16px;font-weight:800;margin:4px 0 10px">'+p.matEntrada+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +'<div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:800">'+fKg(p.pesoEntrada)+'</div><div style="font-size:10px;color:var(--mt)">KG ENTRADA</div></div>'
+    +'<div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:800;color:var(--gr)">'+fKg(ts)+'</div><div style="font-size:10px;color:var(--mt)">KG GERADOS</div></div>'
+    +'</div>'
+    +'<div style="margin-top:8px"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mt)"><span>Aproveitamento</span><span>'+pct.toFixed(1)+'%</span></div>'
+    +'<div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden;margin-top:4px"><div style="height:100%;border-radius:3px;width:'+pct+'%;background:'+(pct>80?'var(--gr)':pct>50?'var(--or)':'var(--rd)')+'"></div></div></div>'
+    +'<div style="border-top:1px solid var(--bd);margin:12px 0;padding-top:10px"><div style="font-size:11px;font-weight:700;color:var(--mt);text-transform:uppercase;margin-bottom:8px">Materiais gerados</div>'+saidasHTML+'</div>';
+
+  if(p.status==='aberta'){
+    html+='<div style="border-top:1px solid var(--bd);padding-top:10px"><div style="font-size:11px;font-weight:700;color:var(--gr);text-transform:uppercase;margin-bottom:8px">+ Registrar material</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+      +'<div class="fld"><label>Material</label><select class="inp" id="rs-mat">'+prodOpts+'</select></div>'
+      +'<div class="fld"><label>Peso (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="rs-peso"></div></div>'
+      +'<button class="btn" onclick="addSaidaProdBV('+p.id+')" style="margin-bottom:10px">+ Adicionar</button>'
+      +'<div style="border-top:1px solid var(--bd);padding-top:10px">'
+      +'<button class="btn" style="background:var(--bl);color:#fff;margin-bottom:8px" onclick="fecharProdBV('+p.id+')">🏁 Fechar Produção</button></div></div>';
+  }
+  html+='<div class="brow"><button class="btnO bOgr" onclick="closeM();go(\'producao\')">Fechar</button></div></div>';
+  openM((p.status==='aberta'?'⏳':'✅')+' Produção',html,560);
+}
+function addSaidaProdBV(prodId){
+  var matId=parseFloat(document.getElementById('rs-mat').value);
+  var peso=parseFloat(document.getElementById('rs-peso').value)||0;
+  if(!matId||peso<=0){toast('Selecione material e peso!','var(--rd)');return;}
+  var prod=gP(matId);
+  for(var i=0;i<DB.producoes.length;i++){
+    if(DB.producoes[i].id===prodId){
+      var achou=false;
+      for(var j=0;j<DB.producoes[i].saidas.length;j++){
+        if(DB.producoes[i].saidas[j].prodId===matId){DB.producoes[i].saidas[j].peso+=peso;achou=true;break;}
+      }
+      if(!achou)DB.producoes[i].saidas.push({prodId:matId,mat:prod?prod.nome:'?',peso:peso});
+      break;
+    }
+  }
+  saveDB();closeM();mVerProdBV(prodId);toast(fKg(peso)+'kg registrado!','var(--gr)');
+}
+function remSaidaProdBV(prodId,idx){
+  for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){DB.producoes[i].saidas.splice(idx,1);break;}
+  saveDB();closeM();mVerProdBV(prodId);
+}
+function fecharProdBV(prodId){
+  for(var i=0;i<DB.producoes.length;i++){
+    if(DB.producoes[i].id===prodId){
+      if(!DB.producoes[i].saidas.length){toast('Registre pelo menos um material!','var(--rd)');return;}
+      DB.producoes[i].status='fechada';
+      var h=new Date();DB.producoes[i].horaFim=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
+      break;
+    }
+  }
+  saveDB();closeM();go('producao');toast('Produção fechada!','var(--gr)');
+}
+
+// ── ANÁLISE (só Admin) ───────────────────────────────
+function _prodAnalise(todasFechadas){
+  // Seletor de período
+  var periodos=[{k:'hoje',l:'Hoje'},{k:'semana',l:'Semana'},{k:'mes',l:'Mês'},{k:'trim',l:'Trimestre'},{k:'ano',l:'Ano'},{k:'tudo',l:'Todo Período'}];
+  var perBar='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px">';
+  periodos.forEach(function(pp){
+    perBar+='<button onclick="prodPeriodo=\''+pp.k+'\';go(\'producao\')" class="tabbtn'+(prodPeriodo===pp.k?' on':'')+'">'+pp.l+'</button>';
+  });
+  perBar+='</div>';
+
+  var fechadas=_prodFiltrar(todasFechadas);
+  if(!fechadas.length)return perBar+'<div class="card" style="text-align:center;padding:40px;color:var(--mt)"><div style="font-size:32px;margin-bottom:10px">📊</div><div style="font-weight:700">Nenhuma produção neste período</div></div>';
+
+  var totalEntrada=0,totalSaida=0,totalValorSaida=0,totalCustoEntrada=0;
+  var porFunc={};var porMatSaida={};var porTabela={};
+
+  fechadas.forEach(function(p){
+    totalEntrada+=p.pesoEntrada;
+    var ce=_prodCustoEntrada(p.matEntrada)*p.pesoEntrada;
+    totalCustoEntrada+=ce;
+    if(!porFunc[p.func])porFunc[p.func]={entrada:0,saida:0,valorSaida:0,custoEntrada:0,prods:0};
+    porFunc[p.func].entrada+=p.pesoEntrada;porFunc[p.func].custoEntrada+=ce;porFunc[p.func].prods++;
+    p.saidas.forEach(function(s){
+      totalSaida+=s.peso;
+      var pv=_prodPrecoVenda(s.prodId);var val=pv*s.peso;
+      totalValorSaida+=val;
+      porFunc[p.func].saida+=s.peso;porFunc[p.func].valorSaida+=val;
+      if(!porMatSaida[s.prodId])porMatSaida[s.prodId]={peso:0,valor:0};
+      porMatSaida[s.prodId].peso+=s.peso;porMatSaida[s.prodId].valor+=val;
+      var tabId=DB.prodVinculos[s.prodId];
+      if(tabId){
+        if(!porTabela[tabId])porTabela[tabId]={nome:_nomeTab(tabId),peso:0,valor:0};
+        porTabela[tabId].peso+=s.peso;porTabela[tabId].valor+=val;
+      }
+    });
+  });
+  var aprov=totalEntrada>0?(totalSaida/totalEntrada*100):0;
+  var lucro=totalValorSaida-totalCustoEntrada;
+
+  var html=perBar+'<div class="g4">'
+    +sc('📥','Entrada',fKg(totalEntrada)+'kg','','var(--bl)')
+    +sc('📤','Saída',fKg(totalSaida)+'kg','','var(--gr)')
+    +sc('📊','Aproveitamento',aprov.toFixed(1)+'%','','var(--pu)')
+    +sc('💰','Lucro Estimado',fR(lucro),'',lucro>=0?'var(--gr)':'var(--rd)')
+    +'</div>';
+
+  // Por tabela
+  var tabIds=Object.keys(porTabela).sort(function(a,b){return porTabela[b].valor-porTabela[a].valor;});
+  if(tabIds.length){
+    html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:10px">📋 Projeção por Tabela (Comprador)</div>';
+    tabIds.forEach(function(tid){
+      var d=porTabela[tid];
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border-radius:8px;margin-bottom:5px">'
+        +'<div style="flex:1"><div style="font-size:13px;font-weight:700">'+d.nome+'</div><div style="font-size:10px;color:var(--mt)">'+fKg(d.peso)+'kg</div></div>'
+        +'<div style="font-size:13px;font-weight:700;color:var(--gr)">'+fR(d.valor)+'</div></div>';
+    });
+    html+='</div>';
+  }
+
+  // Por funcionário
+  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:10px">👷 Produtividade por Funcionário</div>';
+  var funcs=Object.keys(porFunc).sort(function(a,b){return porFunc[b].valorSaida-porFunc[a].valorSaida;});
+  funcs.forEach(function(f){
+    var d=porFunc[f];var ap=d.entrada>0?(d.saida/d.entrada*100):0;var luc=d.valorSaida-d.custoEntrada;
+    html+='<div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center">'
+      +'<div><div style="font-size:14px;font-weight:700">'+f+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+d.prods+' prod · '+fKg(d.entrada)+'kg</div></div>'
+      +'<div style="text-align:right"><div style="font-size:14px;font-weight:800;color:'+(luc>=0?'var(--gr)':'var(--rd)')+'">'+fR(luc)+'</div>'
+      +'<div style="font-size:10px;color:var(--mt)">lucro est.</div></div></div>'
+      +'<div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden;margin-top:8px"><div style="height:100%;border-radius:3px;width:'+ap+'%;background:'+(ap>70?'var(--gr)':ap>40?'var(--or)':'var(--rd)')+'"></div></div>'
+      +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Aprov: '+ap.toFixed(1)+'% · '+fKg(d.saida)+'kg · '+fR(d.valorSaida)+'</div></div>';
+  });
+  html+='</div>';
+
+  // Materiais
+  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:10px">📦 Materiais Gerados</div>';
+  var matIds=Object.keys(porMatSaida).sort(function(a,b){return porMatSaida[b].valor-porMatSaida[a].valor;});
+  matIds.forEach(function(mid){
+    var d=porMatSaida[mid];var prod=gP(parseFloat(mid));var nome=prod?prod.ic+' '+prod.nome:'?';
+    var pv=_prodPrecoVenda(parseFloat(mid));
+    var tabId=DB.prodVinculos[parseFloat(mid)];var tabNome=tabId?_nomeTab(tabId):'sem tabela';
+    html+='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border-radius:8px;margin-bottom:5px">'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:700">'+nome+'</div>'
+      +'<div style="font-size:10px;color:var(--mt)">'+fKg(d.peso)+'kg · '+fR(pv)+'/kg · → '+tabNome+'</div></div>'
+      +'<div style="font-size:13px;font-weight:700;color:var(--gr)">'+fR(d.valor)+'</div></div>';
+  });
+  html+='</div>';
+
+  // Histórico
+  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:10px">📋 Últimas Produções</div>';
+  var recentes=fechadas.slice().sort(function(a,b){return b.id-a.id;}).slice(0,15);
+  recentes.forEach(function(p){
+    var ts=p.saidas.reduce(function(s,x){return s+x.peso;},0);
+    var valS=p.saidas.reduce(function(s,x){return s+_prodPrecoVenda(x.prodId)*x.peso;},0);
+    html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd);cursor:pointer" onclick="mVerProdBV('+p.id+')">'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:700">'+p.func+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+p.data+' · '+p.matEntrada+' · '+fKg(p.pesoEntrada)+'kg → '+fKg(ts)+'kg</div></div>'
+      +'<div style="font-size:13px;font-weight:700;color:var(--gr)">'+fR(valS)+'</div></div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+// ── CONFIGURAÇÃO: tabelas + materiais de entrada ─────
+function _prodConfig(){
+  var tabVenda=DB.tabelas.filter(function(t){return t.tipo==='venda';});
+
+  // Materiais de entrada (lista manual)
+  var html='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:6px">📥 Materiais de Entrada</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:8px">O que chega na porta pra desmontar/processar. Adicione ou remova conforme seu negócio.</div>';
+  (DB.prodMatEntrada||[]).forEach(function(m,i){
+    html+='<div style="display:flex;gap:6px;margin-bottom:5px;align-items:center">'
+      +'<input class="inp" value="'+m+'" id="pme-'+i+'" style="flex:1;padding:8px;font-size:12px">'
+      +'<input class="inp" type="number" step="0.01" value="'+(DB.prodCustoEntrada[m]||0)+'" id="pmec-'+i+'" style="width:90px;padding:8px;font-size:12px" placeholder="R$/kg" title="Custo médio de compra">'
+      +'<button onclick="_remProdMatEnt('+i+')" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:5px 9px;font-size:11px;cursor:pointer">✕</button>'
+      +'</div>';
+  });
+  html+='<div style="display:flex;gap:6px;margin-top:8px"><input class="inp" id="pme-novo" placeholder="Novo material de entrada" style="flex:1;padding:8px;font-size:12px"><button class="btn" style="width:auto;padding:8px 14px" onclick="_addProdMatEnt()">+</button></div>'
+    +'<button class="btn" style="margin-top:10px" onclick="_salvarProdMatEnt()">Salvar Materiais e Custos</button>'
+    +'</div>';
+
+  // Vínculos material de saída → tabela de venda
+  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:6px">📋 Vincular Material → Tabela de Venda</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Escolha qual tabela usar pra projetar o valor de cada material gerado. O preço vem automaticamente da tabela.</div>';
+
+  if(!DB.produtos.length){
+    html+='<div style="text-align:center;padding:20px;color:var(--mt);font-size:12px">Nenhum produto cadastrado no sistema. Cadastre produtos na aba <b>Pesagem</b> ou <b>Estoque</b> primeiro.</div>';
+  } else if(!tabVenda.length){
+    html+='<div style="text-align:center;padding:20px;color:var(--mt);font-size:12px">Nenhuma tabela de venda encontrada. Crie tabelas de venda na aba <b>Tabelas</b> primeiro.</div>';
+  } else {
+    var temAlgum=false;
+    DB.produtos.forEach(function(p){
+      var vinculado=DB.prodVinculos[p.id];
+      var tabsComProd=tabVenda.filter(function(t){return t.itens.some(function(it){return String(it.pId)===String(p.id);});});
+      if(!tabsComProd.length){
+        // Produto não está em nenhuma tabela de venda — mostra aviso
+        html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;margin-bottom:6px;opacity:.5">'
+          +'<div style="font-size:12px;font-weight:600">'+p.ic+' '+p.nome+'</div>'
+          +'<div style="font-size:10px;color:var(--rd);padding:8px">⚠ Não está em nenhuma tabela de venda</div></div>';
+      } else {
+        temAlgum=true;
+        var opts='<option value="">— Sem tabela —</option>'+tabsComProd.map(function(t){
+          var preco=0;for(var j=0;j<t.itens.length;j++){if(String(t.itens[j].pId)===String(p.id)){preco=t.itens[j].preco;break;}}
+          return '<option value="'+t.id+'"'+(vinculado&&String(vinculado)===String(t.id)?' selected':'')+'>'+t.nome+' ('+fR(preco)+'/kg)</option>';
+        }).join('');
+        html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;margin-bottom:6px">'
+          +'<div style="font-size:12px;font-weight:600">'+p.ic+' '+p.nome+'</div>'
+          +'<select class="inp" style="padding:8px;font-size:12px" onchange="_setProdVinc('+p.id+',this.value)">'+opts+'</select></div>';
+      }
+    });
+    if(!temAlgum){
+      html+='<div style="padding:12px;background:var(--orb);border-radius:8px;font-size:11px;color:var(--or);margin-top:8px">⚠ Nenhum produto do catálogo está cadastrado nas suas tabelas de venda. Vá em <b>Tabelas</b> e adicione os produtos (cobre, ferro, alumínio, etc.) nas tabelas dos seus compradores (Green, Diasfer, Metalis...).</div>';
+    }
+  }
+  html+='</div>';
+  return html;
+}
+
+function _setProdVinc(prodId,tabId){
+  if(tabId)DB.prodVinculos[prodId]=parseFloat(tabId);
+  else delete DB.prodVinculos[prodId];
+  saveDB();go('producao');
+}
+function _addProdMatEnt(){
+  var inp=document.getElementById('pme-novo');var v=(inp.value||'').trim();
+  if(!v)return;
+  DB.prodMatEntrada.push(v);saveDB();go('producao');
+}
+function _remProdMatEnt(idx){
+  DB.prodMatEntrada.splice(idx,1);saveDB();go('producao');
+}
+function _salvarProdMatEnt(){
+  var novos=[];var custos={};
+  for(var i=0;i<DB.prodMatEntrada.length;i++){
+    var el=document.getElementById('pme-'+i);
+    var cel=document.getElementById('pmec-'+i);
+    var nome=el?el.value.trim():'';
+    if(nome){novos.push(nome);custos[nome]=parseFloat(cel?cel.value:0)||0;}
+  }
+  DB.prodMatEntrada=novos;DB.prodCustoEntrada=custos;
+  saveDB();go('producao');toast('Materiais e custos salvos!','var(--gr)');
+}
+
 function abrirRotaDia(diaStr){
   var cols=DB.coletas.filter(function(c){return c.data===diaStr&&c.status!=='Cancelada';})
     .sort(function(a,b){return (a.hora||'99:99').localeCompare(b.hora||'99:99');});
@@ -15422,8 +15894,9 @@ function _getNotifs(){
       var diff=Math.ceil((d-hoje)/(1000*60*60*24));
       if(diff>=0&&diff<=3){
         var dc=diff;
+        var valMes=_cfValorMesRef(c,mes);
         notifs.push({tipo:'conta',urgente:diff<=1,titulo:(c.ic||'📅')+' '+c.nome,
-          msg:'Vence '+(dc===0?'hoje':dc===1?'amanhã':'em '+dc+' dias')+' — '+fR(c.valor||0),pg:'fixas'});
+          msg:'Vence '+(dc===0?'hoje':dc===1?'amanhã':'em '+dc+' dias')+' — '+fR(valMes||0),pg:'fixas'});
       }
     }
   }
@@ -16218,10 +16691,10 @@ function delUser(uid){
 // ── Gestão de Funções ──────────────────────────────────────────
 // Base roles stored separately so we can edit them
 var BASE_ROLES=[
-  {id:'adm',     nome:'Administrador',pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','eventos','funcionarios','clientes','tabelas','mercado','classificador','configuracoes']},
+  {id:'adm',     nome:'Administrador',pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','financeiro','agenda','eventos','producao','producao_analise','funcionarios','clientes','tabelas','mercado','classificador','configuracoes']},
   {id:'caixa',   nome:'Caixa',         pages:['caixa_dia','pesagem','pendencias','estoque_vis','classificador']},
   {id:'motorista',nome:'Motorista',    pages:['agenda','classificador']},
-  {id:'operador', nome:'Operador',     pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','eventos','funcionarios','clientes','tabelas','classificador']},
+  {id:'operador', nome:'Operador',     pages:['dashboard','pesagem','pendencias','caixa_dia','estoque','revenda','agenda','eventos','producao','funcionarios','clientes','tabelas','classificador']},
 ];
 // Guarda uma cópia das páginas padrão de cada função ANTES de qualquer restauração de cache/nuvem.
 // Serve pra garantir que páginas novas (como "Agenda de Eventos") sempre apareçam pra quem já
@@ -16247,6 +16720,14 @@ function _buildRoleForm(r){
       +'<span style="font-size:15px">'+p.icon+'</span>'
       +'<span style="font-size:12px;font-weight:500">'+p.label+'</span>'
       +'</label>';
+    // Sub-permissão: Análise de Produção (aparece só se Produção está na lista)
+    if(p.id==='producao'){
+      var chkAn=r&&r.pages.indexOf('producao_analise')>=0;
+      pagesH+='<label style="display:flex;align-items:center;gap:7px;background:var(--s1);border:1px solid var(--bd);border-radius:6px;padding:7px 9px;padding-left:28px;cursor:pointer" onclick="this.style.borderColor=document.getElementById(\&apos;rp-producao_analise\&apos;).checked?\&apos;var(--bd)\&apos;:\&apos;var(--gr)\&apos;">'
+        +'<input type="checkbox" id="rp-producao_analise"'+(chkAn?' checked':'')+' style="width:14px;height:14px;cursor:pointer;accent-color:var(--bl)"> '
+        +'<span style="font-size:12px;color:var(--bl)">📊 Análise de Produção</span>'
+        +'</label>';
+    }
   }
   pagesH+='</div>';
   return '<div class="mf">'
@@ -16263,6 +16744,7 @@ function mNovaRole(){
 function saveNovaRole(){
   var n=document.getElementById('nr2-n').value.trim();if(!n){alert('Informe o nome!');return;}
   var pages=[];for(var i=0;i<ALLPAGES.length;i++){var cb=document.getElementById('rp-'+ALLPAGES[i].id);if(cb&&cb.checked)pages.push(ALLPAGES[i].id);}
+  var cbAn=document.getElementById('rp-producao_analise');if(cbAn&&cbAn.checked)pages.push('producao_analise');
   if(!pages.length){alert('Selecione ao menos uma aba!');return;}
   var id='role_'+Date.now();
   CUSTOM_ROLES.push({id:id,nome:n,pages:pages});
@@ -16283,6 +16765,7 @@ function mEditRole(roleId){
 function saveEditRole(roleId){
   var n=document.getElementById('nr2-n').value.trim();if(!n){alert('Informe o nome!');return;}
   var pages=[];for(var i=0;i<ALLPAGES.length;i++){var cb=document.getElementById('rp-'+ALLPAGES[i].id);if(cb&&cb.checked)pages.push(ALLPAGES[i].id);}
+  var cbAn=document.getElementById('rp-producao_analise');if(cbAn&&cbAn.checked)pages.push('producao_analise');
   if(!pages.length){alert('Selecione ao menos uma aba!');return;}
   // Try base roles first
   var foundBase=false;
@@ -16877,6 +17360,7 @@ function _cfgAtalhos(){
     {id:'financeiro',  label:'Financeiro',    desc:'Navegar para financeiro',         key:'F'},
     {id:'agenda',      label:'Agenda de Coletas',desc:'Navegar para a agenda de coletas',key:'A'},
     {id:'eventos',     label:'Agenda de Eventos',desc:'Navegar para a agenda de eventos',key:'V'},
+    {id:'producao',    label:'Produção',desc:'Controle de produção dos funcionários',key:'P'},
     {id:'funcionarios',label:'Funcionarios',  desc:'Navegar para funcionarios',       key:'N'},
     {id:'clientes',    label:'Clientes',      desc:'Navegar para clientes',           key:'C'},
     {id:'tabelas',     label:'Tabelas',       desc:'Navegar para tabelas',            key:'T'},
