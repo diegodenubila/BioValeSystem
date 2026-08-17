@@ -4612,14 +4612,35 @@ function pgDash(){
   var perLabels={hoje:'Hoje',semana:'7 dias',mes:'Este mês',trim:'Trimestre',sem:'Semestre',ano:'Este ano'};
 
   // ── Coletas ──
-  var hjStr=hj();var colHoje=[],colSemana=[];var agora=new Date();
+  var hjStr=hj();var colHoje=[],colAmanha=[],colSemana=[];var agora=new Date();
+  var amanhaStr=_fmtDataBR(_addDays(agora,1));
   for(var i=0;i<DB.coletas.length;i++){
     var c=DB.coletas[i];
     if(c.data===hjStr)colHoje.push(c);
+    if(c.data===amanhaStr)colAmanha.push(c);
     var d=_parseDataBR(c.data);if(d){var diff=Math.floor((agora-d)/(1000*60*60*24));if(diff>=0&&diff<7)colSemana.push(c);}
   }
   var pesoColHoje=0;for(var i=0;i<colHoje.length;i++)pesoColHoje+=colHoje[i].peso||0;
+  var pesoColAmanha=0;for(var i=0;i<colAmanha.length;i++)pesoColAmanha+=colAmanha[i].peso||0;
   var pesoColSem=0;for(var i=0;i<colSemana.length;i++)pesoColSem+=colSemana[i].peso||0;
+
+  // ── Eventos hoje/amanhã (Agenda de Eventos) ──
+  var evHojeD=(function(){var d=_today();return new Date(d.getFullYear(),d.getMonth(),d.getDate());})();
+  var evAmanhaD=_addDays(evHojeD,1);
+  var evtHoje=[],evtAmanha=[];
+  for(var i=0;i<(DB.eventos||[]).length;i++){
+    var ev=DB.eventos[i];if(ev.status==='Cancelado')continue;
+    var evIni=_parseDataBR(ev.dataIni),evFim=_parseDataBR(ev.dataFim||ev.dataIni);
+    if(!evIni||!evFim)continue;
+    if(evHojeD>=evIni&&evHojeD<=evFim)evtHoje.push(ev);
+    if(evAmanhaD>=evIni&&evAmanhaD<=evFim)evtAmanha.push(ev);
+  }
+  var evtHojeH='';
+  if(!evtHoje.length)evtHojeH='<div style="text-align:center;padding:18px;color:var(--mt);font-size:13px">Nenhum evento hoje</div>';
+  else for(var i=0;i<evtHoje.length;i++){var ev=evtHoje[i];var cfg=_evTipoCfg(ev.tipo);evtHojeH+='<div onclick="mVerEvento('+ev.id+')" style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--bd);cursor:pointer"><div style="width:3px;height:32px;background:'+cfg.cor+';border-radius:2px;flex-shrink:0"></div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">'+cfg.ic+' '+ev.nome+'</div><div style="font-size:10px;color:var(--mt)">'+(ev.horaIni?ev.horaIni+(ev.horaFim?'–'+ev.horaFim:'')+' · ':'')+cfg.label+'</div></div></div>';}
+  var evtAmanhaH='';
+  if(!evtAmanha.length)evtAmanhaH='<div style="text-align:center;padding:18px;color:var(--mt);font-size:13px">Nenhum evento amanhã</div>';
+  else for(var i=0;i<evtAmanha.length;i++){var ev=evtAmanha[i];var cfg=_evTipoCfg(ev.tipo);evtAmanhaH+='<div onclick="mVerEvento('+ev.id+')" style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--bd);cursor:pointer"><div style="width:3px;height:32px;background:'+cfg.cor+';border-radius:2px;flex-shrink:0"></div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">'+cfg.ic+' '+ev.nome+'</div><div style="font-size:10px;color:var(--mt)">'+(ev.horaIni?ev.horaIni+(ev.horaFim?'–'+ev.horaFim:'')+' · ':'')+cfg.label+'</div></div></div>';}
 
   // ── Estoque barras + entradas por período ──
   var max=0.1;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].est>max)max=DB.produtos[i].est;}
@@ -4689,11 +4710,15 @@ function pgDash(){
   // ── Coletas listas ──
   var colHojeH='';
   if(!colHoje.length)colHojeH='<div style="text-align:center;padding:18px;color:var(--mt);font-size:13px">Nenhuma coleta hoje</div>';
-  else for(var i=0;i<colHoje.length;i++){var c=colHoje[i];colHojeH+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)"><div><div style="font-size:12px;font-weight:600">'+(c.hora?c.hora+' · ':'')+c.cli+'</div><div style="font-size:10px;color:var(--mt)">~'+fKg(c.peso)+'kg · '+c.end+'</div></div>'+stag(c.status)+'</div>';}
+  else for(var i=0;i<colHoje.length;i++){var c=colHoje[i];colHojeH+='<div onclick="mVerColeta('+c.id+')" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd);cursor:pointer"><div><div style="font-size:12px;font-weight:600">'+(c.hora?c.hora+' · ':'')+c.cli+'</div><div style="font-size:10px;color:var(--mt)">~'+fKg(c.peso)+'kg · '+c.end+'</div></div>'+stag(c.status)+'</div>';}
+
+  var colAmanhaH='';
+  if(!colAmanha.length)colAmanhaH='<div style="text-align:center;padding:18px;color:var(--mt);font-size:13px">Nenhuma coleta amanhã</div>';
+  else for(var i=0;i<colAmanha.length;i++){var c=colAmanha[i];colAmanhaH+='<div onclick="mVerColeta('+c.id+')" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd);cursor:pointer"><div><div style="font-size:12px;font-weight:600">'+(c.hora?c.hora+' · ':'')+c.cli+'</div><div style="font-size:10px;color:var(--mt)">~'+fKg(c.peso)+'kg · '+c.end+'</div></div>'+stag(c.status)+'</div>';}
 
   var colSemH='';
   if(!colSemana.length)colSemH='<div style="text-align:center;padding:18px;color:var(--mt);font-size:13px">Nenhuma coleta esta semana</div>';
-  else for(var i=0;i<colSemana.length;i++){var c=colSemana[i];colSemH+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)"><div><div style="font-size:12px;font-weight:600">'+c.data+(c.hora?' · '+c.hora:'')+' · '+c.cli+'</div><div style="font-size:10px;color:var(--mt)">~'+fKg(c.peso)+'kg</div></div>'+stag(c.status)+'</div>';}
+  else for(var i=0;i<colSemana.length;i++){var c=colSemana[i];colSemH+='<div onclick="mVerColeta('+c.id+')" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd);cursor:pointer"><div><div style="font-size:12px;font-weight:600">'+c.data+(c.hora?' · '+c.hora:'')+' · '+c.cli+'</div><div style="font-size:10px;color:var(--mt)">~'+fKg(c.peso)+'kg</div></div>'+stag(c.status)+'</div>';}
 
   // ── Seletor período ──
   var perTabH=_buildPerBar(_dashPer,'dash','','','swDashPer');
@@ -4947,6 +4972,47 @@ function pgDash(){
         +'</div>';
     })()
 
+    // ── Coletas (Hoje/Amanhã/Semana) + Eventos (Hoje/Amanhã) — lado a lado ──
+    +'<div class="g2">'
+    // Card coletas deslizável — header clicável → Agenda
+    +'<div class="card" style="overflow:hidden;padding:0">'
+    +'<div style="'+dcc+'padding:13px 14px 10px;border-bottom:1px solid var(--bd)" onclick="go(\&apos;agenda\&apos;)" title="Ver Agenda" '+dca+'>'
+    +'<div style="display:flex;align-items:center;gap:0">'
+    +'<div class="stl" style="margin-bottom:0;flex:1"><div class="stb"></div><div class="stx">🚛 Coletas <span style="color:var(--bl);opacity:.6;font-size:10px">›</span></div></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:0;background:var(--bg);border:1px solid var(--bd);border-radius:20px;overflow:hidden;margin-top:8px" onclick="event.stopPropagation()">'
+    +'<button id="col-tab-hj" onclick="_colTab(0)" style="flex:1;padding:4px 8px;font-size:11px;border:none;border-radius:20px;background:var(--bl);color:#fff;font-weight:700;cursor:pointer">Hoje</button>'
+    +'<button id="col-tab-am" onclick="_colTab(1)" style="flex:1;padding:4px 8px;font-size:11px;border:none;border-radius:0;background:transparent;color:var(--mt);cursor:pointer">Amanhã</button>'
+    +'<button id="col-tab-sm" onclick="_colTab(2)" style="flex:1;padding:4px 8px;font-size:11px;border:none;border-radius:20px;background:transparent;color:var(--mt);cursor:pointer">Semana</button>'
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:6px" id="col-subtit">'+colHoje.length+' coleta(s) · ~'+fKg(pesoColHoje)+'kg est.</div>'
+    +'</div>'
+    +'<div style="overflow:hidden">'
+    +'<div id="col-slides" style="display:flex;transition:transform .3s ease;width:300%">'
+    +'<div style="width:33.333%;padding:4px 14px 10px;box-sizing:border-box">'+colHojeH+'</div>'
+    +'<div style="width:33.333%;padding:4px 14px 10px;box-sizing:border-box">'+colAmanhaH+'</div>'
+    +'<div style="width:33.333%;padding:4px 14px 10px;box-sizing:border-box">'+colSemH+'</div>'
+    +'</div></div></div>'
+
+    // Card eventos deslizável — header clicável → Agenda de Eventos
+    +'<div class="card" style="overflow:hidden;padding:0">'
+    +'<div style="'+dcc+'padding:13px 14px 10px;border-bottom:1px solid var(--bd)" onclick="go(\&apos;eventos\&apos;)" title="Ver Agenda de Eventos" '+dca+'>'
+    +'<div style="display:flex;align-items:center;gap:0">'
+    +'<div class="stl" style="margin-bottom:0;flex:1"><div class="stb" style="background:var(--pu)"></div><div class="stx">🎪 Eventos <span style="color:var(--pu);opacity:.6;font-size:10px">›</span></div></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:0;background:var(--bg);border:1px solid var(--bd);border-radius:20px;overflow:hidden;margin-top:8px" onclick="event.stopPropagation()">'
+    +'<button id="evt-tab-hj" onclick="_evtTab(0)" style="flex:1;padding:4px 8px;font-size:11px;border:none;border-radius:20px;background:var(--pu);color:#fff;font-weight:700;cursor:pointer">Hoje</button>'
+    +'<button id="evt-tab-am" onclick="_evtTab(1)" style="flex:1;padding:4px 8px;font-size:11px;border:none;border-radius:20px;background:transparent;color:var(--mt);cursor:pointer">Amanhã</button>'
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:6px" id="evt-subtit">'+evtHoje.length+' evento(s) hoje</div>'
+    +'</div>'
+    +'<div style="overflow:hidden">'
+    +'<div id="evt-slides" style="display:flex;transition:transform .3s ease;width:200%">'
+    +'<div style="width:50%;padding:4px 14px 10px;box-sizing:border-box">'+evtHojeH+'</div>'
+    +'<div style="width:50%;padding:4px 14px 10px;box-sizing:border-box">'+evtAmanhaH+'</div>'
+    +'</div></div></div>'
+    +'</div>'
+
     // ── Widget Mercado (só adm) ──
     +(CU&&CU.perfil==='adm'?'<div class="card" style="'+dcc+'background:linear-gradient(135deg,var(--s1),rgba(200,168,75,0.06));border-color:rgba(200,168,75,0.2);cursor:pointer" onclick="go(\'mercado\')" title="Ver Mercado" '+dca+'>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
@@ -5055,32 +5121,10 @@ function pgDash(){
     +'</div></div>'
     +'</div>'
 
-    // Linha 3: Coletas swipe card + últimas entradas
-    +'<div class="g2">'
-
-    // Card coletas deslizável — header clicável → Agenda
-    +'<div class="card" style="overflow:hidden;padding:0">'
-    +'<div style="'+dcc+'padding:13px 14px 10px;border-bottom:1px solid var(--bd)" onclick="go(\&apos;agenda\&apos;)" title="Ver Agenda" '+dca+'>'
-    +'<div style="display:flex;align-items:center;gap:0">'
-    +'<div class="stl" style="margin-bottom:0;flex:1"><div class="stb"></div><div class="stx">Coletas <span style="color:var(--bl);opacity:.6;font-size:10px">›</span></div></div>'
-    +'<div style="display:flex;gap:0;background:var(--bg);border:1px solid var(--bd);border-radius:20px;overflow:hidden" onclick="event.stopPropagation()">'
-    +'<button id="col-tab-hj" onclick="_colTab(0)" style="padding:4px 12px;font-size:11px;border:none;border-radius:20px;background:var(--bl);color:#fff;font-weight:700;cursor:pointer">Hoje</button>'
-    +'<button id="col-tab-sm" onclick="_colTab(1)" style="padding:4px 12px;font-size:11px;border:none;border-radius:0;background:transparent;color:var(--mt);cursor:pointer">Semana</button>'
-    +'</div></div>'
-    +'<div style="font-size:10px;color:var(--mt);margin-top:6px" id="col-subtit">'+colHoje.length+' coleta(s) · ~'+fKg(pesoColHoje)+'kg est.</div>'
-    +'</div>'
-    // Swipe container
-    +'<div style="overflow:hidden">'
-    +'<div id="col-slides" style="display:flex;transition:transform .3s ease;width:200%">'
-    +'<div style="width:50%;padding:4px 14px 10px;box-sizing:border-box">'+colHojeH+'</div>'
-    +'<div style="width:50%;padding:4px 14px 10px;box-sizing:border-box">'+colSemH+'</div>'
-    +'</div></div></div>'
-
     // Últimas entradas → Estoque
     +'<div class="card" style="'+dcc+'" onclick="go(\&apos;estoque\&apos;)" title="Ver Estoque" '+dca+'>'
     +'<div class="stl"><div class="stb"></div><div class="stx">Ultimas Entradas <span style="color:var(--gr);opacity:.6;font-size:10px">›</span></div></div>'
     +entrH+'</div>'
-    +'</div>'
 
     // Linha 4: Coletas por dia (barras) → Agenda
     +'<div class="card" style="'+dcc+'" onclick="go(\&apos;agenda\&apos;)" title="Ver Agenda" '+dca+'>'
@@ -5091,7 +5135,9 @@ function pgDash(){
 
     // ── GRÁFICOS: Compras vs Vendas + Evolução Lucro + Comparativo ──
     +(function(){
-      // Calcula dados dos últimos 6 meses a partir do atendHist
+      // Calcula dados dos últimos 6 meses — usa DB.caixasHist (histórico permanente de caixas
+      // fechados) + atendHist (caixa de hoje, ainda aberto). Antes só lia atendHist, que é
+      // zerado todo fechamento de caixa — por isso nunca mostrava nada além do dia atual.
       var meses=[];
       var hoje2=new Date();
       for(var m=5;m>=0;m--){
@@ -5103,32 +5149,30 @@ function pgDash(){
           compras:0,vendas:0
         });
       }
+      function _addAoMes(tipo,total,dataStr){
+        var dp=(dataStr||'').split('/');if(dp.length<3)return;
+        var mM=parseInt(dp[1])-1,mY=parseInt(dp[2]);
+        for(var m=0;m<meses.length;m++){
+          if(meses[m].month===mM&&meses[m].year===mY){
+            if(tipo==='Compra')meses[m].compras+=total;
+            else if(tipo==='Venda'||tipo==='Logistica Reversa')meses[m].vendas+=total;
+          }
+        }
+      }
+      // Histórico de caixas já fechados (fonte permanente — funciona pra qualquer mês passado)
+      if(DB.caixasHist){
+        for(var i=0;i<DB.caixasHist.length;i++){
+          var cx=DB.caixasHist[i];var mvs=cx.movimentos||[];
+          for(var j=0;j<mvs.length;j++){
+            var mv=mvs[j];
+            _addAoMes(mv.tipo,_mvTotal(mv),cx.data);
+          }
+        }
+      }
+      // Caixa de hoje, ainda em memória (não fechado ainda)
       for(var i=0;i<atendHist.length;i++){
         var ah=atendHist[i];
-        var parts=(ah.hora?hj():null);
-        // Pega data do atendHist — está no caixaDia movimentos
-        var ahData=null;
-        if(DB.caixaDia&&DB.caixaDia.movimentos){
-          for(var k=0;k<DB.caixaDia.movimentos.length;k++){
-            if(DB.caixaDia.movimentos[k].num===ah.num){ahData=hj();break;}
-          }
-        }
-        // Fallback: usa movs financeiros para achar a data pelo num
-        if(!ahData){
-          for(var k=0;k<DB.movs.length;k++){
-            if(DB.movs[k].desc&&DB.movs[k].desc.indexOf('#'+ah.num)>=0){ahData=DB.movs[k].data;break;}
-          }
-        }
-        if(!ahData)ahData=hj();
-        var dp=ahData.split('/');
-        if(dp.length<3)continue;
-        var ahM=parseInt(dp[1])-1,ahY=parseInt(dp[2]);
-        for(var m=0;m<meses.length;m++){
-          if(meses[m].month===ahM&&meses[m].year===ahY){
-            if(ah.tipo==='Compra')meses[m].compras+=ah.total||0;
-            else if(ah.tipo==='Venda')meses[m].vendas+=ah.total||0;
-          }
-        }
+        _addAoMes(ah.tipo,_mvTotal(ah),hj());
       }
       // Lucro por mês
       for(var m=0;m<meses.length;m++)meses[m].lucro=meses[m].vendas-meses[m].compras;
@@ -5666,30 +5710,62 @@ var _colTabAtiva=0;
 function _colTab(idx){
   _colTabAtiva=idx;
   var slides=document.getElementById('col-slides');
-  if(slides)slides.style.transform='translateX(-'+(idx*50)+'%)';
-  var hjBtn=document.getElementById('col-tab-hj');
-  var smBtn=document.getElementById('col-tab-sm');
-  if(hjBtn&&smBtn){
-    hjBtn.style.background=idx===0?'var(--bl)':'transparent';
-    hjBtn.style.color=idx===0?'#fff':'var(--mt)';
-    hjBtn.style.fontWeight=idx===0?'700':'400';
-    smBtn.style.background=idx===1?'var(--bl)':'transparent';
-    smBtn.style.color=idx===1?'#fff':'var(--mt)';
-    smBtn.style.fontWeight=idx===1?'700':'400';
+  if(slides)slides.style.transform='translateX(-'+(idx*33.333)+'%)';
+  var btns={0:document.getElementById('col-tab-hj'),1:document.getElementById('col-tab-am'),2:document.getElementById('col-tab-sm')};
+  for(var k in btns){
+    if(!btns[k])continue;
+    var on=(+k===idx);
+    btns[k].style.background=on?'var(--bl)':'transparent';
+    btns[k].style.color=on?'#fff':'var(--mt)';
+    btns[k].style.fontWeight=on?'700':'400';
   }
   // Atualiza subtítulo
   var sub=document.getElementById('col-subtit');
   if(sub){
     var hjStr2=new Date().toLocaleDateString('pt-BR');
-    var colH2=[],colS2=[];var agora2=new Date();
+    var amStr2=_fmtDataBR(_addDays(new Date(),1));
+    var colH2=[],colA2=[],colS2=[];var agora2=new Date();
     for(var i=0;i<DB.coletas.length;i++){
-      var c=DB.coletas[i];if(c.data===hjStr2)colH2.push(c);
+      var c=DB.coletas[i];
+      if(c.data===hjStr2)colH2.push(c);
+      if(c.data===amStr2)colA2.push(c);
       var d=_parseDataBR(c.data);if(d){var df=Math.floor((agora2-d)/(1000*60*60*24));if(df>=0&&df<7)colS2.push(c);}
     }
     var ph=0;for(var i=0;i<colH2.length;i++)ph+=colH2[i].peso||0;
+    var pa=0;for(var i=0;i<colA2.length;i++)pa+=colA2[i].peso||0;
     var ps=0;for(var i=0;i<colS2.length;i++)ps+=colS2[i].peso||0;
     if(idx===0)sub.textContent=colH2.length+' coleta(s) · ~'+fKg(ph)+'kg est.';
+    else if(idx===1)sub.textContent=colA2.length+' coleta(s) amanhã · ~'+fKg(pa)+'kg est.';
     else sub.textContent=colS2.length+' coleta(s) esta semana · ~'+fKg(ps)+'kg est.';
+  }
+}
+
+// Aba Hoje/Amanhã do card de Eventos no dashboard
+function _evtTab(idx){
+  var slides=document.getElementById('evt-slides');
+  if(slides)slides.style.transform='translateX(-'+(idx*50)+'%)';
+  var hjBtn=document.getElementById('evt-tab-hj');
+  var amBtn=document.getElementById('evt-tab-am');
+  if(hjBtn&&amBtn){
+    hjBtn.style.background=idx===0?'var(--pu)':'transparent';
+    hjBtn.style.color=idx===0?'#fff':'var(--mt)';
+    hjBtn.style.fontWeight=idx===0?'700':'400';
+    amBtn.style.background=idx===1?'var(--pu)':'transparent';
+    amBtn.style.color=idx===1?'#fff':'var(--mt)';
+    amBtn.style.fontWeight=idx===1?'700':'400';
+  }
+  var sub=document.getElementById('evt-subtit');
+  if(sub){
+    var hj2b=_today(),hj2=new Date(hj2b.getFullYear(),hj2b.getMonth(),hj2b.getDate()),am2=_addDays(hj2,1);
+    var eH=0,eA=0;
+    for(var i=0;i<(DB.eventos||[]).length;i++){
+      var ev=DB.eventos[i];if(ev.status==='Cancelado')continue;
+      var ini=_parseDataBR(ev.dataIni),fim=_parseDataBR(ev.dataFim||ev.dataIni);
+      if(!ini||!fim)continue;
+      if(hj2>=ini&&hj2<=fim)eH++;
+      if(am2>=ini&&am2<=fim)eA++;
+    }
+    sub.textContent=idx===0?(eH+' evento(s) hoje'):(eA+' evento(s) amanhã');
   }
 }
 
@@ -12053,9 +12129,10 @@ function _agAutoFillCli(nome){
 // ══════════════════════════════════════════════════════
 // AGENDA DE EVENTOS — feiras, reuniões corporativas, auditorias, palestras...
 // ══════════════════════════════════════════════════════
-var evVw='semana'; // 'semana'|'mes'|'lista'
+var evVw='semana'; // 'dia'|'semana'|'mes'|'lista'
 var evSemRef=null; // início da semana exibida
 var evMesRef=null; // {year,month}
+var evDiaRef=null; // Date do dia exibido na visão Dia
 var _EV_TIPOS={
   'Feira':{label:'Feira',ic:'🎪',cor:'var(--pu)',bg:'var(--pub)'},
   'Reuniao':{label:'Reunião Corporativa',ic:'🤝',cor:'var(--bl)',bg:'var(--blb)'},
@@ -12074,6 +12151,7 @@ function pgEventos(){
   var hoje=_today();
   if(!evSemRef)evSemRef=_startOfWeek(hoje);
   if(!evMesRef)evMesRef={year:hoje.getFullYear(),month:hoje.getMonth()};
+  if(!evDiaRef)evDiaRef=_today();
   var lista=DB.eventos||[];
   var aConfirmar=lista.filter(function(e){return e.status==='A confirmar';}).length;
   var confirmados=lista.filter(function(e){return e.status==='Confirmado';}).length;
@@ -12084,12 +12162,13 @@ function pgEventos(){
     return fim>=new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate());
   }).length;
 
-  var corpo=evVw==='semana'?buildEvSemana():evVw==='mes'?buildEvMes():buildEvLista();
+  var corpo=evVw==='dia'?buildEvDia():evVw==='semana'?buildEvSemana():evVw==='mes'?buildEvMes():buildEvLista();
 
   return '<div class="fc">'
     +'<div class="ptop">'
     +'<div><div class="pl">Logistica</div><div class="pt">Agenda de Eventos</div></div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +'<button class="tabbtn'+(evVw==='dia'?' on':'')+'" onclick="swEv(\'dia\')">📅 Dia</button>'
     +'<button class="tabbtn'+(evVw==='semana'?' on':'')+'" onclick="swEv(\'semana\')">📆 Semana</button>'
     +'<button class="tabbtn'+(evVw==='mes'?' on':'')+'" onclick="swEv(\'mes\')">🗓️ Mês</button>'
     +'<button class="tabbtn'+(evVw==='lista'?' on':'')+'" onclick="swEv(\'lista\')">☰ Lista</button>'
@@ -12107,7 +12186,83 @@ function pgEventos(){
 function swEv(v){evVw=v;go('eventos');}
 function evNavSemana(dir){evSemRef=_addDays(evSemRef,dir*7);go('eventos');}
 function evNavMes(dir){var m=evMesRef.month+dir,y=evMesRef.year;if(m<0){m=11;y--;}if(m>11){m=0;y++;}evMesRef={year:y,month:m};go('eventos');}
-function evHoje(){evSemRef=_startOfWeek(_today());evMesRef={year:_today().getFullYear(),month:_today().getMonth()};go('eventos');}
+function evNavDia(dir){evDiaRef=_addDays(evDiaRef,dir);go('eventos');}
+function evHoje(){evSemRef=_startOfWeek(_today());evMesRef={year:_today().getFullYear(),month:_today().getMonth()};evDiaRef=_today();go('eventos');}
+
+// ── VISÃO DIA — igual a Semana, mas 1 coluna só (melhor no celular) ──
+function buildEvDia(){
+  var hoje=_today();
+  var horaIniGrid=7,horaFimGrid=20;
+  var horas=[];for(var h=horaIniGrid;h<=horaFimGrid;h++)horas.push(h);
+  var dia=evDiaRef;
+  var dStr=_fmtDataBR(dia);
+  var isHj=_sameDay(dia,hoje);
+
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px">'
+    +'<button onclick="evNavDia(-1)" style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:6px 14px;color:var(--tx);font-size:16px">‹</button>'
+    +'<div style="text-align:center">'
+    +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase">'+_diasCurtos[dia.getDay()]+'</div>'
+    +'<div style="font-size:15px;font-weight:800;color:'+(isHj?'var(--gr)':'var(--tx)')+'">'+dia.getDate()+' de '+_meses[dia.getMonth()]+'</div>'
+    +(!isHj?'<button onclick="evHoje()" style="background:none;border:none;color:var(--gr);font-size:10px;font-weight:700;cursor:pointer;text-decoration:underline">Hoje</button>':'')
+    +'</div>'
+    +'<button onclick="evNavDia(1)" style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:6px 14px;color:var(--tx);font-size:16px">›</button>'
+    +'</div>';
+
+  var evsDoDia=(DB.eventos||[]).filter(function(e){
+    if(e.status==='Cancelado')return false;
+    var ini=_parseDataBR(e.dataIni),fim=_parseDataBR(e.dataFim||e.dataIni);
+    return dia>=ini&&dia<=fim;
+  });
+  var faixaEv=evsDoDia.filter(function(e){return !e.horaIni;});
+  var horaEv=evsDoDia.filter(function(e){return !!e.horaIni;});
+
+  // Faixa "dia todo"
+  html+='<div style="border-bottom:1px solid var(--bd);padding:6px 0;min-height:24px">';
+  if(faixaEv.length){
+    faixaEv.forEach(function(e){
+      var cfg=_evTipoCfg(e.tipo);
+      html+='<div onclick="mVerEvento('+e.id+')" style="background:'+cfg.cor+';color:#fff;border-radius:6px;padding:8px 10px;margin-bottom:5px;font-size:12px;font-weight:700;cursor:pointer">'+cfg.ic+' '+e.nome+'</div>';
+    });
+  } else {
+    html+='<div style="font-size:10px;color:var(--mt);padding:4px 2px">Nenhum evento de dia inteiro</div>';
+  }
+  html+='</div>';
+
+  // Grade de horas — coluna única, sem scroll lateral
+  var rowH=52;
+  html+='<div style="position:relative;display:grid;grid-template-columns:50px 1fr;margin-top:6px">';
+  html+='<div>';
+  horas.forEach(function(h){
+    html+='<div style="height:'+rowH+'px;text-align:right;padding-right:6px;font-size:10px;color:var(--mt);position:relative;top:-6px">'+(h<10?'0':'')+h+':00</div>';
+  });
+  html+='</div>';
+  html+='<div style="position:relative;border-left:1px solid var(--bd)">';
+  horas.forEach(function(){html+='<div style="height:'+rowH+'px;border-bottom:1px solid var(--bd)"></div>';});
+  if(isHj){
+    var nowH=hoje.getHours()+hoje.getMinutes()/60;
+    if(nowH>=horaIniGrid&&nowH<=horaFimGrid){
+      var topNow=(nowH-horaIniGrid)*rowH;
+      html+='<div style="position:absolute;top:'+topNow+'px;left:0;right:0;height:0;border-top:2px solid var(--rd);z-index:2"><div style="width:8px;height:8px;border-radius:50%;background:var(--rd);position:relative;top:-4.5px"></div></div>';
+    }
+  }
+  horaEv.forEach(function(e){
+    var cfg=_evTipoCfg(e.tipo);
+    var hp=e.horaIni.split(':');var hIniNum=(+hp[0])+(+hp[1])/60;
+    var hFimNum=hIniNum+1;
+    if(e.horaFim){var hpf=e.horaFim.split(':');hFimNum=(+hpf[0])+(+hpf[1])/60;}
+    if(hFimNum<=hIniNum)hFimNum=hIniNum+0.5;
+    var top=Math.max(0,(hIniNum-horaIniGrid)*rowH);
+    var height=Math.max(28,(hFimNum-hIniNum)*rowH-2);
+    var multiDia=e.dataFim&&e.dataFim!==e.dataIni;
+    html+='<div onclick="mVerEvento('+e.id+')" style="position:absolute;top:'+top+'px;left:4px;right:4px;height:'+height+'px;background:'+cfg.bg+';border-left:4px solid '+cfg.cor+';border-radius:6px;padding:5px 8px;overflow:hidden;cursor:pointer;z-index:1">'
+      +'<div style="font-size:12px;font-weight:700;color:'+cfg.cor+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+cfg.ic+' '+e.nome+(multiDia?' 🔁':'')+'</div>'
+      +'<div style="font-size:10px;color:var(--mt)">'+e.horaIni+(e.horaFim?'–'+e.horaFim:'')+(e.local?' · '+e.local:'')+'</div>'
+      +'</div>';
+  });
+  html+='</div></div>';
+  if(!evsDoDia.length)html+='<div style="text-align:center;padding:18px;color:var(--mt);font-size:12px">Nenhum evento neste dia</div>';
+  return html;
+}
 
 // ── VISÃO SEMANA — grade horária estilo Google Agenda ──
 function buildEvSemana(){
@@ -12127,8 +12282,8 @@ function buildEvSemana(){
     var ini=_parseDataBR(e.dataIni),fim=_parseDataBR(e.dataFim||e.dataIni);
     return fim>=semDates[0]&&ini<=semDates[6];
   });
-  var faixaEv=evsSemana.filter(function(e){return !e.horaIni||(e.dataFim&&e.dataFim!==e.dataIni);});
-  var horaEv=evsSemana.filter(function(e){return e.horaIni&&(!e.dataFim||e.dataFim===e.dataIni);});
+  var faixaEv=evsSemana.filter(function(e){return !e.horaIni;});
+  var horaEv=evsSemana.filter(function(e){return !!e.horaIni;});
 
   html+='<div style="overflow-x:auto"><div style="min-width:760px">';
   // cabeçalho dos dias
@@ -12147,16 +12302,10 @@ function buildEvSemana(){
   html+='<div style="font-size:8px;color:var(--mt);text-align:right;padding-right:4px;padding-top:3px">dia<br>todo</div>';
   semDates.forEach(function(dia){
     var evsHoje=faixaEv.filter(function(e){var ini=_parseDataBR(e.dataIni),fim=_parseDataBR(e.dataFim||e.dataIni);return dia>=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate())&&dia<=new Date(fim.getFullYear(),fim.getMonth(),fim.getDate());});
-    // Também mostra eventos COM horário que estão nesse dia (pra quem bate o olho rápido)
-    var evsHoraHoje=horaEv.filter(function(e){return e.dataIni===_fmtDataBR(dia);});
     html+='<div style="padding:1px 2px;border-left:1px solid var(--bd)">';
     evsHoje.forEach(function(e){
       var cfg=_evTipoCfg(e.tipo);
       html+='<div onclick="mVerEvento('+e.id+')" style="background:'+cfg.cor+';color:#fff;border-radius:4px;padding:3px 5px;margin-bottom:2px;font-size:9px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer">'+cfg.ic+' '+e.nome+'</div>';
-    });
-    evsHoraHoje.forEach(function(e){
-      var cfg=_evTipoCfg(e.tipo);
-      html+='<div onclick="mVerEvento('+e.id+')" style="background:'+cfg.bg+';border-left:2px solid '+cfg.cor+';color:'+cfg.cor+';border-radius:4px;padding:2px 5px;margin-bottom:2px;font-size:8px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer">'+e.horaIni+' '+e.nome+'</div>';
     });
     html+='</div>';
   });
@@ -12181,7 +12330,10 @@ function buildEvSemana(){
         html+='<div style="position:absolute;top:'+topNow+'px;left:0;right:0;height:0;border-top:2px solid var(--rd);z-index:2"><div style="width:7px;height:7px;border-radius:50%;background:var(--rd);position:relative;top:-4px"></div></div>';
       }
     }
-    var evsDia=horaEv.filter(function(e){return e.dataIni===dStr;});
+    var evsDia=horaEv.filter(function(e){
+      var d=_parseDataBR(dStr);var ini=_parseDataBR(e.dataIni),fim=_parseDataBR(e.dataFim||e.dataIni);
+      return d>=ini&&d<=fim;
+    });
     evsDia.forEach(function(e){
       var cfg=_evTipoCfg(e.tipo);
       var hp=e.horaIni.split(':');var hIniNum=(+hp[0])+(+hp[1])/60;
@@ -12190,8 +12342,9 @@ function buildEvSemana(){
       if(hFimNum<=hIniNum)hFimNum=hIniNum+0.5;
       var top=Math.max(0,(hIniNum-horaIniGrid)*rowH);
       var height=Math.max(20,(hFimNum-hIniNum)*rowH-2);
+      var multiDia=e.dataFim&&e.dataFim!==e.dataIni;
       html+='<div onclick="mVerEvento('+e.id+')" style="position:absolute;top:'+top+'px;left:2px;right:2px;height:'+height+'px;background:'+cfg.bg+';border-left:3px solid '+cfg.cor+';border-radius:4px;padding:2px 5px;overflow:hidden;cursor:pointer;z-index:1">'
-        +'<div style="font-size:9px;font-weight:700;color:'+cfg.cor+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+cfg.ic+' '+e.nome+'</div>'
+        +'<div style="font-size:9px;font-weight:700;color:'+cfg.cor+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+cfg.ic+' '+e.nome+(multiDia?' 🔁':'')+'</div>'
         +'<div style="font-size:8px;color:var(--mt)">'+e.horaIni+(e.horaFim?'–'+e.horaFim:'')+'</div>'
         +'</div>';
     });
@@ -12224,14 +12377,14 @@ function buildEvMes(){
       return dia>=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate())&&dia<=new Date(fim.getFullYear(),fim.getMonth(),fim.getDate());
     });
     var tem=evsDia.length>0;
-    html+='<div onclick="'+(tem?'mVerEvento('+evsDia[0].id+')':'mNovoEventoDia('+ano+','+(mes+1)+','+d+')')+'" style="cursor:pointer;background:'+(isHj?'var(--grb)':tem?'var(--s2)':'transparent')+';border:1px solid '+(isHj?'var(--gr)':tem?'var(--bd)':'transparent')+';border-radius:8px;padding:5px 4px;min-height:56px">'
+    html+='<div onclick="'+(tem?'evVerDia('+ano+','+(mes+1)+','+d+')':'mNovoEventoDia('+ano+','+(mes+1)+','+d+')')+'" style="cursor:pointer;background:'+(isHj?'var(--grb)':tem?'var(--s2)':'transparent')+';border:1px solid '+(isHj?'var(--gr)':tem?'var(--bd)':'transparent')+';border-radius:8px;padding:5px 4px;min-height:66px">'
       +'<div style="font-size:12px;font-weight:'+(isHj?800:600)+';color:'+(isHj?'var(--gr)':tem?'var(--tx)':'var(--ft)')+';text-align:center">'+d+'</div>';
-    var maxPills=Math.min(evsDia.length,3);
+    var maxPills=Math.min(evsDia.length,2);
     for(var i=0;i<maxPills;i++){
       var cfg=_evTipoCfg(evsDia[i].tipo);
-      html+='<div style="background:'+cfg.bg+';border-left:3px solid '+cfg.cor+';border-radius:3px;padding:1px 4px;margin-top:2px;font-size:8px;font-weight:700;color:'+cfg.cor+';overflow:hidden;white-space:nowrap;text-overflow:ellipsis" title="'+evsDia[i].nome+'">'+evsDia[i].nome+'</div>';
+      html+='<div style="background:'+cfg.bg+';border-left:3px solid '+cfg.cor+';border-radius:3px;padding:2px 4px;margin-top:2px;font-size:9px;font-weight:700;color:'+cfg.cor+';overflow:hidden;white-space:nowrap;text-overflow:ellipsis" title="'+evsDia[i].nome+'">'+evsDia[i].nome+'</div>';
     }
-    if(evsDia.length>3)html+='<div style="font-size:9px;color:var(--mt);text-align:center">+'+(evsDia.length-3)+'</div>';
+    if(evsDia.length>2)html+='<div style="font-size:9px;color:var(--mt);text-align:center;margin-top:1px">+'+(evsDia.length-2)+' mais</div>';
     html+='</div>';
   }
   html+='</div>';
@@ -12306,6 +12459,12 @@ function mNovoEventoDia(ano,mes,dia){
   openM('+ Novo Evento',_buildEventoForm(null)
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveEvento()">Adicionar</button></div>',560);
   setTimeout(function(){var el=document.getElementById('ef-dataIni');if(el)el.value=iso;var n=document.getElementById('ef-nome');if(n)n.focus();},80);
+}
+// Navega da visão Mês direto pra visão Dia de uma data específica (clique num dia com eventos)
+function evVerDia(ano,mes,dia){
+  evDiaRef=new Date(ano,mes-1,dia);
+  evVw='dia';
+  go('eventos');
 }
 
 function saveEvento(){
@@ -12442,7 +12601,7 @@ function mVerEvento(id){
     +'<div style="margin:10px 0 6px;font-size:12px;font-weight:700">✅ Checklist de preparação ('+feitos+'/'+checklist.length+')</div>'
     +checklistHTML
     +'<div style="display:flex;gap:6px;margin-top:8px"><input class="inp" id="cl-novo-'+id+'" placeholder="Adicionar item... (ex: Banner, cartão de visita)" style="flex:1" onkeydown="if(event.key===\'Enter\')addChecklistItem('+id+')"><button class="btn" onclick="addChecklistItem('+id+')" style="padding:8px 12px">+</button></div>'
-    +'<div class="brow" style="margin-top:14px;flex-wrap:wrap">'+stBtns+'<button style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:6px 12px;font-size:12px" onclick="mEditEvento('+id+')">✏️ Editar</button><button class="btnO bOgr" onclick="closeM()">Fechar</button></div>'
+    +'<div class="brow" style="margin-top:14px;flex-wrap:wrap">'+stBtns+'<button style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:6px 12px;font-size:12px" onclick="mEditEvento('+id+')">✏️ Editar</button><button class="btnO bOgr" onclick="closeM()">Fechar</button><button class="btn" style="background:var(--pu)" onclick="closeM();go(\'eventos\')">🎪 Ver na Agenda de Eventos</button></div>'
     +'</div>',560);
 }
 
@@ -12932,6 +13091,32 @@ function saveCol(){
     _agConvertPreId=null;
   }
   saveDB();closeM();go('agenda');
+}
+function mVerColeta(id){
+  var c=null;for(var i=0;i<DB.coletas.length;i++){if(DB.coletas[i].id===id){c=DB.coletas[i];break;}}
+  if(!c)return;
+  var html='<div class="mf">'
+    +'<div style="text-align:center;margin-bottom:10px">'+stBadge(c.status)+'</div>'
+    +'<div style="background:var(--s2);border-radius:var(--r);padding:13px;margin-bottom:12px">'
+    +'<div style="font-size:16px;font-weight:800">'+(c.cli||'—')+'</div>'
+    +(c.tel?'<div style="font-size:12px;color:var(--mt);margin-top:3px">📞 '+c.tel+'</div>':'')
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+    +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase">Data</div><div style="font-size:13px;font-weight:700;margin-top:3px">'+(c.data||'—')+'</div></div>'
+    +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase">Horário</div><div style="font-size:13px;font-weight:700;margin-top:3px">'+(c.hora||'—')+'</div></div>'
+    +'</div>'
+    +(c.end||c.bairro?'<div style="font-size:12px;color:var(--mt);margin-bottom:8px">📍 '+(c.end||'')+(c.bairro?(c.end?' — ':'')+c.bairro:'')+'</div>':'')
+    +(c.mat?'<div style="font-size:12px;color:var(--mt);margin-bottom:8px">📦 '+c.mat+(c.peso?' · ~'+fKg(c.peso)+'kg':'')+'</div>':(c.peso?'<div style="font-size:12px;color:var(--mt);margin-bottom:8px">⚖️ ~'+fKg(c.peso)+'kg estimado</div>':''))
+    +(c.pesoReal?'<div style="font-size:12px;color:var(--gr);margin-bottom:8px">⚖️ '+fKg(c.pesoReal)+'kg real (pesado)</div>':'')
+    +(c.mot?'<div style="font-size:12px;color:var(--mt);margin-bottom:8px">🚛 Motorista: '+c.mot+'</div>':'')
+    +(c.obs?'<div style="font-size:12px;color:var(--or);margin-bottom:8px">⚠ '+c.obs+'</div>':'')
+    +stAcoes(c)
+    +'<div class="brow" style="margin-top:14px">'
+    +'<button class="btnO bOgr" onclick="closeM()">Fechar</button>'
+    +'<button class="btn" style="background:var(--bl)" onclick="closeM();go(\'agenda\')">📅 Ver na Agenda de Coletas</button>'
+    +'</div>'
+    +'</div>';
+  openM('Coleta — '+(c.cli||'?'),html,500);
 }
 function mEditCol(id){
   var c=null;for(var i=0;i<DB.coletas.length;i++){if(DB.coletas[i].id===id){c=DB.coletas[i];break;}}
