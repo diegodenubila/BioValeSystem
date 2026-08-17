@@ -10121,15 +10121,15 @@ function _finFixas(){
     }
     var statusParc=c.tipo==='parcelada'?(mesHist?mesHist.pago?'Pago':'Pendente':'none'):s;
     var borderCol=isFuturo&&v>0?'rgba(168,85,247,.2)':statusParc==='Pendente'&&v>0?'rgba(239,68,68,.25)':statusParc==='Pago'?'rgba(34,197,94,.2)':'var(--bd)';
-    cfH+='<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:var(--s2);border-radius:var(--r);margin-bottom:7px;border:1px solid '+borderCol+'">'
+    cfH+='<div onclick="mVerCF('+c.id+')" style="display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:var(--s2);border-radius:var(--r);margin-bottom:7px;border:1px solid '+borderCol+';cursor:pointer">'
       +'<div style="display:flex;align-items:center;gap:10px">'
       +'<span style="font-size:22px">'+(c.ic||'&#128197;')+'</span>'
       +'<div>'
       +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
       +'<span style="font-size:13px;font-weight:600">'+c.nome+'</span>'+tipoTag+_urgBadge+'</div>'
-      +'<div style="font-size:10px;color:var(--mt);margin-top:2px">Vence '+('0'+(c.venc||1)).slice(-2)+'/'+ma.replace('/','/')+' &middot; <button onclick="mHistCF('+c.id+')" style="background:none;border:none;color:var(--bl);font-size:10px;cursor:pointer;padding:0">ver historico</button></div>'
+      +'<div style="font-size:10px;color:var(--mt);margin-top:2px">Vence '+('0'+(c.venc||1)).slice(-2)+'/'+ma.replace('/','/')+' &middot; <button onclick="event.stopPropagation();mHistCF('+c.id+')" style="background:none;border:none;color:var(--bl);font-size:10px;cursor:pointer;padding:0">ver historico</button></div>'
       +'</div></div>'
-      +'<div style="display:flex;align-items:center;gap:9px">'
+      +'<div style="display:flex;align-items:center;gap:9px" onclick="event.stopPropagation()">'
       +(v>0?'<span style="font-size:14px;font-weight:700;font-family:monospace;color:'+(isFuturo?'var(--pu)':statusParc==='Pendente'?'var(--rd)':'var(--mt)')+'">'+fR(v)+'</span>':'')
       +acoes
       +(!isFuturo&&!isPast?'<button onclick="mEditCF('+c.id+')" style="background:none;border:none;color:var(--mt);font-size:15px;cursor:pointer;padding:2px 4px" title="Editar">&#9998;</button>':'')
@@ -10331,6 +10331,44 @@ function saveNovaCF(){
   document.getElementById('fin-content').innerHTML=_finRender('fixas');
 }
 
+function mVerCF(id){
+  var c=null;for(var i=0;i<DB.contasFixas.length;i++){if(DB.contasFixas[i].id===id){c=DB.contasFixas[i];break;}}
+  if(!c)return;
+  var ma=_mesComOffset(_fixasMesOffset);
+  var v=_cfValorMesRef(c,ma);
+  var s=_cfStatusMesRef(c,ma);
+  var labels={'Fixo':'Despesa Fixa','Aluguel':'Aluguel','Energia':'Energia','Agua':'Água','Internet':'Internet / Telefone','Honorarios':'Honorários','Salario':'Salário / Pró-labore','Imposto':'Impostos','Manutencao':'Manutenção','Servico':'Serviços','Outros':'Outros'};
+  var tipoLabel=c.tipo==='fixa'?'📌 Fixa — valor sempre igual':c.tipo==='variavel'?'🔄 Variável — muda todo mês':'💳 Parcelada';
+
+  var html='<div class="mf">'
+    +'<div style="text-align:center;margin-bottom:14px"><span style="font-size:40px">'+(c.ic||'📅')+'</span></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+    +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase">Tipo</div><div style="font-size:12px;font-weight:700;margin-top:3px">'+tipoLabel+'</div></div>'
+    +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase">Categoria</div><div style="font-size:12px;font-weight:700;margin-top:3px">'+(labels[c.cat]||c.cat||'Fixo')+'</div></div>'
+    +'</div>'
+    +'<div style="background:var(--s2);border-radius:var(--r);padding:13px;text-align:center;margin-bottom:12px">'
+    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase">Valor deste mês ('+_mesLabel(ma)+')</div>'
+    +'<div style="font-size:24px;font-weight:700;font-family:monospace;color:'+(s==='Pago'?'var(--gr)':'var(--rd)')+'">'+(v>0?fR(v):'— não lançado —')+'</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-top:3px">'+(s==='Pago'?'✓ Pago':'Pendente')+'</div>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+    +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase">Vence dia</div><div style="font-size:14px;font-weight:700;margin-top:3px">'+(c.venc||'—')+'</div></div>'
+    +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase">Início</div><div style="font-size:14px;font-weight:700;margin-top:3px">'+(c.mesInicio||'—')+'</div></div>'
+    +'</div>';
+
+  if(c.tipo==='parcelada'){
+    var pagoCount=(c.historico||[]).filter(function(h){return h.pago;}).length;
+    html+='<div class="al alb" style="font-size:12px;margin-bottom:12px">💳 '+pagoCount+'/'+(c.totalParcelas||'?')+' parcelas pagas — '+fR(c.valor||0)+' cada</div>';
+  }
+  if(c.contaPadrao)html+='<div style="font-size:12px;color:var(--mt);margin-bottom:8px">💼 Conta padrão de débito: <b>'+c.contaPadrao+'</b></div>';
+
+  html+='<div class="brow">'
+    +'<button class="btnO bOgr" onclick="closeM()">Fechar</button>'
+    +'<button class="btn" onclick="closeM();mHistCF('+id+')" style="background:var(--bl)">📋 Ver Histórico</button>'
+    +'<button class="btn" onclick="closeM();mEditCF('+id+')">✎ Editar</button>'
+    +'</div></div>';
+  openM('Detalhes: '+c.nome,html,500);
+}
 function mEditCF(id){
   var c=null;for(var i=0;i<DB.contasFixas.length;i++){if(DB.contasFixas[i].id===id){c=DB.contasFixas[i];break;}}
   if(!c)return;
