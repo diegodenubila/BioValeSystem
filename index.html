@@ -411,10 +411,14 @@ var DB={
   ],
   cats:{
     entrada:[
-      {id:1,nome:'Vendas',             cor:'#22c55e'},
+      {id:1,nome:'Venda',              cor:'#22c55e'},
       {id:2,nome:'Doacao',             cor:'#3b82f6'},
       {id:3,nome:'Outros Recebimentos',cor:'#06b6d4'},
       {id:4,nome:'Reforco',            cor:'#a855f7'},
+      {id:5,nome:'Logistica Reversa',  cor:'#8b5cf6'},
+      {id:6,nome:'A Receber',          cor:'#22c55e'},
+      {id:7,nome:'Rendimentos',        cor:'#eab308'},
+      {id:8,nome:'Venda Unidade',      cor:'#f97316'},
     ],
     saida:[
       {id:10,nome:'Compra',      cor:'#ef4444'},
@@ -425,6 +429,20 @@ var DB={
       {id:15,nome:'Transporte',  cor:'#0ea5e9'},
       {id:16,nome:'Impostos',    cor:'#dc2626'},
       {id:17,nome:'Outros',      cor:'#6b7280'},
+      {id:18,nome:'Funcionarios',cor:'#3b82f6'},
+      {id:19,nome:'Aluguel',     cor:'#8b5cf6'},
+      {id:20,nome:'Energia',     cor:'#eab308'},
+      {id:21,nome:'Agua',        cor:'#06b6d4'},
+      {id:22,nome:'Internet',    cor:'#ec4899'},
+      {id:23,nome:'Honorarios',  cor:'#14b8a6'},
+      {id:24,nome:'Servico',     cor:'#84cc16'},
+      {id:25,nome:'Imposto',     cor:'#f43f5e'},
+      {id:26,nome:'Combustivel', cor:'#fb923c'},
+      {id:27,nome:'Ferramentas e EPI', cor:'#22d3ee'},
+      {id:28,nome:'Marketing',   cor:'#e879f9'},
+      {id:29,nome:'Taxas Bancarias', cor:'#94a3b8'},
+      {id:30,nome:'Seguro',     cor:'#4ade80'},
+      {id:31,nome:'Contabilidade', cor:'#38bdf8'},
     ]
   },
 };
@@ -1770,7 +1788,7 @@ function renderPesagem(){
     +'<span class="pdd-arr">&#9660;</span>'
     +'</button>'
     +'<div class="pdd-panel'+(ab.pddUnitOpen?' open':'')+'">'
-    +'<div class="pdd-search" style="display:flex;align-items:center;gap:6px"><input type="text" id="unit-search" placeholder="&#128269; Buscar produto..." oninput="filtrarUnit()" autocomplete="off" style="flex:1;border:none;background:transparent;color:var(--tx);font-size:13px;outline:none;padding:2px 0"><button onclick="abrirCameraPes(&apos;unit&apos;)" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:6px;padding:3px 9px;font-size:16px;cursor:pointer;flex-shrink:0" title="Ler código de barras">&#128247;</button></div>'
+    +'<div class="pdd-search" style="display:flex;align-items:center;gap:6px"><input type="text" id="unit-search" placeholder="&#128269; Buscar produto..." oninput="filtrarUnit()" autocomplete="off" style="flex:1;border:none;background:transparent;color:var(--tx);font-size:13px;outline:none;padding:2px 0"><button onclick="abrirCameraPes(&apos;unit&apos;)" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:6px;padding:3px 9px;font-size:16px;cursor:pointer;flex-shrink:0" title="Ler código de barras">&#128247;</button><button onclick="mRevendaRapida()" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.4);border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;white-space:nowrap" title="Cadastrar e vender na hora, sem preencher a ficha completa">&#9889; Rápido</button></div>'
     +'<div class="pdd-list" id="unit-cards-list">'+unitCardsContent+'</div>'
     +'</div></div></div>';
   var cartH='';
@@ -2456,6 +2474,45 @@ function confAddU(uid){
   closeM();savePesState();renderPesagem();
   setTimeout(_reabrirBuscaProd,150);
 }
+// Cadastro relâmpago de Revenda — pra quando surge um item na correria (ex: TV, bateria)
+// e não dá tempo de preencher a ficha completa (foto, categoria, condição...).
+// Cria o item já como "Disponivel" e adiciona direto no carrinho da venda atual.
+function mRevendaRapida(){
+  var prodO='<option value="">-- Não informar agora --</option>';
+  for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];prodO+='<option value="'+p.id+'">'+p.ic+' '+p.nome+' (Est: '+fKg(p.est)+'kg)</option>';}
+  openM('&#9889; Revenda Rápida',
+    '<div class="mf">'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Pra item que não estava cadastrado. Preço fixo por peça — o peso serve só pra dar baixa correta no estoque, não entra na conta do preço.</div>'
+    +'<div class="fld"><label>Nome do item *</label><input class="inp" id="rr-nome" placeholder="Ex: TV 32&quot;, Bateria de lítio..."></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Peso (kg) *</label><input class="inp" type="number" inputmode="decimal" id="rr-peso" placeholder="0.000" step="0.001"></div>'
+    +'<div class="fld"><label>Preço fixo (R$) *</label><input class="inp" type="number" inputmode="decimal" id="rr-preco" placeholder="0.00" step="0.01"></div>'
+    +'</div>'
+    +'<div class="fld"><label>De onde saiu esse peso? (opcional)</label><select class="inp" id="rr-origem">'+prodO+'</select>'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Informando, o sistema já desconta do estoque desse material e calcula o lucro real desse item lá na Revenda.</div></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-or" onclick="salvarRevendaRapida()">+ Cadastrar e Adicionar</button></div>'
+    +'</div>',440);
+  setTimeout(function(){var n=document.getElementById('rr-nome');if(n)n.focus();},80);
+}
+function salvarRevendaRapida(){
+  var nome=document.getElementById('rr-nome').value.trim();
+  var peso=parseFloat(document.getElementById('rr-peso').value)||0;
+  var preco=parseFloat(document.getElementById('rr-preco').value)||0;
+  var origemId=document.getElementById('rr-origem').value;
+  if(!nome){alert('Digite o nome do item!');return;}
+  if(peso<=0){alert('Informe o peso!');return;}
+  if(preco<=0){alert('Informe o preço!');return;}
+  var novo={id:nid(),prod:nome,desc:'',peso:peso,cond:'',preco:preco,status:'Disponivel',cat:'',estProdId:origemId?parseFloat(origemId):null};
+  DB.revenda.push(novo);
+  // Abate do estoque do material de origem, igual o cadastro completo já faz
+  if(origemId){
+    var ep=gP(parseFloat(origemId));
+    if(ep)ep.est=+(ep.est-peso).toFixed(3);
+  }
+  pesAbas[pesAtiva].itens.push({prodId:null,uid:novo.id,ic:'&#9889;',nome:novo.prod,peso:novo.peso,preco:novo.preco,tipo:'Venda',uni:true});
+  saveDB();closeM();savePesState();renderPesagem();
+  toast('Cadastrado e adicionado à venda!','var(--gr)');
+}
 function confAddP(prodId){
   var ab=pesAbas[pesAtiva];var prod=gP(prodId);
   var peso=parseFloat(document.getElementById('ai-kg').value)||0;
@@ -2562,6 +2619,8 @@ function mFinPes(){
   var blocoPagei=blocoForma('pag-',valPagei,'var(--rd)','A Pagar — Compra','&#11015;');
 
   openM('&#128181; Forma de Pagamento / Recebimento','<div class="mf">'
+    +'<div class="fld"><label>Data da operação (venda/compra) *</label><input class="inp" type="date" id="fin-data" value="'+_isoDateBR(hj())+'">'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Se essa venda/compra aconteceu em outro dia e só está sendo lançada agora, ajuste aqui — o Financeiro vai contabilizar no mês certo.</div></div>'
     // Resumo topo
     +'<div style="background:var(--s2);border-radius:var(--r);padding:12px 14px">'
     +(valReceb>0?'<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span style="color:var(--gr)">&#11014; A receber (Venda / Log. Reversa)</span><span style="color:var(--gr);font-weight:700;font-family:monospace">+'+fR(valReceb)+'</span></div>':'')
@@ -2895,6 +2954,10 @@ function confirmarFin(){
   var pg=getPgMethods();
   var recMethods=pg.recMethods;var pagMethods=pg.pagMethods;
   var valReceb=pg.valReceb;var valPagei=pg.valPagei;
+  // Captura a data da operação agora, enquanto o modal ainda está aberto (pode ser
+  // diferente de hoje, se a venda/compra foi fechada em outro dia)
+  var _dataEl=document.getElementById('fin-data');
+  _finDataOperacao=_dataEl&&_dataEl.value?_dataEl.value.split('-').reverse().join('/'):hj();
   // Validacao: bloco A Receber precisa estar preenchido se ha venda
   if(valReceb>0&&!recMethods.length){alert('Selecione a forma de recebimento (Venda)!');return;}
   // Validacao: bloco A Pagar precisa estar preenchido se ha compra
@@ -2904,6 +2967,7 @@ function confirmarFin(){
   if(pagMethods.length){var somaPag=0;for(var i=0;i<pagMethods.length;i++)somaPag=+(somaPag+pagMethods[i].valor).toFixed(2);if(Math.abs(somaPag-valPagei)>0.01){confirmar('Pagamento ('+fR(somaPag)+') difere da compra ('+fR(valPagei)+').<br>Deseja confirmar mesmo assim?',function(){_finalizarPesagem();});return;}}
   _finalizarPesagem();
 }
+var _finDataOperacao=null; // data real da venda/compra, capturada em confirmarFin()
 function _finalizarPesagem(){
   var ab=pesAbas[pesAtiva];
   var pg=getPgMethods();
@@ -2911,6 +2975,7 @@ function _finalizarPesagem(){
   var valReceb=pg.valReceb;var valPagei=pg.valPagei;
   var obs=document.getElementById('fin-obs')?document.getElementById('fin-obs').value||'':'';
   var num=ab.numAtend||gerarNum();ab.numAtend=num;ab.obs=obs;
+  var dataOp=_finDataOperacao||hj();
   var totLiq2=+(valReceb-valPagei).toFixed(2);
   var vendaTotal=valReceb;var compraTotal=valPagei;
   // Apply stock changes
@@ -2926,7 +2991,7 @@ function _finalizarPesagem(){
           // Custo estimado = peso × preço do material de origem (se vinculado)
           if(DB.revenda[j].estProdId&&DB.revenda[j].peso){
             var _ep=null;for(var _k=0;_k<DB.produtos.length;_k++){if(_normId(DB.produtos[_k].id)===_normId(DB.revenda[j].estProdId)){_ep=DB.produtos[_k];break;}}
-            if(_ep&&_ep.precoC)DB.revenda[j].custoEst=+(DB.revenda[j].peso*_ep.precoC).toFixed(2);
+            if(_ep&&_ep.vC)DB.revenda[j].custoEst=+(DB.revenda[j].peso*_ep.vC).toFixed(2);
           }
           break;
         }
@@ -2954,16 +3019,41 @@ function _finalizarPesagem(){
   }
   // Registrar movimentacoes financeiras separadas por bloco
   // Bloco Recebimento (Venda + Logistica Reversa) — sempre entrada
+  // Separa "Venda" (material por kg) de "Venda Unidade" (item de Revenda), pra saber
+  // no Financeiro de onde veio cada real de lucro. Se a pesagem misturar os dois tipos,
+  // divide o valor de cada forma de pagamento proporcionalmente entre as duas categorias.
+  var vendaKgTotal=0,vendaUniTotal=0;
+  if(ab.tipo!=='Logistica Reversa'){
+    for(var vi=0;vi<ab.itens.length;vi++){
+      var vit=ab.itens[vi];
+      if(vit.tipo!=='Venda')continue;
+      var vpesoEf=vit.pesoLiquido!=null?vit.pesoLiquido:vit.peso;
+      var vv=vit.uni?vit.preco:vpesoEf*vit.preco;
+      if(vit.uni)vendaUniTotal+=vv;else vendaKgTotal+=vv;
+    }
+  }
+  var vendaTotalGeral=vendaKgTotal+vendaUniTotal;
   for(var i=0;i<recMethods.length;i++){
     var m=recMethods[i];
-    var recDesc=ab.tipo==='Logistica Reversa'?'Logistica Reversa':'Venda';
-    DB.movs.unshift({id:nid(),data:hj(),desc:'Recebimento '+recDesc+' #'+num+' ('+m.label+')',tipo:'entrada',cat:recDesc,valor:m.valor,conta:m.conta});
+    if(ab.tipo==='Logistica Reversa'){
+      DB.movs.unshift({id:nid(),data:dataOp,desc:'Recebimento Logistica Reversa #'+num+' ('+m.label+')',tipo:'entrada',cat:'Logistica Reversa',valor:m.valor,conta:m.conta});
+    }else if(vendaUniTotal>0&&vendaKgTotal>0&&vendaTotalGeral>0){
+      var fracUni=vendaUniTotal/vendaTotalGeral;
+      var valUni=+(m.valor*fracUni).toFixed(2);
+      var valMat=+(m.valor-valUni).toFixed(2);
+      if(valMat>0)DB.movs.unshift({id:nid(),data:dataOp,desc:'Recebimento Venda #'+num+' ('+m.label+')',tipo:'entrada',cat:'Venda',valor:valMat,conta:m.conta});
+      if(valUni>0)DB.movs.unshift({id:nid(),data:dataOp,desc:'Recebimento Venda Unidade #'+num+' ('+m.label+')',tipo:'entrada',cat:'Venda Unidade',valor:valUni,conta:m.conta});
+    }else if(vendaUniTotal>0){
+      DB.movs.unshift({id:nid(),data:dataOp,desc:'Recebimento Venda Unidade #'+num+' ('+m.label+')',tipo:'entrada',cat:'Venda Unidade',valor:m.valor,conta:m.conta});
+    }else{
+      DB.movs.unshift({id:nid(),data:dataOp,desc:'Recebimento Venda #'+num+' ('+m.label+')',tipo:'entrada',cat:'Venda',valor:m.valor,conta:m.conta});
+    }
     for(var j=0;j<DB.contas.length;j++){if(DB.contas[j].nome===m.conta){DB.contas[j].saldo=+(DB.contas[j].saldo+m.valor).toFixed(2);break;}}
   }
   // Bloco Pagamento (Compra) — sempre saida
   for(var i=0;i<pagMethods.length;i++){
     var m=pagMethods[i];
-    DB.movs.unshift({id:nid(),data:hj(),desc:'Pagamento Compra #'+num+' ('+m.label+')',tipo:'saida',cat:'Compra',valor:m.valor,conta:m.conta});
+    DB.movs.unshift({id:nid(),data:dataOp,desc:'Pagamento Compra #'+num+' ('+m.label+')',tipo:'saida',cat:'Compra',valor:m.valor,conta:m.conta});
     for(var j=0;j<DB.contas.length;j++){if(DB.contas[j].nome===m.conta){DB.contas[j].saldo=+(DB.contas[j].saldo-m.valor).toFixed(2);break;}}
   }
   // Combinar todos os methods para snapshot do historico
@@ -2988,6 +3078,7 @@ function _finalizarPesagem(){
   closeM();pesAbas.splice(pesAtiva,1);
   if(!pesAbas.length){clearPesState();novaPesAba();autoSave();}else{pesAtiva=Math.min(pesAtiva,pesAbas.length-1);savePesState();renderPesagem();}
   autoSave();
+  _finDataOperacao=null;
 }
 
 // ── PESAGENS EM ABERTO / ATENDIMENTOS SUSPENSOS ──────────────
@@ -3121,6 +3212,8 @@ function liquidarPendencia(pendId){
     +'<div style="background:var(--s2);border-radius:var(--r);padding:11px 13px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:12px;color:var(--mt)">Cliente</span><span style="font-size:13px;font-weight:600">'+cliNome+'</span></div>'
     +(pend.obs?'<div style="font-size:12px;color:var(--mt)">Obs: '+pend.obs+'</div>':'')+'</div>'
     +'<div style="max-height:150px;overflow-y:auto">'+itensSumH+'</div>'
+    +'<div class="fld"><label>Data da operação (venda/compra) *</label><input class="inp" type="date" id="liq-data" value="'+_isoDateBR(hj())+'">'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Se o negócio foi fechado em outro dia e só está sendo liquidado agora, ajuste aqui — o Financeiro vai contabilizar no mês certo.</div></div>'
     +'<div style="background:var(--bg);border-radius:var(--r);padding:11px 13px">'
     +(valReceb>0?'<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--gr);font-size:12px">&#11014; A Receber (Venda)</span><span style="font-weight:700;font-family:monospace;color:var(--gr)">+'+fR(valReceb)+'</span></div>':'')
     +(valPagei>0?'<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--rd);font-size:12px">&#11015; A Pagar (Compra)</span><span style="font-weight:700;font-family:monospace;color:var(--rd)">-'+fR(valPagei)+'</span></div>':'')
@@ -3161,10 +3254,14 @@ function confirmarLiquidacao(pendId,valReceb,valPagei){
   if(!pend)return;
   var conta=document.getElementById('liq-conta')?document.getElementById('liq-conta').value:'Caixa';
   var forma=document.getElementById('liq-forma-val')?document.getElementById('liq-forma-val').value:'Dinheiro';
+  // Data real da operação (pode ser diferente de hoje, se o negócio foi fechado antes
+  // e só está sendo liquidado agora) — assim o Financeiro contabiliza no mês certo.
+  var dataEl=document.getElementById('liq-data');
+  var dataOp=dataEl&&dataEl.value?dataEl.value.split('-').reverse().join('/'):hj();
   var num=pend.num;
   var totLiq=+(valReceb-valPagei).toFixed(2);
-  var _liqCat=pend.tipo==='Logistica Reversa'?'Logistica Reversa':'Venda';if(valReceb>0){DB.movs.unshift({id:nid(),data:hj(),desc:'Liquidacao '+_liqCat+' #'+num+' ('+forma+')',tipo:'entrada',cat:_liqCat,valor:valReceb,conta:conta});for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo+valReceb).toFixed(2);break;}}}
-  if(valPagei>0){DB.movs.unshift({id:nid(),data:hj(),desc:'Liquidacao Compra #'+num+' ('+forma+')',tipo:'saida',cat:'Compra',valor:valPagei,conta:conta});for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo-valPagei).toFixed(2);break;}}}
+  var _liqCat=pend.tipo==='Logistica Reversa'?'Logistica Reversa':'Venda';if(valReceb>0){DB.movs.unshift({id:nid(),data:dataOp,desc:'Liquidacao '+_liqCat+' #'+num+' ('+forma+')',tipo:'entrada',cat:_liqCat,valor:valReceb,conta:conta});for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo+valReceb).toFixed(2);break;}}}
+  if(valPagei>0){DB.movs.unshift({id:nid(),data:dataOp,desc:'Liquidacao Compra #'+num+' ('+forma+')',tipo:'saida',cat:'Compra',valor:valPagei,conta:conta});for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo-valPagei).toFixed(2);break;}}}
   if(DB.caixaDia){if(!DB.caixaDia.movimentos)DB.caixaDia.movimentos=[];DB.caixaDia.movimentos.unshift({num:num,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),itens:pend.itens.length,total:totLiq,venda:valReceb,compra:valPagei,methods:[{label:forma,valor:Math.abs(totLiq),conta:conta}],obs:pend.obs,itensList:pend.itens.slice(),label:pend.label,tipo:pend.tipo,cliId:pend.cliId,tabId:pend.tabId,liquidadoPendencia:true});}
   atendHist.unshift({id:nid(),label:pend.label,tipo:pend.tipo,itens:pend.itens.slice(),num:num,total:totLiq,methods:[{label:forma,valor:Math.abs(totLiq),conta:conta}],obs:pend.obs,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
   DB.pesagensEmAberto.splice(pendIdx,1);
@@ -6302,12 +6399,18 @@ function _buildPerBar(per, varName, d1, d2, onchange){
   var sel=ops.find(function(o){return o.id===per;})||ops[3];
   var opts='';for(var i=0;i<ops.length;i++){opts+='<option value="'+ops[i].id+'"'+(ops[i].id===per?' selected':'')+'>'+ops[i].l+'</option>';}
   var customH=per==='custom'
-    ?'<div style="display:flex;gap:6px;align-items:center;margin-top:6px">'
+    ?'<div style="margin-top:6px">'
+    +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'
+    +'<span style="font-size:11px;color:var(--mt)">Mês específico:</span>'
+    +'<input type="month" id="per-mes-'+varName+'" onchange="_aplicarMesPer(\''+varName+'\',\''+onchange+'\')" style="background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:5px 8px;color:var(--tx);font-size:12px;font-family:inherit">'
+    +'</div>'
+    +'<div style="display:flex;gap:6px;align-items:center">'
+    +'<span style="font-size:11px;color:var(--mt)">ou intervalo:</span>'
     +'<input class="inp" type="date" id="per-d1-'+varName+'" value="'+(d1||'')+'" style="font-size:12px;padding:5px 8px">'
     +'<span style="color:var(--mt);font-size:12px">até</span>'
     +'<input class="inp" type="date" id="per-d2-'+varName+'" value="'+(d2||'')+'" style="font-size:12px;padding:5px 8px">'
     +'<button onclick="'+onchange+'Custom()" style="background:var(--gr2);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">Aplicar</button>'
-    +'</div>':''
+    +'</div></div>':''
   ;
   return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">'
     +'<span style="font-size:11px;color:var(--mt)">&#128197; Período:</span>'
@@ -6315,6 +6418,22 @@ function _buildPerBar(per, varName, d1, d2, onchange){
     +'<span style="font-size:12px;color:var(--gr);font-weight:600">'+sel.l+'</span>'
     +customH
     +'</div>';
+}
+// Preenche o intervalo de datas com o 1º e o último dia do mês escolhido, e já aplica —
+// evita ter que digitar duas datas manualmente só pra pegar um mês inteiro.
+function _aplicarMesPer(varName,onchange){
+  var mesEl=document.getElementById('per-mes-'+varName);
+  if(!mesEl||!mesEl.value)return;
+  var partes=mesEl.value.split('-'); // "AAAA-MM"
+  var ano=parseInt(partes[0]),mes=parseInt(partes[1]);
+  var primeiroDia=ano+'-'+('0'+mes).slice(-2)+'-01';
+  var ultimoDiaNum=new Date(ano,mes,0).getDate();
+  var ultimoDia=ano+'-'+('0'+mes).slice(-2)+'-'+('0'+ultimoDiaNum).slice(-2);
+  var d1El=document.getElementById('per-d1-'+varName);
+  var d2El=document.getElementById('per-d2-'+varName);
+  if(d1El)d1El.value=primeiroDia;
+  if(d2El)d2El.value=ultimoDia;
+  window[onchange+'Custom']();
 }
 
 function _buildEstRelatorio(){
@@ -6388,7 +6507,7 @@ function _buildEstRelatorio(){
   if(!rows)return perBar+'<div style="padding:30px;text-align:center;color:var(--mt)">Nenhuma movimentacao no período.</div>';
 
   return perBar+resumo
-    +'<div style="display:flex;gap:8px;margin-bottom:10px;justify-content:flex-end"><button onclick="exportarRelatorioEstoque(\x27csv\x27)" class="btnO bOgr" style="font-size:12px;padding:6px 12px">  return perBar+resumo#128229; Excel/CSV</button><button onclick="exportarRelatorioEstoque(\x27pdf\x27)" class="btn" style="font-size:12px;padding:6px 12px">  return perBar+resumo#128196; PDF</button></div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:10px;justify-content:flex-end"><button onclick="exportarRelatorioEstoque(\x27csv\x27)" class="btnO bOgr" style="font-size:12px;padding:6px 12px">&#128229; Excel/CSV</button><button onclick="exportarRelatorioEstoque(\x27pdf\x27)" class="btn" style="font-size:12px;padding:6px 12px">&#128196; PDF</button></div>'
     +'<div class="card" style="padding:0;overflow-x:auto">'
     +'<table class="tbl" style="width:100%;min-width:700px"><thead><tr>'
     +'<th style="padding:9px 10px;text-align:left">Material</th>'
@@ -8698,8 +8817,9 @@ function _mvTotal(mv){
   return t;
 }
 function _finResumo(){
-  // totais gerais
-  var _movs=_filtrarMovsPeriodo(DB.movs);
+  // totais gerais — exclui movimentações internas (transferência, reforço, ajuste de caixa),
+  // que não são receita nem despesa de verdade, pra bater com o número do DRE
+  var _movs=_filtrarMovsPeriodo(DB.movs).filter(function(m){return !_isMovInterna(m);});
   var _ents=_filtrarEntradasPeriodo(DB.entradas);
   var ent=0,sai=0;
   for(var i=0;i<_movs.length;i++){if(_movs[i].tipo==='entrada')ent+=_movs[i].valor;else sai+=_movs[i].valor;}
@@ -9067,14 +9187,18 @@ function _finRelatorio(){
   for(var _ci=0;_ci<_allCats.length;_ci++)catCores[_allCats[_ci].nome]=_allCats[_ci].cor;
   catCores['Sangria']='#f97316';catCores['Funcionarios']='#3b82f6';
 
-  // Agrupa categorias — exclui transferências entre contas (não são receita nem despesa)
+  // Agrupa categorias — exclui movimentos internos (transferência, reforço, ajuste de
+  // caixa, sangria) que não são receita nem despesa de verdade, usando a mesma função
+  // já usada nas outras abas (Resumo, Movimentações, Centro de Custo) pra ficar consistente.
   var despCats={},recCats={};
   var totalDesp=0,totalRec=0;
   for(var i=0;i<_movs.length;i++){
     var m=_movs[i];
-    if(m.cat==='Transferencia')continue; // transferência entre contas não entra no DRE
-    if(m.cat==='Ajuste de Caixa')continue; // ajuste contábil interno não entra no DRE
-    if(m.cat==='Outros Recebimentos')continue; // sangria/reforço interno não entra no DRE
+    if(_isMovInterna(m))continue; // transferência/reforço/ajuste/sangria — movimento interno
+    // Compra de material já é contabilizada separadamente como CMV (via cmv/comprasPeriodo,
+    // calculado a partir das pesagens). Se ela também entrasse aqui como despesa comum,
+    // o custo do material seria descontado duas vezes do resultado final.
+    if(m.cat==='Compra')continue;
     if(m.tipo==='saida'){despCats[m.cat]=(despCats[m.cat]||0)+m.valor;totalDesp+=m.valor;}
     else{recCats[m.cat]=(recCats[m.cat]||0)+m.valor;totalRec+=m.valor;}
   }
@@ -9138,7 +9262,7 @@ function _finRelatorio(){
 
   // Separar despesas por categoria
   var despFolha=despCats['Salario']||despCats['Funcionarios']||0;
-  var despFinanc=(despCats['Impostos']||0);
+  var despFinanc=(despCats['Impostos']||0)+(despCats['Imposto']||0);
   var despOpPura=totalDesp-despFolha-despFinanc;
   var despOp=totalDesp;
   var resultado=recLiq+outrasRec-despOp-(_regimeComp?contasPendComp:0)+(_regimeComp?recReceberComp:0);
@@ -9840,11 +9964,18 @@ function _finMovs(){
     return true;
   });
 
-  // Totais dos filtrados
-  var _totEnt=0,_totSai=0;
+  // Totais dos filtrados — exclui movimentações internas (transferência, reforço, ajuste),
+  // senão o "Saldo" mostrado aqui não bate com o Resultado do DRE pro mesmo período.
+  // A lista continua mostrando todos os lançamentos (internos ficam com opacidade reduzida).
+  var _totEnt=0,_totSai=0,_totIntEnt=0,_totIntSai=0;
   for(var i=0;i<_filtrados.length;i++){
-    if(_filtrados[i].tipo==='entrada') _totEnt+=_filtrados[i].valor;
-    else _totSai+=_filtrados[i].valor;
+    var _fm=_filtrados[i];
+    if(_isMovInterna(_fm)){
+      if(_fm.tipo==='entrada')_totIntEnt+=_fm.valor;else _totIntSai+=_fm.valor;
+      continue;
+    }
+    if(_fm.tipo==='entrada') _totEnt+=_fm.valor;
+    else _totSai+=_fm.valor;
   }
 
   // Filtros visuais
@@ -9878,7 +10009,8 @@ function _finMovs(){
     +'<div style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:7px 13px;text-align:center">'
     +'<div style="font-size:10px;color:var(--mt)">Total</div>'
     +'<div style="font-size:14px;font-weight:700;color:var(--tx)">'+_filtrados.length+'</div></div>'
-    +'</div>';
+    +'</div>'
+    +((_totIntEnt||_totIntSai)?'<div style="font-size:10px;color:var(--mt);margin-bottom:10px">&#8646; Não incluído acima: '+fR(_totIntEnt)+' em transferências/reforços recebidos e '+fR(_totIntSai)+' enviados — são movimentos internos, não receita nem despesa.</div>':'');
 
   // Linhas de movimentação com botões editar/excluir
   var rows='';
@@ -9903,9 +10035,9 @@ function _finMovs(){
       // Botões ação — transferências só têm excluir (desfazem os dois lados)
       +'<div style="display:flex;gap:4px;flex-shrink:0">'
       +(m.transfId
-        ?'<button onclick="excluirMov(\''+m.id+'\')" title="Excluir e estornar" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">&#128465;</button>'
-        :'<button onclick="editarMov(\''+m.id+'\')" title="Editar" style="background:var(--s2);border:1px solid var(--bd);color:var(--mt);border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">&#9998;</button>'
-        +'<button onclick="excluirMov(\''+m.id+'\')" title="Excluir e estornar" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">&#128465;</button>')
+        ?'<button onclick="excluirMov('+m.id+')" title="Excluir e estornar" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">&#128465;</button>'
+        :'<button onclick="editarMov('+m.id+')" title="Editar" style="background:var(--s2);border:1px solid var(--bd);color:var(--mt);border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">&#9998;</button>'
+        +'<button onclick="excluirMov('+m.id+')" title="Excluir e estornar" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer">&#128465;</button>')
       +'</div>'
       +'</div>';
   }
@@ -9943,10 +10075,13 @@ function editarMov(id){
     +'<div class="fld"><label>Valor R$</label><input class="inp" type="number" inputmode="decimal" id="emov-val" value="'+m.valor+'"></div>'
     +'<div class="fld"><label>Conta</label><select class="inp" id="emov-conta">'+contaOpts+'</select></div>'
     +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Categoria</label><select class="inp" id="emov-cat">'+catOpts+'</select></div>'
+    +'<div class="fld"><label>Data</label><input class="inp" type="date" id="emov-data" value="'+_isoDateBR(m.data)+'"></div>'
+    +'</div>'
     +'<div class="al aly" style="font-size:11px;margin-bottom:8px">&#9888; Alterar o valor estorna a diferença na conta bancária automaticamente.</div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn" onclick="salvarEdicaoMov(\''+id+'\')">Salvar</button></div></div>',440);
+    +'<button class="btn" onclick="salvarEdicaoMov('+id+')">Salvar</button></div></div>',440);
 }
 function salvarEdicaoMov(id){
   var m=null;var idx=-1;
@@ -9956,6 +10091,8 @@ function salvarEdicaoMov(id){
   var novoVal=parseFloat(document.getElementById('emov-val').value)||0;
   var novaConta=document.getElementById('emov-conta').value;
   var novaCat=document.getElementById('emov-cat').value;
+  var dataEl=document.getElementById('emov-data');
+  var novaData=dataEl&&dataEl.value?dataEl.value.split('-').reverse().join('/'):m.data;
   if(!novoDesc||novoVal<=0){alert('Descrição e valor são obrigatórios.');return;}
   // Estorna o valor antigo na conta antiga
   for(var i=0;i<DB.contas.length;i++){
@@ -9974,7 +10111,7 @@ function salvarEdicaoMov(id){
     }
   }
   // Atualiza o movimento
-  m.desc=novoDesc;m.valor=novoVal;m.conta=novaConta;m.cat=novaCat;
+  m.desc=novoDesc;m.valor=novoVal;m.conta=novaConta;m.cat=novaCat;m.data=novaData;
   _auditLog('Movimentação editada',novoDesc+' — '+fR(novoVal));
   saveDB();closeM();
   document.getElementById('fin-content').innerHTML=_finRender('movs');
@@ -11026,10 +11163,12 @@ function mHistCR(id){
 // ══════════════════════════════════════════════════════════════
 function _finCentros(){
   if(!DB.centroCusto)DB.centroCusto=[];
-  // Agrupa movimentos por centro de custo
+  // Agrupa movimentos por centro de custo — respeita o período selecionado no topo do
+  // Financeiro (antes somava tudo desde o início, ignorando o filtro de período)
+  var _movsCC=_filtrarMovsPeriodo(DB.movs);
   var centroMap={};
-  for(var i=0;i<DB.movs.length;i++){
-    var m=DB.movs[i];
+  for(var i=0;i<_movsCC.length;i++){
+    var m=_movsCC[i];
     var cc=m.centroCusto||'Sem Centro';
     if(!centroMap[cc])centroMap[cc]={entradas:0,saidas:0,movs:[]};
     if(m.tipo==='entrada')centroMap[cc].entradas+=m.valor;
@@ -11051,7 +11190,7 @@ function _finCentros(){
     rows+='<div style="background:var(--s2);border-radius:var(--r);padding:13px;margin-bottom:8px;border:1px solid var(--bd);border-left:4px solid '+cor+'">'+'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+'<div style="display:flex;align-items:center;gap:8px">'+'<div style="width:12px;height:12px;border-radius:50%;background:'+cor+'"></div>'+'<span style="font-size:13px;font-weight:700">'+cc+'</span>'+'<span style="font-size:10px;color:var(--mt)">'+d.movs.length+' mov.</span>'+'</div>'+(cc!=='Sem Centro'&&ccDef?'<button onclick="delCentro(\''+cc+'\')" style="background:none;border:none;color:var(--mt);font-size:13px;cursor:pointer;padding:2px 5px">&#128465;</button>':'')+'</div>'+'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">'+'<div><div style="font-size:10px;color:var(--mt)">Entradas</div><div style="font-size:13px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(d.entradas)+'</div></div>'+'<div><div style="font-size:10px;color:var(--mt)">Saidas</div><div style="font-size:13px;font-weight:700;color:var(--rd);font-family:monospace">'+fR(d.saidas)+'</div></div>'+'<div><div style="font-size:10px;color:var(--mt)">Resultado</div><div style="font-size:13px;font-weight:700;color:'+(positivo?'var(--gr)':'var(--rd)')+';font-family:monospace">'+fR(res)+'</div></div>'+'</div></div>';
   }
   if(!centros.length)rows='<div style="text-align:center;padding:24px;color:var(--mt)">Nenhum centro cadastrado ainda.<br>Ao lancar movimentacoes, voce pode informar o centro.</div>';
-  return '<div class="fc">'+'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">'+'<div style="font-size:11px;color:var(--mt)">Agrupa receitas e despesas por operacao</div>'+'<button class="btn" onclick="mNovoCentro()">+ Novo Centro</button>'+'</div>'+'<div class="al alb" style="font-size:12px;margin-bottom:8px">&#128161; Ao lancar uma movimentacao manual (+ Entrada / - Saida), selecione o centro de custo para classificar.</div>'+'<div class="card" style="padding:8px">'+rows+'</div>'+'</div>';
+  return '<div class="fc">'+'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">'+'<div style="font-size:11px;color:var(--mt)">Agrupa receitas e despesas por operacao — respeita o periodo selecionado acima</div>'+'<button class="btn" onclick="mNovoCentro()">+ Novo Centro</button>'+'</div>'+'<div class="al alb" style="font-size:12px;margin-bottom:8px">&#128161; Ao lancar uma movimentacao manual (+ Entrada / - Saida), selecione o centro de custo para classificar.</div>'+'<div class="card" style="padding:8px">'+rows+'</div>'+'</div>';
 }
 function mNovoCentro(){
   if(!DB.centroCusto)DB.centroCusto=[];
@@ -11195,6 +11334,12 @@ function saveEditCat(id,tipo){
 function delCat(id,tipo){
   var arr=tipo==='entrada'?DB.cats.entrada:DB.cats.saida;
   var nome='';for(var i=0;i<arr.length;i++){if(arr[i].id===id){nome=arr[i].nome;break;}}
+  // "Compra" e "Venda" são geradas automaticamente pela Pesagem — excluir a categoria não
+  // impede novos lançamentos com esse nome, só esconde ela da tela de gestão (fica "órfã").
+  if(nome==='Compra'||nome==='Venda'||nome==='Logistica Reversa'||nome==='A Receber'||nome==='Venda Unidade'){
+    alert('A categoria "'+nome+'" é usada automaticamente pela Pesagem e não pode ser excluída.');
+    return;
+  }
   confirmar('Excluir a categoria <b>'+nome+'</b>?',function(){
     var arr2=tipo==='entrada'?DB.cats.entrada:DB.cats.saida;
     for(var i=0;i<arr2.length;i++){if(arr2[i].id===id){arr2.splice(i,1);break;}}
@@ -11207,7 +11352,10 @@ function mMov(tipo){
   var cO='';for(var i=0;i<DB.contas.length;i++)cO+='<option>'+DB.contas[i].nome+'</option>';
   if(!DB.centroCusto)DB.centroCusto=[];
   var ccO='<option value="">Nenhum</option>';for(var i=0;i<DB.centroCusto.length;i++)ccO+='<option value="'+DB.centroCusto[i].nome+'">'+DB.centroCusto[i].nome+'</option>';
-  var catsArr=tipo==='entrada'?DB.cats.entrada:DB.cats.saida;
+  // "Compra" é reservada para o custo de material apurado automaticamente na Pesagem —
+  // não aparece aqui pra evitar misturar compra de material com qualquer outra compra manual
+  // (equipamento, combustível, etc.), o que corrompia o cálculo de margem no DRE.
+  var catsArr=tipo==='entrada'?DB.cats.entrada:DB.cats.saida.filter(function(c){return c.nome!=='Compra';});
   var catsH=_buildCatBtns(catsArr,'mv');
   openM(tipo==='entrada'?'&#8593; Entrada de Dinheiro':'&#8595; Saida de Dinheiro',
     '<div class="mf">'
