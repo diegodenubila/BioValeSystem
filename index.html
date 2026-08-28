@@ -374,6 +374,8 @@ var DB={
   preAgendaLimite:3,
   eventos:[],
   producoes:[],       // Controle de Produção
+  gestoraHistorico:[], // conversa/análise da Gestora IA — persistida pra não sumir ao trocar de aba
+  gestoraPeriodoSalvo:null,
   prodVinculos:{},    // {materialId: tabelaVendaId} — qual tabela usar pra projetar cada material
   prodCustoTab:null,  // id da tabela de compra usada como custo de entrada
   prodMatEntrada:['Eletrônico p/ desmontar','Motor p/ desmontar','Alumínio p/ limpar','Informática','Telecomunicação','Linha Branca','Sucata Geral'],
@@ -1248,7 +1250,7 @@ function saveDB(){
       atendNum:DB.atendNum,produtos:DB.produtos,movs:DB.movs,contas:DB.contas,
       revenda:DB.revenda,revendaCats:DB.revendaCats,revendaStates:DB.revendaStates,
       entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
-      transf:DB.transf,coletas:DB.coletas,preAgenda:DB.preAgenda,preAgendaLimite:DB.preAgendaLimite,eventos:DB.eventos,producoes:DB.producoes,prodVinculos:DB.prodVinculos,prodCustoTab:DB.prodCustoTab,prodMatEntrada:DB.prodMatEntrada,prodCustoEntrada:DB.prodCustoEntrada,funcs:DB.funcs,clientes:DB.clientes,
+      transf:DB.transf,coletas:DB.coletas,preAgenda:DB.preAgenda,preAgendaLimite:DB.preAgendaLimite,eventos:DB.eventos,producoes:DB.producoes,prodVinculos:DB.prodVinculos,prodCustoTab:DB.prodCustoTab,prodMatEntrada:DB.prodMatEntrada,prodCustoEntrada:DB.prodCustoEntrada,gestoraHistorico:DB.gestoraHistorico,gestoraPeriodoSalvo:DB.gestoraPeriodoSalvo,funcs:DB.funcs,clientes:DB.clientes,
       gerarTabsCustom:DB.gerarTabsCustom,
       pclCatsCustom:DB.pclCatsCustom||{},
       pclCatOrder:DB.pclCatOrder||[],
@@ -1502,6 +1504,8 @@ function _applySnap(s){
     });
   }
   if(s.producoes)DB.producoes=s.producoes;
+  if(s.gestoraHistorico)DB.gestoraHistorico=s.gestoraHistorico;
+  if(s.gestoraPeriodoSalvo)DB.gestoraPeriodoSalvo=s.gestoraPeriodoSalvo;
   if(s.prodVinculos)DB.prodVinculos=s.prodVinculos;
   if(s.prodCustoTab!=null)DB.prodCustoTab=s.prodCustoTab;
   if(s.prodMatEntrada)DB.prodMatEntrada=s.prodMatEntrada;
@@ -8350,6 +8354,27 @@ function _finGestora(){
     var sel=p.id===perAtual;
     return '<button onclick="_gestorSetPeriodo(\''+p.id+'\')" style="padding:6px 14px;border-radius:20px;border:1px solid '+(sel?'#d4af37':'var(--bd)')+';background:'+(sel?'rgba(212,175,55,.15)':'var(--s2)')+';color:'+(sel?'#d4af37':'var(--mt)')+';font-size:12px;cursor:pointer;font-family:inherit;font-weight:'+(sel?'700':'400')+'">'+p.lbl+'</button>';
   }).join('');
+
+  // Se já existe uma análise salva, reconstrói a tela em vez de começar em branco —
+  // resolve o problema de "sumir" ao trocar de aba, já que agora fica em DB.gestoraHistorico.
+  var temHistorico=DB.gestoraHistorico&&DB.gestoraHistorico.length>0;
+  var resultH='',chatH='',quickDisplay='none',askDisplay='none',btnLbl='&#128188; Analisar Financeiro Completo';
+  if(temHistorico){
+    if(DB.gestoraPeriodoSalvo)_finPeriodo=DB.gestoraPeriodoSalvo;
+    _gestorColetarDados(); // repopula window._gestoraDadosCache com os dados atuais
+    var primeiraResp=DB.gestoraHistorico[1]?DB.gestoraHistorico[1].content:'';
+    resultH=_gestorRenderDados()+'<div id="gestora-analise-texto">'+_gestoraFormatarMsg(primeiraResp)+'</div>';
+    quickDisplay='block';askDisplay='block';btnLbl='&#128260; Atualizar Análise';
+    for(var hi=2;hi<DB.gestoraHistorico.length;hi++){
+      var m=DB.gestoraHistorico[hi];
+      if(m.role==='user'){
+        chatH+='<div style="margin-bottom:10px"><div style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:10px 14px;margin-left:30px;font-size:13px">'+m.content+'</div></div>';
+      }else{
+        chatH+='<div style="background:linear-gradient(135deg,rgba(212,175,55,.06),rgba(34,197,94,.04));border:1px solid rgba(212,175,55,.2);border-radius:var(--r);padding:14px;margin-bottom:10px;font-size:13px;line-height:1.7">'+_gestoraFormatarMsg(m.content)+'</div>';
+      }
+    }
+  }
+
   return '<div class="fc" id="gestora-wrap" style="padding-bottom:100px">'
     // Header
     +'<div style="background:linear-gradient(135deg,#0d1b2a,#1a2a1a);border:1px solid rgba(212,175,55,.2);border-radius:var(--r2);padding:20px;margin-bottom:12px">'
@@ -8364,22 +8389,22 @@ function _finGestora(){
     +'</div>'
     // Botão analisar
     +'<div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:16px">'
-    +'<button id="gestora-btn" onclick="_gestorAnalisar()" style="background:linear-gradient(135deg,#b8860b,#d4af37);color:#000;font-size:14px;font-weight:800;padding:14px;border:none;border-radius:var(--r);cursor:pointer;font-family:inherit">&#128188; Analisar Financeiro Completo</button>'
+    +'<button id="gestora-btn" onclick="_gestorAnalisar()" style="background:linear-gradient(135deg,#b8860b,#d4af37);color:#000;font-size:14px;font-weight:800;padding:14px;border:none;border-radius:var(--r);cursor:pointer;font-family:inherit">'+btnLbl+'</button>'
     +'<button onclick="_gestorEmitirRelatorio()" style="background:var(--s1);border:1px solid var(--bd);color:var(--tx);font-size:12px;font-weight:700;padding:14px 16px;border-radius:var(--r);cursor:pointer;font-family:inherit;white-space:nowrap">&#128196; Emitir Relatório</button>'
     +'</div>'
     // Área de resultado
-    +'<div id="gestora-result"></div>'
+    +'<div id="gestora-result">'+resultH+'</div>'
     // Perguntas rápidas
-    +'<div id="gestora-quick" style="display:none;margin-top:16px">'
+    +'<div id="gestora-quick" style="display:'+quickDisplay+';margin-top:16px">'
     +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Perguntas rápidas</div>'
     +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
     +['Quais materiais têm margem abaixo do ideal?','Como está meu fluxo de caixa?','Onde estou perdendo dinheiro?','Top 3 ações para essa semana','Projeção para o próximo mês','Posso aumentar o pró-labore?'].map(function(q){
       return '<button onclick="_gestoraPergunta(\''+q.replace(/'/g,"\\'")+'\',true)" style="background:var(--s2);border:1px solid var(--bd);color:var(--mt);border-radius:20px;padding:6px 14px;font-size:11px;cursor:pointer;font-family:inherit">'+q+'</button>';
     }).join('')+'</div></div>'
     // Chat follow-up
-    +'<div id="gestora-chat" style="margin-top:12px"></div>'
+    +'<div id="gestora-chat" style="margin-top:12px">'+chatH+'</div>'
     // Input livre
-    +'<div id="gestora-ask" style="display:none;margin-top:12px">'
+    +'<div id="gestora-ask" style="display:'+askDisplay+';margin-top:12px">'
     +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Pergunta livre</div>'
     +'<div style="display:flex;gap:8px"><textarea class="inp" id="gestora-inp" rows="2" style="flex:1;resize:none" placeholder="Ex: Devo comprar mais Telefonia Especial?" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();_gestoraPergunta(\'\',false)}"></textarea>'
     +'<button onclick="_gestoraPergunta(\'\',false)" class="btn" style="background:var(--gr);color:#000;height:60px;padding:0 16px;align-self:flex-end">Enviar</button>'
@@ -8630,8 +8655,10 @@ function _gestorColetarDados(){
   var entOp=movsOp.filter(function(m){return m.tipo==='entrada';}).reduce(function(a,m){return a+m.valor;},0);
   var saiOp=movsOp.filter(function(m){return m.tipo==='saida';}).reduce(function(a,m){return a+m.valor;},0);
   var cats={};
-  for(var i=0;i<movs.length;i++){var m=movs[i];if(m.tipo!=='saida')continue;var c=m.cat||'Outros';cats[c]=(cats[c]||0)+m.valor;}
-  var catsArr=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];}).map(function(c){return {cat:c,val:cats[c],pct:sai>0?((cats[c]/sai)*100).toFixed(1):0};});
+  // Usa movsOp (já sem transferência/reforço/ajuste de caixa/sangria) — senão a "Estrutura
+  // de Gastos" mostra movimento interno como se fosse despesa real, distorcendo o gráfico.
+  for(var i=0;i<movsOp.length;i++){var m=movsOp[i];if(m.tipo!=='saida')continue;var c=m.cat||'Outros';cats[c]=(cats[c]||0)+m.valor;}
+  var catsArr=Object.keys(cats).sort(function(a,b){return cats[b]-cats[a];}).map(function(c){return {cat:c,val:cats[c],pct:saiOp>0?((cats[c]/saiOp)*100).toFixed(1):0};});
   var catsStr=catsArr.map(function(x){return '  '+x.cat+': '+fR(x.val)+' ('+x.pct+'% das saídas)';}).join('\n');
   var pendentes=DB.pesagensEmAberto||[];
   var totPend=pendentes.reduce(function(a,p){return a+Math.abs(p.valTotalLiq||p.valTotal||0);},0);
@@ -8723,32 +8750,34 @@ function _gestoraKPI(label,val,cor){
     +'</div>';
 }
 
-var _gestoraHistorico=[];
-
+// Histórico da Gestora agora vive em DB.gestoraHistorico (sincronizado com a nuvem),
+// não some mais ao trocar de aba nem ao fechar o navegador.
 async function _gestorAnalisar(){
   var key=CFG.sistema.anthropicKey||'';
   if(!key){go('configuracoes','ia');return;}
   var btn=document.getElementById('gestora-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳ Analisando...';}
   var dados=_gestorColetarDados();
+  DB.gestoraPeriodoSalvo=_finPeriodo||'mes';
   // Renderiza KPIs e gráficos imediatamente
   var resEl=document.getElementById('gestora-result');
   if(resEl)resEl.innerHTML=_gestorRenderDados()+'<div id="gestora-analise-texto"></div>';
   // Loading no texto
   var textoEl=document.getElementById('gestora-analise-texto');
   if(textoEl)textoEl.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:14px;background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);color:var(--mt);font-size:13px;margin-top:4px"><span style="display:flex;gap:4px"><span style="width:7px;height:7px;border-radius:50%;background:#d4af37;animation:bvPulse .8s ease infinite;display:inline-block"></span><span style="width:7px;height:7px;border-radius:50%;background:#d4af37;animation:bvPulse .8s ease .2s infinite;display:inline-block"></span><span style="width:7px;height:7px;border-radius:50%;background:#d4af37;animation:bvPulse .8s ease .4s infinite;display:inline-block"></span></span>Gestora analisando os dados...</div>';
-  _gestoraHistorico=[];
+  DB.gestoraHistorico=[];
   var prompt='Analise os dados financeiros reais da BioVale:\n\n'+dados+'\n\n'
     +'IMPORTANTE: Os dados visuais (KPIs, gráficos, histórico mensal) já foram exibidos automaticamente. '
-    +'Não repita os números brutos. Foque em INTERPRETAÇÃO e RECOMENDAÇÕES.\n\n'
+    +'Não repita os números brutos. Foque em INTERPRETAÇÃO e RECOMENDAÇÕES. Seja breve — cada item deve caber em 1-2 frases curtas, sem parágrafo longo.\n\n'
     +'Estruture a resposta assim (use exatamente esses títulos):\n\n'
-    +'### Diagnóstico Rápido\n2-3 frases diretas sobre o estado do negócio.\n\n'
-    +'### Pontos de Atenção\nMáximo 3 alertas críticos com ação concreta para cada um.\n\n'
-    +'### Oportunidades Imediatas\nMáximo 3 oportunidades com impacto estimado.\n\n'
-    +'### Plano da Semana\n3 ações específicas para fazer ainda essa semana, em ordem de prioridade.';
+    +'### Diagnóstico Rápido\n2 frases diretas sobre o estado do negócio.\n\n'
+    +'### Pontos de Atenção\nAté 3 alertas. Cada um: 1 frase do problema + 1 frase da ação concreta.\n\n'
+    +'### Oportunidades Imediatas\nAté 3 oportunidades. Cada uma: 1 frase da oportunidade + o impacto estimado em R$ ou %.\n\n'
+    +'### Plano da Semana\n3 ações específicas, uma linha cada, em ordem de prioridade.';
   try{
     var resp=await _gestoraAPI([{role:'user',content:prompt}]);
-    _gestoraHistorico=[{role:'user',content:prompt},{role:'assistant',content:resp}];
+    DB.gestoraHistorico=[{role:'user',content:prompt},{role:'assistant',content:resp}];
+    saveDB();
     if(textoEl)textoEl.innerHTML=_gestoraFormatarMsg(resp);
     var q=document.getElementById('gestora-quick');if(q)q.style.display='block';
     var a=document.getElementById('gestora-ask');if(a)a.style.display='block';
@@ -8759,7 +8788,7 @@ async function _gestorAnalisar(){
 }
 
 async function _gestoraPergunta(q,isQuick){
-  if(!_gestoraHistorico.length){alert('Faça a análise completa primeiro.');return;}
+  if(!DB.gestoraHistorico||!DB.gestoraHistorico.length){alert('Faça a análise completa primeiro.');return;}
   if(!q){var inp=document.getElementById('gestora-inp');q=inp?inp.value.trim():'';if(q&&inp)inp.value='';}
   if(!q)return;
   var chat=document.getElementById('gestora-chat');
@@ -8769,14 +8798,15 @@ async function _gestoraPergunta(q,isQuick){
     uDiv.innerHTML='<div style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:10px 14px;margin-left:30px;font-size:13px">'+q+'</div>';
     chat.appendChild(uDiv);
   }
-  var msgs=[..._gestoraHistorico,{role:'user',content:q}];
-  _gestoraHistorico.push({role:'user',content:q});
+  var msgs=[...DB.gestoraHistorico,{role:'user',content:q}];
+  DB.gestoraHistorico.push({role:'user',content:q});
   var loadDiv=document.createElement('div');
   loadDiv.innerHTML='<div style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);color:var(--mt);font-size:12px;margin-bottom:10px"><span style="display:flex;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:#d4af37;animation:bvPulse .8s ease infinite;display:inline-block"></span><span style="width:6px;height:6px;border-radius:50%;background:#d4af37;animation:bvPulse .8s ease .2s infinite;display:inline-block"></span></span>Analisando...</div>';
   if(chat)chat.appendChild(loadDiv);
   try{
     var resp=await _gestoraAPI(msgs);
-    _gestoraHistorico.push({role:'assistant',content:resp});
+    DB.gestoraHistorico.push({role:'assistant',content:resp});
+    saveDB();
     loadDiv.innerHTML='<div style="background:linear-gradient(135deg,rgba(212,175,55,.06),rgba(34,197,94,.04));border:1px solid rgba(212,175,55,.2);border-radius:var(--r);padding:14px;margin-bottom:10px;font-size:13px;line-height:1.7">'+_gestoraFormatarMsg(resp)+'</div>';
   }catch(e){loadDiv.innerHTML='<div class="al alr" style="margin-bottom:10px">Erro: '+e.message+'</div>';}
   loadDiv.scrollIntoView({behavior:'smooth',block:'end'});
@@ -8801,8 +8831,8 @@ async function _gestoraAPI(msgs){
   var resp=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2000,
-      system:'Você é uma gestora financeira especializada em empresas de reciclagem e gestão de resíduos eletrônicos (REEE) no Brasil, trabalhando exclusivamente para a BioVale de Ipatinga/MG.\n\nCONTEXTO COMPLETO DO NEGÓCIO:\n\nModelo de operação: A BioVale adquire resíduos eletrônicos (e-lixo) de três formas — (1) compra pagando por kg de pessoas físicas (CPF) e empresas (CNPJ), (2) recebe doações de empresas com CNPJ que precisam de destinação correta com emissão de MTR, e (3) recebe doações de pessoas físicas (CPF). O material recebido é desmontado, triado e limpo internamente. Componentes de valor são vendidos por kg para compradores especializados (fundições, exportadores, recicladores de metais preciosos). Equipamentos funcionais são revendidos por unidade.\n\nNuances críticas do modelo:\n- O preço de compra do material é imediato, mas o retorno vem semanas ou meses depois na venda — há um ciclo financeiro que exige capital de giro\n- O valor real de um lote só é conhecido após desmontagem — uma "placa pesada" pode conter processadores dourados que mudam completamente a rentabilidade\n- Há perdas e descarte — nem todo material comprado gera receita; plásticos, capacitores e materiais sem valor precisam de destinação\n- Volume comprado ≠ volume vendido — a diferença é perda operacional normal do processo\n- Preços de compra são diretamente indexados às cotações internacionais de ouro, cobre, paládio e outros metais\n- O MTR (Manifesto de Transporte de Resíduos) é um diferencial competitivo real — permite atender empresas que exigem conformidade legal no descarte\n\nDois mercados completamente diferentes:\n- FORNECEDORES (quem traz material): pessoas físicas que limpam casa/escritório, pequenas empresas, grandes corporações com programas de descarte\n- COMPRADORES (quem compra o processado): fundições, exportadores, recicladores de metais preciosos, compradores de componentes\n\nSazonalidade:\n- Fim de ano: empresas descartam mais equipamentos (renovação de TI)\n- Janeiro-fevereiro: volume menor, mercado mais fraco\n- Cotação de metais: volatilidade constante impacta margens\n\nDiferenças dos comércios tradicionais:\n- Não existe "estoque de prateleira" — o material processado é commodity\n- Não há markup fixo — a margem depende do preço de compra do material E da cotação dos metais no momento da venda\n- O custo principal (compra de material) é variável e imprevisível\n- A receita de doações tem custo zero de aquisição mas exige gestão de MTR\n- Logística de coleta é custo operacional relevante\n\nSEU PAPEL: Analisar os dados com profundidade considerando TODAS essas especificidades. Nunca dar conselhos genéricos de varejo. Sempre contextualizar com a realidade de reciclagem. Seja direta, honesta e acionável. Use ### para seções, **negrito** para destaques, ⚠️/🚨/✅/🎯 para alertas. Sem repetir dados brutos já exibidos na tela.',
+    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1100,
+      system:'Você é uma gestora financeira especializada em empresas de reciclagem e gestão de resíduos eletrônicos (REEE) no Brasil, trabalhando exclusivamente para a BioVale de Ipatinga/MG.\n\nCONTEXTO COMPLETO DO NEGÓCIO:\n\nModelo de operação: A BioVale adquire resíduos eletrônicos (e-lixo) de três formas — (1) compra pagando por kg de pessoas físicas (CPF) e empresas (CNPJ), (2) recebe doações de empresas com CNPJ que precisam de destinação correta com emissão de MTR, e (3) recebe doações de pessoas físicas (CPF). O material recebido é desmontado, triado e limpo internamente. Componentes de valor são vendidos por kg para compradores especializados (fundições, exportadores, recicladores de metais preciosos). Equipamentos funcionais são revendidos por unidade.\n\nNuances críticas do modelo:\n- O preço de compra do material é imediato, mas o retorno vem semanas ou meses depois na venda — há um ciclo financeiro que exige capital de giro\n- O valor real de um lote só é conhecido após desmontagem — uma "placa pesada" pode conter processadores dourados que mudam completamente a rentabilidade\n- Há perdas e descarte — nem todo material comprado gera receita; plásticos, capacitores e materiais sem valor precisam de destinação\n- Volume comprado ≠ volume vendido — a diferença é perda operacional normal do processo\n- Preços de compra são diretamente indexados às cotações internacionais de ouro, cobre, paládio e outros metais\n- O MTR (Manifesto de Transporte de Resíduos) e o CDF (Certificado de Destinação Final) são diferenciais competitivos reais — permitem atender empresas que exigem conformidade legal no descarte\n\nDois mercados completamente diferentes:\n- FORNECEDORES (quem traz material): pessoas físicas que limpam casa/escritório, pequenas empresas, grandes corporações com programas de descarte\n- COMPRADORES (quem compra o processado): fundições, exportadores, recicladores de metais preciosos, compradores de componentes\n\nSazonalidade:\n- Fim de ano: empresas descartam mais equipamentos (renovação de TI)\n- Janeiro-fevereiro: volume menor, mercado mais fraco\n- Cotação de metais: volatilidade constante impacta margens\n\nDiferenças dos comércios tradicionais:\n- Não existe "estoque de prateleira" — o material processado é commodity\n- Não há markup fixo — a margem depende do preço de compra do material E da cotação dos metais no momento da venda\n- O custo principal (compra de material) é variável e imprevisível\n- A receita de doações tem custo zero de aquisição mas exige gestão de MTR\n- Logística de coleta é custo operacional relevante\n\nMARCO REGULATÓRIO (use quando fizer sentido, sem forçar):\n- PNRS — Lei nº 12.305/2010, art. 33: fabricantes, importadores, distribuidores e comerciantes de eletroeletrônicos são OBRIGADOS por lei a estruturar logística reversa — isso torna o serviço da BioVale (MTR + CDF) uma necessidade de compliance, não só um diferencial\n- Decreto nº 10.240/2020: regulamenta o sistema de logística reversa de eletroeletrônicos no Brasil\n- NBR 16156: norma técnica da manufatura reversa — descaracterização total do equipamento, segregação por periculosidade (NBR 10004)\n- Oportunidade pouco explorada: o Decreto nº 11.413/2023 criou certificados de crédito de reciclagem (como o CCRLR) — empresas obrigadas a fazer logística reversa podem COMPRAR esses créditos de operadores certificados em vez de estruturar coleta própria. Se a BioVale tiver as certificações certas, isso pode ser uma fonte de receita adicional além da venda de material processado. Mencione essa possibilidade quando o dono perguntar sobre novas fontes de receita ou diversificação.\n\nCOMO SE COMUNICAR (siga rigorosamente):\n- Fale como alguém explicando pra um dono de empresa que não é da área financeira — nada de jargão técnico sem explicar (se usar um termo técnico, explique em poucas palavras o que significa)\n- Frases curtas. Parágrafos de no máximo 2-3 linhas\n- Direto ao ponto — corte qualquer coisa que não mude a decisão do dono\n- Prefira números concretos e comparações simples ("isso é quase 2 meses de aluguel") a explicações abstratas\n- NUNCA escreva um parágrafo de introdução ou conclusão genérica — vá direto pro conteúdo de cada seção\n\nSEU PAPEL: Analisar os dados com profundidade considerando TODAS essas especificidades. Nunca dar conselhos genéricos de varejo. Sempre contextualizar com a realidade de reciclagem. Seja direta, honesta e acionável. Use ### para seções, **negrito** para destaques, ⚠️/🚨/✅/🎯 para alertas. Sem repetir dados brutos já exibidos na tela.',
       messages:msgs})
   });
   if(!resp.ok){var e=await resp.text();throw new Error(resp.status+': '+e);}
@@ -12771,6 +12801,16 @@ function _prodPrecoVenda(prodId){
   return 0;
 }
 function _prodCustoEntrada(matNome){return DB.prodCustoEntrada[matNome]||0;}
+// Custo de entrada de uma produção: usa o preço de compra do produto real vinculado
+// (novo fluxo) quando existir, senão cai pro custo manual antigo por nome (produções
+// registradas antes dessa mudança, que só tinham um texto solto como entrada).
+function _prodCustoEntradaP(p){
+  if(p.matEntradaId){
+    var prod=gP(p.matEntradaId);
+    if(prod&&prod.vC)return prod.vC;
+  }
+  return _prodCustoEntrada(p.matEntrada);
+}
 function _nomeTab(tabId){for(var i=0;i<DB.tabelas.length;i++)if(String(DB.tabelas[i].id)===String(tabId))return DB.tabelas[i].nome;return '?';}
 
 // Filtro de período
@@ -12852,30 +12892,49 @@ function _prodRegistro(abertas,hjFech){
 
 // ── NOVA PRODUÇÃO (usa lista manual de materiais de entrada) ──
 function mNovaProdBV(){
-  var funcOpts=DB.funcs.map(function(f){return '<option value="'+f.nome+'">'+f.nome+'</option>';}).join('');
-  var matOpts=(DB.prodMatEntrada||[]).map(function(m){return '<option value="'+m+'">'+m+'</option>';}).join('');
+  var funcOpts='<option value="">-- Selecione --</option>';
+  funcOpts+=DB.funcs.map(function(f){return '<option value="'+f.nome+'">'+f.nome+'</option>';}).join('');
+  funcOpts+='<option value="__outro__">&#9997; Outra pessoa (sócio, ajuda pontual...)</option>';
+  var matOpts='<option value="">-- Selecione --</option>'+DB.produtos.map(function(p){return '<option value="'+p.id+'">'+p.ic+' '+p.nome+' (Est: '+fKg(p.est||0)+'kg)</option>';}).join('');
   openM('⚙️ Nova Produção',
     '<div class="mf">'
-    +'<div class="fld"><label>Funcionário *</label><select class="inp" id="np-func">'+funcOpts+'</select></div>'
-    +'<div class="fld"><label>Material de entrada *</label><select class="inp" id="np-mat">'+matOpts+'</select></div>'
+    +'<div class="fld"><label>Quem está fazendo? *</label><select class="inp" id="np-func" onchange="_toggleNpOutro()">'+funcOpts+'</select>'
+    +'<input class="inp" id="np-func-outro" placeholder="Nome de quem vai fazer a produção" style="display:none;margin-top:7px"></div>'
+    +'<div class="fld"><label>Material de entrada (o que vai desmontar) *</label><select class="inp" id="np-mat">'+matOpts+'</select></div>'
+    +'<div class="fld"><label>Apelido do lote (opcional)</label><input class="inp" id="np-lote" placeholder="Ex: Lote de PC Misto (normal + Slim)">'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Só pra você identificar depois — não afeta o estoque. Ajuda a comparar o rendimento médio de lotes parecidos ao longo do tempo (útil pra decidir quanto pagar num leilão, por exemplo).</div></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Peso bruto (kg) *</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="np-peso"></div>'
     +'<div class="fld"><label>Tara (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="np-tara"></div>'
     +'</div>'
-    +'<div style="font-size:10px;color:var(--mt);margin-bottom:12px">Tara = peso do recipiente. Peso líquido = bruto − tara</div>'
+    +'<div style="font-size:10px;color:var(--mt);margin-bottom:12px">Tara = peso do recipiente. Peso líquido = bruto − tara. O peso líquido já sai do estoque do material de entrada agora, na abertura.</div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="salvarNovaProdBV()">Iniciar Produção</button></div>'
-    +'</div>',500);
+    +'</div>',520);
+}
+function _toggleNpOutro(){
+  var sel=document.getElementById('np-func');
+  var outro=document.getElementById('np-func-outro');
+  if(!sel||!outro)return;
+  if(sel.value==='__outro__'){outro.style.display='block';outro.focus();}
+  else outro.style.display='none';
 }
 function salvarNovaProdBV(){
-  var func=document.getElementById('np-func').value;
-  var mat=document.getElementById('np-mat').value;
+  var selVal=document.getElementById('np-func').value;
+  var func=selVal==='__outro__'?document.getElementById('np-func-outro').value.trim():selVal;
+  var matId=parseFloat(document.getElementById('np-mat').value);
+  var lote=document.getElementById('np-lote').value.trim();
   var peso=parseFloat(document.getElementById('np-peso').value)||0;
   var tara=parseFloat(document.getElementById('np-tara').value)||0;
-  if(!func){toast('Selecione o funcionário!','var(--rd)');return;}
-  if(!mat){toast('Selecione o material!','var(--rd)');return;}
+  if(!func){toast('Selecione ou digite quem está fazendo!','var(--rd)');return;}
+  if(!matId){toast('Selecione o material de entrada!','var(--rd)');return;}
   if(peso<=0){toast('Informe o peso!','var(--rd)');return;}
+  var prodEnt=gP(matId);
+  var pesoEntrada=+(peso-tara).toFixed(3);
+  // Desconta do estoque na abertura — o material sai da pilha bruta assim que é
+  // separado pra desmontar, mesmo antes de terminar o processo.
+  if(prodEnt)prodEnt.est=+((prodEnt.est||0)-pesoEntrada).toFixed(3);
   var h=new Date();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
-  DB.producoes.push({id:nid(),func:func,matEntrada:mat,pesoEntrada:peso-tara,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,saidas:[],status:'aberta'});
+  DB.producoes.push({id:nid(),func:func,matEntradaId:matId,matEntrada:prodEnt?prodEnt.nome:'?',lote:lote,pesoEntrada:pesoEntrada,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,saidas:[],status:'aberta'});
   saveDB();closeM();go('producao');toast('Produção iniciada!','var(--gr)');
 }
 
@@ -12901,7 +12960,8 @@ function mVerProdBV(id){
 
   var html='<div class="mf">'
     +'<div style="font-size:12px;color:var(--mt)">👷 '+p.func+' · '+p.data+' '+p.hora+'</div>'
-    +'<div style="font-size:16px;font-weight:800;margin:4px 0 10px">'+p.matEntrada+'</div>'
+    +'<div style="font-size:16px;font-weight:800;margin:4px 0 2px">'+p.matEntrada+'</div>'
+    +(p.lote?'<div style="font-size:12px;color:var(--pu);margin-bottom:10px">📦 '+p.lote+'</div>':'<div style="margin-bottom:10px"></div>')
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
     +'<div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:800">'+fKg(p.pesoEntrada)+'</div><div style="font-size:10px;color:var(--mt)">KG ENTRADA</div></div>'
     +'<div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:800;color:var(--gr)">'+fKg(ts)+'</div><div style="font-size:10px;color:var(--mt)">KG GERADOS</div></div>'
@@ -12943,15 +13003,43 @@ function remSaidaProdBV(prodId,idx){
   for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){DB.producoes[i].saidas.splice(idx,1);break;}
   saveDB();closeM();mVerProdBV(prodId);
 }
+// Fechar produção: se sobrou peso não registrado como saída, pergunta o destino
+// (perda ou material ainda não desmontado) antes de distribuir tudo pro estoque real.
 function fecharProdBV(prodId){
-  for(var i=0;i<DB.producoes.length;i++){
-    if(DB.producoes[i].id===prodId){
-      if(!DB.producoes[i].saidas.length){toast('Registre pelo menos um material!','var(--rd)');return;}
-      DB.producoes[i].status='fechada';
-      var h=new Date();DB.producoes[i].horaFim=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
-      break;
-    }
+  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
+  if(!p)return;
+  if(!p.saidas.length){toast('Registre pelo menos um material!','var(--rd)');return;}
+  var somaSaidas=p.saidas.reduce(function(s,x){return s+x.peso;},0);
+  var sobra=+(p.pesoEntrada-somaSaidas).toFixed(3);
+  if(sobra>0.001)mResolverSobraProd(prodId,sobra);
+  else _finalizarFechamentoProd(prodId,0,null);
+}
+function mResolverSobraProd(prodId,sobra){
+  openM('⚖️ Sobrou '+fKg(sobra)+'kg',
+    '<div class="mf">'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:14px">Você registrou menos peso de saída do que entrou. O que aconteceu com esses '+fKg(sobra)+'kg que faltam?</div>'
+    +'<button class="btn" style="background:var(--rd);margin-bottom:8px;width:100%" onclick="_finalizarFechamentoProd('+prodId+','+sobra+',\'perda\')">🗑️ Foi perda / descarte (sucata, poeira, restos sem valor)</button>'
+    +'<button class="btn" style="background:var(--bl);width:100%" onclick="_finalizarFechamentoProd('+prodId+','+sobra+',\'pendente\')">⏳ Não deu tempo de desmontar (volta pro estoque)</button>'
+    +'<button class="btnO bOgr" style="margin-top:10px;width:100%" onclick="mVerProdBV('+prodId+')">Cancelar, quero registrar mais saída</button>'
+    +'</div>',460);
+}
+function _finalizarFechamentoProd(prodId,sobra,destinoSobra){
+  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
+  if(!p)return;
+  // Credita cada material de saída no estoque real, agora que a produção fechou de vez
+  p.saidas.forEach(function(s){
+    var prod=gP(s.prodId);
+    if(prod)prod.est=+((prod.est||0)+s.peso).toFixed(3);
+  });
+  // Sobra: se ainda não foi desmontada, volta pro estoque do material de entrada.
+  // Se foi perda, não volta pra lugar nenhum — já saiu do estoque na abertura.
+  if(sobra>0.001&&destinoSobra==='pendente'&&p.matEntradaId){
+    var origem=gP(p.matEntradaId);
+    if(origem)origem.est=+((origem.est||0)+sobra).toFixed(3);
   }
+  p.sobra=sobra;p.destinoSobra=destinoSobra;
+  p.status='fechada';
+  var h=new Date();p.horaFim=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
   saveDB();closeM();go('producao');toast('Produção fechada!','var(--gr)');
 }
 
@@ -12970,18 +13058,22 @@ function _prodAnalise(todasFechadas){
 
   var totalEntrada=0,totalSaida=0,totalValorSaida=0,totalCustoEntrada=0;
   var porFunc={};var porMatSaida={};var porTabela={};
+  // Normaliza o nome só pra agrupar (evita "Diego" e "diego" virarem 2 pessoas
+  // diferentes no relatório) — o nome exibido continua com a grafia original.
+  function _chaveFunc(n){return (n||'').trim().replace(/\s+/g,' ').toLowerCase();}
 
   fechadas.forEach(function(p){
     totalEntrada+=p.pesoEntrada;
-    var ce=_prodCustoEntrada(p.matEntrada)*p.pesoEntrada;
+    var ce=_prodCustoEntradaP(p)*p.pesoEntrada;
     totalCustoEntrada+=ce;
-    if(!porFunc[p.func])porFunc[p.func]={entrada:0,saida:0,valorSaida:0,custoEntrada:0,prods:0};
-    porFunc[p.func].entrada+=p.pesoEntrada;porFunc[p.func].custoEntrada+=ce;porFunc[p.func].prods++;
+    var chave=_chaveFunc(p.func);
+    if(!porFunc[chave])porFunc[chave]={nome:p.func.trim(),entrada:0,saida:0,valorSaida:0,custoEntrada:0,prods:0};
+    porFunc[chave].entrada+=p.pesoEntrada;porFunc[chave].custoEntrada+=ce;porFunc[chave].prods++;
     p.saidas.forEach(function(s){
       totalSaida+=s.peso;
       var pv=_prodPrecoVenda(s.prodId);var val=pv*s.peso;
       totalValorSaida+=val;
-      porFunc[p.func].saida+=s.peso;porFunc[p.func].valorSaida+=val;
+      porFunc[chave].saida+=s.peso;porFunc[chave].valorSaida+=val;
       if(!porMatSaida[s.prodId])porMatSaida[s.prodId]={peso:0,valor:0};
       porMatSaida[s.prodId].peso+=s.peso;porMatSaida[s.prodId].valor+=val;
       var tabId=DB.prodVinculos[s.prodId];
@@ -13021,7 +13113,7 @@ function _prodAnalise(todasFechadas){
     var d=porFunc[f];var ap=d.entrada>0?(d.saida/d.entrada*100):0;var luc=d.valorSaida-d.custoEntrada;
     html+='<div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px">'
       +'<div style="display:flex;justify-content:space-between;align-items:center">'
-      +'<div><div style="font-size:14px;font-weight:700">'+f+'</div>'
+      +'<div><div style="font-size:14px;font-weight:700">'+d.nome+'</div>'
       +'<div style="font-size:11px;color:var(--mt)">'+d.prods+' prod · '+fKg(d.entrada)+'kg</div></div>'
       +'<div style="text-align:right"><div style="font-size:14px;font-weight:800;color:'+(luc>=0?'var(--gr)':'var(--rd)')+'">'+fR(luc)+'</div>'
       +'<div style="font-size:10px;color:var(--mt)">lucro est.</div></div></div>'
@@ -13029,6 +13121,41 @@ function _prodAnalise(todasFechadas){
       +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Aprov: '+ap.toFixed(1)+'% · '+fKg(d.saida)+'kg · '+fR(d.valorSaida)+'</div></div>';
   });
   html+='</div>';
+
+  // Rendimento médio por lote — ajuda a decidir quanto vale a pena pagar num leilão
+  // de um tipo de lote parecido, comparando o histórico de todas as vezes que você
+  // desmontou algo com o mesmo apelido.
+  var porLote={};
+  fechadas.forEach(function(p){
+    if(!p.lote)return;
+    var chave=p.lote.trim().replace(/\s+/g,' ').toLowerCase();
+    if(!chave)return;
+    if(!porLote[chave])porLote[chave]={nome:p.lote.trim(),entrada:0,ocorrencias:0,materiais:{}};
+    porLote[chave].entrada+=p.pesoEntrada;
+    porLote[chave].ocorrencias++;
+    p.saidas.forEach(function(s){
+      if(!porLote[chave].materiais[s.prodId])porLote[chave].materiais[s.prodId]=0;
+      porLote[chave].materiais[s.prodId]+=s.peso;
+    });
+  });
+  var lotesKeys=Object.keys(porLote);
+  if(lotesKeys.length){
+    html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:4px">📦 Rendimento Médio por Lote</div>'
+      +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Quanto cada 100kg desse tipo de lote costuma render — útil pra decidir quanto vale a pena pagar num leilão parecido.</div>';
+    lotesKeys.sort(function(a,b){return porLote[b].entrada-porLote[a].entrada;}).forEach(function(k){
+      var d=porLote[k];
+      html+='<div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px">'
+        +'<div style="font-size:13px;font-weight:700">'+d.nome+'</div>'
+        +'<div style="font-size:10px;color:var(--mt);margin-bottom:8px">'+d.ocorrencias+' vez(es) · '+fKg(d.entrada)+'kg no total</div>';
+      Object.keys(d.materiais).sort(function(a,b){return d.materiais[b]-d.materiais[a];}).forEach(function(pid){
+        var prod=gP(parseFloat(pid));var nome=prod?prod.ic+' '+prod.nome:'?';
+        var pct=d.entrada>0?(d.materiais[pid]/d.entrada*100):0;
+        html+='<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0"><span>'+nome+'</span><span style="color:var(--mt)">'+pct.toFixed(1)+'% · ~'+fKg(d.materiais[pid]/d.ocorrencias)+'kg/vez</span></div>';
+      });
+      html+='</div>';
+    });
+    html+='</div>';
+  }
 
   // Materiais
   html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:10px">📦 Materiais Gerados</div>';
