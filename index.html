@@ -12801,10 +12801,12 @@ function _prodPrecoVenda(prodId){
   return 0;
 }
 function _prodCustoEntrada(matNome){return DB.prodCustoEntrada[matNome]||0;}
-// Custo de entrada de uma produção: usa o preço de compra do produto real vinculado
-// (novo fluxo) quando existir, senão cai pro custo manual antigo por nome (produções
-// registradas antes dessa mudança, que só tinham um texto solto como entrada).
+// Custo de entrada de uma produção: usa, em ordem de prioridade —
+// 1) o custo específico digitado nesse lote (quando o preço veio diferente do normal)
+// 2) o preço de compra cadastrado no produto vinculado (padrão do dia a dia)
+// 3) o custo manual antigo por nome (produções registradas antes dessa mudança)
 function _prodCustoEntradaP(p){
+  if(p.custoEntradaLote>0)return p.custoEntradaLote;
   if(p.matEntradaId){
     var prod=gP(p.matEntradaId);
     if(prod&&prod.vC)return prod.vC;
@@ -12900,7 +12902,9 @@ function mNovaProdBV(){
     '<div class="mf">'
     +'<div class="fld"><label>Quem está fazendo? *</label><select class="inp" id="np-func" onchange="_toggleNpOutro()">'+funcOpts+'</select>'
     +'<input class="inp" id="np-func-outro" placeholder="Nome de quem vai fazer a produção" style="display:none;margin-top:7px"></div>'
-    +'<div class="fld"><label>Material de entrada (o que vai desmontar) *</label><select class="inp" id="np-mat">'+matOpts+'</select></div>'
+    +'<div class="fld"><label>Material de entrada (o que vai desmontar) *</label><select class="inp" id="np-mat" onchange="_autoFillCustoProd()">'+matOpts+'</select></div>'
+    +(_isAdm()?'<div class="fld"><label>Custo de compra deste lote (R$/kg)</label><input class="inp" type="number" inputmode="decimal" step="0.01" id="np-custo">'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Já vem preenchido com o preço cadastrado do produto. Mude aqui só se esse lote específico custou diferente do de costume.</div></div>':'')
     +'<div class="fld"><label>Apelido do lote (opcional)</label><input class="inp" id="np-lote" placeholder="Ex: Lote de PC Misto (normal + Slim)">'
     +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Só pra você identificar depois — não afeta o estoque. Ajuda a comparar o rendimento médio de lotes parecidos ao longo do tempo (útil pra decidir quanto pagar num leilão, por exemplo).</div></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
@@ -12918,10 +12922,21 @@ function _toggleNpOutro(){
   if(sel.value==='__outro__'){outro.style.display='block';outro.focus();}
   else outro.style.display='none';
 }
+// Ao escolher o material de entrada, já preenche o custo com o preço cadastrado
+// do produto — o usuário só mexe se o lote em questão custou diferente do normal.
+function _autoFillCustoProd(){
+  var matId=parseFloat(document.getElementById('np-mat').value);
+  var custoEl=document.getElementById('np-custo');
+  if(!matId||!custoEl)return; // não-admin nem tem esse campo na tela
+  var prod=gP(matId);
+  custoEl.value=prod&&prod.vC?prod.vC:'';
+}
 function salvarNovaProdBV(){
   var selVal=document.getElementById('np-func').value;
   var func=selVal==='__outro__'?document.getElementById('np-func-outro').value.trim():selVal;
   var matId=parseFloat(document.getElementById('np-mat').value);
+  var custoEl=document.getElementById('np-custo');
+  var custoLote=custoEl?(parseFloat(custoEl.value)||0):0; // campo só existe pra Admin
   var lote=document.getElementById('np-lote').value.trim();
   var peso=parseFloat(document.getElementById('np-peso').value)||0;
   var tara=parseFloat(document.getElementById('np-tara').value)||0;
@@ -12934,7 +12949,7 @@ function salvarNovaProdBV(){
   // separado pra desmontar, mesmo antes de terminar o processo.
   if(prodEnt)prodEnt.est=+((prodEnt.est||0)-pesoEntrada).toFixed(3);
   var h=new Date();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
-  DB.producoes.push({id:nid(),func:func,matEntradaId:matId,matEntrada:prodEnt?prodEnt.nome:'?',lote:lote,pesoEntrada:pesoEntrada,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,saidas:[],status:'aberta'});
+  DB.producoes.push({id:nid(),func:func,matEntradaId:matId,matEntrada:prodEnt?prodEnt.nome:'?',custoEntradaLote:custoLote,lote:lote,pesoEntrada:pesoEntrada,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,saidas:[],status:'aberta'});
   saveDB();closeM();go('producao');toast('Produção iniciada!','var(--gr)');
 }
 
@@ -12961,7 +12976,8 @@ function mVerProdBV(id){
   var html='<div class="mf">'
     +'<div style="font-size:12px;color:var(--mt)">👷 '+p.func+' · '+p.data+' '+p.hora+'</div>'
     +'<div style="font-size:16px;font-weight:800;margin:4px 0 2px">'+p.matEntrada+'</div>'
-    +(p.lote?'<div style="font-size:12px;color:var(--pu);margin-bottom:10px">📦 '+p.lote+'</div>':'<div style="margin-bottom:10px"></div>')
+    +(p.lote?'<div style="font-size:12px;color:var(--pu);margin-bottom:4px">📦 '+p.lote+'</div>':'')
+    +(_isAdm()&&p.custoEntradaLote>0?'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">💰 Custo considerado: '+fR(p.custoEntradaLote)+'/kg</div>':'<div style="margin-bottom:10px"></div>')
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
     +'<div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:800">'+fKg(p.pesoEntrada)+'</div><div style="font-size:10px;color:var(--mt)">KG ENTRADA</div></div>'
     +'<div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:800;color:var(--gr)">'+fKg(ts)+'</div><div style="font-size:10px;color:var(--mt)">KG GERADOS</div></div>'
@@ -13043,15 +13059,89 @@ function _finalizarFechamentoProd(prodId,sobra,destinoSobra){
   saveDB();closeM();go('producao');toast('Produção fechada!','var(--gr)');
 }
 
+// ── Exportação PDF — relatório completo do setor de Produção ────
+function exportarRelatorioProducao(){
+  var todasFechadas=(DB.producoes||[]).filter(function(p){return p.status==='fechada';});
+  var fechadas=_prodFiltrar(todasFechadas);
+  if(!fechadas.length){alert('Nenhuma produção fechada nesse período pra exportar.');return;}
+
+  var periodos={'hoje':'Hoje','semana':'Esta Semana','mes':'Este Mês','trim':'Trimestre','ano':'Este Ano','tudo':'Todo o Período'};
+  var totalEntrada=0,totalSaida=0,totalValorSaida=0,totalCustoEntrada=0;
+  var porFunc={};var porMatSaida={};
+  function _chaveFunc(n){return (n||'').trim().replace(/\s+/g,' ').toLowerCase();}
+
+  fechadas.forEach(function(p){
+    totalEntrada+=p.pesoEntrada;
+    var ce=_prodCustoEntradaP(p)*p.pesoEntrada;
+    totalCustoEntrada+=ce;
+    var chave=_chaveFunc(p.func);
+    if(!porFunc[chave])porFunc[chave]={nome:p.func.trim(),entrada:0,saida:0,valorSaida:0,custoEntrada:0,prods:0};
+    porFunc[chave].entrada+=p.pesoEntrada;porFunc[chave].custoEntrada+=ce;porFunc[chave].prods++;
+    p.saidas.forEach(function(s){
+      totalSaida+=s.peso;
+      var val=_prodPrecoVenda(s.prodId)*s.peso;
+      totalValorSaida+=val;
+      porFunc[chave].saida+=s.peso;porFunc[chave].valorSaida+=val;
+      if(!porMatSaida[s.prodId])porMatSaida[s.prodId]={peso:0,valor:0};
+      porMatSaida[s.prodId].peso+=s.peso;porMatSaida[s.prodId].valor+=val;
+    });
+  });
+  var aprov=totalEntrada>0?(totalSaida/totalEntrada*100):0;
+  var lucro=totalValorSaida-totalCustoEntrada;
+
+  var html='<div style="display:flex;gap:10px;margin-bottom:14px">'
+    +'<div style="flex:1;background:#f3f4f6;border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:#666">PERÍODO</div><div style="font-size:13px;font-weight:700">'+(periodos[prodPeriodo]||'Este Mês')+'</div></div>'
+    +'<div style="flex:1;background:#f3f4f6;border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:#666">KG ENTRADA</div><div style="font-size:13px;font-weight:700">'+fKg(totalEntrada)+'</div></div>'
+    +'<div style="flex:1;background:#f3f4f6;border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:#666">KG SAÍDA</div><div style="font-size:13px;font-weight:700">'+fKg(totalSaida)+'</div></div>'
+    +'<div style="flex:1;background:#f3f4f6;border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:#666">APROVEITAMENTO</div><div style="font-size:13px;font-weight:700">'+aprov.toFixed(1)+'%</div></div>'
+    +'<div style="flex:1;background:#f3f4f6;border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:#666">LUCRO EST.</div><div style="font-size:13px;font-weight:700">'+fR(lucro)+'</div></div>'
+    +'</div>';
+
+  // Por funcionário
+  html+='<h3 style="font-size:13px;margin:14px 0 6px">Produtividade por Funcionário</h3>';
+  var funcs=Object.keys(porFunc).sort(function(a,b){return porFunc[b].valorSaida-porFunc[a].valorSaida;});
+  html+='<table><thead><tr><th>Funcionário</th><th>Produções</th><th>Kg Entrada</th><th>Kg Saída</th><th>Aproveitamento</th><th>Lucro Est.</th></tr></thead><tbody>';
+  funcs.forEach(function(k){
+    var d=porFunc[k];var ap=d.entrada>0?(d.saida/d.entrada*100):0;var luc=d.valorSaida-d.custoEntrada;
+    html+='<tr><td>'+d.nome+'</td><td>'+d.prods+'</td><td>'+fKg(d.entrada)+'kg</td><td>'+fKg(d.saida)+'kg</td><td>'+ap.toFixed(1)+'%</td><td>'+fR(luc)+'</td></tr>';
+  });
+  html+='</tbody></table>';
+
+  // Materiais gerados
+  html+='<h3 style="font-size:13px;margin:14px 0 6px">Materiais Gerados</h3>';
+  var matIds=Object.keys(porMatSaida).sort(function(a,b){return porMatSaida[b].valor-porMatSaida[a].valor;});
+  html+='<table><thead><tr><th>Material</th><th>Kg Total</th><th>Valor Total</th></tr></thead><tbody>';
+  matIds.forEach(function(pid){
+    var d=porMatSaida[pid];var prod=gP(parseFloat(pid));var nome=prod?prod.nome:'?';
+    html+='<tr><td>'+nome+'</td><td>'+fKg(d.peso)+'kg</td><td>'+fR(d.valor)+'</td></tr>';
+  });
+  html+='</tbody></table>';
+
+  // Histórico detalhado — produção por produção
+  html+='<h3 style="font-size:13px;margin:14px 0 6px">Histórico Detalhado</h3>';
+  html+='<table><thead><tr><th>Data</th><th>Funcionário</th><th>Material Entrada</th><th>Lote</th><th>Kg Entrada</th><th>Materiais Gerados</th></tr></thead><tbody>';
+  var ordenadas=fechadas.slice().sort(function(a,b){return _parseDataBR(b.data)-_parseDataBR(a.data);});
+  ordenadas.forEach(function(p){
+    var geradosStr=p.saidas.map(function(s){var prod=gP(s.prodId);return (prod?prod.nome:'?')+': '+fKg(s.peso)+'kg';}).join(', ');
+    html+='<tr><td>'+p.data+'</td><td>'+p.func+'</td><td>'+p.matEntrada+'</td><td>'+(p.lote||'—')+'</td><td>'+fKg(p.pesoEntrada)+'kg</td><td style="font-size:9px">'+geradosStr+'</td></tr>';
+  });
+  html+='</tbody></table>';
+
+  _exportPDF('Relatório de Produção',html);
+}
+
 // ── ANÁLISE (só Admin) ───────────────────────────────
 function _prodAnalise(todasFechadas){
   // Seletor de período
   var periodos=[{k:'hoje',l:'Hoje'},{k:'semana',l:'Semana'},{k:'mes',l:'Mês'},{k:'trim',l:'Trimestre'},{k:'ano',l:'Ano'},{k:'tudo',l:'Todo Período'}];
-  var perBar='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px">';
+  var perBar='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px">'
+    +'<div style="display:flex;gap:4px;flex-wrap:wrap">';
   periodos.forEach(function(pp){
     perBar+='<button onclick="prodPeriodo=\''+pp.k+'\';go(\'producao\')" class="tabbtn'+(prodPeriodo===pp.k?' on':'')+'">'+pp.l+'</button>';
   });
-  perBar+='</div>';
+  perBar+='</div>'
+    +'<button onclick="exportarRelatorioProducao()" class="btnO bOgr" style="font-size:12px;padding:6px 12px;white-space:nowrap">&#128196; Exportar PDF</button>'
+    +'</div>';
 
   var fechadas=_prodFiltrar(todasFechadas);
   if(!fechadas.length)return perBar+'<div class="card" style="text-align:center;padding:40px;color:var(--mt)"><div style="font-size:32px;margin-bottom:10px">📊</div><div style="font-weight:700">Nenhuma produção neste período</div></div>';
@@ -13190,22 +13280,8 @@ function _prodAnalise(todasFechadas){
 function _prodConfig(){
   var tabVenda=DB.tabelas.filter(function(t){return t.tipo==='venda';});
 
-  // Materiais de entrada (lista manual)
-  var html='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:6px">📥 Materiais de Entrada</div>'
-    +'<div style="font-size:11px;color:var(--mt);margin-bottom:8px">O que chega na porta pra desmontar/processar. Adicione ou remova conforme seu negócio.</div>';
-  (DB.prodMatEntrada||[]).forEach(function(m,i){
-    html+='<div style="display:flex;gap:6px;margin-bottom:5px;align-items:center">'
-      +'<input class="inp" value="'+m+'" id="pme-'+i+'" style="flex:1;padding:8px;font-size:12px">'
-      +'<input class="inp" type="number" step="0.01" value="'+(DB.prodCustoEntrada[m]||0)+'" id="pmec-'+i+'" style="width:90px;padding:8px;font-size:12px" placeholder="R$/kg" title="Custo médio de compra">'
-      +'<button onclick="_remProdMatEnt('+i+')" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:5px 9px;font-size:11px;cursor:pointer">✕</button>'
-      +'</div>';
-  });
-  html+='<div style="display:flex;gap:6px;margin-top:8px"><input class="inp" id="pme-novo" placeholder="Novo material de entrada" style="flex:1;padding:8px;font-size:12px"><button class="btn" style="width:auto;padding:8px 14px" onclick="_addProdMatEnt()">+</button></div>'
-    +'<button class="btn" style="margin-top:10px" onclick="_salvarProdMatEnt()">Salvar Materiais e Custos</button>'
-    +'</div>';
-
   // Vínculos material de saída → tabela de venda
-  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:6px">📋 Vincular Material → Tabela de Venda</div>'
+  var html='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:6px">📋 Vincular Material → Tabela de Venda</div>'
     +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Escolha qual tabela usar pra projetar o valor de cada material gerado. O preço vem automaticamente da tabela.</div>';
 
   if(!DB.produtos.length){
@@ -13218,10 +13294,11 @@ function _prodConfig(){
       var vinculado=DB.prodVinculos[p.id];
       var tabsComProd=tabVenda.filter(function(t){return t.itens.some(function(it){return String(it.pId)===String(p.id);});});
       if(!tabsComProd.length){
-        // Produto não está em nenhuma tabela de venda — mostra aviso
-        html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;margin-bottom:6px;opacity:.5">'
-          +'<div style="font-size:12px;font-weight:600">'+p.ic+' '+p.nome+'</div>'
-          +'<div style="font-size:10px;color:var(--rd);padding:8px">⚠ Não está em nenhuma tabela de venda</div></div>';
+        // Produto não está em nenhuma tabela de venda — em vez de só avisar,
+        // deixa adicionar o preço numa tabela existente sem sair da tela
+        html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;margin-bottom:6px">'
+          +'<div style="font-size:12px;font-weight:600">'+p.ic+' '+p.nome+'<div style="font-size:9px;color:var(--rd)">⚠ Sem preço em nenhuma tabela</div></div>'
+          +'<button onclick="mAddPrecoTabelaProd('+p.id+')" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:8px;font-size:11px;cursor:pointer">+ Adicionar preço numa tabela</button></div>';
       } else {
         temAlgum=true;
         var opts='<option value="">— Sem tabela —</option>'+tabsComProd.map(function(t){
@@ -13246,24 +13323,34 @@ function _setProdVinc(prodId,tabId){
   else delete DB.prodVinculos[prodId];
   saveDB();go('producao');
 }
-function _addProdMatEnt(){
-  var inp=document.getElementById('pme-novo');var v=(inp.value||'').trim();
-  if(!v)return;
-  DB.prodMatEntrada.push(v);saveDB();go('producao');
+// Atalho: adiciona o preço de um produto numa tabela de venda já existente, direto
+// da tela de Produção, sem precisar ir na aba Tabelas separadamente. Já vincula
+// automaticamente o produto a essa tabela em seguida.
+function mAddPrecoTabelaProd(prodId){
+  var prod=gP(prodId);if(!prod)return;
+  var tabVenda=DB.tabelas.filter(function(t){return t.tipo==='venda';});
+  if(!tabVenda.length){alert('Você ainda não tem nenhuma tabela de venda cadastrada. Crie uma na aba Tabelas primeiro.');return;}
+  var tabOpts=tabVenda.map(function(t){return '<option value="'+t.id+'">'+t.nome+'</option>';}).join('');
+  openM('+ Preço — '+prod.ic+' '+prod.nome,
+    '<div class="mf">'
+    +'<div class="fld"><label>Em qual tabela?</label><select class="inp" id="apt-tab">'+tabOpts+'</select></div>'
+    +'<div class="fld"><label>Preço (R$/kg)</label><input class="inp" type="number" inputmode="decimal" step="0.01" id="apt-preco"></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="salvarPrecoTabelaProd('+prodId+')">Salvar</button></div>'
+    +'</div>',420);
 }
-function _remProdMatEnt(idx){
-  DB.prodMatEntrada.splice(idx,1);saveDB();go('producao');
-}
-function _salvarProdMatEnt(){
-  var novos=[];var custos={};
-  for(var i=0;i<DB.prodMatEntrada.length;i++){
-    var el=document.getElementById('pme-'+i);
-    var cel=document.getElementById('pmec-'+i);
-    var nome=el?el.value.trim():'';
-    if(nome){novos.push(nome);custos[nome]=parseFloat(cel?cel.value:0)||0;}
+function salvarPrecoTabelaProd(prodId){
+  var tabId=parseFloat(document.getElementById('apt-tab').value);
+  var preco=parseFloat(document.getElementById('apt-preco').value)||0;
+  if(preco<=0){toast('Informe um preço válido!','var(--rd)');return;}
+  var tab=null;for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].id===tabId){tab=DB.tabelas[i];break;}}
+  if(!tab)return;
+  var achou=false;
+  for(var j=0;j<tab.itens.length;j++){
+    if(String(tab.itens[j].pId)===String(prodId)){tab.itens[j].preco=preco;achou=true;break;}
   }
-  DB.prodMatEntrada=novos;DB.prodCustoEntrada=custos;
-  saveDB();go('producao');toast('Materiais e custos salvos!','var(--gr)');
+  if(!achou)tab.itens.push({pId:prodId,preco:preco});
+  DB.prodVinculos[prodId]=tabId; // já vincula na hora, já que era exatamente pra isso
+  saveDB();closeM();go('producao');toast('Preço adicionado e vinculado!','var(--gr)');
 }
 
 function abrirRotaDia(diaStr){
