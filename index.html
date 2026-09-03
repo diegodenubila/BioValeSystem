@@ -310,7 +310,19 @@ var ALLPAGES=[
 var APP_VERSION='5.6';
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
-  produtos:[],
+  produtos:[
+    // ── EXEMPLO/DEMONSTRAÇÃO — desmontagem de HD, material intermediário volta pro
+    // balaio genérico "Sucata Eletrônica" em vez de virar um produto novo pra cada peça.
+    // Remova quando não precisar mais do exemplo.
+    {id:9001,nome:'Sucata Eletrônica',ic:'💾',vC:0.60,vV:0,est:4.300,prodDestaque:true},
+    {id:9002,nome:'Alumínio Mole',ic:'🥫',vC:0,vV:8,est:0.200,prodDestaque:true},
+    {id:9003,nome:'Alumínio Duro',ic:'🔩',vC:0,vV:10,est:0.050,prodDestaque:true},
+    {id:9004,nome:'Sucata de Ferro',ic:'⚙️',vC:0,vV:1.5,est:0.180,prodDestaque:true},
+    {id:9005,nome:'Cobre Misto',ic:'🟠',vC:0,vV:42,est:0.080,prodDestaque:true},
+    {id:9006,nome:'Cobre Mel',ic:'🟤',vC:0,vV:38,est:0,prodDestaque:true},
+    {id:9007,nome:'Pós Garimpo',ic:'✨',vC:0,vV:200,est:0.010,prodDestaque:true},
+    {id:9008,nome:'Placa HD',ic:'🔌',vC:0,vV:35,est:0.030},
+  ],
   transf:[],
   entradas:[],
   gerarTabsCustom:[],
@@ -373,7 +385,32 @@ var DB={
   preAgenda:[],
   preAgendaLimite:3,
   eventos:[],
-  producoes:[],       // Controle de Produção
+  producoes:[
+    // ── EXEMPLO/DEMONSTRAÇÃO — 1ª desmontagem: parte finalizada sai como Placa HD,
+    // o resto (carcaça, disco, ponta leitora, cabo, tudo misturado e sujo) VOLTA pro
+    // mesmo balaio de Sucata Eletrônica, em vez de virar produto novo no catálogo.
+    {id:9101,func:'Carlos Antônio',matEntradaId:9001,matEntrada:'Sucata Eletrônica',
+      lote:'Exemplo — 1ª Desmontagem de HD',pesoEntrada:0.700,tara:0,pesoBruto:0.700,
+      data:'28/08/2026',hora:'10:00',horaFim:'10:45',status:'fechada',
+      saidas:[
+        {prodId:9008,mat:'Placa HD',peso:0.030},
+        {prodId:9001,mat:'Sucata Eletrônica',peso:0.570}
+      ],
+      sobra:0.100,destinoSobra:'perda'}, // poeira, parafusos e plástico sem valor
+    // ── EXEMPLO/DEMONSTRAÇÃO — 2ª rodada: pega aquela Sucata Eletrônica que voltou
+    // do balaio e agora sim separa de vez nos materiais finais prontos pra vender.
+    {id:9102,func:'Carlos Antônio',matEntradaId:9001,matEntrada:'Sucata Eletrônica',
+      lote:'Exemplo — Separação Final',pesoEntrada:0.570,tara:0,pesoBruto:0.570,
+      data:'28/08/2026',hora:'14:00',horaFim:'14:40',status:'fechada',
+      saidas:[
+        {prodId:9005,mat:'Cobre Misto',peso:0.080},
+        {prodId:9002,mat:'Alumínio Mole',peso:0.200},
+        {prodId:9003,mat:'Alumínio Duro',peso:0.050},
+        {prodId:9004,mat:'Sucata de Ferro',peso:0.180},
+        {prodId:9007,mat:'Pós Garimpo',peso:0.010}
+      ],
+      sobra:0.050,destinoSobra:'perda'} // resíduo/pó sem valor que se perde na separação
+  ],
   gestoraHistorico:[], // conversa/análise da Gestora IA — persistida pra não sumir ao trocar de aba
   gestoraPeriodoSalvo:null,
   prodVinculos:{},    // {materialId: tabelaVendaId} — qual tabela usar pra projetar cada material
@@ -10609,7 +10646,9 @@ function mVerCF(id){
     +'<button class="btnO bOgr" onclick="closeM()">Fechar</button>'
     +'<button class="btn" onclick="closeM();mHistCF('+id+')" style="background:var(--bl)">📋 Ver Histórico</button>'
     +'<button class="btn" onclick="closeM();mEditCF('+id+')">✎ Editar</button>'
-    +'</div></div>';
+    +'</div>'
+    +'<button class="btnO bOgr" style="width:100%;margin-top:8px" onclick="closeM();mAbatimentoParcelado('+id+')">📆 Aplicar valor reduzido em vários meses</button>'
+    +'</div>';
   openM('Detalhes: '+c.nome,html,500);
 }
 function mEditCF(id){
@@ -10726,6 +10765,50 @@ function saveLancarCF(id,pagar){
   document.getElementById('fin-content').innerHTML=_finRender('fixas');
 }
 
+// Aplica um valor reduzido em vários meses seguidos de uma vez — útil quando um
+// abatimento (tipo obra/reforma abatendo do aluguel) vai ser parcelado por N meses,
+// evitando ter que repetir "Alterar" mês a mês manualmente.
+function mAbatimentoParcelado(id){
+  var c=null;for(var i=0;i<DB.contasFixas.length;i++){if(DB.contasFixas[i].id===id){c=DB.contasFixas[i];break;}}
+  if(!c)return;
+  var hoje=new Date();
+  var mesIso=hoje.getFullYear()+'-'+('0'+(hoje.getMonth()+1)).slice(-2);
+  openM('📆 Abatimento em Vários Meses — '+c.nome,
+    '<div class="mf">'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:12px">Aplica um valor reduzido em vários meses seguidos, de uma vez — útil quando um abatimento (ex: obra/reforma descontada do aluguel) vai se estender por vários meses.</div>'
+    +'<div class="fld"><label>Valor mensal já com o abatimento (R$) *</label><input class="inp" type="number" inputmode="decimal" id="ap-valor" placeholder="Ex: 2850.00"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Quantos meses? *</label><input class="inp" type="number" id="ap-qtd" placeholder="Ex: 12" value="12"></div>'
+    +'<div class="fld"><label>A partir de qual mês?</label><input class="inp" type="month" id="ap-inicio" value="'+mesIso+'"></div>'
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--mt);margin-bottom:12px">Isso só pré-define o valor de cada mês — você ainda clica em "Pagar" normalmente todo mês, só que já com esse valor certo, sem precisar lembrar de ajustar.</div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="salvarAbatimentoParcelado('+id+')">Aplicar nos Meses</button></div>'
+    +'</div>',480);
+  setTimeout(function(){var el=document.getElementById('ap-valor');if(el)el.focus();},80);
+}
+function salvarAbatimentoParcelado(id){
+  var c=null;for(var i=0;i<DB.contasFixas.length;i++){if(DB.contasFixas[i].id===id){c=DB.contasFixas[i];break;}}
+  if(!c)return;
+  var valor=parseFloat(document.getElementById('ap-valor').value)||0;
+  var qtd=parseInt(document.getElementById('ap-qtd').value)||0;
+  var inicioVal=document.getElementById('ap-inicio').value; // "AAAA-MM"
+  if(valor<=0){toast('Informe o valor mensal!','var(--rd)');return;}
+  if(qtd<=0||qtd>60){toast('Informe uma quantidade de meses válida (1 a 60)!','var(--rd)');return;}
+  if(!inicioVal){toast('Informe o mês de início!','var(--rd)');return;}
+  var partes=inicioVal.split('-');
+  var ano=parseInt(partes[0]),mes=parseInt(partes[1]);
+  if(!c.historico)c.historico=[];
+  for(var i=0;i<qtd;i++){
+    var mAno=ano,mMes=mes+i;
+    while(mMes>12){mMes-=12;mAno++;}
+    var mesRef=('0'+mMes).slice(-2)+'/'+mAno;
+    c.historico=c.historico.filter(function(h){return h.mes!==mesRef;});
+    c.historico.unshift({mes:mesRef,valor:valor,pago:false,dataPag:null,conta:null});
+  }
+  saveDB();closeM();
+  var el=document.getElementById('fin-content');if(el)el.innerHTML=_finRender('fixas');
+  toast('Abatimento aplicado em '+qtd+' meses!','var(--gr)');
+}
 function desfazerPagCF(id){
   var c=null;for(var i=0;i<DB.contasFixas.length;i++){if(DB.contasFixas[i].id===id){c=DB.contasFixas[i];break;}}
   if(!c)return;
@@ -12814,6 +12897,21 @@ function _prodCustoEntradaP(p){
   return _prodCustoEntrada(p.matEntrada);
 }
 function _nomeTab(tabId){for(var i=0;i<DB.tabelas.length;i++)if(String(DB.tabelas[i].id)===String(tabId))return DB.tabelas[i].nome;return '?';}
+// Materiais marcados como "em destaque" (p.prodDestaque=true) aparecem primeiro nas
+// listas de entrada/saída da Produção — são os que o usuário desmonta com mais frequência,
+// então economiza rolagem toda vez que abre uma produção nova.
+function _prodListaOrdenada(){
+  return DB.produtos.slice().sort(function(a,b){
+    var da=a.prodDestaque?1:0,db=b.prodDestaque?1:0;
+    if(da!==db)return db-da; // destaque primeiro
+    return (a.nome||'').localeCompare(b.nome||'','pt-BR');
+  });
+}
+function _toggleProdDestaque(prodId,marcado){
+  var p=gP(prodId);if(!p)return;
+  p.prodDestaque=marcado;
+  saveDB();
+}
 
 // Filtro de período
 function _prodFiltrar(lista){
@@ -12897,7 +12995,7 @@ function mNovaProdBV(){
   var funcOpts='<option value="">-- Selecione --</option>';
   funcOpts+=DB.funcs.map(function(f){return '<option value="'+f.nome+'">'+f.nome+'</option>';}).join('');
   funcOpts+='<option value="__outro__">&#9997; Outra pessoa (sócio, ajuda pontual...)</option>';
-  var matOpts='<option value="">-- Selecione --</option>'+DB.produtos.map(function(p){return '<option value="'+p.id+'">'+p.ic+' '+p.nome+' (Est: '+fKg(p.est||0)+'kg)</option>';}).join('');
+  var matOpts='<option value="">-- Selecione --</option>'+_prodListaOrdenada().map(function(p){return '<option value="'+p.id+'">'+p.ic+' '+p.nome+' (Est: '+fKg(p.est||0)+'kg)</option>';}).join('');
   openM('⚙️ Nova Produção',
     '<div class="mf">'
     +'<div class="fld"><label>Quem está fazendo? *</label><select class="inp" id="np-func" onchange="_toggleNpOutro()">'+funcOpts+'</select>'
@@ -12971,7 +13069,7 @@ function mVerProdBV(id){
   });
   if(!saidasHTML)saidasHTML='<div style="text-align:center;padding:16px;color:var(--mt);font-size:12px">Nenhum material registrado ainda</div>';
 
-  var prodOpts=DB.produtos.map(function(pr){return '<option value="'+pr.id+'">'+pr.ic+' '+pr.nome+'</option>';}).join('');
+  var prodOpts=_prodListaOrdenada().map(function(pr){return '<option value="'+pr.id+'">'+pr.ic+' '+pr.nome+'</option>';}).join('');
 
   var html='<div class="mf">'
     +'<div style="font-size:12px;color:var(--mt)">👷 '+p.func+' · '+p.data+' '+p.hora+'</div>'
@@ -13280,8 +13378,22 @@ function _prodAnalise(todasFechadas){
 function _prodConfig(){
   var tabVenda=DB.tabelas.filter(function(t){return t.tipo==='venda';});
 
+  // Materiais em destaque — os mais usados, pra não ficar rolando a lista toda vez
+  var html='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:6px">⭐ Materiais em Destaque</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Marque os materiais que você desmonta com mais frequência — eles aparecem primeiro nas listas de entrada e saída da Produção, sem precisar rolar até achar.</div>';
+  if(!DB.produtos.length){
+    html+='<div style="text-align:center;padding:14px;color:var(--mt);font-size:12px">Nenhum produto cadastrado ainda.</div>';
+  } else {
+    DB.produtos.forEach(function(p){
+      html+='<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer">'
+        +'<input type="checkbox" '+(p.prodDestaque?'checked':'')+' onchange="_toggleProdDestaque('+p.id+',this.checked)" style="width:16px;height:16px">'
+        +'<span style="font-size:13px">'+p.ic+' '+p.nome+'</span></label>';
+    });
+  }
+  html+='</div>';
+
   // Vínculos material de saída → tabela de venda
-  var html='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:6px">📋 Vincular Material → Tabela de Venda</div>'
+  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:6px">📋 Vincular Material → Tabela de Venda</div>'
     +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Escolha qual tabela usar pra projetar o valor de cada material gerado. O preço vem automaticamente da tabela.</div>';
 
   if(!DB.produtos.length){
@@ -17067,11 +17179,17 @@ function _goUsuarios(){
     go('usuarios');
   }
 }
+// Salva a lista de usuários na nuvem também — saveDB() sozinho só grava no
+// localStorage (cache do navegador), então sem isso um usuário criado/editado
+// num aparelho nunca aparece nos outros, e pode até sumir se o cache for limpo.
+function _syncUsers(){
+  try{_sbSet('bv_users',USERS,function(){});}catch(e){}
+}
 function moveUser(idx,dir){
   var newIdx=idx+dir;
   if(newIdx<0||newIdx>=USERS.length)return;
   var tmp=USERS[idx];USERS[idx]=USERS[newIdx];USERS[newIdx]=tmp;
-  saveDB();_goUsuarios();
+  saveDB();_syncUsers();_goUsuarios();
 }
 function pgUsers(){
   var uTab=window._uTab||'users';
@@ -17181,7 +17299,7 @@ function saveNovoUser(){
   for(var i=0;i<USERS.length;i++){if(USERS[i].pin===pin){alert('Este PIN ja esta em uso!');return;}}
   USERS.push({id:nid(),nome:n,perfil:role,pin:pin,av:av.toUpperCase(),cor:'#16a34a',bloqueado:false});
   PPAGES[role]=r.pages;
-  saveDB();
+  saveDB();_syncUsers();
   closeM();doLogout();buildLoginList();
 }
 function mEditUser(uid){
@@ -17208,7 +17326,7 @@ function saveEditUser(idx){
   var r=getRoleById(role);if(!r){alert('Selecione uma funcao!');return;}
   USERS[idx].nome=n;USERS[idx].pin=pin;USERS[idx].perfil=role;USERS[idx].av=av.toUpperCase();
   PPAGES[role]=r.pages;
-  saveDB();
+  saveDB();_syncUsers();
   closeM();doLogout();buildLoginList();
 }
 function mMeuPin(){
@@ -17253,14 +17371,14 @@ function saveMeuPin(){
   // Update in USERS array and in CU
   for(var i=0;i<USERS.length;i++){if(USERS[i].id===CU.id){USERS[i].pin=nw;break;}}
   CU.pin=nw;
-  saveDB();
+  saveDB();_syncUsers();
   closeM();
   // Brief success feedback
   var sb=document.getElementById('sbur');if(sb){var orig=sb.textContent;sb.textContent='PIN alterado!';sb.style.color='var(--gr)';setTimeout(function(){sb.textContent=orig;sb.style.color='';},2000);}
 }
 function toggleBlockUser(uid){
   for(var i=0;i<USERS.length;i++){if(String(USERS[i].id)===String(uid)){USERS[i].bloqueado=!USERS[i].bloqueado;break;}}
-  saveDB();_goUsuarios();
+  saveDB();_syncUsers();_goUsuarios();
 }
 function delUser(uid){
   var idx=-1;for(var i=0;i<USERS.length;i++){if(String(USERS[i].id)===String(uid)){idx=i;break;}}
@@ -17268,7 +17386,7 @@ function delUser(uid){
   var nome=USERS[idx].nome;
   confirmar('Excluir usuario <b>'+nome+'</b>?<br><span style="font-size:12px;color:var(--mt)">Esta acao nao pode ser desfeita.</span>',function(){
     for(var i=0;i<USERS.length;i++){if(String(USERS[i].id)===String(uid)){USERS.splice(i,1);break;}}
-    saveDB();
+    saveDB();_syncUsers();
     doLogout();buildLoginList();
   });
 }
