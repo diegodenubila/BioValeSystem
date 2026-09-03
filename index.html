@@ -12995,12 +12995,20 @@ function mNovaProdBV(){
   var funcOpts='<option value="">-- Selecione --</option>';
   funcOpts+=DB.funcs.map(function(f){return '<option value="'+f.nome+'">'+f.nome+'</option>';}).join('');
   funcOpts+='<option value="__outro__">&#9997; Outra pessoa (sócio, ajuda pontual...)</option>';
-  var matOpts='<option value="">-- Selecione --</option>'+_prodListaOrdenada().map(function(p){return '<option value="'+p.id+'">'+p.ic+' '+p.nome+' (Est: '+fKg(p.est||0)+'kg)</option>';}).join('');
   openM('⚙️ Nova Produção',
     '<div class="mf">'
     +'<div class="fld"><label>Quem está fazendo? *</label><select class="inp" id="np-func" onchange="_toggleNpOutro()">'+funcOpts+'</select>'
     +'<input class="inp" id="np-func-outro" placeholder="Nome de quem vai fazer a produção" style="display:none;margin-top:7px"></div>'
-    +'<div class="fld"><label>Material de entrada (o que vai desmontar) *</label><select class="inp" id="np-mat" onchange="_autoFillCustoProd()">'+matOpts+'</select></div>'
+    +'<div class="fld"><label>Material de entrada (o que vai desmontar) *</label>'
+    +'<div class="pdd" id="pdd-np-mat">'
+    +'<button class="pdd-trigger" onclick="_toggleProdPicker(\'np-mat\')" type="button">'
+    +'<span class="pdd-ic" id="np-mat-ic">📦</span><span class="pdd-lbl" id="np-mat-lbl" style="color:var(--mt)">-- Selecione --</span><span class="pdd-arr">&#9660;</span>'
+    +'</button>'
+    +'<div class="pdd-panel" id="np-mat-panel">'
+    +'<div class="pdd-search"><input type="text" id="np-mat-search" placeholder="&#128269; Buscar material..." oninput="_filtrarProdPicker(\'np-mat\')" autocomplete="off"></div>'
+    +'<div class="pdd-list" id="np-mat-list"></div>'
+    +'</div></div>'
+    +'<input type="hidden" id="np-mat-id"></div>'
     +(_isAdm()?'<div class="fld"><label>Custo de compra deste lote (R$/kg)</label><input class="inp" type="number" inputmode="decimal" step="0.01" id="np-custo">'
     +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Já vem preenchido com o preço cadastrado do produto. Mude aqui só se esse lote específico custou diferente do de costume.</div></div>':'')
     +'<div class="fld"><label>Apelido do lote (opcional)</label><input class="inp" id="np-lote" placeholder="Ex: Lote de PC Misto (normal + Slim)">'
@@ -13022,32 +13030,76 @@ function _toggleNpOutro(){
 }
 // Ao escolher o material de entrada, já preenche o custo com o preço cadastrado
 // do produto — o usuário só mexe se o lote em questão custou diferente do normal.
-function _autoFillCustoProd(){
-  var matId=parseFloat(document.getElementById('np-mat').value);
+// Resolve o texto digitado num campo de material (entrada ou saída) de volta pro
+// produto certo — tenta "ícone + nome" exato (como aparece na lista), e se não
+// achar, tenta só pelo nome, sem diferenciar maiúscula/minúscula.
+function _autoFillCustoProdById(id){
+  var prod=gP(id);
   var custoEl=document.getElementById('np-custo');
-  if(!matId||!custoEl)return; // não-admin nem tem esse campo na tela
-  var prod=gP(matId);
-  custoEl.value=prod&&prod.vC?prod.vC:'';
+  if(!prod||!custoEl)return;
+  custoEl.value=prod.vC?prod.vC:'';
+}
+// Componente de "select buscável" reaproveitável — mesmo padrão visual do seletor
+// de material já usado na Pesagem (botão que parece um select, abre um painel com
+// busca e lista rolável). Funciona tanto pro Material de Entrada (prefixo 'np-mat')
+// quanto pro Registrar Material de saída (prefixo 'rs-mat').
+function _toggleProdPicker(prefix){
+  var wrap=document.getElementById('pdd-'+prefix);
+  var trig=wrap?wrap.querySelector('.pdd-trigger'):null;
+  var panel=document.getElementById(prefix+'-panel');
+  if(!trig||!panel)return;
+  var abrir=!panel.classList.contains('open');
+  trig.classList.toggle('open',abrir);
+  panel.classList.toggle('open',abrir);
+  if(abrir){
+    var s=document.getElementById(prefix+'-search');
+    if(s){s.value='';setTimeout(function(){s.focus();},50);}
+    _filtrarProdPicker(prefix);
+  }
+}
+function _filtrarProdPicker(prefix){
+  var searchEl=document.getElementById(prefix+'-search');
+  var busca=(searchEl?searchEl.value:'').toLowerCase();
+  var lista=_prodListaOrdenada().filter(function(p){return !busca||p.nome.toLowerCase().indexOf(busca)>=0;});
+  var listEl=document.getElementById(prefix+'-list');
+  if(!listEl)return;
+  if(!lista.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--mt);font-size:12px">Nenhum material encontrado</div>';return;}
+  listEl.innerHTML=lista.map(function(p){
+    var extra=prefix==='np-mat'?' <span style="color:var(--mt);font-size:10px">(Est: '+fKg(p.est||0)+'kg)</span>':'';
+    return '<div onclick="_selecionarProdPicker(\''+prefix+'\','+p.id+')" style="padding:9px 10px;cursor:pointer;font-size:13px;border-radius:6px">'+p.ic+' '+p.nome+extra+'</div>';
+  }).join('');
+}
+function _selecionarProdPicker(prefix,id){
+  var prod=gP(id);if(!prod)return;
+  var icEl=document.getElementById(prefix+'-ic');
+  var lblEl=document.getElementById(prefix+'-lbl');
+  var idEl=document.getElementById(prefix+'-id');
+  if(icEl)icEl.textContent=prod.ic;
+  if(lblEl){lblEl.textContent=prod.nome;lblEl.style.color='var(--tx)';}
+  if(idEl)idEl.value=id;
+  _toggleProdPicker(prefix); // fecha o painel
+  if(prefix==='np-mat')_autoFillCustoProdById(id);
 }
 function salvarNovaProdBV(){
   var selVal=document.getElementById('np-func').value;
   var func=selVal==='__outro__'?document.getElementById('np-func-outro').value.trim():selVal;
-  var matId=parseFloat(document.getElementById('np-mat').value);
+  var matIdEl=document.getElementById('np-mat-id');
+  var matId=matIdEl&&matIdEl.value?parseFloat(matIdEl.value):null;
+  var prodEnt=matId?gP(matId):null;
   var custoEl=document.getElementById('np-custo');
   var custoLote=custoEl?(parseFloat(custoEl.value)||0):0; // campo só existe pra Admin
   var lote=document.getElementById('np-lote').value.trim();
   var peso=parseFloat(document.getElementById('np-peso').value)||0;
   var tara=parseFloat(document.getElementById('np-tara').value)||0;
   if(!func){toast('Selecione ou digite quem está fazendo!','var(--rd)');return;}
-  if(!matId){toast('Selecione o material de entrada!','var(--rd)');return;}
+  if(!prodEnt){toast('Selecione o material de entrada!','var(--rd)');return;}
   if(peso<=0){toast('Informe o peso!','var(--rd)');return;}
-  var prodEnt=gP(matId);
   var pesoEntrada=+(peso-tara).toFixed(3);
   // Desconta do estoque na abertura — o material sai da pilha bruta assim que é
   // separado pra desmontar, mesmo antes de terminar o processo.
-  if(prodEnt)prodEnt.est=+((prodEnt.est||0)-pesoEntrada).toFixed(3);
+  prodEnt.est=+((prodEnt.est||0)-pesoEntrada).toFixed(3);
   var h=new Date();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
-  DB.producoes.push({id:nid(),func:func,matEntradaId:matId,matEntrada:prodEnt?prodEnt.nome:'?',custoEntradaLote:custoLote,lote:lote,pesoEntrada:pesoEntrada,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,saidas:[],status:'aberta'});
+  DB.producoes.push({id:nid(),func:func,matEntradaId:prodEnt.id,matEntrada:prodEnt.nome,custoEntradaLote:custoLote,lote:lote,pesoEntrada:pesoEntrada,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,saidas:[],status:'aberta'});
   saveDB();closeM();go('producao');toast('Produção iniciada!','var(--gr)');
 }
 
@@ -13069,8 +13121,6 @@ function mVerProdBV(id){
   });
   if(!saidasHTML)saidasHTML='<div style="text-align:center;padding:16px;color:var(--mt);font-size:12px">Nenhum material registrado ainda</div>';
 
-  var prodOpts=_prodListaOrdenada().map(function(pr){return '<option value="'+pr.id+'">'+pr.ic+' '+pr.nome+'</option>';}).join('');
-
   var html='<div class="mf">'
     +'<div style="font-size:12px;color:var(--mt)">👷 '+p.func+' · '+p.data+' '+p.hora+'</div>'
     +'<div style="font-size:16px;font-weight:800;margin:4px 0 2px">'+p.matEntrada+'</div>'
@@ -13086,9 +13136,17 @@ function mVerProdBV(id){
 
   if(p.status==='aberta'){
     html+='<div style="border-top:1px solid var(--bd);padding-top:10px"><div style="font-size:11px;font-weight:700;color:var(--gr);text-transform:uppercase;margin-bottom:8px">+ Registrar material</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
-      +'<div class="fld"><label>Material</label><select class="inp" id="rs-mat">'+prodOpts+'</select></div>'
-      +'<div class="fld"><label>Peso (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="rs-peso"></div></div>'
+      +'<div class="fld"><label>Material</label>'
+      +'<div class="pdd" id="pdd-rs-mat">'
+      +'<button class="pdd-trigger" onclick="_toggleProdPicker(\'rs-mat\')" type="button">'
+      +'<span class="pdd-ic" id="rs-mat-ic">📦</span><span class="pdd-lbl" id="rs-mat-lbl" style="color:var(--mt)">-- Selecione --</span><span class="pdd-arr">&#9660;</span>'
+      +'</button>'
+      +'<div class="pdd-panel" id="rs-mat-panel">'
+      +'<div class="pdd-search"><input type="text" id="rs-mat-search" placeholder="&#128269; Buscar material..." oninput="_filtrarProdPicker(\'rs-mat\')" autocomplete="off"></div>'
+      +'<div class="pdd-list" id="rs-mat-list"></div>'
+      +'</div></div>'
+      +'<input type="hidden" id="rs-mat-id"></div>'
+      +'<div class="fld"><label>Peso (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="rs-peso"></div>'
       +'<button class="btn" onclick="addSaidaProdBV('+p.id+')" style="margin-bottom:10px">+ Adicionar</button>'
       +'<div style="border-top:1px solid var(--bd);padding-top:10px">'
       +'<button class="btn" style="background:var(--bl);color:#fff;margin-bottom:8px" onclick="fecharProdBV('+p.id+')">🏁 Fechar Produção</button></div></div>';
@@ -13097,7 +13155,8 @@ function mVerProdBV(id){
   openM((p.status==='aberta'?'⏳':'✅')+' Produção',html,560);
 }
 function addSaidaProdBV(prodId){
-  var matId=parseFloat(document.getElementById('rs-mat').value);
+  var matIdEl=document.getElementById('rs-mat-id');
+  var matId=matIdEl&&matIdEl.value?parseFloat(matIdEl.value):null;
   var peso=parseFloat(document.getElementById('rs-peso').value)||0;
   if(!matId||peso<=0){toast('Selecione material e peso!','var(--rd)');return;}
   var prod=gP(matId);
