@@ -2568,12 +2568,7 @@ function confAddP(prodId){
   if(pesoLiquido<=0){alert('O Peso Liquido e zero ou negativo. Verifique Tara e Desconto.');return;}
   if(ab.tipo==='Venda'&&prod.est<pesoLiquido){
     var falta=+(pesoLiquido-prod.est).toFixed(2);closeM();
-    var opts='';for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];if(p.id!==prodId&&p.est>0)opts+='<option value="'+p.nome+'">'+p.ic+' '+p.nome+' ('+fKg(p.est)+'kg)</option>';}
-    openM('Estoque Insuficiente','<div class="mf"><div class="al aly">Faltam '+falta+'kg de '+prod.nome+'. Transferir de qual material?</div>'
-      +'<div class="fld"><label>Material de origem</label><select class="inp" id="ori-d">'+opts+'</select></div>'
-      +'<div class="fld"><label>Peso a transferir kg</label><input class="inp" type="number" inputmode="decimal" id="ori-p" value="'+falta+'" step="0.01"></div>'
-      +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-      +'<button class="btn btn-or" onclick="confTransfP('+prodId+','+pesoLiquido+','+preco+')">Transferir e adicionar</button></div></div>',460);
+    mMostrarEstoqueInsuf(prodId,pesoLiquido,preco,falta);
     return;
   }
   var tabN='Padrao';if(ab.tabId){for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].id==ab.tabId){tabN=DB.tabelas[i].nome;break;}}}
@@ -2581,16 +2576,58 @@ function confAddP(prodId){
   closeM();savePesState();renderPesagem();
   setTimeout(_reabrirBuscaProd,150);
 }
-function confTransfP(prodId,peso,preco){
-  var oriNome=document.getElementById('ori-d').value,oriPeso=parseFloat(document.getElementById('ori-p').value)||0;
-  if(!oriNome||!oriPeso){alert('Preencha!');return;}
-  var pOri=null,pDest=gP(prodId);
-  for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].nome===oriNome){pOri=DB.produtos[i];break;}}
-  if(pOri)pOri.est=+(pOri.est-oriPeso).toFixed(2);if(pDest)pDest.est=+(pDest.est+oriPeso).toFixed(2);
-  DB.transf.unshift({id:nid(),data:hj(),de:oriNome,para:pDest.nome,pS:oriPeso,pE:oriPeso,obs:'Desmontagem para venda de '+pDest.nome});
+// Modal de transferência com suporte a MAIS DE UM material de origem — útil quando
+// a falta de estoque não vem de um lugar só (ex: parte do alumínio ficou "escondida"
+// pesada dentro de outro material sem querer).
+var _transfLinhaCount=1;
+function mMostrarEstoqueInsuf(prodId,pesoLiquido,preco,falta){
+  var prod=gP(prodId);
+  var opts='<option value="">-- Selecione --</option>';
+  for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];if(p.id!==prodId&&p.est>0)opts+='<option value="'+p.nome+'">'+p.ic+' '+p.nome+' ('+fKg(p.est)+'kg)</option>';}
+  window._transfProdId=prodId;window._transfPeso=pesoLiquido;window._transfPreco=preco;window._transfOpts=opts;
+  _transfLinhaCount=1;
+  openM('Estoque Insuficiente',
+    '<div class="mf"><div class="al aly">Faltam '+falta+'kg de '+(prod?prod.nome:'?')+'. Transferir de qual material? Pode dividir entre mais de um, se precisar.</div>'
+    +'<div id="transf-linhas">'+_linhaTransfHtml(0,opts,falta)+'</div>'
+    +'<button type="button" class="btnO bOgr" style="width:100%;margin-bottom:10px" onclick="_addLinhaTransf()">+ Adicionar outro material de origem</button>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
+    +'<button class="btn btn-or" onclick="confTransfPMulti()">Transferir e adicionar</button></div></div>',460);
+}
+function _linhaTransfHtml(idx,opts,pesoDefault){
+  return '<div class="transf-linha" style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-end">'
+    +'<div class="fld" style="flex:1;margin-bottom:0"><label>Material de origem</label><select class="inp transf-origem">'+opts+'</select></div>'
+    +'<div class="fld" style="width:100px;margin-bottom:0"><label>Peso kg</label><input class="inp transf-peso" type="number" inputmode="decimal" step="0.01" value="'+(pesoDefault||'')+'"></div>'
+    +(idx>0?'<button type="button" onclick="this.parentElement.remove()" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:9px 10px;cursor:pointer;flex-shrink:0">✕</button>':'')
+    +'</div>';
+}
+function _addLinhaTransf(){
+  var wrap=document.getElementById('transf-linhas');
+  if(!wrap)return;
+  wrap.insertAdjacentHTML('beforeend',_linhaTransfHtml(_transfLinhaCount,window._transfOpts,''));
+  _transfLinhaCount++;
+}
+function confTransfPMulti(){
+  var prodId=window._transfProdId,pesoLiquido=window._transfPeso,preco=window._transfPreco;
+  var pDest=gP(prodId);if(!pDest)return;
+  var linhas=document.querySelectorAll('.transf-linha');
+  var transfs=[];
+  for(var i=0;i<linhas.length;i++){
+    var sel=linhas[i].querySelector('.transf-origem');
+    var pesoEl=linhas[i].querySelector('.transf-peso');
+    var oriNome=sel?sel.value:'';
+    var oriPeso=pesoEl?(parseFloat(pesoEl.value)||0):0;
+    if(oriNome&&oriPeso>0)transfs.push({nome:oriNome,peso:oriPeso});
+  }
+  if(!transfs.length){alert('Preencha ao menos um material de origem com peso!');return;}
+  transfs.forEach(function(t){
+    var pOri=null;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].nome===t.nome){pOri=DB.produtos[i];break;}}
+    if(pOri)pOri.est=+(pOri.est-t.peso).toFixed(2);
+    pDest.est=+(pDest.est+t.peso).toFixed(2);
+    DB.transf.unshift({id:nid(),data:hj(),de:t.nome,para:pDest.nome,pS:t.peso,pE:t.peso,obs:'Desmontagem para venda de '+pDest.nome});
+  });
   var ab=pesAbas[pesAtiva];var tabN='Padrao';
   if(ab.tabId){for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].id==ab.tabId){tabN=DB.tabelas[i].nome;break;}}}
-  ab.itens.push({prodId:prodId,ic:pDest.ic,nome:pDest.nome,peso:peso,preco:preco,tipo:ab.tipo,uni:false,tabN:tabN});
+  ab.itens.push({prodId:prodId,ic:pDest.ic,nome:pDest.nome,peso:pesoLiquido,preco:preco,tipo:ab.tipo,uni:false,tabN:tabN});
   closeM();savePesState();renderPesagem();
   setTimeout(_reabrirBuscaProd,150);
 }
