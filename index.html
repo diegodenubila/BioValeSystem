@@ -2584,27 +2584,48 @@ function mMostrarEstoqueInsuf(prodId,pesoLiquido,preco,falta){
   var prod=gP(prodId);
   var opts='<option value="">-- Selecione --</option>';
   for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];if(p.id!==prodId&&p.est>0)opts+='<option value="'+p.nome+'">'+p.ic+' '+p.nome+' ('+fKg(p.est)+'kg)</option>';}
-  window._transfProdId=prodId;window._transfPeso=pesoLiquido;window._transfPreco=preco;window._transfOpts=opts;
+  window._transfProdId=prodId;window._transfPeso=pesoLiquido;window._transfPreco=preco;window._transfOpts=opts;window._transfFalta=falta;
   _transfLinhaCount=1;
   openM('Estoque Insuficiente',
     '<div class="mf"><div class="al aly">Faltam '+falta+'kg de '+(prod?prod.nome:'?')+'. Transferir de qual material? Pode dividir entre mais de um, se precisar.</div>'
     +'<div id="transf-linhas">'+_linhaTransfHtml(0,opts,falta)+'</div>'
+    +'<div id="transf-restante" style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--gr)">&#9989; Cobre o total da falta</div>'
     +'<button type="button" class="btnO bOgr" style="width:100%;margin-bottom:10px" onclick="_addLinhaTransf()">+ Adicionar outro material de origem</button>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
     +'<button class="btn btn-or" onclick="confTransfPMulti()">Transferir e adicionar</button></div></div>',460);
 }
 function _linhaTransfHtml(idx,opts,pesoDefault){
   return '<div class="transf-linha" style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-end">'
-    +'<div class="fld" style="flex:1;margin-bottom:0"><label>Material de origem</label><select class="inp transf-origem">'+opts+'</select></div>'
-    +'<div class="fld" style="width:100px;margin-bottom:0"><label>Peso kg</label><input class="inp transf-peso" type="number" inputmode="decimal" step="0.01" value="'+(pesoDefault||'')+'"></div>'
-    +(idx>0?'<button type="button" onclick="this.parentElement.remove()" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:9px 10px;cursor:pointer;flex-shrink:0">✕</button>':'')
+    +'<div class="fld" style="flex:1;margin-bottom:0"><label>Material de origem</label><select class="inp transf-origem" onchange="_atualizarRestanteTransf()">'+opts+'</select></div>'
+    +'<div class="fld" style="width:100px;margin-bottom:0"><label>Peso kg</label><input class="inp transf-peso" type="number" inputmode="decimal" step="0.01" value="'+(pesoDefault||'')+'" oninput="_atualizarRestanteTransf()"></div>'
+    +(idx>0?'<button type="button" onclick="this.parentElement.remove();_atualizarRestanteTransf()" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:9px 10px;cursor:pointer;flex-shrink:0">✕</button>':'')
     +'</div>';
+}
+// Soma o que já foi preenchido nas linhas e mostra quanto ainda falta pra cobrir
+// a falta de estoque total — atualiza a cada mudança de material ou peso.
+function _atualizarRestanteTransf(){
+  var pesos=document.querySelectorAll('.transf-peso');
+  var soma=0;pesos.forEach(function(el){soma+=parseFloat(el.value)||0;});
+  var restante=+((window._transfFalta||0)-soma).toFixed(2);
+  var el=document.getElementById('transf-restante');
+  if(!el)return;
+  if(restante<=0){
+    el.innerHTML='&#9989; Cobre o total da falta'+(restante<0?' (sobra '+fKg(Math.abs(restante))+'kg)':'');
+    el.style.color='var(--gr)';
+  }else{
+    el.innerHTML='&#9888; Ainda faltam <b>'+fKg(restante)+'kg</b> pra completar';
+    el.style.color='var(--or)';
+  }
 }
 function _addLinhaTransf(){
   var wrap=document.getElementById('transf-linhas');
   if(!wrap)return;
-  wrap.insertAdjacentHTML('beforeend',_linhaTransfHtml(_transfLinhaCount,window._transfOpts,''));
+  var pesos=document.querySelectorAll('.transf-peso');
+  var soma=0;pesos.forEach(function(el){soma+=parseFloat(el.value)||0;});
+  var restante=Math.max(0,+((window._transfFalta||0)-soma).toFixed(2));
+  wrap.insertAdjacentHTML('beforeend',_linhaTransfHtml(_transfLinhaCount,window._transfOpts,restante>0?restante:''));
   _transfLinhaCount++;
+  _atualizarRestanteTransf();
 }
 function confTransfPMulti(){
   var prodId=window._transfProdId,pesoLiquido=window._transfPeso,preco=window._transfPreco;
@@ -13797,10 +13818,14 @@ function getMonthOf(dateStr) {
 }
 
 function fPendente(f) {
-  var pend=0;
-  for(var j=0;j<f.pontos.length;j++){if(!f.pontos[j].pago)pend+=f.pontos[j].val;}
-  for(var j=0;j<(f.adiantamentos||[]).length;j++){if(!f.adiantamentos[j].descontado)pend+=f.adiantamentos[j].val;}
-  return pend;
+  // Pendente = trabalho ainda não pago, MENOS adiantamentos/descontos que ainda
+  // não foram descontados — antes estava somando o desconto junto com o trabalho
+  // não pago, em vez de abater, o que inflava o valor.
+  var trabNaoPago=0;
+  for(var j=0;j<f.pontos.length;j++){if(!f.pontos[j].pago)trabNaoPago+=f.pontos[j].val;}
+  var adiantPend=0;
+  for(var j=0;j<(f.adiantamentos||[]).length;j++){if(!f.adiantamentos[j].descontado)adiantPend+=f.adiantamentos[j].val;}
+  return Math.max(0,trabNaoPago-adiantPend);
 }
 
 function getTotalSemana(f) {
@@ -13933,6 +13958,12 @@ function pgFuncs(){
     ];
     var vH='';for(var j=0;j<vCards.length;j++){var x=vCards[j];vH+='<div style="background:var(--bg);border-radius:7px;padding:7px 11px"><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">'+x.l+'</div><div style="font-size:13px;font-weight:700;color:'+x.c+';margin-top:2px;font-family:monospace">'+x.v+'</div></div>';}
 
+    // Aviso fixo: se o adiantamento/desconto pendente for maior que o trabalhado da
+    // semana, sobra um resto que não aparece em nenhum card — deixa isso visível
+    // aqui, sem precisar abrir Adiantamentos pra descobrir.
+    var sobraPendente=+Math.max(0,adiantSem-semana).toFixed(2);
+    var avisoSobraH=sobraPendente>0.001?'<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:7px;padding:8px 11px;margin-top:8px;font-size:12px;color:var(--or);font-weight:600">&#9888; Ainda restam '+fR(sobraPendente)+' de adiantamento/desconto pendente, além do que já foi abatido nesta semana</div>':'';
+
     // Tabs for detail panel
     var tabsH='<div class="tabs">'
       +'<button class="tabbtn'+(fTab==='ponto'?' on':'')+'" onclick="setFTab(\&apos;ponto\&apos;)">&#128197; Ponto</button>'
@@ -13945,7 +13976,14 @@ function pgFuncs(){
     if(fTab==='ponto'){
       // Full ponto list
       var ptH='';
-      if(!f.pontos.length) ptH='<p style="color:var(--mt);font-size:13px;padding:14px 0">Nenhum ponto registrado.</p>';
+      // Avisa logo no topo se tem desconto/adiantamento pendente — assim fica claro
+      // que ele vai ser abatido ao pagar, em vez de só aparecer depois de clicar.
+      var descPendTopo=0;
+      for(var j=0;j<(f.adiantamentos||[]).length;j++){if(!f.adiantamentos[j].descontado)descPendTopo+=f.adiantamentos[j].val;}
+      if(descPendTopo>0.001){
+        ptH+='<div style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.35);border-radius:var(--r);padding:9px 12px;margin-bottom:10px;font-size:12px;color:var(--pu);font-weight:600">&#128722; '+fR(descPendTopo)+' de desconto/adiantamento pendente — abate automaticamente ao pagar os dias abaixo</div>';
+      }
+      if(!f.pontos.length) ptH+='<p style="color:var(--mt);font-size:13px;padding:14px 0">Nenhum ponto registrado.</p>';
       else for(var j=0;j<f.pontos.length;j++){
         var pt=f.pontos[j];
         var desc=descHorasAtraso(f, pt.ent, pt.per);
@@ -13975,12 +14013,17 @@ function pgFuncs(){
         if(pt.pago)semanas[wk].pago+=pt.val;
         semanas[wk].pontos.push(pt);
       }
-      // Soma adiantamentos por semana
+      // Soma adiantamentos por semana — separa Adiantamento de Desconto/Compra pro
+      // rótulo certo, e só soma os que ainda estão pendentes (senão um desconto já
+      // aplicado num pagamento anterior seria descontado de novo aqui).
       for(var j=0;j<(f.adiantamentos||[]).length;j++){
         var ad=f.adiantamentos[j];
+        if(ad.descontado)continue;
         var wk=getWeekOf(ad.data);
-        if(!semanas[wk])semanas[wk]={total:0,pago:0,adiant:0,pontos:[]};
+        if(!semanas[wk])semanas[wk]={total:0,pago:0,adiant:0,adiantReal:0,desconto:0,pontos:[]};
         semanas[wk].adiant+=ad.val;
+        if(ad.tipoDesconto)semanas[wk].desconto=(semanas[wk].desconto||0)+ad.val;
+        else semanas[wk].adiantReal=(semanas[wk].adiantReal||0)+ad.val;
       }
       var wKeys=Object.keys(semanas);
       if(!wKeys.length){tabContent='<p style="color:var(--mt);font-size:13px;padding:14px 0">Nenhum dado.</p>';}
@@ -14010,10 +14053,13 @@ function pgFuncs(){
             +'</div>'
             +(isSemanaAtual&&temAberto?'<button style="background:var(--bl);border:none;border-radius:var(--r);padding:6px 13px;color:#fff;font-size:12px;font-weight:700;cursor:pointer" onclick="mPagarSemana('+fSel+')">&#10003; Pagar semana &mdash; '+fR(saldo)+'</button>':'')
             +'</div></div>'
-            +(sw.adiant>0?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">'
-              +'<div style="background:var(--orb);border-radius:6px;padding:6px 10px">'
+            +(sw.adiant>0?'<div style="display:grid;grid-template-columns:'+((sw.adiantReal>0&&sw.desconto>0)?'1fr 1fr 1fr':'1fr 1fr')+';gap:7px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">'
+              +(sw.adiantReal>0?'<div style="background:var(--orb);border-radius:6px;padding:6px 10px">'
               +'<div style="font-size:10px;color:var(--or)">Adiantado</div>'
-              +'<div style="font-size:13px;font-weight:700;color:var(--or);font-family:monospace">-'+fR(sw.adiant)+'</div></div>'
+              +'<div style="font-size:13px;font-weight:700;color:var(--or);font-family:monospace">-'+fR(sw.adiantReal)+'</div></div>':'')
+              +(sw.desconto>0?'<div style="background:rgba(168,85,247,.1);border-radius:6px;padding:6px 10px">'
+              +'<div style="font-size:10px;color:var(--pu)">&#128722; Desconto/Compra</div>'
+              +'<div style="font-size:13px;font-weight:700;color:var(--pu);font-family:monospace">-'+fR(sw.desconto)+'</div></div>':'')
               +'<div style="background:var(--blb);border-radius:6px;padding:6px 10px">'
               +'<div style="font-size:10px;color:var(--bl)">A pagar</div>'
               +'<div style="font-size:13px;font-weight:700;color:var(--bl);font-family:monospace">'+fR(saldo)+'</div></div>'
@@ -14039,9 +14085,12 @@ function pgFuncs(){
       }
       for(var j=0;j<(f.adiantamentos||[]).length;j++){
         var ad=f.adiantamentos[j];
+        if(ad.descontado)continue;
         var mm=getMonthOf(ad.data);
-        if(!meses[mm])meses[mm]={total:0,adiant:0,pts:[]};
+        if(!meses[mm])meses[mm]={total:0,adiant:0,adiantReal:0,desconto:0,pts:[]};
         meses[mm].adiant+=ad.val;
+        if(ad.tipoDesconto)meses[mm].desconto=(meses[mm].desconto||0)+ad.val;
+        else meses[mm].adiantReal=(meses[mm].adiantReal||0)+ad.val;
       }
       var mKeys=Object.keys(meses);
       if(!mKeys.length){tabContent='<p style="color:var(--mt);font-size:13px;padding:14px 0">Nenhum dado.</p>';}
@@ -14058,10 +14107,13 @@ function pgFuncs(){
             +'<div style="font-size:16px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(sm.total)+'</div>'
             +'<div style="font-size:10px;color:var(--mt)">trabalhado</div>'
             +'</div></div>'
-            +(sm.adiant>0?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">'
-              +'<div style="background:var(--orb);border-radius:6px;padding:6px 10px">'
+            +(sm.adiant>0?'<div style="display:grid;grid-template-columns:'+((sm.adiantReal>0&&sm.desconto>0)?'1fr 1fr 1fr':'1fr 1fr')+';gap:7px">'
+              +(sm.adiantReal>0?'<div style="background:var(--orb);border-radius:6px;padding:6px 10px">'
               +'<div style="font-size:10px;color:var(--or)">Adiantado no mes</div>'
-              +'<div style="font-size:13px;font-weight:700;color:var(--or);font-family:monospace">-'+fR(sm.adiant)+'</div></div>'
+              +'<div style="font-size:13px;font-weight:700;color:var(--or);font-family:monospace">-'+fR(sm.adiantReal)+'</div></div>':'')
+              +(sm.desconto>0?'<div style="background:rgba(168,85,247,.1);border-radius:6px;padding:6px 10px">'
+              +'<div style="font-size:10px;color:var(--pu)">&#128722; Desconto no mes</div>'
+              +'<div style="font-size:13px;font-weight:700;color:var(--pu);font-family:monospace">-'+fR(sm.desconto)+'</div></div>':'')
               +'<div style="background:var(--blb);border-radius:6px;padding:6px 10px">'
               +'<div style="font-size:10px;color:var(--bl)">A pagar no mes</div>'
               +'<div style="font-size:14px;font-weight:700;color:var(--bl);font-family:monospace">'+fR(saldoM)+'</div></div>'
@@ -14075,13 +14127,14 @@ function pgFuncs(){
       if(!adList.length) adH='<p style="color:var(--mt);font-size:13px;padding:14px 0">Nenhum adiantamento.</p>';
       else for(var j=0;j<adList.length;j++){
         var ad=adList[j];
-        adH+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg);border-radius:var(--r);margin-bottom:7px;border:1px solid '+(ad.descontado?'var(--bd)':'rgba(245,158,11,.4)')+'"><div>'
-          +'<div style="font-size:13px;font-weight:600">'+ad.data+'</div>'
+        var corAd=ad.tipoDesconto?'var(--pu)':'var(--or)';
+        adH+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg);border-radius:var(--r);margin-bottom:7px;border:1px solid '+(ad.descontado?'var(--bd)':(ad.tipoDesconto?'rgba(168,85,247,.4)':'rgba(245,158,11,.4)'))+'"><div>'
+          +'<div style="font-size:13px;font-weight:600">'+(ad.tipoDesconto?'&#128722; ':'&#128181; ')+ad.data+'</div>'
           +'<div style="font-size:11px;color:var(--mt)">'+ad.obs+'</div>'
           +'</div>'
           +'<div style="display:flex;align-items:center;gap:7px">'
-          +'<span style="font-size:14px;font-weight:700;color:'+(ad.descontado?'var(--mt)':'var(--or)')+';font-family:monospace">'+fR(ad.val)+'</span>'
-          +(ad.descontado?'<span class="tag to">Descontado</span>':'<button class="bsm" style="background:var(--orb);border:1px solid rgba(245,158,11,.4);color:var(--or)" onclick="descAdiant('+fSel+','+j+')">Descontar</button>')
+          +'<span style="font-size:14px;font-weight:700;color:'+(ad.descontado?'var(--mt)':corAd)+';font-family:monospace">'+fR(ad.val)+'</span>'
+          +(ad.descontado?'<span class="tag to">Descontado</span>':(ad.tipoDesconto?'<span class="tag" style="background:rgba(168,85,247,.15);color:var(--pu);border:1px solid rgba(168,85,247,.4)">Ativo — reduzindo o pagamento</span>':'<button class="bsm" style="background:var(--orb);border:1px solid rgba(245,158,11,.4);color:var(--or)" onclick="descAdiant('+fSel+','+j+')">Descontar</button>'))
           +'<button onclick="delAdiant('+fSel+','+j+')" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer">&#215;</button>'
           +'</div></div>';
       }
@@ -14095,10 +14148,12 @@ function pgFuncs(){
       +'<div style="font-size:11px;color:var(--mt)">'+f.cargo+(f.tel?' &middot; '+f.tel:'')+'</div></div>'
       +'<div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end">'
       +'<button class="btn btn-or" style="font-size:12px;padding:7px 12px" onclick="mAdiantamento('+fSel+')">&#128181; Adiantar</button>'
+      +'<button class="btn" style="font-size:12px;padding:7px 12px;background:var(--pu)" onclick="mDescontoCompra('+fSel+')">&#128722; Desconto/Compra</button>'
       +'<button class="btn" onclick="mPonto('+fSel+')">&#128197; Registrar Ponto</button>'
       +'<button onclick="imprimirHolerite('+fSel+')" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:var(--r);padding:7px 12px;font-size:12px;cursor:pointer">&#128196; Holerite</button>'
       +'</div></div>'
       +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:7px">'+vH+'</div>'
+      +avisoSobraH
       +'</div>'
       +'<div class="card">'+tabsH+'<div>'+tabContent+'</div></div>'
       +'</div>';
@@ -14123,6 +14178,12 @@ function pgPt(fi,pi){
   var f=DB.funcs[fi];var pt=f.pontos[fi]||f.pontos[pi];
   pt=f.pontos[pi];
   var val=pt.val||0;
+  // Desconto/adiantamento pendente que abate automaticamente desse pagamento
+  var descPend=0;
+  for(var j=0;j<(f.adiantamentos||[]).length;j++){if(!f.adiantamentos[j].descontado)descPend+=f.adiantamentos[j].val;}
+  var descAplicado=+Math.min(descPend,val).toFixed(2);
+  var valLiquido=+(val-descAplicado).toFixed(2);
+  var descRestante=+(descPend-descAplicado).toFixed(2); // o que não coube nesse dia, fica pendente pro próximo
   // Monta opções de conta
   var cO='';
   // Coloca PIX primeiro (conta poupança/corrente), depois dinheiro
@@ -14132,8 +14193,14 @@ function pgPt(fi,pi){
     return 0;
   });
   for(var i=0;i<sorted.length;i++)cO+='<option value="'+sorted[i].nome+'">'+sorted[i].ic+' '+sorted[i].nome+'</option>';
+  var resumoH='<div style="background:var(--grb);border:1px solid rgba(34,197,94,.2);border-radius:var(--r);padding:12px;margin-bottom:12px">'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:3px">'+pt.per+' · '+pt.data+'</div>'
+    +(descAplicado>0?'<div style="font-size:13px;color:var(--mt)">Trabalhado: '+fR(val)+'</div><div style="font-size:13px;color:var(--pu);font-weight:600">&#128722; Desconto/Adiantamento pendente: -'+fR(descAplicado)+'</div>':'')
+    +'<div style="font-size:22px;font-weight:700;color:var(--gr);font-family:monospace;margin-top:4px">'+fR(valLiquido)+'</div>'
+    +(descRestante>0.001?'<div style="font-size:12px;color:var(--or);font-weight:600;margin-top:6px">&#9888; Ainda vai sobrar '+fR(descRestante)+' pra abater nos próximos dias</div>':'')
+    +'</div>';
   openM('&#128181; Pagar — '+f.nome,
-    '<div class="mf">'+'<div style="background:var(--grb);border:1px solid rgba(34,197,94,.2);border-radius:var(--r);padding:12px;margin-bottom:12px">'+'<div style="font-size:11px;color:var(--mt);margin-bottom:3px">'+pt.per+' · '+pt.data+'</div>'+'<div style="font-size:22px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(val)+'</div>'+'</div>'+'<div class="fld"><label>Pagar via</label><select class="inp" id="pgpt-conta">'+cO+'</select></div>'+'<div class="fld"><label>Observacao (opcional)</label><input class="inp" id="pgpt-obs" placeholder="Ex: PIX, dinheiro em maos, transferencia..."></div>'+'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="confirmPgPt('+fi+','+pi+')">Confirmar Pagamento</button></div>'+'</div>',440);
+    '<div class="mf">'+resumoH+'<div class="fld"><label>Pagar via</label><select class="inp" id="pgpt-conta">'+cO+'</select></div>'+'<div class="fld"><label>Observacao (opcional)</label><input class="inp" id="pgpt-obs" placeholder="Ex: PIX, dinheiro em maos, transferencia..."></div>'+'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="confirmPgPt('+fi+','+pi+')">Confirmar Pagamento</button></div>'+'</div>',440);
   setTimeout(function(){
     // Tenta selecionar a primeira conta não-dinheiro (PIX/banco)
     var sel=document.getElementById('pgpt-conta');
@@ -14144,27 +14211,65 @@ function confirmPgPt(fi,pi){
   var f=DB.funcs[fi];var pt=f.pontos[pi];
   var conta=document.getElementById('pgpt-conta').value;
   var obs=document.getElementById('pgpt-obs').value.trim();
+  var val=pt.val||0;
+  // Abate desconto/adiantamento pendente desse pagamento — consome as entradas
+  // mais antigas primeiro, dividindo uma entrada em duas se ela for maior que o
+  // que ainda falta abater aqui. Guarda exatamente o que foi consumido de cada
+  // uma em pt.descontosConsumidos, pra dar pra desfazer certinho depois.
+  var restante=val;
+  var consumos=[];
+  if(!f.adiantamentos)f.adiantamentos=[];
+  for(var j=0;j<f.adiantamentos.length&&restante>0.001;j++){
+    var ad=f.adiantamentos[j];
+    if(ad.descontado)continue;
+    if(ad.val<=restante){
+      consumos.push({id:ad.id,tipo:'total',valor:ad.val});
+      restante=+(restante-ad.val).toFixed(2);
+      ad.descontado=true;
+    }else{
+      consumos.push({id:ad.id,tipo:'parcial',valor:restante});
+      ad.val=+(ad.val-restante).toFixed(2);
+      restante=0;
+    }
+  }
+  var valLiquido=+restante.toFixed(2);
   pt.pago=true;
   pt.contaPagamento=conta;
+  pt.valPago=valLiquido; // guarda o valor líquido de verdade pago, pra desfazer certo depois
+  pt.descontosConsumidos=consumos;
   if(obs)pt.obsPagamento=obs;
-  // Lança no financeiro com a conta correta
+  // Lança no financeiro com a conta correta — só o valor líquido, já com o desconto abatido
   var desc='Pagto '+f.nome+' - '+pt.per+' '+pt.data+(obs?' ('+obs+')':'');
-  DB.movs.unshift({id:nid(),data:hj(),desc:desc,tipo:'saida',cat:'Funcionarios',valor:pt.val,conta:conta});
-  for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo-pt.val).toFixed(2);break;}}
-  _auditLog('Ponto pago',f.nome+' — '+pt.data+' '+pt.per+' via '+conta);
+  if(valLiquido>0){
+    DB.movs.unshift({id:nid(),data:hj(),desc:desc,tipo:'saida',cat:'Funcionarios',valor:valLiquido,conta:conta});
+    for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo-valLiquido).toFixed(2);break;}}
+  }
+  _auditLog('Ponto pago',f.nome+' — '+pt.data+' '+pt.per+' via '+conta+(valLiquido!==val?' (líquido R$'+valLiquido+', desconto abatido)':''));
   saveDB();closeM();go('funcionarios');
 }
 function desfazerPtPago(fi,pi){
   var f=DB.funcs[fi];var pt=f.pontos[pi];
   if(!pt||!pt.pago)return;
-  confirmar('Desmarcar pagamento de '+pt.data+' ('+fR(pt.val)+')?',function(){
+  var valPago=pt.valPago!=null?pt.valPago:pt.val;
+  var temDesconto=pt.descontosConsumidos&&pt.descontosConsumidos.length;
+  confirmar('Desmarcar pagamento de '+pt.data+' ('+fR(valPago)+')?'+(temDesconto?'<br><span style="font-size:11px;color:var(--mt)">O desconto/adiantamento abatido nesse pagamento também volta a ficar pendente.</span>':''),function(){
     pt.pago=false;
     var desc='Pagto '+f.nome+' - '+pt.per+' '+pt.data;
     for(var i=0;i<DB.movs.length;i++){
-      if(DB.movs[i].desc===desc&&DB.movs[i].valor===pt.val){
-        for(var j=0;j<DB.contas.length;j++){if(DB.contas[j].nome===DB.movs[i].conta){DB.contas[j].saldo=+(DB.contas[j].saldo+pt.val).toFixed(2);break;}}
+      if(DB.movs[i].desc===desc&&DB.movs[i].valor===valPago){
+        for(var j=0;j<DB.contas.length;j++){if(DB.contas[j].nome===DB.movs[i].conta){DB.contas[j].saldo=+(DB.contas[j].saldo+valPago).toFixed(2);break;}}
         DB.movs.splice(i,1);break;
       }
+    }
+    // Devolve o desconto/adiantamento que tinha sido consumido nesse pagamento
+    if(temDesconto){
+      pt.descontosConsumidos.forEach(function(c){
+        var ad=null;for(var k=0;k<(f.adiantamentos||[]).length;k++){if(f.adiantamentos[k].id===c.id){ad=f.adiantamentos[k];break;}}
+        if(!ad)return; // a entrada foi excluída nesse meio tempo — não tem como restaurar essa parte
+        if(c.tipo==='total')ad.descontado=false;
+        else ad.val=+(ad.val+c.valor).toFixed(2);
+      });
+      pt.descontosConsumidos=null;
     }
     _auditLog('Ponto desfeito',f.nome+' — '+pt.data+' '+pt.per);
     saveDB();go('funcionarios');
@@ -14528,6 +14633,50 @@ function saveAdiant(fi){
   if(!f.adiantamentos)f.adiantamentos=[];
   f.adiantamentos.unshift({id:nid(), data:dataFmt, val:v, obs:obs||'Adiantamento', descontado:false});
   _addMovFin('Adiantamento '+f.nome+(obs?' - '+obs:''), 'saida', v);
+  saveDB();closeM(); fTab='adiant'; go('funcionarios');
+}
+// Desconto de compra — funcionário comprou algo na empresa e combinou de abater
+// do pagamento. Usa a MESMA estrutura de adiantamento (pra já entrar automático
+// em todas as contas de "a pagar" semana/mês), só que SEM lançar saída no
+// Financeiro — porque não é dinheiro novo saindo, é só reduzindo o que a empresa
+// já ia pagar pro funcionário. Se quiser dividir em vários dias/semanas, é só
+// registrar mais de uma vez, com data e valor de cada parte.
+function mDescontoCompra(fi){
+  var f=DB.funcs[fi];
+  var hoje=new Date().toISOString().split('T')[0];
+  var trabSemana=getTotalSemana(f);
+  var adiantSemana=getAdiantSemana(f);
+  var saldoSemana=Math.max(0, trabSemana - adiantSemana);
+
+  var resumoH='<div style="background:var(--bg);border-radius:var(--r);padding:11px 13px;margin-bottom:4px">'
+    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Semana atual</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">'
+    +'<div><div style="font-size:10px;color:var(--mt)">Trabalhado</div><div style="font-size:14px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(trabSemana)+'</div></div>'
+    +'<div><div style="font-size:10px;color:var(--mt)">Já descontado</div><div style="font-size:14px;font-weight:700;color:var(--pu);font-family:monospace">'+fR(adiantSemana)+'</div></div>'
+    +'<div><div style="font-size:10px;color:var(--mt)">Saldo disponível</div><div style="font-size:14px;font-weight:700;color:'+(saldoSemana>0?'var(--bl)':'var(--rd)')+';font-family:monospace">'+fR(saldoSemana)+'</div></div>'
+    +'</div></div>';
+
+  openM('&#128722; Desconto/Compra - '+f.nome,
+    '<div class="mf">'
+    +resumoH
+    +'<div class="al alb" style="font-size:12px">Vai ser descontado do pagamento — se quiser dividir em mais de um dia ou semana, registre esse desconto de novo, cada vez com uma parte do valor.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Data</label><input class="inp" type="date" id="dc-d" value="'+hoje+'"></div>'
+    +'<div class="fld"><label>Valor R$ (max: '+fR(saldoSemana)+')</label><input class="inp" type="number" inputmode="decimal" id="dc-v" placeholder="0,00" step="0.01" max="'+saldoSemana+'"></div>'
+    +'</div>'
+    +'<div class="fld"><label>O que comprou? (opcional)</label><input class="inp" id="dc-obs" placeholder="Ex: Bateria de celular"></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" style="background:var(--pu)" onclick="saveDescontoCompra('+fi+')">Registrar Desconto</button></div>'
+    +'</div>', 460);
+}
+function saveDescontoCompra(fi){
+  var f=DB.funcs[fi];
+  var da=document.getElementById('dc-d').value;
+  var v=parseFloat(document.getElementById('dc-v').value)||0;
+  var obs=document.getElementById('dc-obs').value.trim();
+  if(!da||v<=0){alert('Informe data e valor!');return;}
+  var dataFmt=new Date(da+'T12:00').toLocaleDateString('pt-BR');
+  if(!f.adiantamentos)f.adiantamentos=[];
+  f.adiantamentos.unshift({id:nid(), data:dataFmt, val:v, obs:obs?'Compra: '+obs:'Compra na empresa', descontado:false, tipoDesconto:true});
   saveDB();closeM(); fTab='adiant'; go('funcionarios');
 }
 
