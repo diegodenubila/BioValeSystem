@@ -1628,6 +1628,32 @@ function mHistFornPes(){
 }
 
 
+// Monta só "Produto: peso" de cada item do carrinho, um por linha, e copia pra
+// área de transferência — pra colar direto no WhatsApp sem digitar item por item,
+// pros clientes que só querem nome e peso, sem valor, tara, etc.
+function copiarProdutoPeso(){
+  var ab=pesAbas[pesAtiva];
+  if(!ab.itens||!ab.itens.length){alert('Carrinho vazio!');return;}
+  var linhas=ab.itens.map(function(it){
+    var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:(it.peso||0);
+    var nomeProd=it.nome||(it.ic?it.ic+' ':'')+'Material';
+    return it.uni?nomeProd+': 1 un':nomeProd+': '+fKg(pesoEf)+'kg';
+  });
+  var texto=linhas.join('\n');
+  function _avisaCopiado(){toast('Copiado! Já pode colar no WhatsApp.','var(--gr)');}
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(texto).then(_avisaCopiado).catch(function(){_copiarFallback(texto);_avisaCopiado();});
+  }else{
+    _copiarFallback(texto);_avisaCopiado();
+  }
+}
+function _copiarFallback(texto){
+  var ta=document.createElement('textarea');
+  ta.value=texto;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.focus();ta.select();
+  try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
 function mComprovantePes(){
   var ab=pesAbas[pesAtiva];
   if(!ab.itens||!ab.itens.length){alert('Carrinho vazio!');return;}
@@ -1913,7 +1939,7 @@ function renderPesagem(){
     :'<div class="card" style="padding:13px"><div class="stl"><div class="stb"></div><div class="stx">Carrinho</div></div><div style="text-align:center;padding:26px;color:var(--mt)">Selecione produtos da lista</div></div>';
   var finBtn=hasIt
     ?'<div id="pes-fin-bar" style="position:sticky;bottom:0;left:0;right:0;padding:10px 0 4px;background:linear-gradient(to bottom,transparent,var(--bg) 35%);z-index:10;display:block">'
-     +'<div style="display:flex;gap:8px">'     +'<button onclick="mComprovantePes()" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.4);border-radius:var(--r);padding:14px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">&#128196; Recibo</button>'     +'<button class="btn" style="flex:1;padding:14px;font-size:15px;font-weight:700;background:var(--gr2);box-shadow:0 2px 16px rgba(34,197,94,.4)" onclick="mFinPes()">&#10003; Finalizar Pesagem &mdash; '+fR(Math.abs(totLiq))+'</button>'     +'</div></div>'
+     +'<div style="display:flex;gap:8px">'     +'<button onclick="mComprovantePes()" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.4);border-radius:var(--r);padding:14px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">&#128196; Recibo</button>'     +'<button onclick="copiarProdutoPeso()" style="background:rgba(34,197,94,.12);color:var(--gr);border:1px solid rgba(34,197,94,.4);border-radius:var(--r);padding:14px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">&#128203; Copiar p/ WhatsApp</button>'     +'<button class="btn" style="flex:1;padding:14px;font-size:15px;font-weight:700;background:var(--gr2);box-shadow:0 2px 16px rgba(34,197,94,.4)" onclick="mFinPes()">&#10003; Finalizar Pesagem &mdash; '+fR(Math.abs(totLiq))+'</button>'     +'</div></div>'
     :'';
   cc.innerHTML='<div class="fc">'
     +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
@@ -7053,6 +7079,151 @@ function onRevCatChangeSpecs(prefix){
     parent.insertBefore(tmp.firstChild,ref);
   }
 }
+// ── Reservas temporárias ────────────────────────────────────────────
+// Libera sozinho qualquer item "Reservado" cujo prazo já passou, voltando pra
+// "Disponivel" — roda toda vez que a página de Revenda é aberta.
+function _liberarReservasExpiradas(){
+  var agora=Date.now();var mudou=false;
+  for(var i=0;i<DB.revenda.length;i++){
+    var p=DB.revenda[i];
+    if(p.status==='Reservado'&&p.reservaExpira&&agora>p.reservaExpira){
+      p.status='Disponivel';p.reservaExpira=null;p.reservaCliente=null;mudou=true;
+    }
+  }
+  if(mudou)saveDB();
+}
+function cancelarReservaRev(id){
+  var p=gRevById(id);if(!p)return;
+  p.status='Disponivel';p.reservaExpira=null;p.reservaCliente=null;
+  saveDB();closeM();go('revenda');toast('Reserva cancelada!','var(--gr)');
+}
+function gRevById(id){for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id)return DB.revenda[i];}return null;}
+function _fmtDataHoraCurta(ts){
+  if(!ts)return '?';
+  var d=new Date(ts);
+  var hoje=new Date();
+  var mesmoDia=d.toDateString()===hoje.toDateString();
+  var hh=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+  return mesmoDia?hh:('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+' '+hh;
+}
+
+// ── Gerar Relação pra Cliente ────────────────────────────────────────
+// Junta produtos disponíveis (filtrando categoria/faixa de preço), deixa marcar
+// quais entram, e gera um PDF ou Excel/CSV pronto pra mandar pro cliente — com
+// modelo/configuração/condição já puxados do cadastro, sem precisar redigitar
+// em outro lugar.
+var _relCatFiltro='Todos';
+function mGerarRelacao(){
+  _liberarReservasExpiradas();
+  var catNomes=['Todos'].concat(getRevCatNomes());
+  var catOpts=catNomes.map(function(c){return '<option value="'+c+'"'+(c===_relCatFiltro?' selected':'')+'>'+c+'</option>';}).join('');
+  openM('&#128228; Gerar Relação pra Cliente',
+    '<div class="mf">'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:12px">Escolhe os produtos que quer mandar pro cliente — puxa modelo, configuração e condição direto do cadastro.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">'
+    +'<div class="fld" style="margin-bottom:0"><label>Categoria</label><select class="inp" id="rel-cat" onchange="_relRenderLista()">'+catOpts+'</select></div>'
+    +'<div class="fld" style="margin-bottom:0"><label>Preço mín.</label><input class="inp" type="number" id="rel-min" placeholder="0" oninput="_relRenderLista()"></div>'
+    +'<div class="fld" style="margin-bottom:0"><label>Preço máx.</label><input class="inp" type="number" id="rel-max" placeholder="Sem limite" oninput="_relRenderLista()"></div>'
+    +'</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="rel-all" checked onchange="_relToggleAll(this.checked)"> Selecionar todos</label>'
+    +'<span id="rel-contador" style="font-size:11px;color:var(--mt)"></span>'
+    +'</div>'
+    +'<div id="rel-lista" style="max-height:340px;overflow-y:auto;margin-bottom:14px"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+    +'<button class="btnO bOgr" onclick="_relExportar(\'pdf\')">&#128196; Gerar PDF</button>'
+    +'<button class="btnO bOgr" onclick="_relExportar(\'csv\')">&#128202; Gerar Excel/CSV</button>'
+    +'</div>'
+    +'<button class="btn" style="width:100%;background:var(--or)" onclick="_relReservarModal()">&#8987; Reservar selecionados por um tempo</button>'
+    +'</div>',560);
+  setTimeout(_relRenderLista,50);
+}
+function _relItensFiltrados(){
+  var cat=document.getElementById('rel-cat')?document.getElementById('rel-cat').value:'Todos';
+  var min=parseFloat(document.getElementById('rel-min')?document.getElementById('rel-min').value:'')||0;
+  var maxEl=document.getElementById('rel-max');
+  var max=maxEl&&maxEl.value?parseFloat(maxEl.value):Infinity;
+  return DB.revenda.filter(function(p){
+    if(p.status!=='Disponivel')return false;
+    if(cat!=='Todos'&&p.cat!==cat)return false;
+    if((p.preco||0)<min||(p.preco||0)>max)return false;
+    return true;
+  });
+}
+function _relRenderLista(){
+  var itens=_relItensFiltrados();
+  var listEl=document.getElementById('rel-lista');
+  var contEl=document.getElementById('rel-contador');
+  if(!listEl)return;
+  if(!itens.length){listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--mt);font-size:12px">Nenhum produto disponível com esse filtro.</div>';if(contEl)contEl.textContent='';return;}
+  listEl.innerHTML=itens.map(function(p){
+    return '<label style="display:flex;align-items:center;gap:9px;padding:8px 6px;border-bottom:1px solid var(--bd);cursor:pointer">'
+      +'<input type="checkbox" class="rel-item-chk" value="'+p.id+'" checked onchange="_relAtualizaContador()">'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:600">'+p.prod+'</div><div style="font-size:10px;color:var(--mt)">'+(p.cond||'')+(p.cat?' · '+p.cat:'')+'</div></div>'
+      +'<div style="font-size:13px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(p.preco)+'</div>'
+      +'</label>';
+  }).join('');
+  _relAtualizaContador();
+}
+function _relAtualizaContador(){
+  var chks=document.querySelectorAll('.rel-item-chk');
+  var marcados=0;chks.forEach(function(c){if(c.checked)marcados++;});
+  var contEl=document.getElementById('rel-contador');
+  if(contEl)contEl.textContent=marcados+' de '+chks.length+' selecionado(s)';
+}
+function _relToggleAll(marcar){
+  var chks=document.querySelectorAll('.rel-item-chk');
+  chks.forEach(function(c){c.checked=marcar;});
+  _relAtualizaContador();
+}
+function _relSelecionados(){
+  var ids=[];document.querySelectorAll('.rel-item-chk').forEach(function(c){if(c.checked)ids.push(parseFloat(c.value));});
+  return DB.revenda.filter(function(p){return ids.indexOf(p.id)>=0;});
+}
+function _relExportar(fmt){
+  var itens=_relSelecionados();
+  if(!itens.length){alert('Selecione ao menos um produto!');return;}
+  if(fmt==='csv'){
+    var rows=[['Produto','Categoria','Condição','Configuração','Preço']];
+    itens.forEach(function(p){
+      var specsTxt=p.specs?Object.keys(p.specs).map(function(k){return k+': '+p.specs[k];}).join(' | '):'';
+      rows.push([p.prod,p.cat||'',p.cond||'',specsTxt,fR(p.preco)]);
+    });
+    _exportCSV('relacao-produtos-'+hj().replace(/\//g,'-')+'.csv',rows);
+  }else{
+    var th='<table><thead><tr><th>Produto</th><th>Categoria</th><th>Condição</th><th>Configuração</th><th>Preço</th></tr></thead><tbody>';
+    itens.forEach(function(p){
+      var specsTxt=p.specs?Object.keys(p.specs).map(function(k){return '<b>'+k+':</b> '+p.specs[k];}).join('<br>'):'';
+      th+='<tr><td>'+p.prod+'</td><td>'+(p.cat||'')+'</td><td>'+(p.cond||'')+'</td><td style="font-size:9px">'+specsTxt+'</td><td>'+fR(p.preco)+'</td></tr>';
+    });
+    th+='</tbody></table>';
+    _exportPDF('Relação de Produtos',th);
+  }
+}
+function _relReservarModal(){
+  var itens=_relSelecionados();
+  if(!itens.length){alert('Selecione ao menos um produto!');return;}
+  openM('&#8987; Reservar '+itens.length+' item(ns)',
+    '<div class="mf">'
+    +'<div class="fld"><label>Reservar por quanto tempo?</label><select class="inp" id="rel-horas">'
+    +'<option value="2">2 horas</option><option value="6">6 horas</option><option value="24" selected>1 dia</option><option value="72">3 dias</option><option value="168">1 semana</option>'
+    +'</select></div>'
+    +'<div class="fld"><label>Nome do cliente (opcional)</label><input class="inp" id="rel-cliente" placeholder="Ex: João da Loja X"></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" style="background:var(--or)" onclick="_relConfirmarReserva()">Reservar</button></div>'
+    +'</div>',420);
+}
+function _relConfirmarReserva(){
+  var itens=_relSelecionados();
+  var horas=parseFloat(document.getElementById('rel-horas').value)||24;
+  var cliente=document.getElementById('rel-cliente').value.trim();
+  var expira=Date.now()+horas*3600*1000;
+  itens.forEach(function(p){
+    var real=gRevById(p.id);
+    if(real){real.status='Reservado';real.reservaExpira=expira;real.reservaCliente=cliente||null;}
+  });
+  saveDB();closeM();go('revenda');toast(itens.length+' item(ns) reservado(s)!','var(--or)');
+}
+
 function pgRevenda(){
   // Linha 1: Categorias
   var catNomes=getRevCatNomes();
@@ -7078,7 +7249,7 @@ function pgRevenda(){
   var grupos={};var ordemGrupos=[];
   for(var i=0;i<DB.revenda.length;i++){
     var p=DB.revenda[i];
-    if(p.status!=='Disponivel')continue;
+    if(p.status!=='Disponivel'&&p.status!=='Reservado')continue;
     if(revCatFiltro!=='Todos'&&p.cat!==revCatFiltro)continue;
     if(revCondFiltro!=='Todas'&&p.cond!==revCondFiltro)continue;
     // Nome base: remove sufixo " #N" — garante que prod existe
@@ -7092,6 +7263,7 @@ function pgRevenda(){
     var p0=grp.items[0]; // representante do grupo
     var qtd=grp.items.length;
     var condBadge=p0.cond?'<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(168,85,247,.15);color:var(--pu)">'+p0.cond+'</span>':'';
+    var reservaBadge=p0.status==='Reservado'?'<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(245,158,11,.15);color:var(--or)">&#8987; Reservado</span>':'';
     var catCL=getRevCatChecklist(p0.cat);
     var aprovados=p0.testesAprovados||[];
     var testesHtml='';
@@ -7119,7 +7291,7 @@ function pgRevenda(){
       +(p0.desc?'<div style="font-size:11px;color:var(--mt);margin-bottom:5px;line-height:1.4">'+p0.desc+'</div>':'')
       +(function(){var s=p0.specs||{};var keys=Object.keys(s);if(!keys.length)return '';var h='<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">';for(var ki=0;ki<keys.length&&ki<6;ki++){var sv=s[keys[ki]];if(sv===''||sv===null||sv===undefined||sv===false)continue;var sval=sv===true?'&#10003; '+keys[ki]:keys[ki]+': '+sv;h+='<span style="font-size:10px;padding:1px 7px;border-radius:20px;background:rgba(59,130,246,.1);color:var(--bl);border:1px solid rgba(59,130,246,.2)">'+sval+'</span>';}return h+'</div>';})()
       +'<div style="font-size:11px;color:var(--mt);margin-bottom:5px">'+(p0.cat?'<span style="color:var(--bl)">'+p0.cat+'</span> &middot; ':'')+fKg(p0.peso)+'kg</div>'
-      +(p0.cond?'<div style="margin-bottom:6px">'+condBadge+'</div>':'<div style="margin-bottom:6px"></div>')
+      +((p0.cond||reservaBadge)?'<div style="margin-bottom:6px;display:flex;gap:5px;flex-wrap:wrap">'+condBadge+reservaBadge+'</div>':'<div style="margin-bottom:6px"></div>')
       +testesHtml
       +'<div style="display:flex;justify-content:space-between;align-items:center">'
       +'<span style="font-size:19px;font-weight:700;color:var(--gr)">'+fR(p0.preco)+'</span>'
@@ -7182,7 +7354,8 @@ function pgRevenda(){
     +'</div>';
 
   var revTabAtiva=revTabView||'lista';
-  return '<div class="fc"><div class="ptop"><div><div class="pl">Produtos</div><div class="pt">Revenda por Unidade</div></div><button class="btn" onclick="mNovoRev()">+ Novo</button></div>'
+  _liberarReservasExpiradas();
+  return '<div class="fc"><div class="ptop"><div><div class="pl">Produtos</div><div class="pt">Revenda por Unidade</div></div><div style="display:flex;gap:8px"><button class="btnO bOgr" onclick="mGerarRelacao()">&#128228; Gerar Relação</button><button class="btn" onclick="mNovoRev()">+ Novo</button></div></div>'
     +relatorio
     +'<div style="position:relative;margin-bottom:10px;display:flex;gap:8px">'
     +'<div style="position:relative;flex:1">'
@@ -7701,6 +7874,8 @@ function mVerProdRevenda(id){
     +(p.cat?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(59,130,246,.12);color:var(--bl)">'+p.cat+'</span>':'')
     +(p.cond?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(168,85,247,.12);color:var(--pu)">'+p.cond+'</span>':'')
     +(p.peso?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;background:var(--s3);color:var(--mt)">'+fKg(p.peso)+'kg</span>':'')
+    +(p.status==='Disponivel'?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(34,197,94,.12);color:var(--gr)">Disponível</span>':'')
+    +(p.status==='Reservado'?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(245,158,11,.15);color:var(--or)">&#8987; Reservado até '+_fmtDataHoraCurta(p.reservaExpira)+'</span>':'')
     +'</div>'
     +(p.desc?'<div style="font-size:12px;color:var(--mt);margin-bottom:8px;line-height:1.5;border-left:3px solid var(--bd);padding-left:8px">'+p.desc+'</div>':'')
     +specsH
@@ -7709,7 +7884,9 @@ function mVerProdRevenda(id){
     +'<div style="font-size:10px;color:var(--mt);font-family:monospace;margin-top:2px">Cod: '+cod+'</div>'
     +'</div>'
     +'<div style="display:flex;gap:8px">'
-    +(p.status==='Disponivel'?'<button class="btn" style="flex:1" onclick="closeM();mVU('+p.id+')">&#128722; Vender</button>':'<div class="tag tg" style="flex:1;text-align:center;padding:10px">Vendido</div>')
+    +(p.status==='Disponivel'?'<button class="btn" style="flex:1" onclick="closeM();mVU('+p.id+')">&#128722; Vender</button>'
+      :p.status==='Reservado'?'<button class="btnO bOgr" style="flex:1" onclick="cancelarReservaRev('+p.id+')">Cancelar Reserva</button>'
+      :'<div class="tag tg" style="flex:1;text-align:center;padding:10px">Vendido</div>')
     +'<button class="btnO bOb" onclick="imprimirEtiqueta('+p.id+')" style="flex:1">&#128424; Etiqueta</button>'
     +'<button class="btnO bOgr" onclick="closeM();mEditRev('+p.id+')" style="padding:10px 14px">&#9998;</button>'
     +'</div>';
@@ -8120,6 +8297,8 @@ function atualizaPesoRevenda(){
 function _calcMargemRev(prefix){
   var el=document.getElementById(prefix+'-marg');
   if(!el)return;
+  // Funcionário (não-Admin) não pode ver custo, lucro nem margem — só o Admin
+  if(!(CU&&CU.perfil==='adm')){el.innerHTML='';return;}
   var estSel=document.getElementById(prefix+'-estprod');
   var kgEl=document.getElementById(prefix+'-kg');
   var prEl=document.getElementById(prefix+'-pr');
