@@ -329,6 +329,7 @@ var DB={
   pclCatsCustom:{},
   pclCatOrder:[],
   revenda:[],
+  revProxCodigo:1001, // próximo código curto de Revenda (BV-1001, BV-1002...)
   revendaCats:[
     {nome:'Notebooks',  checklist:['Tela','Bateria','Teclado','Carregador'], specs:[
       {key:'Processador',type:'text',placeholder:'Ex: Intel i5-10ª, AMD Ryzen 5'},
@@ -1287,7 +1288,7 @@ function saveDB(){
       atendNum:DB.atendNum,produtos:DB.produtos,movs:DB.movs,contas:DB.contas,
       revenda:DB.revenda,revendaCats:DB.revendaCats,revendaStates:DB.revendaStates,
       entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
-      transf:DB.transf,coletas:DB.coletas,preAgenda:DB.preAgenda,preAgendaLimite:DB.preAgendaLimite,eventos:DB.eventos,producoes:DB.producoes,prodVinculos:DB.prodVinculos,prodCustoTab:DB.prodCustoTab,prodMatEntrada:DB.prodMatEntrada,prodCustoEntrada:DB.prodCustoEntrada,gestoraHistorico:DB.gestoraHistorico,gestoraPeriodoSalvo:DB.gestoraPeriodoSalvo,funcs:DB.funcs,clientes:DB.clientes,
+      transf:DB.transf,coletas:DB.coletas,preAgenda:DB.preAgenda,preAgendaLimite:DB.preAgendaLimite,eventos:DB.eventos,producoes:DB.producoes,prodVinculos:DB.prodVinculos,prodCustoTab:DB.prodCustoTab,prodMatEntrada:DB.prodMatEntrada,prodCustoEntrada:DB.prodCustoEntrada,gestoraHistorico:DB.gestoraHistorico,gestoraPeriodoSalvo:DB.gestoraPeriodoSalvo,revProxCodigo:DB.revProxCodigo,funcs:DB.funcs,clientes:DB.clientes,
       gerarTabsCustom:DB.gerarTabsCustom,
       pclCatsCustom:DB.pclCatsCustom||{},
       pclCatOrder:DB.pclCatOrder||[],
@@ -1542,6 +1543,7 @@ function _applySnap(s){
   }
   if(s.producoes)DB.producoes=s.producoes;
   if(s.gestoraHistorico)DB.gestoraHistorico=s.gestoraHistorico;
+  if(s.revProxCodigo)DB.revProxCodigo=s.revProxCodigo;
   if(s.gestoraPeriodoSalvo)DB.gestoraPeriodoSalvo=s.gestoraPeriodoSalvo;
   if(s.prodVinculos)DB.prodVinculos=s.prodVinculos;
   if(s.prodCustoTab!=null)DB.prodCustoTab=s.prodCustoTab;
@@ -6966,101 +6968,182 @@ function toggleSpecLabel(cb){
   lbl.style.background=cb.checked?'rgba(34,197,94,.07)':'var(--s3)';
   lbl.style.borderColor=cb.checked?'rgba(34,197,94,.4)':'var(--bd)';
 }
-function renderSpecsHtml(catNome,savedSpecs,prefix){
-  var tpl=getRevCatSpecs(catNome);
-  if(!tpl||tpl.length===0)return '';
+function renderSpecsHtml(catNome,savedSpecs,prefix,boolKeys,camposOcultos){
+  var tplFull=getRevCatSpecs(catNome)||[];
+  boolKeys=boolKeys||[];
+  camposOcultos=camposOcultos||[];
   savedSpecs=savedSpecs||{};
+  var tpl=tplFull.filter(function(f){return camposOcultos.indexOf(f.key)<0;});
   var boolFields=[],textFields=[];
   for(var i=0;i<tpl.length;i++){if(tpl[i].type==='bool')boolFields.push(tpl[i]);else textFields.push(tpl[i]);}
-  var h='<div id="'+prefix+'-specs-wrap" style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px;margin-bottom:8px">'
+  var h='<div id="'+prefix+'-specs-wrap" data-cat="'+(catNome||'').replace(/"/g,'&quot;')+'" style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px;margin-bottom:8px">'
     +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">&#128736; Especifica&#231;&#245;es T&#233;cnicas</div>';
-  if(textFields.length>0){
-    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">';
-    for(var i=0;i<textFields.length;i++){
-      var f=textFields[i];var val=savedSpecs[f.key]||'';
-      var ph=(f.placeholder||'').replace(/"/g,'&quot;');
-      h+='<div class="fld" style="margin:0"><label style="font-size:10px">'+f.key+'</label>'
-        +'<input class="inp" id="'+prefix+'-sp-'+i+'" data-key="'+f.key+'" value="'+val+'" placeholder="'+ph+'" style="font-size:12px;padding:5px 8px"></div>';
-    }
-    h+='</div>';
+  var extraKeysPreview=Object.keys(savedSpecs).filter(function(k){
+    var inTpl=false;for(var i=0;i<tpl.length;i++){if(tpl[i].key===k){inTpl=true;break;}}
+    return !inTpl;
+  });
+  var extraTextKeysPreview=extraKeysPreview.filter(function(k){return boolKeys.indexOf(k)<0;});
+  h+='<div id="'+prefix+'-specs-textgrid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">';
+  for(var i=0;i<textFields.length;i++){
+    var f=textFields[i];var val=savedSpecs[f.key]||'';
+    var ph=(f.placeholder||'').replace(/"/g,'&quot;');
+    h+='<div class="fld" style="margin:0;position:relative"><label style="font-size:10px">'+f.key+'</label>'
+      +'<div style="display:flex;gap:4px"><input class="inp" id="'+_specFieldId(prefix,f.key)+'" data-key="'+f.key+'" value="'+val+'" placeholder="'+ph+'" style="font-size:12px;padding:5px 8px;flex:1">'
+      +'<button type="button" onclick="removeTplSpecCampo(\''+prefix+'\',\''+f.key.replace(/'/g,"\\'")+'\')" title="Não se aplica a esse item — remover" style="background:var(--s3);border:1px solid var(--rd);color:var(--rd);border-radius:6px;padding:0 8px;font-size:12px;cursor:pointer;flex-shrink:0">&#10005;</button></div></div>';
   }
+  for(var ei=0;ei<extraTextKeysPreview.length;ei++)h+=_extraTextSpecRowHtml(prefix,ei,extraTextKeysPreview[ei],savedSpecs[extraTextKeysPreview[ei]]);
+  h+='</div>';
   if(boolFields.length>0){
-    h+='<div style="display:flex;flex-wrap:wrap;gap:5px">';
-    var boolStart=textFields.length;
+    h+='<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px">';
     for(var i=0;i<boolFields.length;i++){
       var f=boolFields[i];var checked=savedSpecs[f.key]===true||savedSpecs[f.key]==='true';
-      var eid=prefix+'-sp-'+(boolStart+i);
+      var eid=_specFieldId(prefix,f.key);
       var bg=checked?'rgba(34,197,94,.07)':'var(--s3)';
       var bc=checked?'rgba(34,197,94,.4)':'var(--bd)';
-      h+='<label id="lbl-'+eid+'" style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;background:'+bg+';border:1px solid '+bc+';cursor:pointer;font-size:11px;font-weight:500">'
+      h+='<span style="display:inline-flex;align-items:center;gap:2px">'
+        +'<label id="lbl-'+eid+'" style="display:inline-flex;align-items:center;gap:5px;padding:4px 6px 4px 10px;border-radius:20px 0 0 20px;background:'+bg+';border:1px solid '+bc+';border-right:none;cursor:pointer;font-size:11px;font-weight:500">'
         +'<input type="checkbox" id="'+eid+'" data-key="'+f.key+'" value="'+f.key+'"'+(checked?' checked':'')+' onchange="toggleSpecLabel(this)" style="width:12px;height:12px;accent-color:var(--gr)">'
-        +f.key+'</label>';
+        +f.key+'</label>'
+        +'<button type="button" onclick="removeTplSpecCampo(\''+prefix+'\',\''+f.key.replace(/'/g,"\\'")+'\')" title="Não se aplica a esse item — remover" style="background:'+bg+';border:1px solid '+bc+';border-left:none;border-radius:0 20px 20px 0;color:var(--rd);padding:4px 8px;font-size:11px;cursor:pointer">&#10005;</button></span>';
     }
     h+='</div>';
   }
-  // Extra specs (campos extras do usuario)
-  h+='<div id="'+prefix+'-extra-specs" style="margin-top:8px">';
-  var extraSpecs=savedSpecs?Object.keys(savedSpecs).filter(function(k){var inTpl=false;for(var i=0;i<tpl.length;i++){if(tpl[i].key===k){inTpl=true;break;}}return !inTpl&&savedSpecs[k]!==false&&savedSpecs[k]!==''&&savedSpecs[k]!==undefined;}):[];
-  for(var ei=0;ei<extraSpecs.length;ei++){
-    var ek=extraSpecs[ei];var ev=savedSpecs[ek];
-    h+='<div style="display:flex;gap:5px;align-items:center;margin-bottom:4px" id="'+prefix+'-extra-row-'+ei+'">'      +'<input class="inp" style="flex:0 0 38%;font-size:11px;padding:4px 7px" placeholder="Nome" id="'+prefix+'-ek-'+ei+'" value="'+ek.replace(/"/g,'&quot;')+'">'      +'<input class="inp" style="flex:1;font-size:11px;padding:4px 7px" placeholder="Valor" id="'+prefix+'-ev-'+ei+'" value="'+(ev===true?'Sim':ev).toString().replace(/"/g,'&quot;')+'">'      +'<button onclick="removeExtraSpec(this)" style="background:var(--s3);border:1px solid var(--rd);color:var(--rd);border-radius:6px;padding:3px 8px;font-size:13px;cursor:pointer;flex-shrink:0">&#10005;</button>'      +'</div>';
-  }
+  // Extra specs Sim/Não (características extras adicionadas como selo) — as de texto
+  // já foram renderizadas junto com Processador/RAM lá em cima, na mesma grade.
+  var extraKeys=Object.keys(savedSpecs).filter(function(k){
+    var inTpl=false;for(var i=0;i<tpl.length;i++){if(tpl[i].key===k){inTpl=true;break;}}
+    return !inTpl;
+  });
+  var extraBoolKeys=extraKeys.filter(function(k){return boolKeys.indexOf(k)>=0;});
+  h+='<div id="'+prefix+'-extra-specs" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">';
+  for(var ei=0;ei<extraBoolKeys.length;ei++)h+=_extraSpecRowHtml(prefix,ei,extraBoolKeys[ei],savedSpecs[extraBoolKeys[ei]]===true);
   h+='</div>';
-  h+='<button onclick="addExtraSpec(\&apos;'+prefix+'\&apos;)" style="margin-top:6px;background:var(--s3);border:1px dashed var(--bd);color:var(--mt);border-radius:var(--r);padding:5px 12px;font-size:11px;cursor:pointer;width:100%">+ Adicionar característica</button>';
+  h+='<input type="hidden" id="'+prefix+'-campos-ocultos" value="'+camposOcultos.join(',')+'">';
+  h+='<input type="hidden" id="'+prefix+'-spec-tipo" value="bool">';
+  h+='<div style="display:flex;gap:5px;margin-top:8px;align-items:center">'
+    +'<button type="button" id="'+prefix+'-tipo-bool" onclick="_setSpecNovoTipo(\''+prefix+'\',\'bool\')" style="background:var(--gr2);color:#fff;border:none;border-radius:20px 0 0 20px;padding:6px 10px;font-size:10px;cursor:pointer;font-weight:700">Sim/Não</button>'
+    +'<button type="button" id="'+prefix+'-tipo-texto" onclick="_setSpecNovoTipo(\''+prefix+'\',\'texto\')" style="background:var(--s3);color:var(--mt);border:none;border-radius:0 20px 20px 0;padding:6px 10px;font-size:10px;cursor:pointer;font-weight:700;margin-right:4px">Texto</button>'
+    +'<input class="inp" id="'+prefix+'-spec-novo" placeholder="Nova característica... (ex: Fonte)" style="flex:1;font-size:11px;padding:5px 8px" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addExtraSpec(\''+prefix+'\')}">'
+    +'<button type="button" onclick="addExtraSpec(\''+prefix+'\')" style="background:var(--s3);border:1px dashed var(--bd);color:var(--mt);border-radius:var(--r);padding:6px 12px;font-size:11px;cursor:pointer;white-space:nowrap">+ Adicionar</button></div>';
   h+='</div>';
   return h;
 }
+// Alterna se a próxima característica adicionada vira selo Sim/Não ou campo de texto
+function _setSpecNovoTipo(prefix,tipo){
+  var tipoEl=document.getElementById(prefix+'-spec-tipo');
+  if(tipoEl)tipoEl.value=tipo;
+  var bBool=document.getElementById(prefix+'-tipo-bool');
+  var bTexto=document.getElementById(prefix+'-tipo-texto');
+  if(bBool)bBool.style.background=tipo==='bool'?'var(--gr2)':'var(--s3)';
+  if(bBool)bBool.style.color=tipo==='bool'?'#fff':'var(--mt)';
+  if(bTexto)bTexto.style.background=tipo==='texto'?'var(--gr2)':'var(--s3)';
+  if(bTexto)bTexto.style.color=tipo==='texto'?'#fff':'var(--mt)';
+}
+// Monta um campo de texto extra com rótulo — igual visualmente aos campos fixos
+// (Processador, RAM...), só que criado na hora pelo usuário.
+function _extraTextSpecRowHtml(prefix,idx,nome,valor){
+  nome=nome||'';valor=valor==null?'':String(valor);
+  return '<div class="fld" style="margin:0;position:relative" id="'+prefix+'-extratext-row-'+idx+'" data-nome="'+nome.replace(/"/g,'&quot;')+'"><label style="font-size:10px">'+nome+'</label>'
+    +'<div style="display:flex;gap:4px"><input class="inp" id="'+prefix+'-etv-'+idx+'" value="'+valor.replace(/"/g,'&quot;')+'" placeholder="Ex: 500W, Sim, Gold..." style="font-size:12px;padding:5px 8px;flex:1">'
+    +'<button type="button" onclick="this.parentElement.parentElement.remove()" style="background:var(--s3);border:1px solid var(--rd);color:var(--rd);border-radius:6px;padding:0 8px;font-size:12px;cursor:pointer;flex-shrink:0">&#10005;</button></div></div>';
+}
+// Monta uma linha de característica extra — texto livre ou Sim/Não, com botão de tipo e remover
+// Monta uma característica extra como selo Sim/Não — igual ao estilo do checklist
+function _extraSpecRowHtml(prefix,idx,nome,checked){
+  nome=nome||'';
+  var eid=prefix+'-ev-'+idx;
+  var bg=checked?'rgba(34,197,94,.07)':'var(--s3)';
+  var bc=checked?'rgba(34,197,94,.4)':'var(--bd)';
+  return '<span style="display:inline-flex;align-items:center;gap:2px" id="'+prefix+'-extra-row-'+idx+'" data-nome="'+nome.replace(/"/g,'&quot;')+'">'
+    +'<label id="lbl-'+eid+'" style="display:inline-flex;align-items:center;gap:5px;padding:4px 6px 4px 10px;border-radius:20px 0 0 20px;background:'+bg+';border:1px solid '+bc+';border-right:none;cursor:pointer;font-size:11px;font-weight:500">'
+    +'<input type="checkbox" id="'+eid+'"'+(checked?' checked':'')+' onchange="toggleSpecLabel(this)" style="width:12px;height:12px;accent-color:var(--gr)">'
+    +nome+'</label>'
+    +'<button type="button" onclick="removeExtraSpec(this)" style="background:'+bg+';border:1px solid '+bc+';border-left:none;border-radius:0 20px 20px 0;color:var(--rd);padding:4px 8px;font-size:11px;cursor:pointer">&#10005;</button></span>';
+}
+// Remove um campo pré-definido da categoria (ex: "Placa de Vídeo" num item simples que
+// não precisa disso) — não afeta a categoria, só esse cadastro específico. Re-renderiza
+// o bloco de specs sem esse campo, preservando o que já tinha sido preenchido nos outros.
+function removeTplSpecCampo(prefix,chave){
+  var wrap=document.getElementById(prefix+'-specs-wrap');
+  if(!wrap)return;
+  var catNome=wrap.getAttribute('data-cat')||'';
+  var atual=getSpecsFromForm(prefix,catNome);
+  var novosOcultos=atual.camposOcultos.indexOf(chave)>=0?atual.camposOcultos:atual.camposOcultos.concat([chave]);
+  wrap.outerHTML=renderSpecsHtml(catNome,atual.specs,prefix,atual.boolKeys,novosOcultos);
+}
 
+// Adiciona uma característica extra nova (vira selo Sim/Não já marcado) — igual ao
+// "adicionar item" do checklist: um campo, um botão, pronto.
 function addExtraSpec(prefix){
-  var ct=document.getElementById(prefix+'-extra-specs');
-  if(!ct)return;
-  var idx=ct.querySelectorAll('[id^="'+prefix+'-ek-"]').length;
-  var row=document.createElement('div');
-  row.style.cssText='display:flex;gap:5px;align-items:center;margin-bottom:4px';
-  row.id=prefix+'-extra-row-'+idx;
-  row.innerHTML='<input class="inp" style="flex:0 0 38%;font-size:11px;padding:4px 7px" placeholder="Nome" id="'+prefix+'-ek-'+idx+'">'
-    +'<input class="inp" style="flex:1;font-size:11px;padding:4px 7px" placeholder="Valor" id="'+prefix+'-ev-'+idx+'">'
-    +'<button onclick="removeExtraSpec(this)" style="background:var(--s3);border:1px solid var(--rd);color:var(--rd);border-radius:6px;padding:3px 8px;font-size:13px;cursor:pointer;flex-shrink:0">&#10005;</button>';
-  ct.appendChild(row);
-  row.querySelector('input').focus();
+  var inp=document.getElementById(prefix+'-spec-novo');
+  if(!inp)return;
+  var nome=inp.value.trim();
+  if(!nome)return;
+  var tipoEl=document.getElementById(prefix+'-spec-tipo');
+  var tipo=tipoEl?tipoEl.value:'bool';
+  if(tipo==='texto'){
+    var ctT=document.getElementById(prefix+'-specs-textgrid');
+    if(!ctT)return;
+    var idxT=ctT.querySelectorAll('[id^="'+prefix+'-extratext-row-"]').length;
+    ctT.insertAdjacentHTML('beforeend',_extraTextSpecRowHtml(prefix,idxT,nome,''));
+    inp.value='';
+    var novoValor=document.getElementById(prefix+'-etv-'+idxT);
+    if(novoValor)novoValor.focus();
+  }else{
+    var ct=document.getElementById(prefix+'-extra-specs');
+    if(!ct)return;
+    var idx=ct.querySelectorAll('[id^="'+prefix+'-extra-row-"]').length;
+    ct.insertAdjacentHTML('beforeend',_extraSpecRowHtml(prefix,idx,nome,true));
+    inp.value='';
+    inp.focus();
+  }
 }
 
 function removeExtraSpec(btn){
   var row=btn.parentNode;if(row)row.remove();
 }
 
+function _specFieldId(prefix,key){return prefix+'-sp-'+key.replace(/[^a-zA-Z0-9]/g,'_');}
 function getSpecsFromForm(prefix,catNome){
-  var tpl=getRevCatSpecs(catNome);
+  var tplFull=getRevCatSpecs(catNome)||[];
+  var ocultosEl=document.getElementById(prefix+'-campos-ocultos');
+  var ocultos=ocultosEl&&ocultosEl.value?ocultosEl.value.split(',').filter(Boolean):[];
+  var tpl=tplFull.filter(function(f){return ocultos.indexOf(f.key)<0;});
   var specs={};
-  if(tpl&&tpl.length>0){
-    var boolStart=0;
-    for(var i=0;i<tpl.length;i++){if(tpl[i].type!=='bool')boolStart++;}
-    var bi=0;
-    for(var i=0;i<tpl.length;i++){
-      var f=tpl[i];
-      if(f.type==='bool'){
-        var el=document.getElementById(prefix+'-sp-'+(boolStart+bi));
-        if(el)specs[f.key]=el.checked;
-        bi++;
-      }else{
-        var el=document.getElementById(prefix+'-sp-'+i);
-        if(el&&el.value.trim())specs[f.key]=el.value.trim();
-      }
-    }
+  for(var i=0;i<tpl.length;i++){
+    var f=tpl[i];var fid=_specFieldId(prefix,f.key);
+    var el=document.getElementById(fid);
+    if(!el)continue;
+    if(f.type==='bool')specs[f.key]=el.checked;
+    else if(el.value.trim())specs[f.key]=el.value.trim();
   }
-  // Extra specs (campos livres)
+  // Extra specs Sim/Não (características adicionadas como selo)
+  var boolKeys=[];
   var ct=document.getElementById(prefix+'-extra-specs');
   if(ct){
-    var keyEls=ct.querySelectorAll('[id^="'+prefix+'-ek-"]');
-    for(var i=0;i<keyEls.length;i++){
-      var k=keyEls[i].value.trim();
-      var vidx=keyEls[i].id.replace(prefix+'-ek-','');
-      var vel=document.getElementById(prefix+'-ev-'+vidx);
-      var v=vel?vel.value.trim():'';
-      if(k)specs[k]=v||true;
+    var rows=ct.querySelectorAll('[id^="'+prefix+'-extra-row-"]');
+    for(var i=0;i<rows.length;i++){
+      var k=rows[i].getAttribute('data-nome');
+      var vel=rows[i].querySelector('input[type=checkbox]');
+      if(!k)continue;
+      specs[k]=vel?vel.checked:false;
+      boolKeys.push(k);
     }
   }
-  return specs;
+  // Extra specs de texto (características adicionadas como campo com rótulo) — agora
+  // vivem na mesma grade dos campos fixos, distinguidas pelo prefixo do id
+  var ctT=document.getElementById(prefix+'-specs-textgrid');
+  if(ctT){
+    var rowsT=ctT.querySelectorAll('[id^="'+prefix+'-extratext-row-"]');
+    for(var i=0;i<rowsT.length;i++){
+      var k=rowsT[i].getAttribute('data-nome');
+      var vel=rowsT[i].querySelector('input');
+      if(!k)continue;
+      var v=vel?vel.value.trim():'';
+      if(v)specs[k]=v;
+    }
+  }
+  return {specs:specs,boolKeys:boolKeys,camposOcultos:ocultos};
 }
 function onRevCatChangeSpecs(prefix){
   var sel=document.getElementById(prefix+'-cat');
@@ -7180,21 +7263,54 @@ function _relSelecionados(){
   var ids=[];document.querySelectorAll('.rel-item-chk').forEach(function(c){if(c.checked)ids.push(parseFloat(c.value));});
   return DB.revenda.filter(function(p){return ids.indexOf(p.id)>=0;});
 }
+// Monta o texto de "Configuração" de um produto pro relatório — specs de texto como
+// "Chave: valor", specs sim/não como ✅/❌, e campos vazios ficam de fora.
+function _relFormatarConfig(p,htmlMode){
+  var boolKeys=p.specsBoolKeys||[];
+  var tplBool=[];
+  var tpl=getRevCatSpecs(p.cat||'')||[];
+  for(var i=0;i<tpl.length;i++){if(tpl[i].type==='bool')tplBool.push(tpl[i].key);}
+  var todosBool=tplBool.concat(boolKeys);
+  var partes=[];
+  var specs=p.specs||{};
+  Object.keys(specs).forEach(function(k){
+    var v=specs[k];
+    if(todosBool.indexOf(k)>=0){
+      partes.push((v?'&#9989;':'&#10060;')+' '+k);
+    }else if(v!==''&&v!==undefined&&v!==null){
+      partes.push((htmlMode?'<b>'+k+':</b> ':k+': ')+v);
+    }
+  });
+  return partes.join(htmlMode?'<br>':' | ');
+}
+// Monta o texto de "O que falta" — itens do checklist que existem pra essa categoria
+// mas não foram marcados como aprovados nesse produto específico.
+function _relOQueFalta(p){
+  var clFull=getRevCatChecklist(p.cat||'')||[];
+  var ocultos=p.checklistOcultos||[];
+  var extras=p.checklistExtra||[];
+  var cl=clFull.filter(function(item){return ocultos.indexOf(item)<0;}).concat(extras);
+  var aprovados=p.testesAprovados||[];
+  var faltando=cl.filter(function(item){return aprovados.indexOf(item)<0;});
+  return faltando.join(', ');
+}
 function _relExportar(fmt){
   var itens=_relSelecionados();
   if(!itens.length){alert('Selecione ao menos um produto!');return;}
   if(fmt==='csv'){
-    var rows=[['Produto','Categoria','Condição','Configuração','Preço']];
+    var rows=[['Produto','Código','Marca','Modelo','Categoria','Condição','Configuração','O que falta','Preço']];
     itens.forEach(function(p){
-      var specsTxt=p.specs?Object.keys(p.specs).map(function(k){return k+': '+p.specs[k];}).join(' | '):'';
-      rows.push([p.prod,p.cat||'',p.cond||'',specsTxt,fR(p.preco)]);
+      var specsTxt=_relFormatarConfig(p,false).replace(/&#9989;/g,'OK').replace(/&#10060;/g,'X');
+      rows.push([p.prod,p.codCurto||'',p.marca||'',p.modelo||'',p.cat||'',p.cond||'',specsTxt,_relOQueFalta(p),fR(p.preco)]);
     });
     _exportCSV('relacao-produtos-'+hj().replace(/\//g,'-')+'.csv',rows);
   }else{
-    var th='<table><thead><tr><th>Produto</th><th>Categoria</th><th>Condição</th><th>Configuração</th><th>Preço</th></tr></thead><tbody>';
+    var th='<table><thead><tr><th>Produto</th><th>Categoria</th><th>Condição</th><th>Configuração</th><th>O que falta</th><th>Preço</th></tr></thead><tbody>';
     itens.forEach(function(p){
-      var specsTxt=p.specs?Object.keys(p.specs).map(function(k){return '<b>'+k+':</b> '+p.specs[k];}).join('<br>'):'';
-      th+='<tr><td>'+p.prod+'</td><td>'+(p.cat||'')+'</td><td>'+(p.cond||'')+'</td><td style="font-size:9px">'+specsTxt+'</td><td>'+fR(p.preco)+'</td></tr>';
+      var specsTxt=_relFormatarConfig(p,true);
+      var faltaTxt=_relOQueFalta(p);
+      var nomeCel=p.prod+(p.marca||p.modelo?'<br><span style="font-size:8px;color:#666">'+(p.marca||'')+' '+(p.modelo||'')+'</span>':'')+(p.codCurto?'<br><span style="font-size:8px;color:#888;font-family:monospace">'+p.codCurto+'</span>':'');
+      th+='<tr><td>'+nomeCel+'</td><td>'+(p.cat||'')+'</td><td>'+(p.cond||'')+'</td><td style="font-size:9px">'+(specsTxt||'&mdash;')+'</td><td style="font-size:9px;color:#b45309">'+(faltaTxt||'&mdash;')+'</td><td>'+fR(p.preco)+'</td></tr>';
     });
     th+='</tbody></table>';
     _exportPDF('Relação de Produtos',th);
@@ -7224,17 +7340,218 @@ function _relConfirmarReserva(){
   saveDB();closeM();go('revenda');toast(itens.length+' item(ns) reservado(s)!','var(--or)');
 }
 
+// ── Filtros Avançados da Revenda (Preço, Marca, Especificações) ─────────────
+// Estado dos filtros — fica solto na página, então sobrevive entre re-renders
+// enquanto você navega, até você limpar ou mudar de aba.
+var revFiltroPrecoMin=null,revFiltroPrecoMax=null;
+var revFiltroMarcas=[];
+var revFiltroCategorias=[];
+var revFiltroSpecs={}; // {chave: true} pra sim/não marcado, {chave: [valores]} pra texto
+// Varre os produtos disponíveis e monta as opções possíveis de cada filtro —
+// preço mín/máx real, marcas usadas, e toda especificação (texto ou sim/não)
+// que já apareceu em algum produto cadastrado.
+function _revColetarFacets(categoriasFiltro){
+  var itens=DB.revenda.filter(function(p){
+    if(p.status!=='Disponivel'&&p.status!=='Reservado')return false;
+    if(categoriasFiltro&&categoriasFiltro.length&&categoriasFiltro.indexOf(p.cat)<0)return false;
+    return true;
+  });
+  var precoMin=Infinity,precoMax=0;
+  var marcasSet={};
+  var specsFacets={};
+  itens.forEach(function(p){
+    if(p.preco<precoMin)precoMin=p.preco;
+    if(p.preco>precoMax)precoMax=p.preco;
+    if(p.marca)marcasSet[p.marca]=true;
+    var specs=p.specs||{};
+    Object.keys(specs).forEach(function(k){
+      var v=specs[k];
+      if(v===''||v===undefined||v===null)return;
+      if(typeof v==='boolean'){
+        if(v)specsFacets[k]={tipo:'bool'};
+      }else{
+        if(!specsFacets[k]||specsFacets[k].tipo!=='texto')specsFacets[k]={tipo:'texto',valores:{}};
+        specsFacets[k].valores[v]=true;
+      }
+    });
+  });
+  if(precoMin===Infinity)precoMin=0;
+  return {precoMin:precoMin,precoMax:precoMax,marcas:Object.keys(marcasSet).sort(),specsFacets:specsFacets};
+}
+// Decide se um produto passa nos filtros avançados atuais (preço, marca, specs)
+function _revPassaFiltrosAvancados(p){
+  if(revFiltroCategorias.length&&revFiltroCategorias.indexOf(p.cat)<0)return false;
+  if(revFiltroPrecoMin!=null&&(p.preco||0)<revFiltroPrecoMin)return false;
+  if(revFiltroPrecoMax!=null&&(p.preco||0)>revFiltroPrecoMax)return false;
+  if(revFiltroMarcas.length&&revFiltroMarcas.indexOf(p.marca)<0)return false;
+  var specs=p.specs||{};
+  for(var k in revFiltroSpecs){
+    var filtro=revFiltroSpecs[k];
+    if(filtro===true){if(specs[k]!==true)return false;}
+    else if(Array.isArray(filtro)&&filtro.length){if(filtro.indexOf(specs[k])<0)return false;}
+  }
+  return true;
+}
+function _rfCategoriasHtml(cats){
+  return cats.map(function(c){
+    var checked=revFiltroCategorias.indexOf(c)>=0;
+    return '<label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;margin-bottom:4px"><input type="checkbox" class="rf-categoria" value="'+c.replace(/"/g,'&quot;')+'"'+(checked?' checked':'')+' onchange="_rfCategoriaChanged()"> '+c+'</label>';
+  }).join('');
+}
+// Monta a seção de Especificações — separada em função própria pra poder ser
+// re-renderizada sozinha quando a categoria selecionada mudar.
+function _rfSpecsSectionHtml(specsFacets){
+  var chaves=Object.keys(specsFacets).sort();
+  if(!chaves.length)return '<div id="rf-specs-section"></div>';
+  var html='<div id="rf-specs-section"><div style="font-size:12px;font-weight:700;margin-bottom:8px">&#128736; Especificações</div>';
+  chaves.forEach(function(k){
+    var f=specsFacets[k];
+    html+='<div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--bd)"><div style="font-size:11px;font-weight:700;color:var(--mt);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">'+k+'</div>';
+    if(f.tipo==='bool'){
+      var checked=revFiltroSpecs[k]===true;
+      html+='<label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer"><input type="checkbox" class="rf-spec-bool" data-key="'+k.replace(/"/g,'&quot;')+'"'+(checked?' checked':'')+'> Tem '+k+'</label>';
+    }else{
+      var valores=Object.keys(f.valores).sort();
+      var selecionados=Array.isArray(revFiltroSpecs[k])?revFiltroSpecs[k]:[];
+      valores.forEach(function(v){
+        var checked=selecionados.indexOf(v)>=0;
+        html+='<label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;margin-bottom:4px"><input type="checkbox" class="rf-spec-text" data-key="'+k.replace(/"/g,'&quot;')+'" data-valor="'+v.replace(/"/g,'&quot;')+'"'+(checked?' checked':'')+'> '+v+'</label>';
+      });
+    }
+    html+='</div>';
+  });
+  html+='</div>';
+  return html;
+}
+// Quando marca/desmarca uma categoria no painel, atualiza a seção de Especificações
+// na hora, mostrando só o que existe pras categorias marcadas — sem precisar fechar
+// e reabrir o painel.
+function _rfCategoriaChanged(){
+  var checked=[];
+  document.querySelectorAll('.rf-categoria:checked').forEach(function(c){checked.push(c.value);});
+  var facets=_revColetarFacets(checked.length?checked:null);
+  var specsEl=document.getElementById('rf-specs-section');
+  if(specsEl)specsEl.outerHTML=_rfSpecsSectionHtml(facets.specsFacets);
+  // A lista de Marca também precisa se atualizar junto — senão fica mostrando
+  // marcas de categorias que talvez nem estejam mais selecionadas.
+  var marcasMarcadas=[];
+  document.querySelectorAll('.rf-marca:checked').forEach(function(c){marcasMarcadas.push(c.value);});
+  var buscaAtual=document.getElementById('rf-marca-busca')?document.getElementById('rf-marca-busca').value:'';
+  var marcasEl=document.getElementById('rf-marcas-lista');
+  if(marcasEl)marcasEl.innerHTML=_rfMarcasHtml(facets.marcas,buscaAtual,marcasMarcadas);
+}
+function mFiltrosAvancados(){
+  var catsIniciais=revFiltroCategorias.length?revFiltroCategorias:null;
+  var facets=_revColetarFacets(catsIniciais);
+  var pMin=revFiltroPrecoMin!=null?revFiltroPrecoMin:facets.precoMin;
+  var pMax=revFiltroPrecoMax!=null?revFiltroPrecoMax:facets.precoMax;
+  var html='<div class="mf">'
+    +'<div style="margin-bottom:18px"><div style="font-size:12px;font-weight:700;margin-bottom:8px">&#128230; Categoria</div>'
+    +'<div id="rf-categorias-lista">'+_rfCategoriasHtml(getRevCatNomes())+'</div></div>'
+    +'<div style="margin-bottom:18px"><div style="font-size:12px;font-weight:700;margin-bottom:8px">&#128176; Preço</div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gr);font-weight:700;margin-bottom:4px"><span id="rf-preco-min-lbl">'+fR(pMin)+'</span><span id="rf-preco-max-lbl">'+fR(pMax)+'</span></div>'
+    +'<div style="font-size:9px;color:var(--mt);margin-bottom:2px">Mínimo</div>'
+    +'<input type="range" id="rf-preco-min" min="'+facets.precoMin+'" max="'+facets.precoMax+'" step="1" value="'+pMin+'" oninput="document.getElementById(\'rf-preco-min-lbl\').textContent=fR(this.value)" style="width:100%;accent-color:var(--gr)">'
+    +'<div style="font-size:9px;color:var(--mt);margin:4px 0 2px">Máximo</div>'
+    +'<input type="range" id="rf-preco-max" min="'+facets.precoMin+'" max="'+facets.precoMax+'" step="1" value="'+pMax+'" oninput="document.getElementById(\'rf-preco-max-lbl\').textContent=fR(this.value)" style="width:100%;accent-color:var(--gr)">'
+    +'</div>'
+    +'<div style="margin-bottom:18px"><div style="font-size:12px;font-weight:700;margin-bottom:8px">&#127991; Marca</div>'
+    +'<input class="inp" id="rf-marca-busca" placeholder="&#128269; Buscar marca..." oninput="_rfFiltrarMarcas()" style="font-size:12px;padding:6px 9px;margin-bottom:6px">'
+    +'<div id="rf-marcas-lista" style="max-height:150px;overflow-y:auto">'+_rfMarcasHtml(facets.marcas,'')+'</div></div>'
+    +_rfSpecsSectionHtml(facets.specsFacets);
+  html+='<div class="brow"><button class="btnO bOgr" onclick="_rfLimpar()">Limpar Filtros</button><button class="btn" onclick="_rfAplicar()">Aplicar</button></div>';
+  html+='</div>';
+  openM('&#127991; Filtros Avançados',html,480);
+}
+function _rfMarcasHtml(marcas,busca,marcasCheck){
+  marcasCheck=marcasCheck||revFiltroMarcas;
+  var filtradas=marcas.filter(function(m){return !busca||m.toLowerCase().indexOf(busca.toLowerCase())>=0;});
+  if(!filtradas.length)return '<div style="font-size:11px;color:var(--mt);padding:6px">Nenhuma marca encontrada pra essa categoria</div>';
+  return filtradas.map(function(m){
+    var checked=marcasCheck.indexOf(m)>=0;
+    return '<label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;margin-bottom:4px"><input type="checkbox" class="rf-marca" value="'+m.replace(/"/g,'&quot;')+'"'+(checked?' checked':'')+'> '+m+'</label>';
+  }).join('');
+}
+function _rfFiltrarMarcas(){
+  var busca=document.getElementById('rf-marca-busca').value;
+  var marcasMarcadas=[];
+  document.querySelectorAll('.rf-marca:checked').forEach(function(c){marcasMarcadas.push(c.value);});
+  var checkedCats=[];
+  document.querySelectorAll('.rf-categoria:checked').forEach(function(c){checkedCats.push(c.value);});
+  var facets=_revColetarFacets(checkedCats.length?checkedCats:null);
+  var el=document.getElementById('rf-marcas-lista');
+  if(el)el.innerHTML=_rfMarcasHtml(facets.marcas,busca,marcasMarcadas);
+}
+function _rfLimpar(){
+  revFiltroPrecoMin=null;revFiltroPrecoMax=null;
+  revFiltroMarcas=[];revFiltroSpecs={};revFiltroCategorias=[];
+  closeM();go('revenda');
+}
+function _rfAplicar(){
+  revFiltroCategorias=[];
+  document.querySelectorAll('.rf-categoria:checked').forEach(function(c){revFiltroCategorias.push(c.value);});
+  var minEl=document.getElementById('rf-preco-min');
+  var maxEl=document.getElementById('rf-preco-max');
+  revFiltroPrecoMin=minEl?parseFloat(minEl.value):null;
+  revFiltroPrecoMax=maxEl?parseFloat(maxEl.value):null;
+  if(revFiltroPrecoMin!=null&&revFiltroPrecoMax!=null&&revFiltroPrecoMin>revFiltroPrecoMax){
+    var tmp=revFiltroPrecoMin;revFiltroPrecoMin=revFiltroPrecoMax;revFiltroPrecoMax=tmp;
+  }
+  revFiltroMarcas=[];
+  document.querySelectorAll('.rf-marca:checked').forEach(function(c){revFiltroMarcas.push(c.value);});
+  revFiltroSpecs={};
+  document.querySelectorAll('.rf-spec-bool:checked').forEach(function(c){revFiltroSpecs[c.getAttribute('data-key')]=true;});
+  var textChecks={};
+  document.querySelectorAll('.rf-spec-text:checked').forEach(function(c){
+    var k=c.getAttribute('data-key');var v=c.getAttribute('data-valor');
+    if(!textChecks[k])textChecks[k]=[];
+    textChecks[k].push(v);
+  });
+  Object.keys(textChecks).forEach(function(k){revFiltroSpecs[k]=textChecks[k];});
+  closeM();go('revenda');
+}
+function setRevCat(c){revCatFiltro=c;go('revenda');}
+// Menu cascata buscável pra categoria — mesmo componente já usado na Produção
+function _toggleCatPicker(){
+  var wrap=document.getElementById('pdd-revcat');
+  var trig=wrap?wrap.querySelector('.pdd-trigger'):null;
+  var panel=document.getElementById('revcat-panel');
+  if(!trig||!panel)return;
+  var abrir=!panel.classList.contains('open');
+  trig.classList.toggle('open',abrir);
+  panel.classList.toggle('open',abrir);
+  if(abrir){
+    var s=document.getElementById('revcat-search');
+    if(s){s.value='';setTimeout(function(){s.focus();},50);}
+    _filtrarCatPicker();
+  }
+}
+function _filtrarCatPicker(){
+  var busca=(document.getElementById('revcat-search').value||'').toLowerCase();
+  var cats=['Todos'].concat(getRevCatNomes());
+  var filtradas=cats.filter(function(c){return !busca||c.toLowerCase().indexOf(busca)>=0;});
+  var listEl=document.getElementById('revcat-list');
+  if(!listEl)return;
+  if(!filtradas.length){listEl.innerHTML='<div style="padding:14px;text-align:center;color:var(--mt);font-size:12px">Nenhuma categoria encontrada</div>';return;}
+  listEl.innerHTML=filtradas.map(function(c){
+    return '<div onclick="setRevCat(\''+c.replace(/'/g,"\\'")+'\')" style="padding:9px 10px;cursor:pointer;font-size:13px;border-radius:6px">'+c+'</div>';
+  }).join('');
+}
 function pgRevenda(){
-  // Linha 1: Categorias
+  // Linha 1: Categorias — menu cascata buscável (toca, digita ou rola)
   var catNomes=getRevCatNomes();
   var cats=['Todos'].concat(catNomes);
-  var catBar='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:7px">';
-  for(var i=0;i<cats.length;i++){
-    var c=cats[i];var on=(revCatFiltro===c);
-    catBar+='<button onclick="setRevCat(\&apos;'+c+'\&apos;)" style="background:'+(on?'var(--grb)':'var(--s2)')+';border:1px solid '+(on?'var(--gr)':'var(--bd)')+';color:'+(on?'var(--gr)':'var(--mt)')+';border-radius:20px;padding:5px 14px;font-size:12px;font-weight:'+(on?'700':'400')+';cursor:pointer;white-space:nowrap">'+c+'</button>';
-  }
-  catBar+='<button onclick="mGerenciarCats()" style="background:var(--s3);border:1px solid var(--bd);color:var(--mt);border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer" title="Gerenciar Categorias">&#9881;</button>';
-  catBar+='</div>';
+  var catBar='<div style="display:flex;gap:8px;align-items:center;margin-bottom:7px">'
+    +'<div class="pdd" id="pdd-revcat" style="min-width:180px;flex:1;max-width:260px">'
+    +'<button class="pdd-trigger" onclick="_toggleCatPicker()" type="button">'
+    +'<span class="pdd-lbl" style="color:var(--gr);font-weight:700">'+revCatFiltro+'</span><span class="pdd-arr">&#9660;</span>'
+    +'</button>'
+    +'<div class="pdd-panel" id="revcat-panel">'
+    +'<div class="pdd-search"><input type="text" id="revcat-search" placeholder="&#128269; Buscar categoria..." oninput="_filtrarCatPicker()" autocomplete="off"></div>'
+    +'<div class="pdd-list" id="revcat-list"></div>'
+    +'</div></div>'
+    +'<button onclick="mGerenciarCats()" style="background:var(--s3);border:1px solid var(--bd);color:var(--mt);border-radius:20px;padding:8px 12px;font-size:12px;cursor:pointer" title="Gerenciar Categorias">&#9881;</button>'
+    +'</div>';
   // Linha 2: Condições
   var conds=['Todas'].concat(DB.revendaStates);
   var condBar='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px">';
@@ -7243,6 +7560,8 @@ function pgRevenda(){
     condBar+='<button onclick="setRevCond(\&apos;'+c+'\&apos;)" style="background:'+(on?'rgba(168,85,247,.15)':'var(--s2)')+';border:1px solid '+(on?'var(--pu)':'var(--bd)')+';color:'+(on?'var(--pu)':'var(--mt)')+';border-radius:20px;padding:5px 14px;font-size:12px;font-weight:'+(on?'700':'400')+';cursor:pointer;white-space:nowrap">'+c+'</button>';
   }
   condBar+='<button onclick="mGerenciarStates()" style="background:var(--s3);border:1px solid var(--bd);color:var(--mt);border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer" title="Gerenciar Condicoes">&#9881;</button>';
+  var qtdFiltrosAtivos=(revFiltroPrecoMin!=null?1:0)+(revFiltroPrecoMax!=null?1:0)+revFiltroMarcas.length+revFiltroCategorias.length+Object.keys(revFiltroSpecs).length;
+  condBar+='<button onclick="mFiltrosAvancados()" style="background:'+(qtdFiltrosAtivos?'var(--grb)':'var(--s3)')+';border:1px solid '+(qtdFiltrosAtivos?'var(--gr)':'var(--bd)')+';color:'+(qtdFiltrosAtivos?'var(--gr)':'var(--mt)')+';border-radius:20px;padding:5px 12px;font-size:12px;font-weight:'+(qtdFiltrosAtivos?'700':'400')+';cursor:pointer;white-space:nowrap">&#127991; Filtros'+(qtdFiltrosAtivos?' ('+qtdFiltrosAtivos+')':'')+'</button>';
   condBar+='</div>';
   var cards='';
   // Agrupa por nome base do produto (remove sufixo #1, #2, etc)
@@ -7252,6 +7571,7 @@ function pgRevenda(){
     if(p.status!=='Disponivel'&&p.status!=='Reservado')continue;
     if(revCatFiltro!=='Todos'&&p.cat!==revCatFiltro)continue;
     if(revCondFiltro!=='Todas'&&p.cond!==revCondFiltro)continue;
+    if(!_revPassaFiltrosAvancados(p))continue;
     // Nome base: remove sufixo " #N" — garante que prod existe
     var nomeBase=(p.prod||p.nome||'Sem nome').replace(/ #\d+$/,'');
     if(!grupos[nomeBase]){grupos[nomeBase]={items:[],nomeBase:nomeBase};ordemGrupos.push(nomeBase);}
@@ -7283,11 +7603,12 @@ function pgRevenda(){
     }
     // Badge de quantidade
     var qtdBadge=qtd>1?'<span style="position:absolute;top:13px;left:13px;background:var(--bl);color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px">'+qtd+'x</span>':'';
-    cards+='<div class="card" style="position:relative;cursor:pointer;transition:border-color .15s" onclick="mEditRev('+p0.id+')" onmouseover="this.style.borderColor=\'var(--gr)\'" onmouseout="this.style.borderColor=\'\'">'
+    cards+='<div class="card" style="position:relative;cursor:pointer;transition:border-color .15s" onclick="'+(qtd>1?'mVerUnidadesPorIds('+grp.items.map(function(x){return x.id;}).join(',')+')':'mVerProdRevenda('+p0.id+')')+'" onmouseover="this.style.borderColor=\'var(--gr)\'" onmouseout="this.style.borderColor=\'\'">'
       +qtdBadge
       +'<div style="position:absolute;top:13px;right:13px"><span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:var(--grb);color:var(--gr)">Disponivel</span></div>'
       +'<div style="font-size:22px;margin-bottom:7px">&#127991;</div>'
-      +'<div style="font-size:14px;font-weight:700;margin-bottom:4px">'+(p0.nomeBase||p0.prod||'Sem nome')+(qtd>1?' <span style="font-size:12px;color:var(--bl);font-weight:700">('+qtd+' unid.)</span>':'')+'</div>'
+      +'<div style="font-size:14px;font-weight:700;margin-bottom:2px">'+(p0.nomeBase||p0.prod||'Sem nome')+(qtd>1?' <span style="font-size:12px;color:var(--bl);font-weight:700">('+qtd+' unid.)</span>':(p0.codCurto?' <span style="font-size:11px;color:var(--bl);font-weight:600;font-family:monospace">'+p0.codCurto+'</span>':''))+'</div>'
+      +((p0.marca||p0.modelo)?'<div style="font-size:11px;color:var(--mt);margin-bottom:4px">'+(p0.marca||'')+(p0.marca&&p0.modelo?' &middot; ':'')+(p0.modelo||'')+'</div>':'')
       +(p0.desc?'<div style="font-size:11px;color:var(--mt);margin-bottom:5px;line-height:1.4">'+p0.desc+'</div>':'')
       +(function(){var s=p0.specs||{};var keys=Object.keys(s);if(!keys.length)return '';var h='<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">';for(var ki=0;ki<keys.length&&ki<6;ki++){var sv=s[keys[ki]];if(sv===''||sv===null||sv===undefined||sv===false)continue;var sval=sv===true?'&#10003; '+keys[ki]:keys[ki]+': '+sv;h+='<span style="font-size:10px;padding:1px 7px;border-radius:20px;background:rgba(59,130,246,.1);color:var(--bl);border:1px solid rgba(59,130,246,.2)">'+sval+'</span>';}return h+'</div>';})()
       +'<div style="font-size:11px;color:var(--mt);margin-bottom:5px">'+(p0.cat?'<span style="color:var(--bl)">'+p0.cat+'</span> &middot; ':'')+fKg(p0.peso)+'kg</div>'
@@ -7300,6 +7621,7 @@ function pgRevenda(){
       +(qtd>1?'<button class="btnO bOb" style="font-size:12px;padding:5px 9px" title="Ver todas as unidades" onclick="mVerUnidadesPorIds('+grp.items.map(function(x){return x.id;}).join(',')+')">&#128203; '+qtd+'</button>':'')
       +'<button class="btnO" style="font-size:12px;padding:5px 9px;border:1px solid var(--gr);color:var(--gr)" title="Adicionar unidade" onclick="mAddUnidade('+p0.id+')">+</button>'
       +'<button class="btnO bOb" style="font-size:12px;padding:5px 9px" title="Imprimir etiqueta" onclick="imprimirEtiqueta('+p0.id+')">&#128424;</button>'
+      +(qtd===1?'<button class="btnO bOgr" style="font-size:12px;padding:5px 9px" title="Editar produto" onclick="mEditRev('+p0.id+')">&#9998;</button>':'')
       +'<button class="btnO bOr" style="font-size:12px;padding:5px 9px;min-height:30px" title="Excluir" onclick="mDelRev('+p0.id+')">&#128465;</button>'
       +'</div></div></div>';
   }
@@ -7312,7 +7634,7 @@ function pgRevenda(){
     var p0=grp.items[0];var qtd=grp.items.length;
     var specsStr='';var s=p0.specs||{};var sk=Object.keys(s);
     for(var ki=0;ki<sk.length&&ki<3;ki++){var sv=s[sk[ki]];if(!sv&&sv!==0)continue;specsStr+=(specsStr?' · ':'')+( sv===true?sk[ki]:sk[ki]+': '+sv);}
-    listaRows+='<tr style="border-bottom:1px solid var(--bd);cursor:pointer" onclick="mEditRev('+p0.id+')">'
+    listaRows+='<tr style="border-bottom:1px solid var(--bd);cursor:pointer" onclick="'+(qtd>1?'mVerUnidadesPorIds('+grp.items.map(function(x){return x.id;}).join(',')+')':'mVerProdRevenda('+p0.id+')')+'">'
       +'<td style="padding:9px 10px"><div style="font-size:13px;font-weight:600">'+(p0.nomeBase||p0.prod||'Sem nome')+(qtd>1?' <span style="font-size:11px;color:var(--bl);font-weight:700">('+qtd+'x)</span>':'')+'</div>'
       +(specsStr?'<div style="font-size:10px;color:var(--mt);margin-top:1px">'+specsStr+'</div>':'')+'</td>'
       +'<td style="padding:9px 6px;font-size:11px;color:var(--mt);white-space:nowrap">'+(p0.cat||'')+'</td>'
@@ -7359,7 +7681,7 @@ function pgRevenda(){
     +relatorio
     +'<div style="position:relative;margin-bottom:10px;display:flex;gap:8px">'
     +'<div style="position:relative;flex:1">'
-    +'<input class="inp" id="rev-barcode-inp" type="text" inputmode="numeric" placeholder="Código de barras ou número..." style="padding-left:38px;font-size:14px;transition:box-shadow .2s,border-color .2s" onkeydown="if(event.key===\'Enter\'){buscarPorCodigo(this.value);event.preventDefault();}" onfocus="_revBarcFocus(true)" onblur="_revBarcFocus(false)">'
+    +'<input class="inp" id="rev-barcode-inp" type="text" inputmode="text" placeholder="Código, BV-1001, nome, marca ou modelo..." style="padding-left:38px;font-size:14px;transition:box-shadow .2s,border-color .2s" onkeydown="if(event.key===\'Enter\'){buscarPorCodigo(this.value);event.preventDefault();}" onfocus="_revBarcFocus(true)" onblur="_revBarcFocus(false)">'
     +'<span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;pointer-events:none">&#128269;</span>'
     +'</div>'
     +'<button onclick="buscarPorCodigo(document.getElementById(\'rev-barcode-inp\').value)" style="background:var(--gr2);color:#fff;border:none;border-radius:8px;padding:0 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Buscar</button>'
@@ -7399,12 +7721,12 @@ function mVerUnidadesPorIds(){
   for(var i=0;i<unidades.length;i++){
     var p=unidades[i];
     rows+='<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--bd)">'
-      +'<div style="flex:1"><div style="font-size:13px;font-weight:600">'+(p.prod||'Produto')+'</div>'
+      +'<div style="flex:1;cursor:pointer" onclick="closeM();mVerProdRevenda('+p.id+')"><div style="font-size:13px;font-weight:600">'+(p.prod||'Produto')+'</div>'
       +'<div style="font-size:11px;color:var(--mt)">'+(p.cond||'')+(p.desc?' &middot; '+p.desc.slice(0,40):'')+'</div></div>'
       +'<div style="display:flex;gap:6px;align-items:center">'
       +'<span style="font-size:13px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(p.preco)+'</span>'
       +'<button class="btn" style="font-size:11px;padding:4px 10px" onclick="closeM();mVU('+p.id+')">Vender</button>'
-      +'<button class="btnO bOb" style="font-size:11px;padding:4px 8px" onclick="closeM();mEditRev('+p.id+')">&#9998;</button>'
+      +'<button class="btnO bOb" style="font-size:11px;padding:4px 8px" title="Editar" onclick="closeM();mEditRev('+p.id+')">&#9998;</button>'
       +'</div></div>';
   }
   if(!rows)rows='<div style="padding:20px;text-align:center;color:var(--mt)">Nenhuma unidade disponivel.</div>';
@@ -7473,12 +7795,12 @@ function mVerUnidades(nomeBase){
   for(var i=0;i<unidades.length;i++){
     var p=unidades[i];
     rows+='<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--bd)">'
-      +'<div style="flex:1"><div style="font-size:13px;font-weight:600">'+p.prod+'</div>'
-      +'<div style="font-size:11px;color:var(--mt)">'+(p.cond||'')+(p.desc?' &middot; '+p.desc.slice(0,40):'')+'</div></div>'
+      +'<div style="flex:1;cursor:pointer" onclick="closeM();mVerProdRevenda('+p.id+')"><div style="font-size:13px;font-weight:600">'+p.prod+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+(p.codCurto?'<span style="font-family:monospace;color:var(--bl)">'+p.codCurto+'</span> &middot; ':'')+(p.cond||'')+(p.desc?' &middot; '+p.desc.slice(0,40):'')+'</div></div>'
       +'<div style="display:flex;gap:6px;align-items:center">'
       +'<span style="font-size:13px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(p.preco)+'</span>'
       +'<button class="btn" style="font-size:11px;padding:4px 10px" onclick="closeM();mVU('+p.id+')">Vender</button>'
-      +'<button class="btnO bOb" style="font-size:11px;padding:4px 8px" onclick="closeM();mEditRev('+p.id+')">&#9998;</button>'
+      +'<button class="btnO bOb" style="font-size:11px;padding:4px 8px" title="Editar" onclick="closeM();mEditRev('+p.id+')">&#9998;</button>'
       +'</div></div>';
   }
   openM('&#127991; '+nomeBase+' ('+unidades.length+' unidades)','<div class="card" style="padding:0;overflow:hidden">'+rows+'</div>',500);
@@ -7814,15 +8136,50 @@ function _revBarcFocus(on){
   if(inp){inp.style.borderColor=on?'var(--gr)':'';inp.style.boxShadow=on?'0 0 0 3px rgba(34,197,94,.2)':'';}
   if(st)st.style.display=on?'flex':'none';
 }
+// Mostra os resultados quando a busca por texto (produto/marca/modelo) encontra mais de um
+function mListaBuscaTexto(itens,termo){
+  var rows=itens.map(function(p){
+    return '<div onclick="closeM();mVerProdRevenda('+p.id+')" style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--bd);cursor:pointer">'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:600">'+p.prod+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+(p.codCurto?'<span style="font-family:monospace;color:var(--bl)">'+p.codCurto+'</span> &middot; ':'')+(p.marca?p.marca+' ':'')+(p.modelo||'')+'</div></div>'
+      +'<span style="font-size:13px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(p.preco)+'</span>'
+      +'</div>';
+  }).join('');
+  openM('&#128269; Resultados pra "'+termo+'"','<div class="card" style="padding:0;overflow:hidden;max-height:400px;overflow-y:auto">'+rows+'</div>',500);
+}
 function buscarPorCodigo(val){
   val=(val||'').trim();if(!val)return;
   var found=null;
   var valNorm=val.replace(/^0+/,'');
+  var valBvNorm=val.toUpperCase().replace(/^BV-?/,'').trim(); // aceita "BV-1001", "bv1001" ou só "1001"
   for(var i=0;i<DB.revenda.length;i++){
     var p=DB.revenda[i];
     var cod=_revCodigo(p.id);       // agora retorna 13 dígitos EAN-13
     var codNorm=cod.replace(/^0+/,'');
     if(cod===val||codNorm===valNorm||String(p.id)===val){found=p;break;}
+    if(p.codCurto){
+      var codCurtoNorm=p.codCurto.toUpperCase().replace(/^BV-?/,'').trim();
+      if(p.codCurto.toUpperCase()===val.toUpperCase()||codCurtoNorm===valBvNorm){found=p;break;}
+    }
+  }
+  if(!found){
+    // Não achou por código — tenta buscar por texto (produto, marca ou modelo)
+    var valLower=val.toLowerCase();
+    var porTexto=DB.revenda.filter(function(p){
+      return p.status!=='Vendido'&&(
+        (p.prod||'').toLowerCase().indexOf(valLower)>=0||
+        (p.marca||'').toLowerCase().indexOf(valLower)>=0||
+        (p.modelo||'').toLowerCase().indexOf(valLower)>=0
+      );
+    });
+    if(porTexto.length===1){
+      found=porTexto[0];
+    }else if(porTexto.length>1){
+      var inp2=document.getElementById('rev-barcode-inp');if(inp2)inp2.value='';
+      var m2=document.getElementById('rev-notfound-msg');if(m2)m2.style.display='none';
+      mListaBuscaTexto(porTexto,val);
+      return;
+    }
   }
   if(!found){
     var inp=document.getElementById('rev-barcode-inp');
@@ -7881,7 +8238,7 @@ function mVerProdRevenda(id){
     +specsH
     +testesH
     +'<div style="font-size:24px;font-weight:800;color:var(--gr);margin-top:8px">'+fR(p.preco)+'</div>'
-    +'<div style="font-size:10px;color:var(--mt);font-family:monospace;margin-top:2px">Cod: '+cod+'</div>'
+    +'<div style="font-size:10px;color:var(--mt);font-family:monospace;margin-top:2px">Cod: '+cod+(p.codCurto?' &middot; <span style="color:var(--bl);font-weight:700">'+p.codCurto+'</span>':'')+'</div>'
     +'</div>'
     +'<div style="display:flex;gap:8px">'
     +(p.status==='Disponivel'?'<button class="btn" style="flex:1" onclick="closeM();mVU('+p.id+')">&#128722; Vender</button>'
@@ -7902,9 +8259,11 @@ function imprimirEtiqueta(id){
     +'body{font-family:"Courier New",monospace;background:#fff;color:#000;text-align:center;padding:4mm}'
     +'.preco{font-size:30px;font-weight:900;margin:6px 0}'
     +'.bc{margin:8px 0;line-height:0}'
+    +'.codcurto{font-size:11px;font-weight:700;letter-spacing:1px;margin-top:2px}'
     +'</style></head><body>'
     +'<div class="preco">'+fR(p.preco)+'</div>'
     +'<div class="bc">'+bars+'</div>'
+    +(p.codCurto?'<div class="codcurto">'+p.codCurto+'</div>':'')
     +'<script>'
     +'window.onload=function(){'
     +'  var el=document.getElementById("bc-svg");'
@@ -7920,7 +8279,7 @@ function imprimirEtiqueta(id){
   var html='<div style="text-align:center;margin-bottom:10px">'
     +'<iframe id="etq-frame" style="width:100%;height:260px;border:1px solid var(--bd);border-radius:var(--r);background:#fff"></iframe>'
     +'</div>'
-    +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px;text-align:center">Código: <strong style="font-family:monospace">'+cod+'</strong></div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px;text-align:center">Código: <strong style="font-family:monospace">'+cod+'</strong>'+(p.codCurto?' &middot; <strong style="color:var(--bl)">'+p.codCurto+'</strong>':'')+'</div>'
     +'<div class="brow">'
     +'<button class="btnO bOgr" onclick="closeM()">Fechar</button>'
     +'<button class="btn" onclick="document.getElementById(\'etq-frame\').contentWindow.print()">&#128424; Imprimir</button>'
@@ -8192,32 +8551,77 @@ function delRevStateGlobal(idx){
   saveDB();closeM();mGerenciarStates();
 }
 
-function renderChecklistHtml(catNome, aprovados, prefix){
-  var cl=getRevCatChecklist(catNome);
-  if(!cl||cl.length===0)return '';
-  var h='<div id="'+prefix+'-cl-wrap" style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px">'
-    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">&#9989; Checklist Técnico</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
-  for(var j=0;j<cl.length;j++){
-    var checked=aprovados&&aprovados.indexOf(cl[j])>=0;
-    var eid=prefix+'-ck-'+j;
-    h+='<label style="display:flex;align-items:center;gap:7px;background:var(--s1);border:1px solid '+(checked?'rgba(34,197,94,.4)':'var(--bd)')+';border-radius:6px;padding:7px 9px;cursor:pointer;transition:all .15s" '
-      +'onclick="var cb=document.getElementById(\&apos;'+eid+'\&apos;);this.style.borderColor=cb.checked?\&apos;var(--bd)\&apos;:\&apos; rgba(34,197,94,.4)\&apos;;this.style.background=cb.checked?\&apos;var(--s1)\&apos;:\&apos; rgba(34,197,94,.07)\&apos;">'
-      +'<input type="checkbox" id="'+eid+'" value="'+cl[j]+'"'+(checked?' checked':'')+' style="width:14px;height:14px;cursor:pointer;accent-color:var(--gr)">'
-      +'<span style="font-size:12px;font-weight:500">'+cl[j]+'</span>'
-      +'</label>';
+function _clFieldId(prefix,item){return prefix+'-ck-'+String(item).replace(/[^a-zA-Z0-9]/g,'_');}
+function renderChecklistHtml(catNome, aprovados, prefix, itensExtra, itensOcultos){
+  var clFull=getRevCatChecklist(catNome)||[];
+  itensExtra=itensExtra||[];
+  itensOcultos=itensOcultos||[];
+  var cl=clFull.filter(function(item){return itensOcultos.indexOf(item)<0;}).concat(itensExtra);
+  var h='<div id="'+prefix+'-cl-wrap" data-cat="'+(catNome||'').replace(/"/g,'&quot;')+'" style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px">'
+    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">&#9989; Checklist Técnico</div>';
+  if(cl.length){
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+    for(var j=0;j<cl.length;j++){
+      var item=cl[j];
+      var checked=aprovados&&aprovados.indexOf(item)>=0;
+      var eid=_clFieldId(prefix,item);
+      h+='<div style="display:flex;align-items:center;gap:4px">'
+        +'<label style="flex:1;display:flex;align-items:center;gap:7px;background:var(--s1);border:1px solid '+(checked?'rgba(34,197,94,.4)':'var(--bd)')+';border-radius:6px;padding:7px 9px;cursor:pointer;transition:all .15s" '
+        +'onclick="var cb=document.getElementById(\&apos;'+eid+'\&apos;);this.style.borderColor=cb.checked?\&apos;var(--bd)\&apos;:\&apos; rgba(34,197,94,.4)\&apos;;this.style.background=cb.checked?\&apos;var(--s1)\&apos;:\&apos; rgba(34,197,94,.07)\&apos;">'
+        +'<input type="checkbox" id="'+eid+'" value="'+item.replace(/"/g,'&quot;')+'"'+(checked?' checked':'')+' style="width:14px;height:14px;cursor:pointer;accent-color:var(--gr)">'
+        +'<span style="font-size:12px;font-weight:500">'+item+'</span>'
+        +'</label>'
+        +'<button type="button" onclick="removeChecklistItem(\''+prefix+'\',\''+item.replace(/'/g,"\\'")+'\')" title="Não se aplica a esse item — remover" style="background:var(--s3);border:1px solid var(--rd);color:var(--rd);border-radius:6px;padding:0 8px;font-size:12px;cursor:pointer;flex-shrink:0;align-self:stretch">&#10005;</button>'
+        +'</div>';
+    }
+    h+='</div>';
   }
-  h+='</div></div>';
+  h+='<input type="hidden" id="'+prefix+'-cl-ocultos" value="'+itensOcultos.join('|')+'">';
+  h+='<input type="hidden" id="'+prefix+'-cl-extras" value="'+itensExtra.join('|')+'">';
+  h+='<div style="display:flex;gap:5px;margin-top:8px"><input class="inp" id="'+prefix+'-cl-novo" placeholder="Novo item do checklist..." style="flex:1;font-size:11px;padding:5px 8px" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addRevChecklistItem(\''+prefix+'\',\''+(catNome||'').replace(/'/g,"\\'")+'\')}">'
+    +'<button type="button" onclick="addRevChecklistItem(\''+prefix+'\',\''+(catNome||'').replace(/'/g,"\\'")+'\')" style="background:var(--s3);border:1px dashed var(--bd);color:var(--mt);border-radius:var(--r);padding:5px 12px;font-size:11px;cursor:pointer;white-space:nowrap">+ Adicionar</button></div>';
+  h+='</div>';
   return h;
+}
+function getChecklistExtras(prefix){
+  var ocultosEl=document.getElementById(prefix+'-cl-ocultos');
+  var extrasEl=document.getElementById(prefix+'-cl-extras');
+  return {
+    ocultos:ocultosEl&&ocultosEl.value?ocultosEl.value.split('|').filter(Boolean):[],
+    extras:extrasEl&&extrasEl.value?extrasEl.value.split('|').filter(Boolean):[]
+  };
+}
+// Remove um item do checklist (pré-definido da categoria ou extra) só pra esse produto
+function removeChecklistItem(prefix,item){
+  var wrap=document.getElementById(prefix+'-cl-wrap');
+  if(!wrap)return;
+  var catNome=wrap.getAttribute('data-cat')||'';
+  var aprovadosAtual=[];wrap.querySelectorAll('input[type=checkbox]').forEach(function(cb){if(cb.checked)aprovadosAtual.push(cb.value);});
+  var ex=getChecklistExtras(prefix);
+  var novoOcultos=ex.ocultos.indexOf(item)>=0?ex.ocultos:ex.ocultos.concat([item]);
+  var novoExtras=ex.extras.filter(function(e){return e!==item;});
+  wrap.outerHTML=renderChecklistHtml(catNome,aprovadosAtual,prefix,novoExtras,novoOcultos);
+}
+// Adiciona um item de checklist novo, só pra esse produto — já marcado como aprovado
+function addRevChecklistItem(prefix,catNome){
+  var inp=document.getElementById(prefix+'-cl-novo');
+  if(!inp)return;
+  var novoItem=inp.value.trim();
+  if(!novoItem)return;
+  var wrap=document.getElementById(prefix+'-cl-wrap');
+  if(!wrap)return;
+  var aprovadosAtual=[];wrap.querySelectorAll('input[type=checkbox]').forEach(function(cb){if(cb.checked)aprovadosAtual.push(cb.value);});
+  if(aprovadosAtual.indexOf(novoItem)<0)aprovadosAtual.push(novoItem);
+  var ex=getChecklistExtras(prefix);
+  if(ex.extras.indexOf(novoItem)<0)ex.extras.push(novoItem);
+  wrap.outerHTML=renderChecklistHtml(catNome,aprovadosAtual,prefix,ex.extras,ex.ocultos);
 }
 function onRevCatChange(prefix){
   var sel=document.getElementById(prefix+'-cat');
   if(!sel)return;
   var wrap=document.getElementById(prefix+'-cl-wrap');
   if(wrap){
-    var aprovados=[];
-    wrap.querySelectorAll('input[type=checkbox]').forEach(function(cb){if(cb.checked)aprovados.push(cb.value);});
-    wrap.outerHTML=renderChecklistHtml(sel.value,[],prefix);
+    wrap.outerHTML=renderChecklistHtml(sel.value,[],prefix,[],[]);
   }
 }
 function mEditRev(id){
@@ -8239,7 +8643,7 @@ function mEditRev(id){
     if(ep)estInfo+='Estoque atual: <strong style="color:var(--gr)">'+fKg(ep.est)+' kg</strong>';
   }
   estInfo+='</div>';
-  var clHtml=renderChecklistHtml(it.cat||'',it.testesAprovados||[],'er');
+  var clHtml=renderChecklistHtml(it.cat||'',it.testesAprovados||[],'er',it.checklistExtra||[],it.checklistOcultos||[]);
   // Detecta outras unidades "idênticas" (mesmo nome-base + mesma condição) ainda disponíveis,
   // para oferecer a opção de aplicar a edição a todo o grupo de uma vez.
   var nomeBaseAtual=(it.prod||'').replace(/\s*#\d+\s*$/,'').toLowerCase();
@@ -8253,20 +8657,24 @@ function mEditRev(id){
   var grupoHtml=irmaos.length
     ?'<div style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:var(--r);padding:10px;margin-bottom:10px">'
       +'<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">'
-      +'<input type="checkbox" id="er-aplicar-grupo" checked style="margin-top:2px">'
+      +'<input type="checkbox" id="er-aplicar-grupo" style="margin-top:2px">'
       +'<span style="font-size:12px">Aplicar Preco, Peso e Descricao as outras <strong>'+irmaos.length+'</strong> unidade'+(irmaos.length>1?'s':'')+' identica'+(irmaos.length>1?'s':'')+' ('+it.cond+') ainda disponive'+(irmaos.length>1?'is':'l')+'</span>'
       +'</label></div>'
     :'';
   var h='<div class="mf">'
     +'<div class="fld"><label>Produto</label><input class="inp" id="er-p" value="'+(it.prod||'')+'"></div>'
-    +'<div class="fld"><label>Descricao / Especificacoes</label><textarea class="inp" id="er-desc" rows="3" style="resize:vertical;min-height:64px;line-height:1.5">'+(it.desc||'')+'</textarea></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Marca (opcional)</label><input class="inp" id="er-marca" value="'+(it.marca||'')+'" placeholder="Ex: Dell"></div>'
+    +'<div class="fld"><label>Modelo (opcional)</label><input class="inp" id="er-modelo" value="'+(it.modelo||'')+'" placeholder="Ex: Inspiron 15"></div>'
+    +'</div>'
+    +'<div class="fld"><label>Observação</label><textarea class="inp" id="er-desc" rows="3" style="resize:vertical;min-height:64px;line-height:1.5">'+(it.desc||'')+'</textarea></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Preco R$</label><input class="inp" type="number" inputmode="decimal" id="er-pr" value="'+it.preco+'" oninput="_calcMargemRev(\'er\')"></div>'
     +'<div class="fld"><label>Categoria</label><select class="inp" id="er-cat" onchange="onRevCatChange(\'er\');onRevCatChangeSpecs(\'er\')">'+catO+'</select></div>'
     +'</div>'
     +'<div class="fld"><label>Condicao</label><select class="inp" id="er-c">'+condO+'</select></div>'
     +clHtml
-    +renderSpecsHtml(it.cat||'',it.specs||{},'er')
+    +renderSpecsHtml(it.cat||'',it.specs||{},'er',it.specsBoolKeys||[],it.specsCamposOcultos||[])
     +'<div class="fld"><label>Produto do Estoque (opcional)</label><select class="inp" id="er-estprod" onchange="atualizaPesoRevenda()">'+prodO+'</select></div>'
     +estInfo
     +'<div class="fld"><label>Peso kg</label><input class="inp" type="number" inputmode="decimal" id="er-kg" value="'+it.peso+'" oninput="_calcMargemRev(\'er\')"></div>'
@@ -8341,17 +8749,25 @@ function saveEditRev(id){
   }
 
   it.prod=n;
+  it.marca=(document.getElementById('er-marca').value||'').trim();
+  it.modelo=(document.getElementById('er-modelo').value||'').trim();
   it.desc=(document.getElementById('er-desc').value||'').trim();
   it.preco=parseFloat(document.getElementById('er-pr').value)||0;
   it.cat=document.getElementById('er-cat').value;
   it.cond=document.getElementById('er-c').value;
   it.peso=pesoNovo;
   it.estProdId=pIdNovo;
-  it.specs=getSpecsFromForm('er',it.cat);
+  var specsResult=getSpecsFromForm('er',it.cat);
+  it.specs=specsResult.specs;
+  it.specsBoolKeys=specsResult.boolKeys;
+  it.specsCamposOcultos=specsResult.camposOcultos;
   var aprovados=[];
   var cbs=document.querySelectorAll('#er-cl-wrap input[type=checkbox]');
   for(var i=0;i<cbs.length;i++){if(cbs[i].checked)aprovados.push(cbs[i].value);}
   it.testesAprovados=aprovados;
+  var clExtras=getChecklistExtras('er');
+  it.checklistExtra=clExtras.extras;
+  it.checklistOcultos=clExtras.ocultos;
 
   // Se marcado, aplica Preco, Peso, Descricao e testes às outras unidades idênticas
   // (mesmo nome-base + mesma condição original) ainda disponíveis.
@@ -8438,7 +8854,11 @@ function mNovoRev(){
   var clHtml=firstCat?renderChecklistHtml(firstCat,[],'nr'):'';
   openM('Novo Produto Revenda','<div class="mf">'
     +'<div class="fld"><label>Produto</label><input class="inp" id="nr-p" placeholder="Ex: Notebook Dell i5"></div>'
-    +'<div class="fld"><label>Descricao / Especificacoes</label><textarea class="inp" id="nr-desc" rows="3" placeholder="Ex: 8GB RAM, 256GB SSD, Intel i5 10ª geração..." style="resize:vertical;min-height:64px;line-height:1.5"></textarea></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Marca (opcional)</label><input class="inp" id="nr-marca" placeholder="Ex: Dell"></div>'
+    +'<div class="fld"><label>Modelo (opcional)</label><input class="inp" id="nr-modelo" placeholder="Ex: Inspiron 15"></div>'
+    +'</div>'
+    +'<div class="fld"><label>Observação</label><textarea class="inp" id="nr-desc" rows="3" placeholder="Ex: Sem detalhes, nota fiscal disponível, etc." style="resize:vertical;min-height:64px;line-height:1.5"></textarea></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Categoria</label><select class="inp" id="nr-cat" onchange="onRevCatChange(\'nr\');onRevCatChangeSpecs(\'nr\')">'+catO+'</select></div>'
     +'<div class="fld"><label>Preco R$ (por unidade)</label><input class="inp" type="number" inputmode="decimal" id="nr-pr" oninput="_calcMargemRev(\'nr\')"></div>'
@@ -8469,6 +8889,8 @@ function onRevEstProdChange(){
 }
 function saveRev(){
   var n=document.getElementById('nr-p').value.trim();if(!n)return;
+  var marca=(document.getElementById('nr-marca').value||'').trim();
+  var modelo=(document.getElementById('nr-modelo').value||'').trim();
   var pIdSelRaw=document.getElementById('nr-estprod').value;
   var pIdSel=pIdSelRaw?parseInt(pIdSelRaw)||pIdSelRaw:null;
   var pesoRev=parseFloat(document.getElementById('nr-kg').value)||0;
@@ -8480,9 +8902,11 @@ function saveRev(){
   var cat=document.getElementById('nr-cat').value;
   var cond=document.getElementById('nr-c').value;
   var desc=(document.getElementById('nr-desc').value||'').trim();
-  var specs=getSpecsFromForm('nr',cat);
+  var specsResult=getSpecsFromForm('nr',cat);
+  var clExtras=getChecklistExtras('nr');
   for(var u=0;u<qtd;u++){
-    DB.revenda.push({id:nid(),prod:n+(qtd>1?' #'+(u+1):''),desc:desc,peso:pesoRev,cond:cond,preco:preco,status:'Disponivel',cat:cat,estProdId:pIdSel,testesAprovados:aprovados.slice(),specs:specs});
+    var codCurto='BV-'+(DB.revProxCodigo++);
+    DB.revenda.push({id:nid(),codCurto:codCurto,prod:n+(qtd>1?' #'+(u+1):''),marca:marca,modelo:modelo,desc:desc,peso:pesoRev,cond:cond,preco:preco,status:'Disponivel',cat:cat,estProdId:pIdSel,testesAprovados:aprovados.slice(),specs:specsResult.specs,specsBoolKeys:specsResult.boolKeys,specsCamposOcultos:specsResult.camposOcultos,checklistExtra:clExtras.extras,checklistOcultos:clExtras.ocultos});
     if(pIdSel&&pesoRev>0){
       var ep=null;
       for(var i=0;i<DB.produtos.length;i++){if(_normId(DB.produtos[i].id)===_normId(pIdSel)){ep=DB.produtos[i];break;}}
@@ -17609,6 +18033,12 @@ function _goUsuarios(){
 function _syncUsers(){
   try{_sbSet('bv_users',USERS,function(){});}catch(e){}
 }
+// Mesma lógica pras Funções (papéis/permissões) — saveDB() também só grava local
+// pra BASE_ROLES/CUSTOM_ROLES, então uma função criada ou editada num aparelho
+// nunca aparecia nos outros sem isso.
+function _syncRoles(){
+  try{_sbSet('bv_roles',{base:BASE_ROLES,custom:CUSTOM_ROLES},function(){});}catch(e){}
+}
 function moveUser(idx,dir){
   var newIdx=idx+dir;
   if(newIdx<0||newIdx>=USERS.length)return;
@@ -17876,7 +18306,7 @@ function saveNovaRole(){
   var id='role_'+Date.now();
   CUSTOM_ROLES.push({id:id,nome:n,pages:pages});
   PPAGES[id]=pages;PNOME[id]=n;
-  saveDB();closeM();_goUsuarios();
+  saveDB();_syncRoles();closeM();_goUsuarios();
 }
 function mEditRole(roleId){
   var r=getRoleById(roleId);
@@ -17905,7 +18335,7 @@ function saveEditRole(roleId){
     }
   }
   PPAGES[roleId]=pages;PNOME[roleId]=n;
-  saveDB();
+  saveDB();_syncRoles();
   closeM();_goUsuarios();
 }
 function delRole(roleId){
@@ -17915,7 +18345,7 @@ function delRole(roleId){
   confirmar('Excluir a funcao <b>'+nome+'</b>?',function(){
     for(var i=0;i<BASE_ROLES.length;i++){if(BASE_ROLES[i].id===roleId){BASE_ROLES.splice(i,1);break;}}
     for(var i=0;i<CUSTOM_ROLES.length;i++){if(CUSTOM_ROLES[i].id===roleId){CUSTOM_ROLES.splice(i,1);break;}}
-    saveDB();_goUsuarios();
+    saveDB();_syncRoles();_goUsuarios();
   });
 }
 
