@@ -3667,23 +3667,7 @@ function renderCaixaDia(){
   var saldoAt=0;for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){saldoAt=DB.contas[i].saldo;break;}}
   var sang=0;if(cd.sangrias)for(var i=0;i<cd.sangrias.length;i++)sang+=cd.sangrias[i].valor;
   var refor=0;if(cd.reforcos)for(var i=0;i<cd.reforcos.length;i++)refor+=cd.reforcos[i].valor;
-  // Estimado = reconstrução a partir dos movimentos do dia (só Dinheiro no caixa físico)
-  var _estim=+(cd.saldoAbertura||0);
-  for(var i=0;i<movsDia.length;i++){
-    var mv=movsDia[i];
-    // recMethods = entradas (vendas/LR pagas em dinheiro)
-    if(mv.recMethods){for(var j=0;j<mv.recMethods.length;j++){if(mv.recMethods[j].conta==='Caixa'||mv.recMethods[j].label==='Dinheiro')_estim=+(_estim+mv.recMethods[j].valor).toFixed(2);}}
-    // pagMethods = saídas (compras pagas em dinheiro)
-    if(mv.pagMethods){for(var j=0;j<mv.pagMethods.length;j++){if(mv.pagMethods[j].conta==='Caixa'||mv.pagMethods[j].label==='Dinheiro')_estim=+(_estim-mv.pagMethods[j].valor).toFixed(2);}}
-    // liquidações de pendência (methods direto)
-    if(mv.liquidadoPendencia&&mv.methods){for(var j=0;j<mv.methods.length;j++){var _lm=mv.methods[j];if(_lm.conta==='Caixa'||_lm.label==='Dinheiro'){if(mv.tipo==='Compra')_estim=+(_estim-_lm.valor).toFixed(2);else _estim=+(_estim+_lm.valor).toFixed(2);}}}
-  }
-  // despesas do dia — subtrai as pagas em conta tipo Dinheiro (caixa físico)
-  var _contasDinheiro={};for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].tipo==='Dinheiro')_contasDinheiro[DB.contas[i].nome]=true;}
   var _cxDataStr=cd.data||hj();
-  var _catsExcluirEstim={'Transferencia':1,'Ajuste de Caixa':1,'Outros Recebimentos':1,'Sangria':1,'Reforco':1};
-  for(var i=0;i<DB.movs.length;i++){var _mv=DB.movs[i];if(_mv.tipo==='saida'&&_mv.data===_cxDataStr&&(!_mv.desc||_mv.desc.indexOf('#')<0)&&_contasDinheiro[_mv.conta]&&!_catsExcluirEstim[_mv.cat]&&!(_mv.desc&&(_mv.desc.indexOf('Sangria:')==0||_mv.desc.indexOf('Reforco:')==0||_mv.desc.indexOf('Transferencia')==0)))_estim=+(_estim-_mv.valor).toFixed(2);}
-  _estim=+(_estim+refor-sang).toFixed(2);
   var extras='';
   if(cd.sangrias&&cd.sangrias.length){
     var _sRows='';
@@ -3774,7 +3758,7 @@ function renderCaixaDia(){
     +sc('&#128229;','Compras',_mask(fR(compras)),'no dia','var(--rd)')
     +sc('&#9878;','Peso Total',fKg(pesoTotal)+' kg','pesagens','var(--bl)')
     +'</div>'
-    +sc('&#128176;','Saldo Caixa',_mask(fR(_estim)),'Estimado','var(--gr)')
+    +sc('&#128176;','Saldo Caixa',_mask(fR(saldoAt)),'Valor real na conta','var(--gr)')
     +(_totDesp>0?sc('&#127869;','Despesas',_mask(fR(_totDesp)),_despDia.length+' lancamento(s)','var(--or)'):'')
     +(extras?extras:'')
     +'<div class="card" style="padding:0;overflow:hidden"><div style="padding:13px 16px;border-bottom:1px solid var(--bd)"><div class="stl" style="margin-bottom:0"><div class="stb"></div><div class="stx">Atendimentos ('+movsDia.length+')</div></div></div>'+movsH+'</div>'
@@ -4400,23 +4384,6 @@ function cfgMotSalvar(){
 
 function mFecharCaixa(){
   var saldoAt=0;for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){saldoAt=DB.contas[i].saldo;break;}}
-  // Estimado reconstruído (igual ao da tela)
-  var cd=DB.caixaDia;var movsDia=cd?cd.movimentos||[]:[];
-  var _fe=+(cd?cd.saldoAbertura||0:0);
-  var _refor=0;if(cd&&cd.reforcos)for(var i=0;i<cd.reforcos.length;i++)_refor+=cd.reforcos[i].valor;
-  var _sang=0;if(cd&&cd.sangrias)for(var i=0;i<cd.sangrias.length;i++)_sang+=cd.sangrias[i].valor;
-  for(var i=0;i<movsDia.length;i++){var mv=movsDia[i];if(mv.recMethods){for(var j=0;j<mv.recMethods.length;j++){if(mv.recMethods[j].conta==='Caixa'||mv.recMethods[j].label==='Dinheiro')_fe=+(_fe+mv.recMethods[j].valor).toFixed(2);}}if(mv.pagMethods){for(var j=0;j<mv.pagMethods.length;j++){if(mv.pagMethods[j].conta==='Caixa'||mv.pagMethods[j].label==='Dinheiro')_fe=+(_fe-mv.pagMethods[j].valor).toFixed(2);}}if(mv.liquidadoPendencia&&mv.methods){for(var j=0;j<mv.methods.length;j++){var _lm=mv.methods[j];if(_lm.conta==='Caixa'||_lm.label==='Dinheiro'){if(mv.tipo==='Compra')_fe=+(_fe-_lm.valor).toFixed(2);else _fe=+(_fe+_lm.valor).toFixed(2);}}}}
-  var _fContasDin={};for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].tipo==='Dinheiro')_fContasDin[DB.contas[i].nome]=true;}
-  var _fCxDataStr=DB.caixaDia&&DB.caixaDia.data?DB.caixaDia.data:hj();
-  var _catsExcluirFech={'Transferencia':1,'Ajuste de Caixa':1,'Outros Recebimentos':1,'Sangria':1,'Reforco':1};
-  for(var i=0;i<DB.movs.length;i++){
-    var _mv=DB.movs[i];
-    if(_mv.tipo==='saida'&&_mv.data===_fCxDataStr&&(!_mv.desc||_mv.desc.indexOf('#')<0)
-       &&_fContasDin[_mv.conta]&&!_catsExcluirFech[_mv.cat])
-      _fe=+(_fe-_mv.valor).toFixed(2);
-  }
-  _fe=+(_fe+_refor-_sang).toFixed(2);
-  saldoAt=_fe; // usa o estimado reconstruído
   openM('Fechar Caixa','<div class="mf"><div class="al aly">Voce esta prestes a fechar o caixa de hoje.</div><div style="background:var(--s2);border-radius:var(--r);padding:13px"><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--bd)"><span style="color:var(--mt)">Abertura</span><span style="font-family:monospace">'+fR(DB.caixaDia.saldoAbertura)+'</span></div><div style="display:flex;justify-content:space-between;padding:7px 0;font-size:15px;font-weight:700"><span>Saldo esperado</span><span style="color:var(--gr);font-family:monospace">'+fR(saldoAt)+'</span></div></div><div class="fld"><label>Valor contado R$</label><input class="inp" type="number" inputmode="decimal" id="fc-v" value="'+saldoAt+'" style="font-size:20px;text-align:center;font-family:monospace" oninput="calcFD('+saldoAt+')"></div><div id="fc-dif"></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-rd" onclick="confirmarFech('+saldoAt+')">Fechar Caixa</button></div></div>');}
 function calcFD(esp){var v=parseFloat(document.getElementById('fc-v')?document.getElementById('fc-v').value:0)||0,dif=+(v-esp).toFixed(2);var el=document.getElementById('fc-dif');if(!el)return;if(Math.abs(dif)<0.01)el.innerHTML='<div class="al alg">&#10003; Caixa confere!</div>';else if(dif<0)el.innerHTML='<div class="al alr">Falta '+fR(Math.abs(dif))+'</div>';else el.innerHTML='<div class="al aly">Sobra '+fR(dif)+'</div>';}
 function confirmarFech(esp){
@@ -7676,6 +7643,7 @@ function pgRevenda(){
     +'</div>';
 
   var revTabAtiva=revTabView||'lista';
+  var qtdManutencao=DB.revenda.filter(function(p){return p.status==='Manutencao';}).length;
   _liberarReservasExpiradas();
   return '<div class="fc"><div class="ptop"><div><div class="pl">Produtos</div><div class="pt">Revenda por Unidade</div></div><div style="display:flex;gap:8px"><button class="btnO bOgr" onclick="mGerarRelacao()">&#128228; Gerar Relação</button><button class="btn" onclick="mNovoRev()">+ Novo</button></div></div>'
     +relatorio
@@ -7710,7 +7678,7 @@ function pgRevenda(){
     +'var i=document.getElementById("rev-barcode-inp");if(i)i.focus();}'
     +'});}'
     +'},200);})();<\/script>'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'    +'<div class="tabs" style="margin-bottom:0"><button class="tabbtn'+(revTabAtiva==='lista'?' on':'')+'" onclick="revTabView=\'lista\';go(\'revenda\')">Lista</button><button class="tabbtn'+(revTabAtiva==='vendidos'?' on':'')+'" onclick="revTabView=\'vendidos\';go(\'revenda\')">&#128200; Vendidos</button></div>'    +(revTabAtiva==='lista'?'<div style="display:flex;gap:4px"><button onclick="revViewMode=\'cards\';go(\'revenda\')" style="background:'+(revViewMode!=='lista'?'var(--grb)':'var(--s2)')+';border:1px solid '+(revViewMode!=='lista'?'var(--gr)':'var(--bd)')+';color:'+(revViewMode!=='lista'?'var(--gr)':'var(--mt)')+';border-radius:6px;padding:5px 10px;font-size:15px;cursor:pointer" title="Cards">&#9638;</button><button onclick="revViewMode=\'lista\';go(\'revenda\')" style="background:'+(revViewMode==='lista'?'var(--grb)':'var(--s2)')+';border:1px solid '+(revViewMode==='lista'?'var(--gr)':'var(--bd)')+';color:'+(revViewMode==='lista'?'var(--gr)':'var(--mt)')+';border-radius:6px;padding:5px 10px;font-size:15px;cursor:pointer" title="Lista">&#9776;</button></div>':'')+'</div>'    +(revTabAtiva==='lista'?catBar+condBar+(revViewMode==='lista'?listaHtml:'<div class="g2">'+cards+'</div>'):_buildRevVendidos())
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'    +'<div class="tabs" style="margin-bottom:0"><button class="tabbtn'+(revTabAtiva==='lista'?' on':'')+'" onclick="revTabView=\'lista\';go(\'revenda\')">Lista</button><button class="tabbtn'+(revTabAtiva==='manutencao'?' on':'')+'" onclick="revTabView=\'manutencao\';go(\'revenda\')">&#128295; Manutenção'+(qtdManutencao?' ('+qtdManutencao+')':'')+'</button><button class="tabbtn'+(revTabAtiva==='vendidos'?' on':'')+'" onclick="revTabView=\'vendidos\';go(\'revenda\')">&#128200; Vendidos</button></div>'    +(revTabAtiva==='lista'?'<div style="display:flex;gap:4px"><button onclick="revViewMode=\'cards\';go(\'revenda\')" style="background:'+(revViewMode!=='lista'?'var(--grb)':'var(--s2)')+';border:1px solid '+(revViewMode!=='lista'?'var(--gr)':'var(--bd)')+';color:'+(revViewMode!=='lista'?'var(--gr)':'var(--mt)')+';border-radius:6px;padding:5px 10px;font-size:15px;cursor:pointer" title="Cards">&#9638;</button><button onclick="revViewMode=\'lista\';go(\'revenda\')" style="background:'+(revViewMode==='lista'?'var(--grb)':'var(--s2)')+';border:1px solid '+(revViewMode==='lista'?'var(--gr)':'var(--bd)')+';color:'+(revViewMode==='lista'?'var(--gr)':'var(--mt)')+';border-radius:6px;padding:5px 10px;font-size:15px;cursor:pointer" title="Lista">&#9776;</button></div>':'')+'</div>'    +(revTabAtiva==='lista'?catBar+condBar+(revViewMode==='lista'?listaHtml:'<div class="g2">'+cards+'</div>'):revTabAtiva==='manutencao'?catBar+condBar+_buildRevManutencao():_buildRevVendidos())
     +'</div>';
 }
 function mVerUnidadesPorIds(){
@@ -8243,7 +8211,9 @@ function mVerProdRevenda(id){
     +'<div style="display:flex;gap:8px">'
     +(p.status==='Disponivel'?'<button class="btn" style="flex:1" onclick="closeM();mVU('+p.id+')">&#128722; Vender</button>'
       :p.status==='Reservado'?'<button class="btnO bOgr" style="flex:1" onclick="cancelarReservaRev('+p.id+')">Cancelar Reserva</button>'
+      :p.status==='Manutencao'?'<button class="btn" style="flex:1" onclick="closeM();concluirManutencao('+p.id+')">&#9989; Concluir Manutenção</button>'
       :'<div class="tag tg" style="flex:1;text-align:center;padding:10px">Vendido</div>')
+    +(p.status==='Disponivel'?'<button class="btnO" style="flex:0 0 auto;padding:10px 12px;border-color:rgba(245,158,11,.4);color:var(--or)" onclick="closeM();mMarcarManutencao('+p.id+')" title="Marcar em Manutenção">&#128295;</button>':'')
     +'<button class="btnO bOb" onclick="imprimirEtiqueta('+p.id+')" style="flex:1">&#128424; Etiqueta</button>'
     +'<button class="btnO bOgr" onclick="closeM();mEditRev('+p.id+')" style="padding:10px 14px">&#9998;</button>'
     +'</div>';
@@ -8298,11 +8268,66 @@ function imprimirEtiqueta(id){
 function setRevCond(c){revCondFiltro=c;go('revenda');}
 var revTabView='lista';
 var revViewMode='cards';
+// ── Aba Manutenção — separa o que está pronto pra vender do que ainda falta
+// peça/reparo. Reaproveita o checklist técnico pra já mostrar "o que falta".
+function _buildRevManutencao(){
+  var itens=DB.revenda.filter(function(p){
+    if(p.status!=='Manutencao')return false;
+    if(revCatFiltro!=='Todos'&&p.cat!==revCatFiltro)return false;
+    if(revCondFiltro!=='Todas'&&p.cond!==revCondFiltro)return false;
+    if(!_revPassaFiltrosAvancados(p))return false;
+    return true;
+  });
+  if(!itens.length){
+    return '<div class="card" style="text-align:center;padding:40px;color:var(--mt)"><div style="font-size:32px;margin-bottom:10px">&#128295;</div><div style="font-weight:700">Nada em manutenção</div><div style="font-size:12px;margin-top:4px">Itens que faltam peça ou reparo aparecem aqui</div></div>';
+  }
+  var html='';
+  itens.forEach(function(p){
+    var falta=_relOQueFalta(p);
+    html+='<div class="card" style="margin-bottom:8px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
+      +'<div style="flex:1;cursor:pointer" onclick="mVerProdRevenda('+p.id+')"><div style="font-size:14px;font-weight:700">'+p.prod+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+(p.cat||'')+(p.cond?' &middot; '+p.cond:'')+'</div></div>'
+      +'<span style="font-size:13px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(p.preco)+'</span>'
+      +'</div>'
+      +(p.manutencaoObs?'<div style="font-size:12px;color:var(--or);margin-top:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:6px 9px">&#128221; '+p.manutencaoObs+'</div>':'')
+      +(falta?'<div style="font-size:11px;color:var(--mt);margin-top:6px">&#9888; Faltando no checklist: '+falta+'</div>':'')
+      +'<div style="display:flex;gap:6px;margin-top:10px">'
+      +'<button class="btn" style="flex:1;font-size:12px;padding:6px" onclick="concluirManutencao('+p.id+')">&#9989; Concluir — Disponível pra venda</button>'
+      +'<button class="btnO bOb" style="font-size:12px;padding:6px 10px" onclick="mEditRev('+p.id+')">&#9998;</button>'
+      +'</div></div>';
+  });
+  return html;
+}
+// Marca um produto como em manutenção — pergunta uma observação opcional (ex:
+// "falta memória RAM") pra deixar registrado o que precisa ser feito.
+function mMarcarManutencao(id){
+  var p=gRevById(id);if(!p)return;
+  openM('&#128295; Marcar em Manutenção',
+    '<div class="mf">'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:12px">"'+p.prod+'" sai da lista de disponíveis pra venda até você marcar como concluído.</div>'
+    +'<div class="fld"><label>O que falta? (opcional)</label><input class="inp" id="mm-obs" placeholder="Ex: Falta pente de memória RAM"></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" style="background:var(--or)" onclick="confirmarManutencao('+id+')">Marcar em Manutenção</button></div>'
+    +'</div>',420);
+}
+function confirmarManutencao(id){
+  var p=gRevById(id);if(!p)return;
+  var obs=(document.getElementById('mm-obs').value||'').trim();
+  p.status='Manutencao';
+  p.manutencaoObs=obs;
+  saveDB();closeM();go('revenda');toast('Marcado em manutenção!','var(--or)');
+}
+function concluirManutencao(id){
+  var p=gRevById(id);if(!p)return;
+  p.status='Disponivel';
+  p.manutencaoObs=null;
+  saveDB();go('revenda');toast('Pronto pra venda!','var(--gr)');
+}
 function _buildRevVendidos(){
   var per=_revRelPer;
   var perBar=_buildPerBar(per,'revRel','','','swRevRelPer');
   var vendidos=DB.revenda.filter(function(p){
-    if(p.status==='Disponivel')return false;
+    if(p.status!=='Vendido')return false;
     var data=p.dataVenda||'';
     if(!data)return per==='tudo';
     return _perFiltro(data,per,_revRelD1,_revRelD2);
@@ -8624,6 +8649,17 @@ function onRevCatChange(prefix){
     wrap.outerHTML=renderChecklistHtml(sel.value,[],prefix,[],[]);
   }
 }
+// Alterna o visual dos dois botões de Status na tela de Editar
+function _toggleErManutencao(){
+  var manut=document.querySelector('input[name="er-status"][value="Manutencao"]');
+  var ehManut=manut&&manut.checked;
+  var lblDisp=document.getElementById('er-status-disp');
+  var lblManut=document.getElementById('er-status-manut');
+  var obsEl=document.getElementById('er-manut-obs');
+  if(lblDisp){lblDisp.style.borderColor=ehManut?'var(--bd)':'var(--gr)';lblDisp.style.background=ehManut?'var(--s2)':'var(--grb)';lblDisp.style.color=ehManut?'var(--mt)':'var(--gr)';}
+  if(lblManut){lblManut.style.borderColor=ehManut?'var(--or)':'var(--bd)';lblManut.style.background=ehManut?'rgba(245,158,11,.1)':'var(--s2)';lblManut.style.color=ehManut?'var(--or)':'var(--mt)';}
+  if(obsEl)obsEl.style.display=ehManut?'block':'none';
+}
 function mEditRev(id){
   var it=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){it=DB.revenda[i];break;}}if(!it)return;
   var catO='';for(var i=0;i<DB.revendaCats.length;i++)catO+='<option value="'+DB.revendaCats[i].nome+'"'+(it.cat===DB.revendaCats[i].nome?' selected':'')+'>'+DB.revendaCats[i].nome+'</option>';
@@ -8673,6 +8709,14 @@ function mEditRev(id){
     +'<div class="fld"><label>Categoria</label><select class="inp" id="er-cat" onchange="onRevCatChange(\'er\');onRevCatChangeSpecs(\'er\')">'+catO+'</select></div>'
     +'</div>'
     +'<div class="fld"><label>Condicao</label><select class="inp" id="er-c">'+condO+'</select></div>'
+    +((it.status==='Disponivel'||it.status==='Manutencao'||!it.status)?
+    '<div class="fld"><label>Status</label>'
+    +'<div style="display:flex;gap:8px">'
+    +'<label id="er-status-disp" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:var(--r);border:1px solid '+(it.status!=='Manutencao'?'var(--gr)':'var(--bd)')+';background:'+(it.status!=='Manutencao'?'var(--grb)':'var(--s2)')+';color:'+(it.status!=='Manutencao'?'var(--gr)':'var(--mt)')+';font-size:12px;font-weight:700;cursor:pointer"><input type="radio" name="er-status" value="Disponivel"'+(it.status!=='Manutencao'?' checked':'')+' onchange="_toggleErManutencao()" style="accent-color:var(--gr)"> &#9989; Disponível</label>'
+    +'<label id="er-status-manut" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:var(--r);border:1px solid '+(it.status==='Manutencao'?'var(--or)':'var(--bd)')+';background:'+(it.status==='Manutencao'?'rgba(245,158,11,.1)':'var(--s2)')+';color:'+(it.status==='Manutencao'?'var(--or)':'var(--mt)')+';font-size:12px;font-weight:700;cursor:pointer"><input type="radio" name="er-status" value="Manutencao"'+(it.status==='Manutencao'?' checked':'')+' onchange="_toggleErManutencao()" style="accent-color:var(--or)"> &#128295; Em Manutenção</label>'
+    +'</div>'
+    +'<input class="inp" id="er-manut-obs" value="'+(it.manutencaoObs||'').replace(/"/g,'&quot;')+'" placeholder="Ex: Falta memória RAM, bateria, carregador..." style="display:'+(it.status==='Manutencao'?'block':'none')+';margin-top:7px"></div>'
+    :'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Status atual: <b>'+(it.status||'Disponivel')+'</b> — gerencie isso pelos botões da tela de detalhes, não aqui.</div>')
     +clHtml
     +renderSpecsHtml(it.cat||'',it.specs||{},'er',it.specsBoolKeys||[],it.specsCamposOcultos||[])
     +'<div class="fld"><label>Produto do Estoque (opcional)</label><select class="inp" id="er-estprod" onchange="atualizaPesoRevenda()">'+prodO+'</select></div>'
@@ -8752,6 +8796,14 @@ function saveEditRev(id){
   it.marca=(document.getElementById('er-marca').value||'').trim();
   it.modelo=(document.getElementById('er-modelo').value||'').trim();
   it.desc=(document.getElementById('er-desc').value||'').trim();
+  // Status (Disponível/Manutenção) — só existe na tela se o item já estava num
+  // desses dois estados; se estiver Vendido/Reservado, não mexe (evita sobrescrever
+  // sem querer algo que se gerencia pelos botões da tela de detalhes).
+  var statusSel=document.querySelector('input[name="er-status"]:checked');
+  if(statusSel){
+    it.status=statusSel.value;
+    it.manutencaoObs=statusSel.value==='Manutencao'?(document.getElementById('er-manut-obs').value||'').trim():null;
+  }
   it.preco=parseFloat(document.getElementById('er-pr').value)||0;
   it.cat=document.getElementById('er-cat').value;
   it.cond=document.getElementById('er-c').value;
@@ -8869,6 +8921,12 @@ function mNovoRev(){
     +'<input class="inp" type="number" inputmode="numeric" id="nr-qtd" value="1" min="1" step="1" style="font-size:16px;text-align:center;font-family:monospace">'
     +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Cria 1 card por unidade</div></div>'
     +'</div>'
+    +'<div class="fld"><label>Status</label>'
+    +'<div style="display:flex;gap:8px">'
+    +'<label id="nr-status-disp" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:var(--r);border:1px solid var(--gr);background:var(--grb);color:var(--gr);font-size:12px;font-weight:700;cursor:pointer"><input type="radio" name="nr-status" value="Disponivel" checked onchange="_toggleNrManutencao()" style="accent-color:var(--gr)"> &#9989; Disponível</label>'
+    +'<label id="nr-status-manut" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:var(--r);border:1px solid var(--bd);background:var(--s2);color:var(--mt);font-size:12px;font-weight:700;cursor:pointer"><input type="radio" name="nr-status" value="Manutencao" onchange="_toggleNrManutencao()" style="accent-color:var(--or)"> &#128295; Em Manutenção</label>'
+    +'</div>'
+    +'<input class="inp" id="nr-manut-obs" placeholder="Ex: Falta memória RAM, bateria, carregador..." style="display:none;margin-top:7px"></div>'
     +clHtml
     +(firstCat?renderSpecsHtml(firstCat,{},'nr'):'')
     +'<div class="fld"><label>Produto do Estoque (opcional)</label><select class="inp" id="nr-estprod" onchange="onRevEstProdChange()">'+prodO+'</select></div>'
@@ -8876,6 +8934,17 @@ function mNovoRev(){
     +'<div id="nr-est-info" style="font-size:11px;color:var(--mt);margin-top:-6px;margin-bottom:8px"></div>'
     +'<div id="nr-marg" style="margin-bottom:8px"></div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveRev()">Cadastrar</button></div></div>',500);
+}
+// Alterna o visual dos dois botões de Status e mostra/esconde o campo "o que falta"
+function _toggleNrManutencao(){
+  var manut=document.querySelector('input[name="nr-status"][value="Manutencao"]');
+  var ehManut=manut&&manut.checked;
+  var lblDisp=document.getElementById('nr-status-disp');
+  var lblManut=document.getElementById('nr-status-manut');
+  var obsEl=document.getElementById('nr-manut-obs');
+  if(lblDisp){lblDisp.style.borderColor=ehManut?'var(--bd)':'var(--gr)';lblDisp.style.background=ehManut?'var(--s2)':'var(--grb)';lblDisp.style.color=ehManut?'var(--mt)':'var(--gr)';}
+  if(lblManut){lblManut.style.borderColor=ehManut?'var(--or)':'var(--bd)';lblManut.style.background=ehManut?'rgba(245,158,11,.1)':'var(--s2)';lblManut.style.color=ehManut?'var(--or)':'var(--mt)';}
+  if(obsEl)obsEl.style.display=ehManut?'block':'none';
 }
 function onRevEstProdChange(){
   var sel=document.getElementById('nr-estprod');
@@ -8904,9 +8973,12 @@ function saveRev(){
   var desc=(document.getElementById('nr-desc').value||'').trim();
   var specsResult=getSpecsFromForm('nr',cat);
   var clExtras=getChecklistExtras('nr');
+  var statusSel=document.querySelector('input[name="nr-status"]:checked');
+  var status=statusSel?statusSel.value:'Disponivel';
+  var manutObs=status==='Manutencao'?(document.getElementById('nr-manut-obs').value||'').trim():null;
   for(var u=0;u<qtd;u++){
     var codCurto='BV-'+(DB.revProxCodigo++);
-    DB.revenda.push({id:nid(),codCurto:codCurto,prod:n+(qtd>1?' #'+(u+1):''),marca:marca,modelo:modelo,desc:desc,peso:pesoRev,cond:cond,preco:preco,status:'Disponivel',cat:cat,estProdId:pIdSel,testesAprovados:aprovados.slice(),specs:specsResult.specs,specsBoolKeys:specsResult.boolKeys,specsCamposOcultos:specsResult.camposOcultos,checklistExtra:clExtras.extras,checklistOcultos:clExtras.ocultos});
+    DB.revenda.push({id:nid(),codCurto:codCurto,prod:n+(qtd>1?' #'+(u+1):''),marca:marca,modelo:modelo,desc:desc,peso:pesoRev,cond:cond,preco:preco,status:status,manutencaoObs:manutObs,cat:cat,estProdId:pIdSel,testesAprovados:aprovados.slice(),specs:specsResult.specs,specsBoolKeys:specsResult.boolKeys,specsCamposOcultos:specsResult.camposOcultos,checklistExtra:clExtras.extras,checklistOcultos:clExtras.ocultos});
     if(pIdSel&&pesoRev>0){
       var ep=null;
       for(var i=0;i<DB.produtos.length;i++){if(_normId(DB.produtos[i].id)===_normId(pIdSel)){ep=DB.produtos[i];break;}}
