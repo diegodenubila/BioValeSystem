@@ -1807,18 +1807,23 @@ function renderPesagem(){
       }
     }
   })();
-  // Agrupa unidades disponíveis por nome+condição idênticos (preço também deve bater,
-  // já que itens idênticos têm o mesmo preço por definição).
-  var _gruposUni={}; // chave "nomeBase|cond|preco" -> {ids:[...], nome, cond, preco, peso}
+  // Agrupa unidades disponíveis "cada uma diferente" por identidade completa (categoria,
+  // marca, modelo, condição, specs e preço) — mesma regra usada na aba Revenda, pra não
+  // juntar coisas parecidas no nome mas configuração diferente (ex: um i5 e um i7).
+  // Produtos "todas idênticas" (tipoUnidade='quantidade') ficam de fora daqui — têm
+  // tratamento próprio logo abaixo, porque já vêm com a quantidade certa num só registro.
+  var _gruposUni={}; // chave -> {ids:[...], nome, cond, preco, peso}
+  var _itensQtd=[];
   for(var i=0;i<DB.revenda.length;i++){
     var rv=DB.revenda[i];
     if(rv.status!=='Disponivel')continue;
     if(_uidsNoCarrinho[rv.id])continue; // já está no carrinho — não oferece de novo
     hasD=true;
+    if(rv.tipoUnidade==='quantidade'){_itensQtd.push(rv);continue;}
     var nomeRv=(rv.prod||rv.nome||'Produto');
     // Remove sufixo " #N" usado no cadastro em lote (ex: "motor de tanquinho #3" -> "motor de tanquinho")
     var nomeBase=nomeRv.replace(/\s*#\d+\s*$/,'');
-    var chave=nomeBase.toLowerCase()+'|'+(rv.cond||'')+'|'+rv.preco;
+    var chave=_revChaveIdentica(rv)+'||'+rv.preco;
     if(!_gruposUni[chave])_gruposUni[chave]={ids:[],nome:nomeBase,cond:rv.cond,preco:rv.preco,peso:rv.peso};
     _gruposUni[chave].ids.push(rv.id);
   }
@@ -1841,6 +1846,22 @@ function renderPesagem(){
       +'</div>'
       +'<div style="text-align:right;flex-shrink:0">'
       +'<div style="font-size:14px;font-weight:700;color:#f59e0b;font-family:monospace">'+fR(g.preco)+'</div>'
+      +'<div style="font-size:10px;color:#7a90b0;margin-top:1px">Unidade</div>'
+      +'</div></div>';
+  });
+  // Produtos "todas idênticas" — mostram a quantidade real do estoque e abrem o
+  // seletor de quantidade certo (limitado ao qtdEstoque, não à quantidade de registros).
+  _itensQtd.forEach(function(rv){
+    var _rvCod=(function(id){var s=String(Math.abs(Math.floor(parseFloat(id)||0)));while(s.length<12)s='0'+s;return s.slice(-12);})(rv.id);
+    var qtdDisp=rv.qtdEstoque||0;
+    unitCards+='<div class="prod-card" data-nome="'+(rv.prod||'').toLowerCase()+'" data-cod="'+_rvCod+'" onclick="selUnitQtd('+rv.id+')">'
+      +'<span style="font-size:20px;flex-shrink:0">&#127991;</span>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:13px;font-weight:600">'+rv.prod+' <span style="font-size:11px;font-weight:700;color:var(--bl);background:rgba(59,130,246,.12);padding:1px 7px;border-radius:10px;margin-left:4px">'+qtdDisp+' em estoque</span></div>'
+      +'<div style="font-size:11px;color:var(--mt);margin-top:1px">'+(rv.cond||'')+' &middot; '+fKg(rv.peso)+'kg</div>'
+      +'</div>'
+      +'<div style="text-align:right;flex-shrink:0">'
+      +'<div style="font-size:14px;font-weight:700;color:#f59e0b;font-family:monospace">'+fR(rv.preco)+'</div>'
       +'<div style="font-size:10px;color:#7a90b0;margin-top:1px">Unidade</div>'
       +'</div></div>';
   });
@@ -1881,9 +1902,13 @@ function renderPesagem(){
         detalhe='<div style="font-size:10px;color:var(--mt);margin-top:2px;font-family:monospace">Peso: '+fKg(it.peso)+'kg | Tara: '+fKg(it.tara||0)+'kg | Desc: '+dStr+' | L\u00edq: '+fKg(pesoEfetivo)+'kg</div>';
       }
       var ctrl=it.uni
-        ?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:6px">'
-        +'<div class="fld"><label>Peso kg</label><input type="number" inputmode="decimal" class="inp" value="'+parseFloat(it.peso).toFixed(3)+'" min="0.001" step="0.001" style="padding:8px 9px;font-family:monospace;font-size:14px" onchange="updIP('+i+',this.value)"></div>'
-        +'<div class="fld"><label>Preco R$</label><input type="number" inputmode="decimal" class="inp" value="'+it.preco+'" min="0" step="0.01" style="padding:8px 9px;font-family:monospace;font-size:14px" onchange="updIPr('+i+',this.value)"></div></div>'
+        ?(it.qtdVendida
+          ?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:6px">'
+          +'<div class="fld"><label>Quantidade</label><input type="number" inputmode="numeric" class="inp" value="'+it.qtdVendida+'" min="1" max="'+(it.qtdMax||999)+'" step="1" style="padding:8px 9px;font-family:monospace;font-size:14px;text-align:center" onchange="updIQtd('+i+',this.value)"></div>'
+          +'<div class="fld"><label>Preço unitário R$</label><input type="number" inputmode="decimal" class="inp" value="'+(it.precoUnit!=null?it.precoUnit:it.preco)+'" min="0" step="0.01" style="padding:8px 9px;font-family:monospace;font-size:14px" onchange="updIPrUnit('+i+',this.value)"></div></div>'
+          :'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:6px">'
+          +'<div class="fld"><label>Peso kg</label><input type="number" inputmode="decimal" class="inp" value="'+parseFloat(it.peso).toFixed(3)+'" min="0.001" step="0.001" style="padding:8px 9px;font-family:monospace;font-size:14px" onchange="updIP('+i+',this.value)"></div>'
+          +'<div class="fld"><label>Preco R$</label><input type="number" inputmode="decimal" class="inp" value="'+it.preco+'" min="0" step="0.01" style="padding:8px 9px;font-family:monospace;font-size:14px" onchange="updIPr('+i+',this.value)"></div></div>')
         :'<div style="display:grid;grid-template-columns:repeat(3,minmax(80px,1fr));gap:7px;margin-top:6px;align-items:end">'
         +'<div class="fld"><label>Peso kg</label><input type="number" inputmode="decimal" class="inp" value="'+parseFloat(it.peso).toFixed(3)+'" min="0" step="0.001" style="padding:8px 9px;font-family:monospace;font-size:14px" onchange="updIP('+i+',this.value)"></div>'
         +'<div class="fld"><label>Tara kg</label><input type="number" inputmode="decimal" class="inp" value="'+parseFloat(it.tara||0).toFixed(3)+'" min="0" step="0.001" style="padding:8px 9px;font-family:monospace;font-size:14px" onchange="updITara('+i+',this.value)"></div>'
@@ -2186,6 +2211,26 @@ function updITara(i,v){
 }
 function updIPLiq(i,v){pesAbas[pesAtiva].itens[i].pesoLiquido=parseFloat(v)||0;savePesState();renderPesagem();}
 function updIPr(i,v){pesAbas[pesAtiva].itens[i].preco=parseFloat(v)||0;savePesState();renderPesagem();}
+// Muda a quantidade de um item vendido por unidade (ex: cliente pediu 10, mudou
+// pra 9) — recalcula o total sozinho a partir do preço unitário guardado, sem
+// precisar apagar e adicionar o item de novo.
+function updIQtd(i,v){
+  var ab=pesAbas[pesAtiva];var it=ab.itens[i];if(!it)return;
+  var novaQtd=Math.max(1,Math.min(it.qtdMax||999,parseInt(v)||1));
+  it.qtdVendida=novaQtd;
+  var unit=it.precoUnit!=null?it.precoUnit:it.preco;
+  it.preco=+(unit*novaQtd).toFixed(2);
+  it.nome=it.nome.replace(/\s*\(x\d+\)\s*$/,'')+' (x'+novaQtd+')';
+  savePesState();renderPesagem();
+}
+// Muda o preço unitário de um item vendido por unidade — recalcula o total junto.
+function updIPrUnit(i,v){
+  var ab=pesAbas[pesAtiva];var it=ab.itens[i];if(!it)return;
+  var novoUnit=Math.max(0,parseFloat(v)||0);
+  it.precoUnit=novoUnit;
+  it.preco=+(novoUnit*(it.qtdVendida||1)).toFixed(2);
+  savePesState();renderPesagem();
+}
 function updIObs(i,v){pesAbas[pesAtiva].itens[i].obs=v.trim();savePesState();}
 function delIP(i){pesAbas[pesAtiva].itens.splice(i,1);savePesState();autoSave();renderPesagem();}
 
@@ -2513,6 +2558,38 @@ function confAddUGrupo(chave){
     if(!rv)continue;
     ab.itens.push({prodId:null,uid:uid,ic:'&#127991;',nome:g.nome,peso:rv.peso,preco:rv.preco,tipo:'Venda',uni:true});
   }
+  closeM();savePesState();renderPesagem();
+  setTimeout(_reabrirBuscaProd,150);
+}
+// Abre o seletor de quantidade pra um produto "todas idênticas" — igual visualmente
+// ao selUnitGrupo, mas limitado ao qtdEstoque real (não à quantidade de registros,
+// já que aqui é só 1 registro com uma quantidade guardada nele).
+function selUnitQtd(id){
+  var rv=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){rv=DB.revenda[i];break;}}if(!rv)return;
+  var qtdMax=rv.qtdEstoque||0;
+  if(qtdMax<=0){alert('Sem estoque desse produto!');return;}
+  openM('&#127991; '+rv.prod,'<div class="mf">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:11px;background:var(--s2);border-radius:var(--r)">'
+    +'<span style="font-size:26px">&#127991;</span>'
+    +'<div style="flex:1"><div style="font-size:14px;font-weight:700">'+rv.prod+'</div>'
+    +'<div style="font-size:12px;color:var(--mt)">'+(rv.cond||'')+' &middot; '+fKg(rv.peso)+'kg &middot; '+qtdMax+' disponível'+(qtdMax>1?'is':'')+'</div></div>'
+    +'<div style="font-size:18px;font-weight:800;color:var(--or)">'+fR(rv.preco)+'</div></div>'
+    +'<div class="fld" style="margin-top:10px"><label>Quantidade a vender</label>'
+    +'<div style="display:flex;align-items:center;gap:10px">'
+    +'<button class="btnO bOgr" style="padding:8px 14px;font-size:18px" onclick="var el=document.getElementById(\'squ-qtd\');el.value=Math.max(1,(parseInt(el.value)||1)-1)">&minus;</button>'
+    +'<input class="inp" type="number" id="squ-qtd" value="1" min="1" max="'+qtdMax+'" style="text-align:center;font-size:16px;font-weight:700" oninput="if(parseInt(this.value)>'+qtdMax+')this.value='+qtdMax+';if(parseInt(this.value)<1)this.value=1;">'
+    +'<button class="btnO bOgr" style="padding:8px 14px;font-size:18px" onclick="var el=document.getElementById(\'squ-qtd\');el.value=Math.min('+qtdMax+',(parseInt(el.value)||1)+1)">&plus;</button>'
+    +'</div></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
+    +'<button class="btn btn-or" onclick="confAddUQtd('+id+')">+ Adicionar ao Carrinho</button></div></div>',420);
+}
+function confAddUQtd(id){
+  var rv=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){rv=DB.revenda[i];break;}}
+  if(!rv)return;
+  var qtdMax=rv.qtdEstoque||0;
+  var qtd=Math.max(1,Math.min(parseInt(document.getElementById('squ-qtd').value)||1,qtdMax));
+  var ab=pesAbas[pesAtiva];
+  ab.itens.push({prodId:null,uid:rv.id,ic:'&#127991;',nome:rv.prod+' (x'+qtd+')',peso:rv.peso,preco:+(rv.preco*qtd).toFixed(2),precoUnit:rv.preco,qtdMax:qtdMax,tipo:'Venda',uni:true,qtdVendida:qtd});
   closeM();savePesState();renderPesagem();
   setTimeout(_reabrirBuscaProd,150);
 }
@@ -3111,14 +3188,29 @@ function _finalizarPesagem(){
     if(it.uni){
       for(var j=0;j<DB.revenda.length;j++){
         if(DB.revenda[j].id===it.uid){
-          DB.revenda[j].status='Vendido';
-          DB.revenda[j].dataVenda=hj();
-          DB.revenda[j].precoVenda=it.preco||DB.revenda[j].preco||0;
-          DB.revenda[j].atendNum=ab.numAtend||null;
-          // Custo estimado = peso × preço do material de origem (se vinculado)
-          if(DB.revenda[j].estProdId&&DB.revenda[j].peso){
-            var _ep=null;for(var _k=0;_k<DB.produtos.length;_k++){if(_normId(DB.produtos[_k].id)===_normId(DB.revenda[j].estProdId)){_ep=DB.produtos[_k];break;}}
-            if(_ep&&_ep.vC)DB.revenda[j].custoEst=+(DB.revenda[j].peso*_ep.vC).toFixed(2);
+          if(DB.revenda[j].tipoUnidade==='quantidade'){
+            // "Todas idênticas": abate a quantidade vendida do estoque, só marca
+            // Vendido quando não sobrar nenhuma unidade
+            var qtdV=it.qtdVendida||1;
+            DB.revenda[j].qtdEstoque=Math.max(0,(DB.revenda[j].qtdEstoque||0)-qtdV);
+            DB.revenda[j].dataVenda=hj();
+            DB.revenda[j].precoVenda=DB.revenda[j].preco||0;
+            DB.revenda[j].atendNum=ab.numAtend||null;
+            if(DB.revenda[j].qtdEstoque<=0)DB.revenda[j].status='Vendido';
+            if(DB.revenda[j].estProdId&&DB.revenda[j].peso){
+              var _ep=null;for(var _k=0;_k<DB.produtos.length;_k++){if(_normId(DB.produtos[_k].id)===_normId(DB.revenda[j].estProdId)){_ep=DB.produtos[_k];break;}}
+              if(_ep&&_ep.vC)DB.revenda[j].custoEst=+(DB.revenda[j].peso*_ep.vC).toFixed(2);
+            }
+          }else{
+            DB.revenda[j].status='Vendido';
+            DB.revenda[j].dataVenda=hj();
+            DB.revenda[j].precoVenda=it.preco||DB.revenda[j].preco||0;
+            DB.revenda[j].atendNum=ab.numAtend||null;
+            // Custo estimado = peso × preço do material de origem (se vinculado)
+            if(DB.revenda[j].estProdId&&DB.revenda[j].peso){
+              var _ep=null;for(var _k=0;_k<DB.produtos.length;_k++){if(_normId(DB.produtos[_k].id)===_normId(DB.revenda[j].estProdId)){_ep=DB.produtos[_k];break;}}
+              if(_ep&&_ep.vC)DB.revenda[j].custoEst=+(DB.revenda[j].peso*_ep.vC).toFixed(2);
+            }
           }
           break;
         }
@@ -7169,17 +7261,19 @@ function mGerarRelacao(){
   var catOpts=catNomes.map(function(c){return '<option value="'+c+'"'+(c===_relCatFiltro?' selected':'')+'>'+c+'</option>';}).join('');
   openM('&#128228; Gerar Relação pra Cliente',
     '<div class="mf">'
-    +'<div style="font-size:12px;color:var(--mt);margin-bottom:12px">Escolhe os produtos que quer mandar pro cliente — puxa modelo, configuração e condição direto do cadastro.</div>'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:12px">Escolhe os produtos que quer mandar pro cliente — puxa modelo e configuração direto do cadastro.</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">'
     +'<div class="fld" style="margin-bottom:0"><label>Categoria</label><select class="inp" id="rel-cat" onchange="_relRenderLista()">'+catOpts+'</select></div>'
     +'<div class="fld" style="margin-bottom:0"><label>Preço mín.</label><input class="inp" type="number" id="rel-min" placeholder="0" oninput="_relRenderLista()"></div>'
     +'<div class="fld" style="margin-bottom:0"><label>Preço máx.</label><input class="inp" type="number" id="rel-max" placeholder="Sem limite" oninput="_relRenderLista()"></div>'
     +'</div>'
+    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:var(--r);padding:8px 10px"><input type="checkbox" id="rel-manut" onchange="_relRenderLista()"> &#128295; Incluir itens em Manutenção (mostra "O que falta" pro cliente decidir)</label>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
     +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="rel-all" checked onchange="_relToggleAll(this.checked)"> Selecionar todos</label>'
     +'<span id="rel-contador" style="font-size:11px;color:var(--mt)"></span>'
     +'</div>'
     +'<div id="rel-lista" style="max-height:340px;overflow-y:auto;margin-bottom:14px"></div>'
+    +'<button class="btn" style="width:100%;background:var(--s3);border:1px solid var(--bd);color:var(--tx);margin-bottom:8px" onclick="_relVisualizar()">&#128065; Visualizar (igual ao PDF)</button>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
     +'<button class="btnO bOgr" onclick="_relExportar(\'pdf\')">&#128196; Gerar PDF</button>'
     +'<button class="btnO bOgr" onclick="_relExportar(\'csv\')">&#128202; Gerar Excel/CSV</button>'
@@ -7188,13 +7282,34 @@ function mGerarRelacao(){
     +'</div>',560);
   setTimeout(_relRenderLista,50);
 }
+// Monta a mesma tabela que iria pro PDF, mas mostra dentro do próprio modal — pra
+// conferir antes de gerar o arquivo de verdade, sem precisar baixar só pra olhar.
+// Monta a tabela no mesmo HTML/estilo que vai pro PDF — reaproveitada tanto pra
+// gerar o PDF de verdade quanto pra visualização prévia (mesma aparência exata).
+function _relMontarTabelaPDF(itens){
+  var th='<table><thead><tr><th>Produto</th><th>Categoria</th><th>Configuração</th><th>O que falta</th><th>Preço</th></tr></thead><tbody>';
+  itens.forEach(function(p){
+    var specsTxt=_relFormatarConfig(p,true);
+    var faltaTxt=_relOQueFalta(p);
+    var nomeCel=p.prod+(p.marca||p.modelo?'<br><span style="font-size:8px;color:#666">'+(p.marca||'')+' '+(p.modelo||'')+'</span>':'')+(p.codCurto?'<br><span style="font-size:8px;color:#888;font-family:monospace">'+p.codCurto+'</span>':'')+(p.status==='Manutencao'?'<br><span style="font-size:8px;color:#b45309;font-weight:700">EM MANUTENÇÃO</span>':'');
+    th+='<tr><td>'+nomeCel+'</td><td>'+(p.cat||'')+'</td><td style="font-size:9px">'+(specsTxt||'&mdash;')+'</td><td style="font-size:9px;color:#b45309">'+(faltaTxt||'&mdash;')+'</td><td>'+fR(p.preco)+'</td></tr>';
+  });
+  th+='</tbody></table>';
+  return th;
+}
+function _relVisualizar(){
+  var itens=_relSelecionados();
+  if(!itens.length){alert('Selecione ao menos um produto!');return;}
+  _visualizarComoPDF('Relação de Produtos',_relMontarTabelaPDF(itens));
+}
 function _relItensFiltrados(){
   var cat=document.getElementById('rel-cat')?document.getElementById('rel-cat').value:'Todos';
   var min=parseFloat(document.getElementById('rel-min')?document.getElementById('rel-min').value:'')||0;
   var maxEl=document.getElementById('rel-max');
   var max=maxEl&&maxEl.value?parseFloat(maxEl.value):Infinity;
+  var incluirManut=document.getElementById('rel-manut')?document.getElementById('rel-manut').checked:false;
   return DB.revenda.filter(function(p){
-    if(p.status!=='Disponivel')return false;
+    if(p.status!=='Disponivel'&&!(incluirManut&&p.status==='Manutencao'))return false;
     if(cat!=='Todos'&&p.cat!==cat)return false;
     if((p.preco||0)<min||(p.preco||0)>max)return false;
     return true;
@@ -7209,7 +7324,7 @@ function _relRenderLista(){
   listEl.innerHTML=itens.map(function(p){
     return '<label style="display:flex;align-items:center;gap:9px;padding:8px 6px;border-bottom:1px solid var(--bd);cursor:pointer">'
       +'<input type="checkbox" class="rel-item-chk" value="'+p.id+'" checked onchange="_relAtualizaContador()">'
-      +'<div style="flex:1"><div style="font-size:13px;font-weight:600">'+p.prod+'</div><div style="font-size:10px;color:var(--mt)">'+(p.cond||'')+(p.cat?' · '+p.cat:'')+'</div></div>'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:600">'+p.prod+(p.status==='Manutencao'?' <span style="font-size:9px;color:var(--or);font-weight:700;background:rgba(245,158,11,.15);padding:1px 6px;border-radius:8px">MANUTENÇÃO</span>':'')+'</div><div style="font-size:10px;color:var(--mt)">'+(p.cond||'')+(p.cat?' · '+p.cat:'')+'</div></div>'
       +'<div style="font-size:13px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(p.preco)+'</div>'
       +'</label>';
   }).join('');
@@ -7252,40 +7367,39 @@ function _relFormatarConfig(p,htmlMode){
 }
 // Monta o texto de "O que falta" — itens do checklist que existem pra essa categoria
 // mas não foram marcados como aprovados nesse produto específico.
-function _relOQueFalta(p){
+// Lista (array) dos itens do checklist que ainda não foram marcados — usada tanto
+// no relatório quanto no card de Manutenção.
+function _revFaltandoArray(p){
   var clFull=getRevCatChecklist(p.cat||'')||[];
   var ocultos=p.checklistOcultos||[];
   var extras=p.checklistExtra||[];
   var cl=clFull.filter(function(item){return ocultos.indexOf(item)<0;}).concat(extras);
   var aprovados=p.testesAprovados||[];
-  var faltando=cl.filter(function(item){return aprovados.indexOf(item)<0;});
-  return faltando.join(', ');
+  return cl.filter(function(item){return aprovados.indexOf(item)<0;});
+}
+function _relOQueFalta(p){
+  return _revFaltandoArray(p).join(', ');
 }
 function _relExportar(fmt){
   var itens=_relSelecionados();
   if(!itens.length){alert('Selecione ao menos um produto!');return;}
   if(fmt==='csv'){
-    var rows=[['Produto','Código','Marca','Modelo','Categoria','Condição','Configuração','O que falta','Preço']];
+    var rows=[['Produto','Código','Marca','Modelo','Categoria','Status','Configuração','O que falta','Preço']];
     itens.forEach(function(p){
       var specsTxt=_relFormatarConfig(p,false).replace(/&#9989;/g,'OK').replace(/&#10060;/g,'X');
-      rows.push([p.prod,p.codCurto||'',p.marca||'',p.modelo||'',p.cat||'',p.cond||'',specsTxt,_relOQueFalta(p),fR(p.preco)]);
+      rows.push([p.prod,p.codCurto||'',p.marca||'',p.modelo||'',p.cat||'',(p.status==='Manutencao'?'Em Manutenção':'Disponível'),specsTxt,_relOQueFalta(p),fR(p.preco)]);
     });
     _exportCSV('relacao-produtos-'+hj().replace(/\//g,'-')+'.csv',rows);
   }else{
-    var th='<table><thead><tr><th>Produto</th><th>Categoria</th><th>Condição</th><th>Configuração</th><th>O que falta</th><th>Preço</th></tr></thead><tbody>';
-    itens.forEach(function(p){
-      var specsTxt=_relFormatarConfig(p,true);
-      var faltaTxt=_relOQueFalta(p);
-      var nomeCel=p.prod+(p.marca||p.modelo?'<br><span style="font-size:8px;color:#666">'+(p.marca||'')+' '+(p.modelo||'')+'</span>':'')+(p.codCurto?'<br><span style="font-size:8px;color:#888;font-family:monospace">'+p.codCurto+'</span>':'');
-      th+='<tr><td>'+nomeCel+'</td><td>'+(p.cat||'')+'</td><td>'+(p.cond||'')+'</td><td style="font-size:9px">'+(specsTxt||'&mdash;')+'</td><td style="font-size:9px;color:#b45309">'+(faltaTxt||'&mdash;')+'</td><td>'+fR(p.preco)+'</td></tr>';
-    });
-    th+='</tbody></table>';
-    _exportPDF('Relação de Produtos',th);
+    _exportPDF('Relação de Produtos',_relMontarTabelaPDF(itens));
   }
 }
 function _relReservarModal(){
   var itens=_relSelecionados();
   if(!itens.length){alert('Selecione ao menos um produto!');return;}
+  // Guarda os ids selecionados ANTES de trocar de modal — abrir esse modal novo
+  // substitui a tela de seleção, então as caixinhas marcadas deixam de existir.
+  window._relIdsParaReservar=itens.map(function(p){return p.id;});
   openM('&#8987; Reservar '+itens.length+' item(ns)',
     '<div class="mf">'
     +'<div class="fld"><label>Reservar por quanto tempo?</label><select class="inp" id="rel-horas">'
@@ -7296,7 +7410,8 @@ function _relReservarModal(){
     +'</div>',420);
 }
 function _relConfirmarReserva(){
-  var itens=_relSelecionados();
+  var ids=window._relIdsParaReservar||[];
+  var itens=DB.revenda.filter(function(p){return ids.indexOf(p.id)>=0;});
   var horas=parseFloat(document.getElementById('rel-horas').value)||24;
   var cliente=document.getElementById('rel-cliente').value.trim();
   var expira=Date.now()+horas*3600*1000;
@@ -7304,6 +7419,7 @@ function _relConfirmarReserva(){
     var real=gRevById(p.id);
     if(real){real.status='Reservado';real.reservaExpira=expira;real.reservaCliente=cliente||null;}
   });
+  window._relIdsParaReservar=null;
   saveDB();closeM();go('revenda');toast(itens.length+' item(ns) reservado(s)!','var(--or)');
 }
 
@@ -7504,6 +7620,78 @@ function _filtrarCatPicker(){
     return '<div onclick="setRevCat(\''+c.replace(/'/g,"\\'")+'\')" style="padding:9px 10px;cursor:pointer;font-size:13px;border-radius:6px">'+c+'</div>';
   }).join('');
 }
+// Decide se duas unidades são "a mesma coisa" pra fim de agrupar num card só —
+// olha categoria, marca, modelo, condição e TODAS as especificações preenchidas.
+// "Produto" (o nome exibido) fica de fora dessa conta de propósito: dois notebooks
+// podem ter o mesmo nome mas configurações diferentes (ex: um i5 e um i7) e não
+// devem se juntar só porque o texto do nome é igual.
+// Preenche "Produto" automaticamente juntando Categoria + Marca + Modelo — mas só
+// enquanto o campo estiver vazio ou ainda for exatamente o que a gente mesmo gerou
+// da última vez. Se a pessoa digitar algo diferente na mão, para de mexer — não
+// sobrescreve nome customizado.
+function _revAutoNomearProduto(prefix){
+  var catSel=document.getElementById(prefix+'-cat');
+  var marcaEl=document.getElementById(prefix+'-marca');
+  var modeloEl=document.getElementById(prefix+'-modelo');
+  var prodEl=document.getElementById(prefix+'-p');
+  if(!prodEl)return;
+  var catNome=catSel?catSel.value:'';
+  var marca=marcaEl?marcaEl.value.trim():'';
+  var modelo=modeloEl?modeloEl.value.trim():'';
+  if(!marca&&!modelo)return;
+  var gerado=[catNome,marca,modelo].filter(Boolean).join(' ');
+  var ultimoGerado=prodEl.getAttribute('data-autogen')||'';
+  if(!prodEl.value.trim()||prodEl.value===ultimoGerado){
+    prodEl.value=gerado;
+    prodEl.setAttribute('data-autogen',gerado);
+  }
+}
+function _revChaveIdentica(p){
+  var specsKey=p.specs?Object.keys(p.specs).sort().map(function(k){return k+':'+p.specs[k];}).join('|'):'';
+  return [(p.cat||''),(p.marca||'').toLowerCase(),(p.modelo||'').toLowerCase(),(p.cond||''),specsKey].join('||');
+}
+// ── Reatribuir categoria em lote (modo lista da Revenda) ────────────────────
+function _revBulkAtualiza(){
+  var chks=document.querySelectorAll('.rv-bulk-chk:checked');
+  var n=chks.length;
+  var bar=document.getElementById('rv-bulk-bar');
+  var count=document.getElementById('rv-bulk-count');
+  if(bar)bar.style.display=n>0?'block':'none';
+  if(count)count.textContent=n+' selecionado'+(n===1?'':'s');
+  var todosChk=document.querySelectorAll('.rv-bulk-chk');
+  var allBox=document.getElementById('rv-bulk-all');
+  if(allBox)allBox.checked=todosChk.length>0&&n===todosChk.length;
+}
+function _revBulkTodos(marcar){
+  document.querySelectorAll('.rv-bulk-chk').forEach(function(c){c.checked=marcar;});
+  _revBulkAtualiza();
+}
+function _revBulkLimpar(){
+  document.querySelectorAll('.rv-bulk-chk').forEach(function(c){c.checked=false;});
+  var allBox=document.getElementById('rv-bulk-all');if(allBox)allBox.checked=false;
+  _revBulkAtualiza();
+}
+// Muda a categoria de todos os produtos marcados de uma vez — reseta checklist e
+// especificações pro padrão da categoria nova (igual aconteceria editando um por um),
+// já que os campos da categoria antiga não fazem mais sentido.
+function _revAplicarCategoriaLote(){
+  var chks=document.querySelectorAll('.rv-bulk-chk:checked');
+  if(!chks.length){alert('Selecione ao menos um produto!');return;}
+  var novaCat=document.getElementById('rv-bulk-cat').value;
+  if(!novaCat)return;
+  var ids=[];
+  chks.forEach(function(c){(c.getAttribute('data-ids')||'').split(',').forEach(function(id){if(id)ids.push(parseFloat(id));});});
+  confirmar('Mudar a categoria de <b>'+ids.length+'</b> produto'+(ids.length===1?'':'s')+' pra <b>'+novaCat+'</b>?<br><span style="font-size:11px;color:var(--mt)">O checklist e as especificações de cada um serão reiniciados pro padrão dessa categoria.</span>',function(){
+    ids.forEach(function(id){
+      var p=gRevById(id);if(!p)return;
+      p.cat=novaCat;
+      p.testesAprovados=[];p.checklistExtra=[];p.checklistOcultos=[];
+      p.specs={};p.specsBoolKeys=[];p.specsCamposOcultos=[];
+    });
+    saveDB();go('revenda');
+    toast(ids.length+' produto'+(ids.length===1?'':'s')+' movido'+(ids.length===1?'':'s')+' pra '+novaCat+'!','var(--bl)');
+  });
+}
 function pgRevenda(){
   // Linha 1: Categorias — menu cascata buscável (toca, digita ou rola)
   var catNomes=getRevCatNomes();
@@ -7539,10 +7727,11 @@ function pgRevenda(){
     if(revCatFiltro!=='Todos'&&p.cat!==revCatFiltro)continue;
     if(revCondFiltro!=='Todas'&&p.cond!==revCondFiltro)continue;
     if(!_revPassaFiltrosAvancados(p))continue;
-    // Nome base: remove sufixo " #N" — garante que prod existe
+    // Nome base: remove sufixo " #N" — usado só pra exibir, não decide mais o agrupamento
     var nomeBase=(p.prod||p.nome||'Sem nome').replace(/ #\d+$/,'');
-    if(!grupos[nomeBase]){grupos[nomeBase]={items:[],nomeBase:nomeBase};ordemGrupos.push(nomeBase);}
-    grupos[nomeBase].items.push(p);
+    var chaveGrupo=_revChaveIdentica(p);
+    if(!grupos[chaveGrupo]){grupos[chaveGrupo]={items:[],nomeBase:nomeBase};ordemGrupos.push(chaveGrupo);}
+    grupos[chaveGrupo].items.push(p);
   }
 
   for(var g=0;g<ordemGrupos.length;g++){
@@ -7550,7 +7739,7 @@ function pgRevenda(){
     var p0=grp.items[0]; // representante do grupo
     var qtd=grp.items.length;
     var condBadge=p0.cond?'<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(168,85,247,.15);color:var(--pu)">'+p0.cond+'</span>':'';
-    var reservaBadge=p0.status==='Reservado'?'<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(245,158,11,.15);color:var(--or)">&#8987; Reservado</span>':'';
+    var reservaBadge=p0.status==='Reservado'?'<span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(245,158,11,.15);color:var(--or)">&#8987; Reservado'+(p0.reservaCliente?' — '+p0.reservaCliente:'')+'</span>':'';
     var catCL=getRevCatChecklist(p0.cat);
     var aprovados=p0.testesAprovados||[];
     var testesHtml='';
@@ -7574,7 +7763,7 @@ function pgRevenda(){
       +qtdBadge
       +'<div style="position:absolute;top:13px;right:13px"><span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:var(--grb);color:var(--gr)">Disponivel</span></div>'
       +'<div style="font-size:22px;margin-bottom:7px">&#127991;</div>'
-      +'<div style="font-size:14px;font-weight:700;margin-bottom:2px">'+(p0.nomeBase||p0.prod||'Sem nome')+(qtd>1?' <span style="font-size:12px;color:var(--bl);font-weight:700">('+qtd+' unid.)</span>':(p0.codCurto?' <span style="font-size:11px;color:var(--bl);font-weight:600;font-family:monospace">'+p0.codCurto+'</span>':''))+'</div>'
+      +'<div style="font-size:14px;font-weight:700;margin-bottom:2px">'+(p0.nomeBase||p0.prod||'Sem nome')+(p0.tipoUnidade==='quantidade'?' <span style="font-size:12px;color:var(--bl);font-weight:700">('+p0.qtdEstoque+' em estoque)</span>':qtd>1?' <span style="font-size:12px;color:var(--bl);font-weight:700">('+qtd+' unid.)</span>':(p0.codCurto?' <span style="font-size:11px;color:var(--bl);font-weight:600;font-family:monospace">'+p0.codCurto+'</span>':''))+'</div>'
       +((p0.marca||p0.modelo)?'<div style="font-size:11px;color:var(--mt);margin-bottom:4px">'+(p0.marca||'')+(p0.marca&&p0.modelo?' &middot; ':'')+(p0.modelo||'')+'</div>':'')
       +(p0.desc?'<div style="font-size:11px;color:var(--mt);margin-bottom:5px;line-height:1.4">'+p0.desc+'</div>':'')
       +(function(){var s=p0.specs||{};var keys=Object.keys(s);if(!keys.length)return '';var h='<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px">';for(var ki=0;ki<keys.length&&ki<6;ki++){var sv=s[keys[ki]];if(sv===''||sv===null||sv===undefined||sv===false)continue;var sval=sv===true?'&#10003; '+keys[ki]:keys[ki]+': '+sv;h+='<span style="font-size:10px;padding:1px 7px;border-radius:20px;background:rgba(59,130,246,.1);color:var(--bl);border:1px solid rgba(59,130,246,.2)">'+sval+'</span>';}return h+'</div>';})()
@@ -7584,12 +7773,12 @@ function pgRevenda(){
       +'<div style="display:flex;justify-content:space-between;align-items:center">'
       +'<span style="font-size:19px;font-weight:700;color:var(--gr)">'+fR(p0.preco)+'</span>'
       +'<div style="display:flex;gap:5px" onclick="event.stopPropagation()">'
-      +'<button class="btn" style="font-size:12px;padding:6px 11px" onclick="mVU('+p0.id+')">Vender</button>'
+      +'<button class="btn" style="font-size:12px;padding:6px 11px" onclick="'+(p0.tipoUnidade==='quantidade'?'mVenderQtd('+p0.id+')':'mVU('+p0.id+')')+'">Vender</button>'
       +(qtd>1?'<button class="btnO bOb" style="font-size:12px;padding:5px 9px" title="Ver todas as unidades" onclick="mVerUnidadesPorIds('+grp.items.map(function(x){return x.id;}).join(',')+')">&#128203; '+qtd+'</button>':'')
-      +'<button class="btnO" style="font-size:12px;padding:5px 9px;border:1px solid var(--gr);color:var(--gr)" title="Adicionar unidade" onclick="mAddUnidade('+p0.id+')">+</button>'
-      +'<button class="btnO bOb" style="font-size:12px;padding:5px 9px" title="Imprimir etiqueta" onclick="imprimirEtiqueta('+p0.id+')">&#128424;</button>'
+      +(p0.tipoUnidade==='quantidade'?'':'<button class="btnO" style="font-size:12px;padding:5px 9px;border:1px solid var(--gr);color:var(--gr)" title="Adicionar unidade" onclick="mAddUnidade('+p0.id+')">+</button>')
+      +'<button class="btnO bOb" style="font-size:12px;padding:5px 9px" title="Imprimir etiqueta" onclick="'+(qtd>1?'mVerUnidadesPorIds('+grp.items.map(function(x){return x.id;}).join(',')+')':'imprimirEtiqueta('+p0.id+')')+'">&#128424;</button>'
       +(qtd===1?'<button class="btnO bOgr" style="font-size:12px;padding:5px 9px" title="Editar produto" onclick="mEditRev('+p0.id+')">&#9998;</button>':'')
-      +'<button class="btnO bOr" style="font-size:12px;padding:5px 9px;min-height:30px" title="Excluir" onclick="mDelRev('+p0.id+')">&#128465;</button>'
+      +'<button class="btnO bOr" style="font-size:12px;padding:5px 9px;min-height:30px" title="Excluir" onclick="'+(qtd>1?'mVerUnidadesPorIds('+grp.items.map(function(x){return x.id;}).join(',')+')':'mDelRev('+p0.id+')')+'">&#128465;</button>'
       +'</div></div></div>';
   }
   if(!cards)cards='<div class="card" style="text-align:center;color:var(--mt);padding:30px">Nenhum produto encontrado.</div>';
@@ -7599,29 +7788,43 @@ function pgRevenda(){
   for(var g=0;g<ordemGrupos.length;g++){
     var grp=grupos[ordemGrupos[g]];
     var p0=grp.items[0];var qtd=grp.items.length;
+    var idsGrupo=grp.items.map(function(x){return x.id;}).join(',');
     var specsStr='';var s=p0.specs||{};var sk=Object.keys(s);
     for(var ki=0;ki<sk.length&&ki<3;ki++){var sv=s[sk[ki]];if(!sv&&sv!==0)continue;specsStr+=(specsStr?' · ':'')+( sv===true?sk[ki]:sk[ki]+': '+sv);}
-    listaRows+='<tr style="border-bottom:1px solid var(--bd);cursor:pointer" onclick="'+(qtd>1?'mVerUnidadesPorIds('+grp.items.map(function(x){return x.id;}).join(',')+')':'mVerProdRevenda('+p0.id+')')+'">'
-      +'<td style="padding:9px 10px"><div style="font-size:13px;font-weight:600">'+(p0.nomeBase||p0.prod||'Sem nome')+(qtd>1?' <span style="font-size:11px;color:var(--bl);font-weight:700">('+qtd+'x)</span>':'')+'</div>'
+    listaRows+='<tr style="border-bottom:1px solid var(--bd);cursor:pointer" onclick="'+(qtd>1?'mVerUnidadesPorIds('+idsGrupo+')':'mVerProdRevenda('+p0.id+')')+'">'
+      +'<td style="padding:9px 6px" onclick="event.stopPropagation()"><input type="checkbox" class="rv-bulk-chk" data-ids="'+idsGrupo+'" onchange="_revBulkAtualiza()" style="width:16px;height:16px;cursor:pointer"></td>'
+      +'<td style="padding:9px 10px"><div style="font-size:13px;font-weight:600">'+(p0.nomeBase||p0.prod||'Sem nome')+(p0.tipoUnidade==='quantidade'?' <span style="font-size:11px;color:var(--bl);font-weight:700">('+p0.qtdEstoque+' em estoque)</span>':qtd>1?' <span style="font-size:11px;color:var(--bl);font-weight:700">('+qtd+'x)</span>':'')+'</div>'
       +(specsStr?'<div style="font-size:10px;color:var(--mt);margin-top:1px">'+specsStr+'</div>':'')+'</td>'
       +'<td style="padding:9px 6px;font-size:11px;color:var(--mt);white-space:nowrap">'+(p0.cat||'')+'</td>'
       +'<td style="padding:9px 6px;font-size:11px;white-space:nowrap">'+(p0.cond?'<span style="color:var(--pu)">'+p0.cond+'</span>':'')+'</td>'
       +'<td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--gr);font-family:monospace;white-space:nowrap">'+fR(p0.preco)+'</td>'
       +'<td style="padding:9px 8px;text-align:right" onclick="event.stopPropagation()">'
-      +'<button class="btn" style="font-size:11px;padding:4px 9px" onclick="mVU('+p0.id+')">Vender</button>'
+      +'<button class="btn" style="font-size:11px;padding:4px 9px" onclick="'+(p0.tipoUnidade==='quantidade'?'mVenderQtd('+p0.id+')':'mVU('+p0.id+')')+'">Vender</button>'
       +'</td>'
       +'</tr>';
   }
+  var catOptsLote='';for(var i=0;i<DB.revendaCats.length;i++)catOptsLote+='<option value="'+DB.revendaCats[i].nome+'">'+DB.revendaCats[i].nome+'</option>';
+  var barraLote='<div class="card" id="rv-bulk-bar" style="display:none;margin-bottom:8px;padding:10px 14px;background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.3)">'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<span id="rv-bulk-count" style="font-size:12px;font-weight:700;color:var(--bl)">0 selecionados</span>'
+    +'<select class="inp" id="rv-bulk-cat" style="flex:1;min-width:140px;font-size:12px;padding:6px 9px">'+catOptsLote+'</select>'
+    +'<button class="btn" style="font-size:12px;padding:6px 12px" onclick="_revAplicarCategoriaLote()">Aplicar Categoria</button>'
+    +'<button class="btnO bOgr" style="font-size:12px;padding:6px 12px" onclick="_revBulkLimpar()">Limpar Seleção</button>'
+    +'</div></div>';
   var listaHtml=listaRows
-    ?'<div class="card" style="padding:0;overflow:hidden"><table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--bd)"><th style="padding:8px 10px;font-size:11px;color:var(--mt);text-align:left;font-weight:600">Produto</th><th style="padding:8px 6px;font-size:11px;color:var(--mt);text-align:left;font-weight:600">Cat</th><th style="padding:8px 6px;font-size:11px;color:var(--mt);text-align:left;font-weight:600">Cond.</th><th style="padding:8px 10px;font-size:11px;color:var(--mt);text-align:right;font-weight:600">Preço</th><th></th></tr></thead><tbody>'+listaRows+'</tbody></table></div>'
+    ?barraLote+'<div class="card" style="padding:0;overflow:hidden"><table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--bd)"><th style="padding:8px 6px"><input type="checkbox" id="rv-bulk-all" onchange="_revBulkTodos(this.checked)" style="width:16px;height:16px;cursor:pointer"></th><th style="padding:8px 10px;font-size:11px;color:var(--mt);text-align:left;font-weight:600">Produto</th><th style="padding:8px 6px;font-size:11px;color:var(--mt);text-align:left;font-weight:600">Cat</th><th style="padding:8px 6px;font-size:11px;color:var(--mt);text-align:left;font-weight:600">Cond.</th><th style="padding:8px 10px;font-size:11px;color:var(--mt);text-align:right;font-weight:600">Preço</th><th></th></tr></thead><tbody>'+listaRows+'</tbody></table></div>'
     :'<div class="card" style="text-align:center;color:var(--mt);padding:30px">Nenhum produto encontrado.</div>';
 
   // Relatório
-  var totalDisp=0,totalVend=0,totalRec=0,qtdDisp=0,qtdVend=0;
+  // Relatório — conta certinho cada status: Disponível, Vendido de verdade (não
+  // Manutenção nem Reservado, que não são vendas), e o total cadastrado de tudo.
+  var totalDisp=0,totalRec=0,qtdDisp=0,qtdVend=0,qtdTotal=0,totalCadastrado=0;
   for(var i=0;i<DB.revenda.length;i++){
     var p=DB.revenda[i];
+    qtdTotal++;
+    totalCadastrado+=p.preco||0;
     if(p.status==='Disponivel'){qtdDisp++;totalDisp+=p.preco||0;}
-    else{qtdVend++;totalRec+=p.precoVenda||p.preco||0;}
+    else if(p.status==='Vendido'){qtdVend++;totalRec+=p.precoVenda||p.preco||0;}
   }
   var relatorio='<div class="g4" style="margin-bottom:14px">'
     +'<div class="card" style="background:linear-gradient(135deg,var(--s1),rgba(34,197,94,.08));border-color:rgba(34,197,94,.2)">'
@@ -7634,11 +7837,11 @@ function pgRevenda(){
     +'<div style="font-size:11px;color:var(--mt)">'+fR(totalRec)+' recebido</div></div>'
     +'<div class="card">'
     +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Total Cadastrado</div>'
-    +'<div style="font-size:20px;font-weight:800;color:var(--tx);font-family:monospace">'+(qtdDisp+qtdVend)+' un</div>'
-    +'<div style="font-size:11px;color:var(--mt)">'+fR(totalDisp+totalRec)+' total</div></div>'
+    +'<div style="font-size:20px;font-weight:800;color:var(--tx);font-family:monospace">'+qtdTotal+' un</div>'
+    +'<div style="font-size:11px;color:var(--mt)">'+fR(totalCadastrado)+' total</div></div>'
     +'<div class="card" style="background:linear-gradient(135deg,var(--s1),rgba(168,85,247,.08));border-color:rgba(168,85,247,.2)">'
     +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Taxa Conversao</div>'
-    +'<div style="font-size:20px;font-weight:800;color:var(--pu);font-family:monospace">'+(qtdDisp+qtdVend>0?Math.round(qtdVend/(qtdDisp+qtdVend)*100):0)+'%</div>'
+    +'<div style="font-size:20px;font-weight:800;color:var(--pu);font-family:monospace">'+(qtdTotal>0?Math.round(qtdVend/qtdTotal*100):0)+'%</div>'
     +'<div style="font-size:11px;color:var(--mt)">vendido/total</div></div>'
     +'</div>';
 
@@ -7695,10 +7898,27 @@ function mVerUnidadesPorIds(){
       +'<span style="font-size:13px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(p.preco)+'</span>'
       +'<button class="btn" style="font-size:11px;padding:4px 10px" onclick="closeM();mVU('+p.id+')">Vender</button>'
       +'<button class="btnO bOb" style="font-size:11px;padding:4px 8px" title="Editar" onclick="closeM();mEditRev('+p.id+')">&#9998;</button>'
+      +'<button class="btnO bOb" style="font-size:11px;padding:4px 8px" title="Imprimir etiqueta" onclick="imprimirEtiqueta('+p.id+')">&#128424;</button>'
+      +'<button class="btnO bOr" style="font-size:11px;padding:4px 8px" title="Excluir" onclick="closeM();mDelRev('+p.id+')">&#128465;</button>'
       +'</div></div>';
   }
   if(!rows)rows='<div style="padding:20px;text-align:center;color:var(--mt)">Nenhuma unidade disponivel.</div>';
-  openM('&#127991; '+titulo,'<div class="card" style="padding:0;overflow:hidden">'+rows+'</div>',500);
+  var idsStr=unidades.map(function(p){return p.id;}).join(',');
+  var topoBtn=unidades.length?'<div style="padding:10px 13px;border-bottom:1px solid var(--bd)"><button class="btnO bOr" style="width:100%;font-size:12px" onclick="confirmarExcluirTodasUnidades(\''+idsStr+'\')">&#128465; Excluir Todos ('+unidades.length+')</button></div>':'';
+  openM('&#127991; '+titulo,'<div class="card" style="padding:0;overflow:hidden">'+topoBtn+rows+'</div>',500);
+}
+// Exclui de uma vez todas as unidades mostradas numa lista (ex: pra limpar um
+// lote de teste rápido, sem clicar excluir uma por uma).
+function confirmarExcluirTodasUnidades(idsStr){
+  var ids=idsStr.split(',').map(function(s){return parseFloat(s);}).filter(function(n){return !isNaN(n);});
+  if(!ids.length)return;
+  confirmar('Excluir essas <b>'+ids.length+'</b> unidades de uma vez?<br><span style="font-size:11px;color:var(--mt)">Esta ação não pode ser desfeita.</span>',function(){
+    ids.forEach(function(id){
+      for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){DB.revenda.splice(i,1);break;}}
+    });
+    saveDB();closeM();go('revenda');
+    toast(ids.length+' unidades excluídas!','var(--rd)');
+  });
 }
 function mAddUnidade(idRef){
   var ref=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===idRef){ref=DB.revenda[i];break;}}
@@ -7769,9 +7989,13 @@ function mVerUnidades(nomeBase){
       +'<span style="font-size:13px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(p.preco)+'</span>'
       +'<button class="btn" style="font-size:11px;padding:4px 10px" onclick="closeM();mVU('+p.id+')">Vender</button>'
       +'<button class="btnO bOb" style="font-size:11px;padding:4px 8px" title="Editar" onclick="closeM();mEditRev('+p.id+')">&#9998;</button>'
+      +'<button class="btnO bOb" style="font-size:11px;padding:4px 8px" title="Imprimir etiqueta" onclick="imprimirEtiqueta('+p.id+')">&#128424;</button>'
+      +'<button class="btnO bOr" style="font-size:11px;padding:4px 8px" title="Excluir" onclick="closeM();mDelRev('+p.id+')">&#128465;</button>'
       +'</div></div>';
   }
-  openM('&#127991; '+nomeBase+' ('+unidades.length+' unidades)','<div class="card" style="padding:0;overflow:hidden">'+rows+'</div>',500);
+  var idsStr2=unidades.map(function(p){return p.id;}).join(',');
+  var topoBtn2=unidades.length?'<div style="padding:10px 13px;border-bottom:1px solid var(--bd)"><button class="btnO bOr" style="width:100%;font-size:12px" onclick="confirmarExcluirTodasUnidades(\''+idsStr2+'\')">&#128465; Excluir Todos ('+unidades.length+')</button></div>':'';
+  openM('&#127991; '+nomeBase+' ('+unidades.length+' unidades)','<div class="card" style="padding:0;overflow:hidden">'+topoBtn2+rows+'</div>',500);
 }
 function _reabrirBuscaProd(){
   var ab2=pesAbas[pesAtiva];ab2.pddOpen=true;
@@ -8200,7 +8424,7 @@ function mVerProdRevenda(id){
     +(p.cond?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(168,85,247,.12);color:var(--pu)">'+p.cond+'</span>':'')
     +(p.peso?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;background:var(--s3);color:var(--mt)">'+fKg(p.peso)+'kg</span>':'')
     +(p.status==='Disponivel'?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(34,197,94,.12);color:var(--gr)">Disponível</span>':'')
-    +(p.status==='Reservado'?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(245,158,11,.15);color:var(--or)">&#8987; Reservado até '+_fmtDataHoraCurta(p.reservaExpira)+'</span>':'')
+    +(p.status==='Reservado'?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(245,158,11,.15);color:var(--or)">&#8987; Reservado até '+_fmtDataHoraCurta(p.reservaExpira)+(p.reservaCliente?' — '+p.reservaCliente:'')+'</span>':'')
     +'</div>'
     +(p.desc?'<div style="font-size:12px;color:var(--mt);margin-bottom:8px;line-height:1.5;border-left:3px solid var(--bd);padding-left:8px">'+p.desc+'</div>':'')
     +specsH
@@ -8209,7 +8433,7 @@ function mVerProdRevenda(id){
     +'<div style="font-size:10px;color:var(--mt);font-family:monospace;margin-top:2px">Cod: '+cod+(p.codCurto?' &middot; <span style="color:var(--bl);font-weight:700">'+p.codCurto+'</span>':'')+'</div>'
     +'</div>'
     +'<div style="display:flex;gap:8px">'
-    +(p.status==='Disponivel'?'<button class="btn" style="flex:1" onclick="closeM();mVU('+p.id+')">&#128722; Vender</button>'
+    +(p.status==='Disponivel'?'<button class="btn" style="flex:1" onclick="'+(p.tipoUnidade==='quantidade'?'closeM();mVenderQtd('+p.id+')':'closeM();mVU('+p.id+')')+'">&#128722; Vender</button>'
       :p.status==='Reservado'?'<button class="btnO bOgr" style="flex:1" onclick="cancelarReservaRev('+p.id+')">Cancelar Reserva</button>'
       :p.status==='Manutencao'?'<button class="btn" style="flex:1" onclick="closeM();concluirManutencao('+p.id+')">&#9989; Concluir Manutenção</button>'
       :'<div class="tag tg" style="flex:1;text-align:center;padding:10px">Vendido</div>')
@@ -8283,21 +8507,56 @@ function _buildRevManutencao(){
   }
   var html='';
   itens.forEach(function(p){
-    var falta=_relOQueFalta(p);
+    var faltando=_revFaltandoArray(p);
     html+='<div class="card" style="margin-bottom:8px">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
       +'<div style="flex:1;cursor:pointer" onclick="mVerProdRevenda('+p.id+')"><div style="font-size:14px;font-weight:700">'+p.prod+'</div>'
       +'<div style="font-size:11px;color:var(--mt)">'+(p.cat||'')+(p.cond?' &middot; '+p.cond:'')+'</div></div>'
       +'<span style="font-size:13px;font-weight:700;color:var(--gr);font-family:monospace">'+fR(p.preco)+'</span>'
       +'</div>'
-      +(p.manutencaoObs?'<div style="font-size:12px;color:var(--or);margin-top:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:6px 9px">&#128221; '+p.manutencaoObs+'</div>':'')
-      +(falta?'<div style="font-size:11px;color:var(--mt);margin-top:6px">&#9888; Faltando no checklist: '+falta+'</div>':'')
-      +'<div style="display:flex;gap:6px;margin-top:10px">'
+      +(p.manutencaoObs?'<div style="font-size:12px;color:var(--or);margin-top:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:6px 9px">&#128221; '+p.manutencaoObs+'</div>':'');
+    if(faltando.length){
+      html+='<div style="margin-top:10px"><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">&#9888; Faltando ('+faltando.length+')</div>';
+      faltando.forEach(function(item){
+        var obsAtual=(p.checklistObs&&p.checklistObs[item])||'';
+        var eid='mn-'+p.id+'-'+item.replace(/[^a-zA-Z0-9]/g,'_');
+        html+='<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-top:1px solid var(--bd)">'
+          +'<input type="checkbox" id="'+eid+'" onchange="_revResolverItemManut('+p.id+',\''+item.replace(/'/g,"\\'")+'\',this.checked)" style="margin-top:4px;width:15px;height:15px;accent-color:var(--gr);cursor:pointer">'
+          +'<div style="flex:1"><label for="'+eid+'" style="font-size:12px;font-weight:600;cursor:pointer">'+item+'</label>'
+          +'<input class="inp" value="'+obsAtual.replace(/"/g,'&quot;')+'" placeholder="Nota sobre esse item (opcional)" onblur="_revSalvarNotaItem('+p.id+',\''+item.replace(/'/g,"\\'")+'\',this.value)" style="font-size:11px;padding:5px 8px;margin-top:4px;width:100%"></div>'
+          +'</div>';
+      });
+      html+='</div>';
+    }
+    html+='<div style="display:flex;gap:6px;margin-top:10px">'
       +'<button class="btn" style="flex:1;font-size:12px;padding:6px" onclick="concluirManutencao('+p.id+')">&#9989; Concluir — Disponível pra venda</button>'
       +'<button class="btnO bOb" style="font-size:12px;padding:6px 10px" onclick="mEditRev('+p.id+')">&#9998;</button>'
       +'</div></div>';
   });
   return html;
+}
+// Marca/desmarca um item do checklist direto no card de Manutenção — sem precisar
+// abrir a tela de Editar. Ao resolver (marcar), a nota daquele item some, já que
+// não faz mais sentido guardar.
+function _revResolverItemManut(id,item,checked){
+  var p=gRevById(id);if(!p)return;
+  if(!p.testesAprovados)p.testesAprovados=[];
+  if(checked){
+    if(p.testesAprovados.indexOf(item)<0)p.testesAprovados.push(item);
+    if(p.checklistObs)delete p.checklistObs[item];
+  }else{
+    p.testesAprovados=p.testesAprovados.filter(function(a){return a!==item;});
+  }
+  saveDB();go('revenda');
+}
+// Salva a nota de um item específico do checklist (ex: "aguardando peça do fornecedor")
+function _revSalvarNotaItem(id,item,valor){
+  var p=gRevById(id);if(!p)return;
+  valor=(valor||'').trim();
+  if(!p.checklistObs)p.checklistObs={};
+  if(valor)p.checklistObs[item]=valor;
+  else delete p.checklistObs[item];
+  saveDB();
 }
 // Marca um produto como em manutenção — pergunta uma observação opcional (ex:
 // "falta memória RAM") pra deixar registrado o que precisa ser feito.
@@ -8660,6 +8919,46 @@ function _toggleErManutencao(){
   if(lblManut){lblManut.style.borderColor=ehManut?'var(--or)':'var(--bd)';lblManut.style.background=ehManut?'rgba(245,158,11,.1)':'var(--s2)';lblManut.style.color=ehManut?'var(--or)':'var(--mt)';}
   if(obsEl)obsEl.style.display=ehManut?'block':'none';
 }
+// Junta esse item + as unidades idênticas restantes num registro só "Todas idênticas"
+function confirmarConverterQtd(id){
+  var it=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){it=DB.revenda[i];break;}}
+  if(!it)return;
+  var chaveAtual=_revChaveIdentica(it);
+  var irmaos=[];
+  for(var i=0;i<DB.revenda.length;i++){
+    var rv2=DB.revenda[i];
+    if(rv2.id===it.id||rv2.status!=='Disponivel')continue;
+    if(_revChaveIdentica(rv2)===chaveAtual)irmaos.push(rv2.id);
+  }
+  var total=1+irmaos.length;
+  confirmar('Juntar esse produto com as outras '+irmaos.length+' unidades idênticas, virando "Todas idênticas" com '+total+' em estoque?<br><span style="font-size:11px;color:var(--mt)">Os códigos individuais das outras unidades serão apagados — só fica o código desse item.</span>',function(){
+    irmaos.forEach(function(uid){
+      for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===uid){DB.revenda.splice(i,1);break;}}
+    });
+    it.tipoUnidade='quantidade';
+    it.qtdEstoque=total;
+    it.prod=(it.prod||'').replace(/\s*#\d+\s*$/,'');
+    saveDB();closeM();go('revenda');
+    toast('Convertido! '+total+' em estoque agora.','var(--bl)');
+  });
+}
+// Divide um registro "Todas idênticas" em N unidades individuais, cada uma com seu
+// próprio código de barras — o caminho inverso da conversão acima.
+function confirmarDividirUnidades(id){
+  var it=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){it=DB.revenda[i];break;}}
+  if(!it)return;
+  var qtd=it.qtdEstoque||0;
+  if(qtd<=0){alert('Sem estoque pra dividir!');return;}
+  confirmar('Dividir esse produto em '+qtd+' unidades individuais, cada uma com seu próprio código de barras?',function(){
+    for(var u=0;u<qtd;u++){
+      var codCurto='BV-'+(DB.revProxCodigo++);
+      DB.revenda.push({id:nid(),codCurto:codCurto,prod:it.prod+(qtd>1?' #'+(u+1):''),marca:it.marca,modelo:it.modelo,desc:it.desc,peso:it.peso,cond:it.cond,preco:it.preco,status:'Disponivel',cat:it.cat,estProdId:it.estProdId,testesAprovados:(it.testesAprovados||[]).slice(),specs:it.specs?JSON.parse(JSON.stringify(it.specs)):{},specsBoolKeys:(it.specsBoolKeys||[]).slice(),specsCamposOcultos:(it.specsCamposOcultos||[]).slice(),checklistExtra:(it.checklistExtra||[]).slice(),checklistOcultos:(it.checklistOcultos||[]).slice()});
+    }
+    for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===it.id){DB.revenda.splice(i,1);break;}}
+    saveDB();closeM();go('revenda');
+    toast('Dividido em '+qtd+' unidades!','var(--gr)');
+  });
+}
 function mEditRev(id){
   var it=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){it=DB.revenda[i];break;}}if(!it)return;
   var catO='';for(var i=0;i<DB.revendaCats.length;i++)catO+='<option value="'+DB.revendaCats[i].nome+'"'+(it.cat===DB.revendaCats[i].nome?' selected':'')+'>'+DB.revendaCats[i].nome+'</option>';
@@ -8680,15 +8979,15 @@ function mEditRev(id){
   }
   estInfo+='</div>';
   var clHtml=renderChecklistHtml(it.cat||'',it.testesAprovados||[],'er',it.checklistExtra||[],it.checklistOcultos||[]);
-  // Detecta outras unidades "idênticas" (mesmo nome-base + mesma condição) ainda disponíveis,
-  // para oferecer a opção de aplicar a edição a todo o grupo de uma vez.
-  var nomeBaseAtual=(it.prod||'').replace(/\s*#\d+\s*$/,'').toLowerCase();
+  // Detecta outras unidades "idênticas de verdade" (mesma chave completa — categoria,
+  // marca, modelo, condição e specs) ainda disponíveis, pra oferecer aplicar a edição
+  // no grupo inteiro de uma vez. Não usa mais o nome digitado pra decidir isso.
+  var chaveAtual=_revChaveIdentica(it);
   var irmaos=[];
   for(var i=0;i<DB.revenda.length;i++){
     var rv2=DB.revenda[i];
     if(rv2.id===it.id||rv2.status!=='Disponivel')continue;
-    var nomeBase2=(rv2.prod||'').replace(/\s*#\d+\s*$/,'').toLowerCase();
-    if(nomeBase2===nomeBaseAtual && rv2.cond===it.cond) irmaos.push(rv2.id);
+    if(_revChaveIdentica(rv2)===chaveAtual) irmaos.push(rv2.id);
   }
   var grupoHtml=irmaos.length
     ?'<div style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:var(--r);padding:10px;margin-bottom:10px">'
@@ -8697,18 +8996,28 @@ function mEditRev(id){
       +'<span style="font-size:12px">Aplicar Preco, Peso e Descricao as outras <strong>'+irmaos.length+'</strong> unidade'+(irmaos.length>1?'s':'')+' identica'+(irmaos.length>1?'s':'')+' ('+it.cond+') ainda disponive'+(irmaos.length>1?'is':'l')+'</span>'
       +'</label></div>'
     :'';
+  // Converter entre "cada unidade é diferente" e "todas idênticas" — só depois de
+  // cadastrado, direto na tela de Editar.
+  var converterHtml=it.tipoUnidade==='quantidade'
+    ?'<div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);border-radius:var(--r);padding:10px;margin-bottom:10px">'
+      +'<div style="font-size:11px;color:var(--mt);margin-bottom:6px">Hoje: <strong style="color:var(--bl)">Todas idênticas</strong> ('+(it.qtdEstoque||0)+' em estoque, 1 código só)</div>'
+      +'<button type="button" class="btnO bOb" style="width:100%;font-size:12px" onclick="confirmarDividirUnidades('+it.id+')">&#128257; Dividir em unidades individuais</button>'
+      +'</div>'
+    :(irmaos.length?'<div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);border-radius:var(--r);padding:10px;margin-bottom:10px">'
+      +'<div style="font-size:11px;color:var(--mt);margin-bottom:6px">Hoje: <strong style="color:var(--gr)">Cada unidade é diferente</strong></div>'
+      +'<button type="button" class="btnO bOb" style="width:100%;font-size:12px" onclick="confirmarConverterQtd('+it.id+')">&#128257; Juntar essa + as '+irmaos.length+' idênticas em "Todas idênticas"</button>'
+      +'</div>':'');
   var h='<div class="mf">'
-    +'<div class="fld"><label>Produto</label><input class="inp" id="er-p" value="'+(it.prod||'')+'"></div>'
+    +'<div class="fld"><label>Categoria</label><select class="inp" id="er-cat" onchange="onRevCatChange(\'er\');onRevCatChangeSpecs(\'er\');_revAutoNomearProduto(\'er\')">'+catO+'</select></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>Marca (opcional)</label><input class="inp" id="er-marca" value="'+(it.marca||'')+'" placeholder="Ex: Dell"></div>'
-    +'<div class="fld"><label>Modelo (opcional)</label><input class="inp" id="er-modelo" value="'+(it.modelo||'')+'" placeholder="Ex: Inspiron 15"></div>'
+    +'<div class="fld"><label>Marca (opcional)</label><input class="inp" id="er-marca" value="'+(it.marca||'')+'" placeholder="Ex: Dell" oninput="_revAutoNomearProduto(\'er\')"></div>'
+    +'<div class="fld"><label>Modelo (opcional)</label><input class="inp" id="er-modelo" value="'+(it.modelo||'')+'" placeholder="Ex: Inspiron 15" oninput="_revAutoNomearProduto(\'er\')"></div>'
     +'</div>'
+    +'<div class="fld"><label>Produto</label><input class="inp" id="er-p" value="'+(it.prod||'')+'" data-autogen="'+((it.prod===[it.cat,it.marca,it.modelo].filter(Boolean).join(' '))?(it.prod||''):'').replace(/"/g,'&quot;')+'"></div>'
     +'<div class="fld"><label>Observação</label><textarea class="inp" id="er-desc" rows="3" style="resize:vertical;min-height:64px;line-height:1.5">'+(it.desc||'')+'</textarea></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Preco R$</label><input class="inp" type="number" inputmode="decimal" id="er-pr" value="'+it.preco+'" oninput="_calcMargemRev(\'er\')"></div>'
-    +'<div class="fld"><label>Categoria</label><select class="inp" id="er-cat" onchange="onRevCatChange(\'er\');onRevCatChangeSpecs(\'er\')">'+catO+'</select></div>'
-    +'</div>'
     +'<div class="fld"><label>Condicao</label><select class="inp" id="er-c">'+condO+'</select></div>'
+    +(it.tipoUnidade==='quantidade'?'<div class="fld"><label>Quantidade em estoque</label><input class="inp" type="number" id="er-qtdestoque" value="'+(it.qtdEstoque||0)+'" min="0" step="1" style="font-size:16px;text-align:center;font-family:monospace"></div>':'')
     +((it.status==='Disponivel'||it.status==='Manutencao'||!it.status)?
     '<div class="fld"><label>Status</label>'
     +'<div style="display:flex;gap:8px">'
@@ -8717,6 +9026,7 @@ function mEditRev(id){
     +'</div>'
     +'<input class="inp" id="er-manut-obs" value="'+(it.manutencaoObs||'').replace(/"/g,'&quot;')+'" placeholder="Ex: Falta memória RAM, bateria, carregador..." style="display:'+(it.status==='Manutencao'?'block':'none')+';margin-top:7px"></div>'
     :'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Status atual: <b>'+(it.status||'Disponivel')+'</b> — gerencie isso pelos botões da tela de detalhes, não aqui.</div>')
+    +converterHtml
     +clHtml
     +renderSpecsHtml(it.cat||'',it.specs||{},'er',it.specsBoolKeys||[],it.specsCamposOcultos||[])
     +'<div class="fld"><label>Produto do Estoque (opcional)</label><select class="inp" id="er-estprod" onchange="atualizaPesoRevenda()">'+prodO+'</select></div>'
@@ -8790,6 +9100,20 @@ function saveEditRev(id){
       var epNov=null;for(var i=0;i<DB.produtos.length;i++){if(_normId(DB.produtos[i].id)===_normId(pIdNovo)){epNov=DB.produtos[i];break;}}
       if(epNov)epNov.est=+(epNov.est-pesoNovo).toFixed(3);
     }
+  }
+
+  // Reabastecendo estoque de um produto "todas idênticas" — ajusta a quantidade e,
+  // se tiver material de origem vinculado, desconta a diferença dele também
+  var qtdEstoqueEl=document.getElementById('er-qtdestoque');
+  if(qtdEstoqueEl&&it.tipoUnidade==='quantidade'){
+    var qtdNovo=Math.max(0,parseInt(qtdEstoqueEl.value)||0);
+    var deltaQtd=qtdNovo-(it.qtdEstoque||0);
+    if(deltaQtd!==0&&it.estProdId&&it.peso>0){
+      var epQ=null;for(var i=0;i<DB.produtos.length;i++){if(_normId(DB.produtos[i].id)===_normId(it.estProdId)){epQ=DB.produtos[i];break;}}
+      if(epQ)epQ.est=+(epQ.est-deltaQtd*it.peso).toFixed(3);
+    }
+    it.qtdEstoque=qtdNovo;
+    if(qtdNovo>0&&it.status==='Vendido')it.status='Disponivel';
   }
 
   it.prod=n;
@@ -8869,6 +9193,55 @@ function confDelRev(id){
   }
   saveDB();closeM();go('revenda');
 }
+// Pergunta quantas unidades vender de um produto "todas idênticas" (ex: 5 cabos,
+// 2 fontes) antes de adicionar na venda — em vez de sempre vender 1 por vez.
+function mVenderQtd(id){
+  var it=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){it=DB.revenda[i];break;}}
+  if(!it)return;
+  var disp=it.qtdEstoque||0;
+  if(disp<=0){alert('Sem estoque desse produto!');return;}
+  openM('&#128722; Vender — '+it.prod,
+    '<div class="mf">'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:12px">Disponível em estoque: <strong style="color:var(--gr)">'+disp+'</strong></div>'
+    +'<div class="fld"><label>Quantas unidades?</label><input class="inp" type="number" id="vq-qtd" value="1" min="1" max="'+disp+'" step="1" style="font-size:20px;text-align:center;font-family:monospace" oninput="_vqAtualizaTotal('+it.preco+','+disp+')"></div>'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:12px">Total: <strong id="vq-total" style="color:var(--gr)">'+fR(it.preco)+'</strong></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="confirmarVenderQtd('+id+')">Adicionar à Venda</button></div>'
+    +'</div>',420);
+}
+function _vqAtualizaTotal(precoUnit,disp){
+  var inp=document.getElementById('vq-qtd');
+  var tot=document.getElementById('vq-total');
+  if(!inp||!tot)return;
+  var q=Math.max(1,Math.min(disp,parseInt(inp.value)||1));
+  tot.textContent=fR(precoUnit*q);
+}
+function confirmarVenderQtd(id){
+  var it=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){it=DB.revenda[i];break;}}
+  if(!it)return;
+  var qtdEl=document.getElementById('vq-qtd');
+  var qtdVend=Math.max(1,Math.min(it.qtdEstoque||1,parseInt(qtdEl.value)||1));
+  closeM();
+  if(!caixaAberto()){
+    openM('Caixa Fechado','<div class="mf"><div class="al aly">Abra o caixa do dia antes de realizar vendas.</div>'
+      +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
+      +'<button class="btn btn-bl" onclick="closeM();go(\&apos;caixa_dia\&apos;)">Ir para Caixa</button></div></div>');
+    return;
+  }
+  if(!pesAbas.length) novaPesAba();
+  pesAbas.push({
+    id:nid(),
+    label:'Rev.#'+it.id,
+    tipo:'Venda',
+    cliId:'',
+    tabId:null,
+    itens:[{prodId:null,uid:it.id,ic:'&#127991;',nome:it.prod+' (x'+qtdVend+')',peso:it.peso,preco:+(it.preco*qtdVend).toFixed(2),precoUnit:it.preco,qtdMax:it.qtdEstoque||qtdVend,tipo:'Venda',uni:true,qtdVendida:qtdVend}],
+    obs:'',
+    showUnit:true
+  });
+  pesAtiva=pesAbas.length-1;
+  savePesState();
+  go('pesagem');
+}
 function mVU(id){
   var it=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){it=DB.revenda[i];break;}}
   if(!it)return;
@@ -8905,21 +9278,24 @@ function mNovoRev(){
   var firstCat=DB.revendaCats.length>0?DB.revendaCats[0].nome:'';
   var clHtml=firstCat?renderChecklistHtml(firstCat,[],'nr'):'';
   openM('Novo Produto Revenda','<div class="mf">'
+    +'<div class="fld"><label>Categoria</label><select class="inp" id="nr-cat" onchange="onRevCatChange(\'nr\');onRevCatChangeSpecs(\'nr\');_revAutoNomearProduto(\'nr\')">'+catO+'</select></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Marca (opcional)</label><input class="inp" id="nr-marca" placeholder="Ex: Dell" oninput="_revAutoNomearProduto(\'nr\')"></div>'
+    +'<div class="fld"><label>Modelo (opcional)</label><input class="inp" id="nr-modelo" placeholder="Ex: Inspiron 15" oninput="_revAutoNomearProduto(\'nr\')"></div>'
+    +'</div>'
     +'<div class="fld"><label>Produto</label><input class="inp" id="nr-p" placeholder="Ex: Notebook Dell i5"></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>Marca (opcional)</label><input class="inp" id="nr-marca" placeholder="Ex: Dell"></div>'
-    +'<div class="fld"><label>Modelo (opcional)</label><input class="inp" id="nr-modelo" placeholder="Ex: Inspiron 15"></div>'
-    +'</div>'
     +'<div class="fld"><label>Observação</label><textarea class="inp" id="nr-desc" rows="3" placeholder="Ex: Sem detalhes, nota fiscal disponível, etc." style="resize:vertical;min-height:64px;line-height:1.5"></textarea></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>Categoria</label><select class="inp" id="nr-cat" onchange="onRevCatChange(\'nr\');onRevCatChangeSpecs(\'nr\')">'+catO+'</select></div>'
     +'<div class="fld"><label>Preco R$ (por unidade)</label><input class="inp" type="number" inputmode="decimal" id="nr-pr" oninput="_calcMargemRev(\'nr\')"></div>'
-    +'</div>'
+    +'<div class="fld"><label>Como controlar as unidades?</label>'
+    +'<div style="display:flex;gap:8px">'
+    +'<label id="nr-tipo-individual" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:var(--r);border:1px solid var(--gr);background:var(--grb);color:var(--gr);font-size:11px;font-weight:700;cursor:pointer;text-align:center"><input type="radio" name="nr-tipounidade" value="individual" checked onchange="_toggleNrTipoUnidade()" style="accent-color:var(--gr)"> Cada unidade é diferente</label>'
+    +'<label id="nr-tipo-quantidade" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:var(--r);border:1px solid var(--bd);background:var(--s2);color:var(--mt);font-size:11px;font-weight:700;cursor:pointer;text-align:center"><input type="radio" name="nr-tipounidade" value="quantidade" onchange="_toggleNrTipoUnidade()" style="accent-color:var(--bl)"> Todas são idênticas</label>'
+    +'</div></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Condicao</label><select class="inp" id="nr-c">'+condO+'</select></div>'
     +'<div class="fld"><label>Quantidade</label>'
     +'<input class="inp" type="number" inputmode="numeric" id="nr-qtd" value="1" min="1" step="1" style="font-size:16px;text-align:center;font-family:monospace">'
-    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Cria 1 card por unidade</div></div>'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:3px" id="nr-qtd-hint">Cria 1 card por unidade</div></div>'
     +'</div>'
     +'<div class="fld"><label>Status</label>'
     +'<div style="display:flex;gap:8px">'
@@ -8936,6 +9312,17 @@ function mNovoRev(){
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveRev()">Cadastrar</button></div></div>',500);
 }
 // Alterna o visual dos dois botões de Status e mostra/esconde o campo "o que falta"
+// Alterna visual e explicação entre "cada unidade é diferente" e "todas idênticas"
+function _toggleNrTipoUnidade(){
+  var quant=document.querySelector('input[name="nr-tipounidade"][value="quantidade"]');
+  var ehQuant=quant&&quant.checked;
+  var lblInd=document.getElementById('nr-tipo-individual');
+  var lblQuant=document.getElementById('nr-tipo-quantidade');
+  var hint=document.getElementById('nr-qtd-hint');
+  if(lblInd){lblInd.style.borderColor=ehQuant?'var(--bd)':'var(--gr)';lblInd.style.background=ehQuant?'var(--s2)':'var(--grb)';lblInd.style.color=ehQuant?'var(--mt)':'var(--gr)';}
+  if(lblQuant){lblQuant.style.borderColor=ehQuant?'var(--bl)':'var(--bd)';lblQuant.style.background=ehQuant?'rgba(59,130,246,.1)':'var(--s2)';lblQuant.style.color=ehQuant?'var(--bl)':'var(--mt)';}
+  if(hint)hint.textContent=ehQuant?'Quantidade em estoque — todas idênticas, um código só':'Cria 1 card por unidade';
+}
 function _toggleNrManutencao(){
   var manut=document.querySelector('input[name="nr-status"][value="Manutencao"]');
   var ehManut=manut&&manut.checked;
@@ -8976,6 +9363,20 @@ function saveRev(){
   var statusSel=document.querySelector('input[name="nr-status"]:checked');
   var status=statusSel?statusSel.value:'Disponivel';
   var manutObs=status==='Manutencao'?(document.getElementById('nr-manut-obs').value||'').trim():null;
+  var tipoUniSel=document.querySelector('input[name="nr-tipounidade"]:checked');
+  var tipoUnidade=tipoUniSel?tipoUniSel.value:'individual';
+  if(tipoUnidade==='quantidade'){
+    // Todas idênticas: 1 registro só, com quantidade em estoque e 1 código único
+    var codCurto='BV-'+(DB.revProxCodigo++);
+    DB.revenda.push({id:nid(),codCurto:codCurto,prod:n,marca:marca,modelo:modelo,desc:desc,peso:pesoRev,cond:cond,preco:preco,status:status,manutencaoObs:manutObs,cat:cat,estProdId:pIdSel,testesAprovados:aprovados.slice(),specs:specsResult.specs,specsBoolKeys:specsResult.boolKeys,specsCamposOcultos:specsResult.camposOcultos,checklistExtra:clExtras.extras,checklistOcultos:clExtras.ocultos,tipoUnidade:'quantidade',qtdEstoque:qtd});
+    if(pIdSel&&pesoRev>0){
+      var ep=null;
+      for(var i=0;i<DB.produtos.length;i++){if(_normId(DB.produtos[i].id)===_normId(pIdSel)){ep=DB.produtos[i];break;}}
+      if(ep)ep.est=+(ep.est-pesoRev*qtd).toFixed(3);
+    }
+    saveDB();closeM();go('revenda');
+    return;
+  }
   for(var u=0;u<qtd;u++){
     var codCurto='BV-'+(DB.revProxCodigo++);
     DB.revenda.push({id:nid(),codCurto:codCurto,prod:n+(qtd>1?' #'+(u+1):''),marca:marca,modelo:modelo,desc:desc,peso:pesoRev,cond:cond,preco:preco,status:status,manutencaoObs:manutObs,cat:cat,estProdId:pIdSel,testesAprovados:aprovados.slice(),specs:specsResult.specs,specsBoolKeys:specsResult.boolKeys,specsCamposOcultos:specsResult.camposOcultos,checklistExtra:clExtras.extras,checklistOcultos:clExtras.ocultos});
@@ -17569,9 +17970,11 @@ function _exportCSV(filename, rows){
   a.download=filename;
   a.click();
 }
-function _exportPDF(titulo,htmlContent){
+// Monta o HTML igual ao do PDF — extraído pra poder reaproveitar tanto na
+// impressão de verdade (_exportPDF) quanto numa prévia visual (_visualizarComoPDF).
+function _buildPDFHtml(titulo,htmlContent,autoPrint){
   var e=CFG.empresa;var nomeEmp=e.nome||'BioVale';
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+titulo+'</title>'
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+titulo+'</title>'
     +'<style>*{box-sizing:border-box;margin:0;padding:0}@page{size:A4 portrait;margin:10mm 12mm}body{font-family:Arial,sans-serif;font-size:11px;color:#000;background:#fff}.hdr{background:#111;color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}.hdr-logo{height:28px;width:auto;filter:brightness(0) invert(1)}.hdr-right{text-align:right;font-size:9px;color:rgba(255,255,255,.7)}.hdr-right strong{font-size:13px;color:#fff;display:block}.body{padding:8px 0}table{width:100%;border-collapse:collapse;font-size:10px}thead tr{background:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}th{padding:6px 8px;color:#fff;font-weight:700;text-align:left}tbody tr:nth-child(even){background:#f3f4f6;-webkit-print-color-adjust:exact;print-color-adjust:exact}td{padding:5px 8px;border-bottom:1px solid #e5e7eb}.footer{margin-top:8px;padding:5px 0;border-top:1px solid #ddd;display:flex;justify-content:space-between;font-size:8px;color:#999}</style></head><body>'
     +'<div class="hdr">'
     +((_LOGO_B64_CACHE)?'<img src="data:image/png;base64,'+_LOGO_B64_CACHE+'" class="hdr-logo" alt="'+nomeEmp+'">':'<strong style="font-size:16px">'+nomeEmp+'</strong>')
@@ -17579,9 +17982,19 @@ function _exportPDF(titulo,htmlContent){
     +'</div>'
     +'<div class="body">'+htmlContent+'</div>'
     +'<div class="footer"><span>'+nomeEmp+'</span><span>Gerado em: '+new Date().toLocaleString('pt-BR')+'</span></div>'
-    +'<script>window.onload=function(){window.print();}</'+'script>'
+    +(autoPrint?'<script>window.onload=function(){window.print();}</'+'script>':'')
     +'</body></html>';
-  _printHTML(html);
+}
+function _exportPDF(titulo,htmlContent){
+  _printHTML(_buildPDFHtml(titulo,htmlContent,true));
+}
+// Abre uma aba de verdade mostrando o conteúdo com a MESMA aparência do PDF que
+// seria gerado (fundo branco, cabeçalho, tudo igual) — só que sem mandar imprimir
+// sozinho, pra você só olhar e conferir antes de gerar o arquivo de fato.
+function _visualizarComoPDF(titulo,htmlContent){
+  var w=window.open('','_blank');
+  if(!w){alert('O navegador bloqueou a aba de visualização. Permita pop-ups pra esse site.');return;}
+  w.document.open();w.document.write(_buildPDFHtml(titulo,htmlContent,false));w.document.close();
 }
 function exportarRelatorioEstoque(fmt){
   var compMap={},vendMap={};
