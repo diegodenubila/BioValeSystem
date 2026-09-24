@@ -7018,6 +7018,8 @@ function saveTransf(){
 
 var revCatFiltro='Todos';
 var revCondFiltro='Todas';
+var revAnuncioFiltro='Todos'; // 'Todos' | 'Sim' | 'Nao'
+function setRevAnuncio(v){revAnuncioFiltro=(revAnuncioFiltro===v?'Todos':v);go('revenda');}
 function getRevCatNomes(){return DB.revendaCats.map(function(c){return c.nome;});}
 function getRevCatChecklist(nome){for(var i=0;i<DB.revendaCats.length;i++){if(DB.revendaCats[i].nome===nome)return DB.revendaCats[i].checklist;}return['Liga/Dá Sinal','Estado Estético','Funcionamento Geral'];}
 function getRevCatSpecs(nome){for(var i=0;i<DB.revendaCats.length;i++){if(DB.revendaCats[i].nome===nome)return DB.revendaCats[i].specs||[];}return[];}
@@ -7692,6 +7694,16 @@ function _revAplicarCategoriaLote(){
     toast(ids.length+' produto'+(ids.length===1?'':'s')+' movido'+(ids.length===1?'':'s')+' pra '+novaCat+'!','var(--bl)');
   });
 }
+// Marca/desmarca "Anunciado" — se o card representa um grupo de unidades
+// idênticas, aplica em todas de uma vez (é um anúncio só pra todas elas).
+function toggleAnuncioGrupo(idsStr,checked){
+  var ids=idsStr.split(',').map(function(s){return parseFloat(s);});
+  ids.forEach(function(id){
+    var p=gRevById(id);
+    if(p)p.anunciado=checked;
+  });
+  saveDB();go('revenda');
+}
 function pgRevenda(){
   // Linha 1: Categorias — menu cascata buscável (toca, digita ou rola)
   var catNomes=getRevCatNomes();
@@ -7715,6 +7727,9 @@ function pgRevenda(){
     condBar+='<button onclick="setRevCond(\&apos;'+c+'\&apos;)" style="background:'+(on?'rgba(168,85,247,.15)':'var(--s2)')+';border:1px solid '+(on?'var(--pu)':'var(--bd)')+';color:'+(on?'var(--pu)':'var(--mt)')+';border-radius:20px;padding:5px 14px;font-size:12px;font-weight:'+(on?'700':'400')+';cursor:pointer;white-space:nowrap">'+c+'</button>';
   }
   condBar+='<button onclick="mGerenciarStates()" style="background:var(--s3);border:1px solid var(--bd);color:var(--mt);border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer" title="Gerenciar Condicoes">&#9881;</button>';
+  condBar+='<span style="width:1px;height:20px;background:var(--bd);margin:0 2px"></span>';
+  condBar+='<button onclick="setRevAnuncio(\'Sim\')" style="background:'+(revAnuncioFiltro==='Sim'?'rgba(59,130,246,.15)':'var(--s2)')+';border:1px solid '+(revAnuncioFiltro==='Sim'?'var(--bl)':'var(--bd)')+';color:'+(revAnuncioFiltro==='Sim'?'var(--bl)':'var(--mt)')+';border-radius:20px;padding:5px 14px;font-size:12px;font-weight:'+(revAnuncioFiltro==='Sim'?'700':'400')+';cursor:pointer;white-space:nowrap">&#128227; Anunciados</button>';
+  condBar+='<button onclick="setRevAnuncio(\'Nao\')" style="background:'+(revAnuncioFiltro==='Nao'?'rgba(239,68,68,.12)':'var(--s2)')+';border:1px solid '+(revAnuncioFiltro==='Nao'?'var(--rd)':'var(--bd)')+';color:'+(revAnuncioFiltro==='Nao'?'var(--rd)':'var(--mt)')+';border-radius:20px;padding:5px 14px;font-size:12px;font-weight:'+(revAnuncioFiltro==='Nao'?'700':'400')+';cursor:pointer;white-space:nowrap">Não Anunciados</button>';
   var qtdFiltrosAtivos=(revFiltroPrecoMin!=null?1:0)+(revFiltroPrecoMax!=null?1:0)+revFiltroMarcas.length+revFiltroCategorias.length+Object.keys(revFiltroSpecs).length;
   condBar+='<button onclick="mFiltrosAvancados()" style="background:'+(qtdFiltrosAtivos?'var(--grb)':'var(--s3)')+';border:1px solid '+(qtdFiltrosAtivos?'var(--gr)':'var(--bd)')+';color:'+(qtdFiltrosAtivos?'var(--gr)':'var(--mt)')+';border-radius:20px;padding:5px 12px;font-size:12px;font-weight:'+(qtdFiltrosAtivos?'700':'400')+';cursor:pointer;white-space:nowrap">&#127991; Filtros'+(qtdFiltrosAtivos?' ('+qtdFiltrosAtivos+')':'')+'</button>';
   condBar+='</div>';
@@ -7726,6 +7741,8 @@ function pgRevenda(){
     if(p.status!=='Disponivel'&&p.status!=='Reservado')continue;
     if(revCatFiltro!=='Todos'&&p.cat!==revCatFiltro)continue;
     if(revCondFiltro!=='Todas'&&p.cond!==revCondFiltro)continue;
+    if(revAnuncioFiltro==='Sim'&&!p.anunciado)continue;
+    if(revAnuncioFiltro==='Nao'&&p.anunciado)continue;
     if(!_revPassaFiltrosAvancados(p))continue;
     // Nome base: remove sufixo " #N" — usado só pra exibir, não decide mais o agrupamento
     var nomeBase=(p.prod||p.nome||'Sem nome').replace(/ #\d+$/,'');
@@ -7759,9 +7776,12 @@ function pgRevenda(){
     }
     // Badge de quantidade
     var qtdBadge=qtd>1?'<span style="position:absolute;top:13px;left:13px;background:var(--bl);color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px">'+qtd+'x</span>':'';
+    var todosAnunciados=grp.items.every(function(x){return !!x.anunciado;});
+    var idsGrupoAnuncio=grp.items.map(function(x){return x.id;}).join(',');
+    var anuncioRow='<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bd)" onclick="event.stopPropagation()"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:'+(todosAnunciados?'var(--bl)':'var(--mt)')+';font-weight:'+(todosAnunciados?'700':'400')+'"><input type="checkbox" '+(todosAnunciados?'checked':'')+' onchange="toggleAnuncioGrupo(\''+idsGrupoAnuncio+'\',this.checked)" style="width:14px;height:14px;accent-color:var(--bl);cursor:pointer"> &#128227; Anunciado'+(qtd>1?' (marca as '+qtd+' unidades)':'')+'</label></div>';
     cards+='<div class="card" style="position:relative;cursor:pointer;transition:border-color .15s" onclick="'+(qtd>1?'mVerUnidadesPorIds('+grp.items.map(function(x){return x.id;}).join(',')+')':'mVerProdRevenda('+p0.id+')')+'" onmouseover="this.style.borderColor=\'var(--gr)\'" onmouseout="this.style.borderColor=\'\'">'
       +qtdBadge
-      +'<div style="position:absolute;top:13px;right:13px"><span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:var(--grb);color:var(--gr)">Disponivel</span></div>'
+      +'<div style="position:absolute;top:13px;right:13px;display:flex;flex-direction:column;gap:3px;align-items:flex-end"><span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:var(--grb);color:var(--gr)">Disponivel</span>'+(todosAnunciados?'<span style="padding:2px 9px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(59,130,246,.12);color:var(--bl)">&#128227; Anunciado</span>':'')+'</div>'
       +'<div style="font-size:22px;margin-bottom:7px">&#127991;</div>'
       +'<div style="font-size:14px;font-weight:700;margin-bottom:2px">'+(p0.nomeBase||p0.prod||'Sem nome')+(p0.tipoUnidade==='quantidade'?' <span style="font-size:12px;color:var(--bl);font-weight:700">('+p0.qtdEstoque+' em estoque)</span>':qtd>1?' <span style="font-size:12px;color:var(--bl);font-weight:700">('+qtd+' unid.)</span>':(p0.codCurto?' <span style="font-size:11px;color:var(--bl);font-weight:600;font-family:monospace">'+p0.codCurto+'</span>':''))+'</div>'
       +((p0.marca||p0.modelo)?'<div style="font-size:11px;color:var(--mt);margin-bottom:4px">'+(p0.marca||'')+(p0.marca&&p0.modelo?' &middot; ':'')+(p0.modelo||'')+'</div>':'')
@@ -7779,7 +7799,9 @@ function pgRevenda(){
       +'<button class="btnO bOb" style="font-size:12px;padding:5px 9px" title="Imprimir etiqueta" onclick="'+(qtd>1?'mVerUnidadesPorIds('+grp.items.map(function(x){return x.id;}).join(',')+')':'imprimirEtiqueta('+p0.id+')')+'">&#128424;</button>'
       +(qtd===1?'<button class="btnO bOgr" style="font-size:12px;padding:5px 9px" title="Editar produto" onclick="mEditRev('+p0.id+')">&#9998;</button>':'')
       +'<button class="btnO bOr" style="font-size:12px;padding:5px 9px;min-height:30px" title="Excluir" onclick="'+(qtd>1?'mVerUnidadesPorIds('+grp.items.map(function(x){return x.id;}).join(',')+')':'mDelRev('+p0.id+')')+'">&#128465;</button>'
-      +'</div></div></div>';
+      +'</div></div>'
+      +anuncioRow
+      +'</div>';
   }
   if(!cards)cards='<div class="card" style="text-align:center;color:var(--mt);padding:30px">Nenhum produto encontrado.</div>';
 
@@ -7791,10 +7813,13 @@ function pgRevenda(){
     var idsGrupo=grp.items.map(function(x){return x.id;}).join(',');
     var specsStr='';var s=p0.specs||{};var sk=Object.keys(s);
     for(var ki=0;ki<sk.length&&ki<3;ki++){var sv=s[sk[ki]];if(!sv&&sv!==0)continue;specsStr+=(specsStr?' · ':'')+( sv===true?sk[ki]:sk[ki]+': '+sv);}
+    var todosAnunciadosL=grp.items.every(function(x){return !!x.anunciado;});
     listaRows+='<tr style="border-bottom:1px solid var(--bd);cursor:pointer" onclick="'+(qtd>1?'mVerUnidadesPorIds('+idsGrupo+')':'mVerProdRevenda('+p0.id+')')+'">'
       +'<td style="padding:9px 6px" onclick="event.stopPropagation()"><input type="checkbox" class="rv-bulk-chk" data-ids="'+idsGrupo+'" onchange="_revBulkAtualiza()" style="width:16px;height:16px;cursor:pointer"></td>'
       +'<td style="padding:9px 10px"><div style="font-size:13px;font-weight:600">'+(p0.nomeBase||p0.prod||'Sem nome')+(p0.tipoUnidade==='quantidade'?' <span style="font-size:11px;color:var(--bl);font-weight:700">('+p0.qtdEstoque+' em estoque)</span>':qtd>1?' <span style="font-size:11px;color:var(--bl);font-weight:700">('+qtd+'x)</span>':'')+'</div>'
-      +(specsStr?'<div style="font-size:10px;color:var(--mt);margin-top:1px">'+specsStr+'</div>':'')+'</td>'
+      +(specsStr?'<div style="font-size:10px;color:var(--mt);margin-top:1px">'+specsStr+'</div>':'')
+      +'<label style="display:inline-flex;align-items:center;gap:4px;margin-top:3px;cursor:pointer;font-size:10px;color:'+(todosAnunciadosL?'var(--bl)':'var(--mt)')+'" onclick="event.stopPropagation()"><input type="checkbox" '+(todosAnunciadosL?'checked':'')+' onchange="toggleAnuncioGrupo(\''+idsGrupo+'\',this.checked)" style="width:11px;height:11px;accent-color:var(--bl);cursor:pointer"> &#128227; Anunciado</label>'
+      +'</td>'
       +'<td style="padding:9px 6px;font-size:11px;color:var(--mt);white-space:nowrap">'+(p0.cat||'')+'</td>'
       +'<td style="padding:9px 6px;font-size:11px;white-space:nowrap">'+(p0.cond?'<span style="color:var(--pu)">'+p0.cond+'</span>':'')+'</td>'
       +'<td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--gr);font-family:monospace;white-space:nowrap">'+fR(p0.preco)+'</td>'
@@ -7848,7 +7873,9 @@ function pgRevenda(){
   var revTabAtiva=revTabView||'lista';
   var qtdManutencao=DB.revenda.filter(function(p){return p.status==='Manutencao';}).length;
   _liberarReservasExpiradas();
-  return '<div class="fc"><div class="ptop"><div><div class="pl">Produtos</div><div class="pt">Revenda por Unidade</div></div><div style="display:flex;gap:8px"><button class="btnO bOgr" onclick="mGerarRelacao()">&#128228; Gerar Relação</button><button class="btn" onclick="mNovoRev()">+ Novo</button></div></div>'
+  return '<div class="fc"><div class="ptop"><div><div class="pl">Produtos</div><div class="pt">Revenda por Unidade</div></div><div style="display:flex;gap:8px">'
+    +(revTabAtiva==='manutencao'&&qtdManutencao?'<button class="btnO" style="border-color:rgba(245,158,11,.4);color:var(--or)" onclick="mRelatorioManutencao()">&#128202; Relatório de Custos</button>':'')
+    +'<button class="btnO bOgr" onclick="mGerarRelacao()">&#128228; Gerar Relação</button><button class="btn" onclick="mNovoRev()">+ Novo</button></div></div>'
     +relatorio
     +'<div style="position:relative;margin-bottom:10px;display:flex;gap:8px">'
     +'<div style="position:relative;flex:1">'
@@ -8392,6 +8419,33 @@ function buscarPorCodigo(val){
   var m=document.getElementById('rev-notfound-msg');if(m)m.style.display='none';
   mVerProdRevenda(found.id);
 }
+// Resumo (só leitura) do que falta pra esse produto ficar pronto — aparece na
+// tela de detalhes, pra não ficar uma informação só visível na aba Manutenção.
+function _revManutResumoHtml(p){
+  if(p.status!=='Manutencao')return '';
+  var faltando=_revFaltandoArray(p);
+  var precos=p.checklistPrecos||{};
+  var pendente=0;faltando.forEach(function(item){pendente+=precos[item]||0;});
+  var gastoTotal=p.manutencaoGastoTotal||0;
+  var html='<div style="margin:10px 0;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.25);border-radius:var(--r);padding:10px 12px">';
+  if(p.manutencaoObs)html+='<div style="font-size:12px;color:var(--or);margin-bottom:8px">&#128221; '+p.manutencaoObs+'</div>';
+  if(faltando.length){
+    html+='<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">&#9888; Faltando ('+faltando.length+')'+(pendente>0?' &middot; Pendente: <b style="color:var(--or)">'+fR(pendente)+'</b>':'')+'</div>';
+    faltando.forEach(function(item){
+      var obsItem=(p.checklistObs&&p.checklistObs[item])||'';
+      var precoItem=precos[item];
+      var linkItem=(p.checklistLinks&&p.checklistLinks[item])||'';
+      html+='<div style="font-size:12px;padding:4px 0;border-top:1px solid rgba(245,158,11,.15)"><b>'+item+'</b>'
+        +(obsItem?' — '+obsItem:'')
+        +(precoItem?' <span style="color:var(--or)">('+fR(precoItem)+')</span>':'')
+        +(linkItem?' <a href="'+linkItem.replace(/"/g,'&quot;')+'" target="_blank" style="color:var(--bl)">&#128279; link</a>':'')
+        +'</div>';
+    });
+  }
+  if(gastoTotal>0)html+='<div style="font-size:10px;color:var(--mt);margin-top:8px">&#128220; Já gasto nesse produto: <b style="color:var(--tx)">'+fR(gastoTotal)+'</b></div>';
+  html+='</div>';
+  return html;
+}
 function mVerProdRevenda(id){
   var p=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){p=DB.revenda[i];break;}}
   if(!p)return;
@@ -8424,11 +8478,13 @@ function mVerProdRevenda(id){
     +(p.cond?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(168,85,247,.12);color:var(--pu)">'+p.cond+'</span>':'')
     +(p.peso?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;background:var(--s3);color:var(--mt)">'+fKg(p.peso)+'kg</span>':'')
     +(p.status==='Disponivel'?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(34,197,94,.12);color:var(--gr)">Disponível</span>':'')
+    +(p.status==='Manutencao'?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(245,158,11,.15);color:var(--or)">&#128295; Em Manutenção</span>':'')
     +(p.status==='Reservado'?'<span style="padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(245,158,11,.15);color:var(--or)">&#8987; Reservado até '+_fmtDataHoraCurta(p.reservaExpira)+(p.reservaCliente?' — '+p.reservaCliente:'')+'</span>':'')
     +'</div>'
     +(p.desc?'<div style="font-size:12px;color:var(--mt);margin-bottom:8px;line-height:1.5;border-left:3px solid var(--bd);padding-left:8px">'+p.desc+'</div>':'')
     +specsH
     +testesH
+    +_revManutResumoHtml(p)
     +'<div style="font-size:24px;font-weight:800;color:var(--gr);margin-top:8px">'+fR(p.preco)+'</div>'
     +'<div style="font-size:10px;color:var(--mt);font-family:monospace;margin-top:2px">Cod: '+cod+(p.codCurto?' &middot; <span style="color:var(--bl);font-weight:700">'+p.codCurto+'</span>':'')+'</div>'
     +'</div>'
@@ -8494,6 +8550,75 @@ var revTabView='lista';
 var revViewMode='cards';
 // ── Aba Manutenção — separa o que está pronto pra vender do que ainda falta
 // peça/reparo. Reaproveita o checklist técnico pra já mostrar "o que falta".
+// ── Relatório de Custos — Manutenção ─────────────────────────────────────
+// Junta tudo que está em manutenção: o que falta em cada um, valor de cada
+// peça, subtotal por produto e o total geral pra deixar tudo pronto pra venda.
+function mRelatorioManutencao(){
+  var itens=DB.revenda.filter(function(p){return p.status==='Manutencao';});
+  if(!itens.length){alert('Nada em manutenção no momento!');return;}
+  var totalGeral=0;
+  var corpoHtml='';
+  itens.forEach(function(p){
+    var faltando=_revFaltandoArray(p);
+    var precos=p.checklistPrecos||{};
+    var subtotal=0;faltando.forEach(function(item){subtotal+=precos[item]||0;});
+    totalGeral+=subtotal;
+    corpoHtml+='<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bd)">'
+      +'<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span>'+p.prod+'</span><span style="color:var(--or)">'+(subtotal>0?fR(subtotal):'&mdash;')+'</span></div>'
+      +'<div style="font-size:10px;color:var(--mt);margin-bottom:4px">'+(p.cat||'')+'</div>';
+    if(faltando.length){
+      faltando.forEach(function(item){
+        var precoItem=precos[item]||0;
+        corpoHtml+='<div style="font-size:11px;padding:2px 0;display:flex;justify-content:space-between;color:var(--mt)"><span>&bull; '+item+'</span><span>'+(precoItem?fR(precoItem):'&mdash;')+'</span></div>';
+      });
+    }
+    corpoHtml+='</div>';
+  });
+  var modalHtml='<div class="mf">'
+    +'<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r);padding:12px;margin-bottom:14px;text-align:center">'
+    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Total pra deixar tudo pronto</div>'
+    +'<div style="font-size:26px;font-weight:800;color:var(--or)">'+fR(totalGeral)+'</div>'
+    +'<div style="font-size:11px;color:var(--mt)">'+itens.length+' produto'+(itens.length===1?'':'s')+' em manutenção</div>'
+    +'</div>'
+    +'<div style="max-height:340px;overflow-y:auto;margin-bottom:14px">'+corpoHtml+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +'<button class="btnO bOgr" onclick="_manutVisualizarPDF()">&#128065; Visualizar</button>'
+    +'<button class="btnO bOgr" onclick="_manutExportarPDF()">&#128196; Gerar PDF</button>'
+    +'</div></div>';
+  openM('&#128202; Relatório de Custos — Manutenção',modalHtml,560);
+}
+// Monta a tabela no estilo do PDF — um bloco por produto, com subtotal, e o
+// total geral no fim. Reaproveitada tanto na visualização quanto no PDF real.
+function _manutMontarTabelaPDF(){
+  var itens=DB.revenda.filter(function(p){return p.status==='Manutencao';});
+  var totalGeral=0;
+  var html='';
+  itens.forEach(function(p){
+    var faltando=_revFaltandoArray(p);
+    var precos=p.checklistPrecos||{};
+    var subtotal=0;faltando.forEach(function(item){subtotal+=precos[item]||0;});
+    totalGeral+=subtotal;
+    html+='<table style="margin-bottom:14px"><thead><tr><th colspan="2" style="background:#374151">'+p.prod+' &mdash; '+(p.cat||'')+'</th></tr><tr><th>Item faltando</th><th style="text-align:right">Valor estimado</th></tr></thead><tbody>';
+    if(faltando.length){
+      faltando.forEach(function(item){
+        var precoItem=precos[item]||0;
+        var obsItem=(p.checklistObs&&p.checklistObs[item])||'';
+        html+='<tr><td>'+item+(obsItem?'<br><span style="font-size:8px;color:#666">'+obsItem+'</span>':'')+'</td><td style="text-align:right">'+(precoItem?fR(precoItem):'&mdash;')+'</td></tr>';
+      });
+    }else{
+      html+='<tr><td colspan="2" style="color:#999">Checklist completo, só falta concluir.</td></tr>';
+    }
+    html+='<tr style="font-weight:700;background:#f3f4f6"><td>Subtotal</td><td style="text-align:right">'+fR(subtotal)+'</td></tr></tbody></table>';
+  });
+  html+='<div style="margin-top:10px;padding:12px 14px;background:#111;color:#fff;border-radius:6px;display:flex;justify-content:space-between;font-size:14px;font-weight:800;-webkit-print-color-adjust:exact;print-color-adjust:exact"><span>TOTAL GERAL</span><span>'+fR(totalGeral)+'</span></div>';
+  return html;
+}
+function _manutVisualizarPDF(){
+  _visualizarComoPDF('Relatório de Custos - Manutenção',_manutMontarTabelaPDF());
+}
+function _manutExportarPDF(){
+  _exportPDF('Relatório de Custos - Manutenção',_manutMontarTabelaPDF());
+}
 function _buildRevManutencao(){
   var itens=DB.revenda.filter(function(p){
     if(p.status!=='Manutencao')return false;
@@ -8508,6 +8633,8 @@ function _buildRevManutencao(){
   var html='';
   itens.forEach(function(p){
     var faltando=_revFaltandoArray(p);
+    var precos=p.checklistPrecos||{};
+    var pendente=0;faltando.forEach(function(item){pendente+=precos[item]||0;});
     html+='<div class="card" style="margin-bottom:8px">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
       +'<div style="flex:1;cursor:pointer" onclick="mVerProdRevenda('+p.id+')"><div style="font-size:14px;font-weight:700">'+p.prod+'</div>'
@@ -8516,18 +8643,28 @@ function _buildRevManutencao(){
       +'</div>'
       +(p.manutencaoObs?'<div style="font-size:12px;color:var(--or);margin-top:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:6px 9px">&#128221; '+p.manutencaoObs+'</div>':'');
     if(faltando.length){
-      html+='<div style="margin-top:10px"><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">&#9888; Faltando ('+faltando.length+')</div>';
+      html+='<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px"><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.5px">&#9888; Faltando ('+faltando.length+')</div>'
+        +(pendente>0?'<div style="font-size:11px;color:var(--or);font-weight:700">&#128176; Pendente: '+fR(pendente)+'</div>':'')+'</div>';
       faltando.forEach(function(item){
         var obsAtual=(p.checklistObs&&p.checklistObs[item])||'';
+        var precoAtual=precos[item]||'';
+        var linkAtual=(p.checklistLinks&&p.checklistLinks[item])||'';
         var eid='mn-'+p.id+'-'+item.replace(/[^a-zA-Z0-9]/g,'_');
-        html+='<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-top:1px solid var(--bd)">'
+        html+='<div style="padding:6px 0;border-top:1px solid var(--bd)">'
+          +'<div style="display:flex;align-items:flex-start;gap:8px">'
           +'<input type="checkbox" id="'+eid+'" onchange="_revResolverItemManut('+p.id+',\''+item.replace(/'/g,"\\'")+'\',this.checked)" style="margin-top:4px;width:15px;height:15px;accent-color:var(--gr);cursor:pointer">'
           +'<div style="flex:1"><label for="'+eid+'" style="font-size:12px;font-weight:600;cursor:pointer">'+item+'</label>'
-          +'<input class="inp" value="'+obsAtual.replace(/"/g,'&quot;')+'" placeholder="Nota sobre esse item (opcional)" onblur="_revSalvarNotaItem('+p.id+',\''+item.replace(/'/g,"\\'")+'\',this.value)" style="font-size:11px;padding:5px 8px;margin-top:4px;width:100%"></div>'
-          +'</div>';
+          +'<input class="inp" value="'+obsAtual.replace(/"/g,'&quot;')+'" placeholder="Nota (ex: modelo da peça)" onblur="_revSalvarNotaItem('+p.id+',\''+item.replace(/'/g,"\\'")+'\',this.value)" style="font-size:11px;padding:5px 8px;margin-top:4px;width:100%">'
+          +'<div style="display:flex;gap:5px;margin-top:4px">'
+          +'<input class="inp" type="number" inputmode="decimal" step="0.01" value="'+precoAtual+'" placeholder="Preço estimado R$" onblur="_revSalvarPrecoItem('+p.id+',\''+item.replace(/'/g,"\\'")+'\',this.value)" style="font-size:11px;padding:5px 8px;flex:1">'
+          +'<input class="inp" value="'+linkAtual.replace(/"/g,'&quot;')+'" placeholder="Link de compra" onblur="_revSalvarLinkItem('+p.id+',\''+item.replace(/'/g,"\\'")+'\',this.value)" style="font-size:11px;padding:5px 8px;flex:1">'
+          +(linkAtual?'<a href="'+linkAtual.replace(/"/g,'&quot;')+'" target="_blank" style="background:var(--s3);border:1px solid var(--bl);color:var(--bl);border-radius:6px;padding:5px 9px;font-size:12px;text-decoration:none;flex-shrink:0">&#128279;</a>':'')
+          +'</div></div></div></div>';
       });
       html+='</div>';
     }
+    var gastoTotal=p.manutencaoGastoTotal||0;
+    html+=(gastoTotal>0?'<div style="font-size:10px;color:var(--mt);margin-top:8px">&#128220; Já gasto nesse produto: <b style="color:var(--tx)">'+fR(gastoTotal)+'</b></div>':'');
     html+='<div style="display:flex;gap:6px;margin-top:10px">'
       +'<button class="btn" style="flex:1;font-size:12px;padding:6px" onclick="concluirManutencao('+p.id+')">&#9989; Concluir — Disponível pra venda</button>'
       +'<button class="btnO bOb" style="font-size:12px;padding:6px 10px" onclick="mEditRev('+p.id+')">&#9998;</button>'
@@ -8536,16 +8673,20 @@ function _buildRevManutencao(){
   return html;
 }
 // Marca/desmarca um item do checklist direto no card de Manutenção — sem precisar
-// abrir a tela de Editar. Ao resolver (marcar), a nota daquele item some, já que
-// não faz mais sentido guardar.
+// abrir a tela de Editar. Ao resolver (marcar), banca o preço estimado daquele item
+// no histórico de gasto do produto (que NUNCA é apagado, mesmo depois de resolvido)
+// — desmarcar de novo desfaz certinho esse valor do histórico.
 function _revResolverItemManut(id,item,checked){
   var p=gRevById(id);if(!p)return;
   if(!p.testesAprovados)p.testesAprovados=[];
+  var precoItem=(p.checklistPrecos&&p.checklistPrecos[item])||0;
   if(checked){
     if(p.testesAprovados.indexOf(item)<0)p.testesAprovados.push(item);
     if(p.checklistObs)delete p.checklistObs[item];
+    p.manutencaoGastoTotal=+((p.manutencaoGastoTotal||0)+precoItem).toFixed(2);
   }else{
     p.testesAprovados=p.testesAprovados.filter(function(a){return a!==item;});
+    p.manutencaoGastoTotal=Math.max(0,+((p.manutencaoGastoTotal||0)-precoItem).toFixed(2));
   }
   saveDB();go('revenda');
 }
@@ -8557,6 +8698,25 @@ function _revSalvarNotaItem(id,item,valor){
   if(valor)p.checklistObs[item]=valor;
   else delete p.checklistObs[item];
   saveDB();
+}
+// Salva o preço estimado de um item específico do checklist — usado pra somar o
+// total pendente e, quando resolvido, entra no histórico de gasto do produto.
+function _revSalvarPrecoItem(id,item,valor){
+  var p=gRevById(id);if(!p)return;
+  var num=parseFloat(valor)||0;
+  if(!p.checklistPrecos)p.checklistPrecos={};
+  if(num>0)p.checklistPrecos[item]=num;
+  else delete p.checklistPrecos[item];
+  saveDB();go('revenda');
+}
+// Salva o link de compra de um item específico do checklist
+function _revSalvarLinkItem(id,item,valor){
+  var p=gRevById(id);if(!p)return;
+  valor=(valor||'').trim();
+  if(!p.checklistLinks)p.checklistLinks={};
+  if(valor)p.checklistLinks[item]=valor;
+  else delete p.checklistLinks[item];
+  saveDB();go('revenda');
 }
 // Marca um produto como em manutenção — pergunta uma observação opcional (ex:
 // "falta memória RAM") pra deixar registrado o que precisa ser feito.
@@ -9083,9 +9243,68 @@ function _calcMargemRev(prefix){
     +'<div><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Margem</div><div style="font-size:13px;font-weight:800;color:'+cor+'">'+margem+'%</div></div>'
     +'</div>';
 }
-function saveEditRev(id){
+// Verifica o que falta preencher/marcar num produto: itens do checklist não
+// marcados + campos de texto das especificações em branco. Ignora as specs de
+// Sim/Não (não são defeito, só características que o modelo pode ou não ter).
+function _revChecarGaps(prefix){
+  var gaps=[];
+  var clWrap=document.getElementById(prefix+'-cl-wrap');
+  if(clWrap){
+    var cbs=clWrap.querySelectorAll('input[type=checkbox]');
+    for(var i=0;i<cbs.length;i++){if(!cbs[i].checked)gaps.push(cbs[i].value);}
+  }
+  var textGrid=document.getElementById(prefix+'-specs-textgrid');
+  if(textGrid){
+    var inputs=textGrid.querySelectorAll('input');
+    for(var i=0;i<inputs.length;i++){
+      var inp=inputs[i];
+      if(inp.value&&inp.value.trim())continue;
+      var key=inp.getAttribute('data-key');
+      if(!key){var fld=inp.closest('.fld');key=fld?fld.getAttribute('data-nome'):null;}
+      if(key)gaps.push(key);
+    }
+  }
+  return gaps;
+}
+// Mostra o aviso de itens faltando — não trava nada, só pergunta se quer manter
+// Disponível mesmo assim ou já ir pra Manutenção. "salvarFn" é a função (saveRev
+// ou saveEditRev) que deve rodar de novo, forçando o status escolhido.
+// Mostra o aviso de itens faltando — DENTRO do próprio formulário que já está
+// aberto (nunca troca de modal), porque trocar de modal apagaria os campos que
+// a pessoa já preencheu, e o salvamento de novo não teria mais o que ler.
+function _revAvisarGaps(gaps,salvarFnNome,args){
+  var lista=gaps.join(', ');
+  var argsStr=args.map(function(a){return typeof a==='string'?"'"+a+"'":a;}).join(',');
+  var argsComVirgula=argsStr?argsStr+',':'';
+  var formEl=document.querySelector('.mbx .mf');
+  if(!formEl){
+    // Sem formulário aberto pra mostrar o aviso dentro — não deveria acontecer,
+    // mas por segurança salva direto como Disponível em vez de travar o usuário.
+    window[salvarFnNome].apply(null,args.concat(['Disponivel']));
+    return;
+  }
+  var aviso=document.getElementById('rev-gaps-aviso');
+  if(!aviso){aviso=document.createElement('div');aviso.id='rev-gaps-aviso';formEl.insertBefore(aviso,formEl.firstChild);}
+  aviso.innerHTML='<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r);padding:10px 12px;margin-bottom:12px">'
+    +'<div style="font-size:12px;color:var(--or);font-weight:700;margin-bottom:4px">&#9888; Faltando: '+lista+'</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:8px">Pode ter sido só esquecimento, ou pode ser que realmente falte. Salvar mesmo assim como Disponível, ou marcar em Manutenção?</div>'
+    +'<div style="display:flex;gap:8px"><button type="button" class="btnO bOgr" style="flex:1;font-size:11px;padding:6px" onclick="'+salvarFnNome+'('+argsComVirgula+'\'Disponivel\')">Manter Disponível</button>'
+    +'<button type="button" class="btn" style="flex:1;font-size:11px;padding:6px;background:var(--or)" onclick="'+salvarFnNome+'('+argsComVirgula+'\'Manutencao\')">Ir pra Manutenção</button></div></div>';
+  aviso.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function saveEditRev(id,forcarStatus){
   var it=null;for(var i=0;i<DB.revenda.length;i++){if(DB.revenda[i].id===id){it=DB.revenda[i];break;}}if(!it)return;
   var n=document.getElementById('er-p').value.trim();if(!n){alert('Informe o nome!');return;}
+  // Se está salvando como Disponível (e ainda não decidiu forçar), confere se
+  // falta algo no checklist/especificações antes de mexer em qualquer estoque.
+  if(!forcarStatus){
+    var statusSelPrev=document.querySelector('input[name="er-status"]:checked');
+    var statusPrev=statusSelPrev?statusSelPrev.value:it.status;
+    if(statusPrev==='Disponivel'){
+      var gaps=_revChecarGaps('er');
+      if(gaps.length){_revAvisarGaps(gaps,'saveEditRev',[id]);return;}
+    }
+  }
   var pIdNovo=document.getElementById('er-estprod').value;
   pIdNovo=pIdNovo?parseInt(pIdNovo)||pIdNovo:null;
   var pesoNovo=parseFloat(document.getElementById('er-kg').value)||0;
@@ -9124,7 +9343,11 @@ function saveEditRev(id){
   // desses dois estados; se estiver Vendido/Reservado, não mexe (evita sobrescrever
   // sem querer algo que se gerencia pelos botões da tela de detalhes).
   var statusSel=document.querySelector('input[name="er-status"]:checked');
-  if(statusSel){
+  if(forcarStatus){
+    it.status=forcarStatus;
+    var manutObsEl=document.getElementById('er-manut-obs');
+    it.manutencaoObs=forcarStatus==='Manutencao'?(manutObsEl&&manutObsEl.value.trim()?manutObsEl.value.trim():('Faltando: '+_revChecarGaps('er').join(', '))):null;
+  }else if(statusSel){
     it.status=statusSel.value;
     it.manutencaoObs=statusSel.value==='Manutencao'?(document.getElementById('er-manut-obs').value||'').trim():null;
   }
@@ -9343,8 +9566,18 @@ function onRevEstProdChange(){
   else{if(info)info.textContent='';}
   _calcMargemRev('nr');
 }
-function saveRev(){
+function saveRev(forcarStatus){
   var n=document.getElementById('nr-p').value.trim();if(!n)return;
+  // Confere se falta algo (checklist/especificações) antes de salvar como
+  // Disponível — mas só se ainda não decidiu forçar um status específico.
+  if(!forcarStatus){
+    var statusSelPrev=document.querySelector('input[name="nr-status"]:checked');
+    var statusPrev=statusSelPrev?statusSelPrev.value:'Disponivel';
+    if(statusPrev==='Disponivel'){
+      var gaps=_revChecarGaps('nr');
+      if(gaps.length){_revAvisarGaps(gaps,'saveRev',[]);return;}
+    }
+  }
   var marca=(document.getElementById('nr-marca').value||'').trim();
   var modelo=(document.getElementById('nr-modelo').value||'').trim();
   var pIdSelRaw=document.getElementById('nr-estprod').value;
@@ -9361,8 +9594,9 @@ function saveRev(){
   var specsResult=getSpecsFromForm('nr',cat);
   var clExtras=getChecklistExtras('nr');
   var statusSel=document.querySelector('input[name="nr-status"]:checked');
-  var status=statusSel?statusSel.value:'Disponivel';
-  var manutObs=status==='Manutencao'?(document.getElementById('nr-manut-obs').value||'').trim():null;
+  var status=forcarStatus||(statusSel?statusSel.value:'Disponivel');
+  var manutObsEl=document.getElementById('nr-manut-obs');
+  var manutObs=status==='Manutencao'?(manutObsEl&&manutObsEl.value.trim()?manutObsEl.value.trim():(forcarStatus?'Faltando: '+_revChecarGaps('nr').join(', '):'')):null;
   var tipoUniSel=document.querySelector('input[name="nr-tipounidade"]:checked');
   var tipoUnidade=tipoUniSel?tipoUniSel.value:'individual';
   if(tipoUnidade==='quantidade'){
