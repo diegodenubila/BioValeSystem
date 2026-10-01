@@ -1823,7 +1823,7 @@ function renderPesagem(){
     var nomeRv=(rv.prod||rv.nome||'Produto');
     // Remove sufixo " #N" usado no cadastro em lote (ex: "motor de tanquinho #3" -> "motor de tanquinho")
     var nomeBase=nomeRv.replace(/\s*#\d+\s*$/,'');
-    var chave=_revChaveIdentica(rv)+'||'+rv.preco;
+    var chave=_revChaveIdentica(rv);
     if(!_gruposUni[chave])_gruposUni[chave]={ids:[],nome:nomeBase,cond:rv.cond,preco:rv.preco,peso:rv.peso};
     _gruposUni[chave].ids.push(rv.id);
   }
@@ -7650,7 +7650,8 @@ function _revAutoNomearProduto(prefix){
 }
 function _revChaveIdentica(p){
   var specsKey=p.specs?Object.keys(p.specs).sort().map(function(k){return k+':'+p.specs[k];}).join('|'):'';
-  return [(p.cat||''),(p.marca||'').toLowerCase(),(p.modelo||'').toLowerCase(),(p.cond||''),specsKey].join('||');
+  var nomeBase=(p.prod||'').replace(/\s*#\d+\s*$/,'').toLowerCase().trim();
+  return [nomeBase,(p.cat||''),(p.marca||'').toLowerCase(),(p.modelo||'').toLowerCase(),(p.cond||''),specsKey,p.preco].join('||');
 }
 // ── Reatribuir categoria em lote (modo lista da Revenda) ────────────────────
 function _revBulkAtualiza(){
@@ -14256,6 +14257,75 @@ function _prodCustoEntrada(matNome){return DB.prodCustoEntrada[matNome]||0;}
 // 1) o custo específico digitado nesse lote (quando o preço veio diferente do normal)
 // 2) o preço de compra cadastrado no produto vinculado (padrão do dia a dia)
 // 3) o custo manual antigo por nome (produções registradas antes dessa mudança)
+// Duração de uma produção em minutos, a partir do horário de abertura e fechamento
+// (ambos já são salvos automaticamente ao abrir/fechar cada produção).
+// Histórico completo de um funcionário no período selecionado — cada produção
+// com data, horário de início/fim, duração e o que rendeu.
+function mVerFuncionarioProducao(chaveFunc){
+  var todasFechadas=(DB.producoes||[]).filter(function(p){return p.status==='fechada';});
+  var fechadas=_prodFiltrar(todasFechadas);
+  function _chaveFunc2(n){return (n||'').trim().replace(/\s+/g,' ').toLowerCase();}
+  var doFunc=fechadas.filter(function(p){return _chaveFunc2(p.func)===chaveFunc;});
+  if(!doFunc.length){alert('Nada encontrado nesse período.');return;}
+  var nomeExibir=doFunc[0].func.trim();
+  var tempoTotal=0,entradaTotal=0,saidaTotal=0,valorTotal=0;
+  doFunc.sort(function(a,b){return (b.data+(b.hora||'')).localeCompare(a.data+(a.hora||''));});
+  var linhas='';
+  doFunc.forEach(function(p){
+    var dur=_prodDuracaoMin(p);
+    tempoTotal+=dur;
+    entradaTotal+=p.pesoEntrada;
+    var saidaP=0,valorP=0;
+    p.saidas.forEach(function(s){saidaP+=s.peso;valorP+=_prodPrecoVenda(s.prodId)*s.peso;});
+    saidaTotal+=saidaP;valorTotal+=valorP;
+    linhas+='<div style="padding:9px 0;border-bottom:1px solid var(--bd)">'
+      +'<div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:700">'+(p.lote||p.matEntrada||'')+'</span><span style="font-size:11px;color:var(--mt)">'+p.data+'</span></div>'
+      +'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+(p.hora&&p.horaFim?'&#9200; '+p.hora+' &rarr; '+p.horaFim+' ('+_fmtDuracao(dur)+')'+(_prodDuracaoSuspeita(p)?' <span style="color:var(--or)">&#9888; conferir</span>':''):'&#9200; sem horário registrado')+'</div>'
+      +'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+fKg(p.pesoEntrada)+'kg entrada &rarr; '+fKg(saidaP)+'kg saída &middot; '+fR(valorP)+'</div>'
+      +'</div>';
+  });
+  var resumo='<div class="g4" style="margin-bottom:14px">'
+    +sc('&#128230;','Produções',doFunc.length,'','var(--bl)')
+    +sc('&#9201;','Tempo Total',_fmtDuracao(tempoTotal),'','var(--pu)')
+    +sc('&#128229;','Entrada',fKg(entradaTotal)+'kg','','var(--bl)')
+    +sc('&#128176;','Valor Gerado',fR(valorTotal),'','var(--gr)')
+    +'</div>';
+  openM('&#128119; '+nomeExibir,'<div class="mf">'+resumo+'<div style="max-height:400px;overflow-y:auto">'+linhas+'</div></div>',560);
+}
+function _prodDuracaoMin(p){
+  if(!p.hora||!p.horaFim)return 0;
+  var hi=p.hora.split(':');var hf=p.horaFim.split(':');
+  if(hi.length<2||hf.length<2)return 0;
+  var minIni=(+hi[0])*60+(+hi[1]);
+  var minFim=(+hf[0])*60+(+hf[1]);
+  var dur=minFim-minIni;
+  if(dur<0)dur+=24*60; // passou da meia-noite
+  // Desconta o tempo das pausas (⏸️ Pausar/Retomar) — só conta tempo de trabalho real
+  if(p.pausas&&p.pausas.length){
+    p.pausas.forEach(function(pa){
+      if(!pa.inicio||!pa.fim)return;
+      var pi=pa.inicio.split(':');var pf=pa.fim.split(':');
+      if(pi.length<2||pf.length<2)return;
+      var pMinIni=(+pi[0])*60+(+pi[1]);
+      var pMinFim=(+pf[0])*60+(+pf[1]);
+      var pDur=pMinFim-pMinIni;
+      if(pDur<0)pDur+=24*60;
+      dur-=pDur;
+    });
+  }
+  return Math.max(0,dur);
+}
+// Duração é "suspeita" quando passa de 6h numa produção só — provavelmente
+// esqueceram de fechar/pausar na hora certa. Usado só pra marcar visualmente,
+// nunca bloqueia nada.
+function _prodDuracaoSuspeita(p){
+  return _prodDuracaoMin(p)>360;
+}
+function _fmtDuracao(min){
+  if(!min)return '0min';
+  var h=Math.floor(min/60);var m=Math.round(min%60);
+  return (h>0?h+'h':'')+(h>0&&m>0?' ':'')+(m>0||h===0?m+'min':'');
+}
 function _prodCustoEntradaP(p){
   if(p.custoEntradaLote>0)return p.custoEntradaLote;
   if(p.matEntradaId){
@@ -14308,14 +14378,16 @@ function pgProducao(){
     +'<button onclick="prodVw=\'registro\';go(\'producao\')" style="background:none;border:none;border-bottom:2px solid '+(prodVw==='registro'?'var(--gr)':'transparent')+';color:'+(prodVw==='registro'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer">👷 Registro</button>';
   if(adm){
     subTabs+='<button onclick="prodVw=\'analise\';go(\'producao\')" style="background:none;border:none;border-bottom:2px solid '+(prodVw==='analise'?'var(--gr)':'transparent')+';color:'+(prodVw==='analise'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer">📊 Análise</button>'
+      +'<button onclick="prodVw=\'lotes\';go(\'producao\')" style="background:none;border:none;border-bottom:2px solid '+(prodVw==='lotes'?'var(--gr)':'transparent')+';color:'+(prodVw==='lotes'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer">📦 Lotes</button>'
       +'<button onclick="prodVw=\'config\';go(\'producao\')" style="background:none;border:none;border-bottom:2px solid '+(prodVw==='config'?'var(--gr)':'transparent')+';color:'+(prodVw==='config'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer">⚙️ Tabelas</button>';
   }
   subTabs+='</div>';
-  // Se não é admin e tenta ver análise/config, volta pra registro
+  // Se não é admin e tenta ver análise/lotes/config, volta pra registro
   if(!adm&&prodVw!=='registro')prodVw='registro';
 
   var corpo=prodVw==='registro'?_prodRegistro(abertas,hjFech)
     :prodVw==='analise'?_prodAnalise(fechadas)
+    :prodVw==='lotes'?_prodLotes(fechadas)
     :_prodConfig();
 
   return '<div class="fc"><div class="ptop">'
@@ -14349,7 +14421,7 @@ function _prodRegistro(abertas,hjFech){
       html+='<div class="card" style="cursor:pointer" onclick="mVerProdBV('+p.id+')">'
         +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
         +'<div><div style="font-size:14px;font-weight:700">👷 '+p.func+'</div>'
-        +'<div style="font-size:11px;color:var(--mt)">'+p.matEntrada+' · '+fKg(p.pesoEntrada)+'kg → '+fKg(ts)+'kg · '+p.hora+'</div></div>'
+        +'<div style="font-size:11px;color:var(--mt)">'+p.matEntrada+' · '+fKg(p.pesoEntrada)+'kg → '+fKg(ts)+'kg · '+(p.hora&&p.horaFim?p.hora+' &rarr; '+p.horaFim+' ('+_fmtDuracao(_prodDuracaoMin(p))+')'+(_prodDuracaoSuspeita(p)?' <span style="color:var(--or)">&#9888;</span>':''):p.hora)+'</div></div>'
         +'<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:var(--grb);color:var(--gr)">Fechada</span>'
         +'</div></div>';
     });
@@ -14448,7 +14520,7 @@ function _selecionarProdPicker(prefix,id){
   _toggleProdPicker(prefix); // fecha o painel
   if(prefix==='np-mat')_autoFillCustoProdById(id);
 }
-function salvarNovaProdBV(){
+function salvarNovaProdBV(forcar){
   var selVal=document.getElementById('np-func').value;
   var func=selVal==='__outro__'?document.getElementById('np-func-outro').value.trim():selVal;
   var matIdEl=document.getElementById('np-mat-id');
@@ -14462,13 +14534,38 @@ function salvarNovaProdBV(){
   if(!func){toast('Selecione ou digite quem está fazendo!','var(--rd)');return;}
   if(!prodEnt){toast('Selecione o material de entrada!','var(--rd)');return;}
   if(peso<=0){toast('Informe o peso!','var(--rd)');return;}
+  // Avisa (não bloqueia) se essa pessoa já tem outra produção aberta — isso faz o
+  // tempo trabalhado contar errado se as duas ficarem rodando "ao mesmo tempo".
+  if(!forcar){
+    var jaTemAberta=DB.producoes.some(function(p){return p.status==='aberta'&&(p.func||'').trim().toLowerCase()===func.trim().toLowerCase();});
+    if(jaTemAberta){
+      _prodAvisoInline('&#9888; <b>'+func+'</b> já tem uma produção em aberto. Se abrir outra, o tempo trabalhado de uma pode contar junto com o da outra sem querer.','salvarNovaProdBV',[],'Abrir mesmo assim');
+      return;
+    }
+  }
   var pesoEntrada=+(peso-tara).toFixed(3);
   // Desconta do estoque na abertura — o material sai da pilha bruta assim que é
   // separado pra desmontar, mesmo antes de terminar o processo.
   prodEnt.est=+((prodEnt.est||0)-pesoEntrada).toFixed(3);
   var h=new Date();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
-  DB.producoes.push({id:nid(),func:func,matEntradaId:prodEnt.id,matEntrada:prodEnt.nome,custoEntradaLote:custoLote,lote:lote,pesoEntrada:pesoEntrada,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,saidas:[],status:'aberta'});
+  DB.producoes.push({id:nid(),func:func,matEntradaId:prodEnt.id,matEntrada:prodEnt.nome,custoEntradaLote:custoLote,lote:lote,pesoEntrada:pesoEntrada,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,pausas:[],saidas:[],status:'aberta'});
   saveDB();closeM();go('producao');toast('Produção iniciada!','var(--gr)');
+}
+// Mostra um aviso DENTRO do formulário que já está aberto (não troca de modal —
+// trocar apagaria os campos já preenchidos). Reaproveitável por qualquer tela de
+// Produção que precise confirmar algo antes de seguir.
+function _prodAvisoInline(msgHtml,fnNome,args,labelContinuar){
+  var argsStr=args.map(function(a){return typeof a==='string'?"'"+a+"'":a;}).join(',');
+  var argsComVirgula=argsStr?argsStr+',':'';
+  var formEl=document.querySelector('.mbx .mf');
+  if(!formEl){window[fnNome].apply(null,args.concat([true]));return;}
+  var aviso=document.getElementById('prod-aviso-inline');
+  if(!aviso){aviso=document.createElement('div');aviso.id='prod-aviso-inline';formEl.insertBefore(aviso,formEl.firstChild);}
+  aviso.innerHTML='<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r);padding:10px 12px;margin-bottom:12px">'
+    +'<div style="font-size:12px;color:var(--or);margin-bottom:8px">'+msgHtml+'</div>'
+    +'<div style="display:flex;gap:8px"><button type="button" class="btnO bOgr" style="flex:1;font-size:11px;padding:6px" onclick="document.getElementById(\'prod-aviso-inline\').remove()">Cancelar</button>'
+    +'<button type="button" class="btn" style="flex:1;font-size:11px;padding:6px;background:var(--or)" onclick="'+fnNome+'('+argsComVirgula+'true)">'+(labelContinuar||'Continuar mesmo assim')+'</button></div></div>';
+  aviso.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 // ── DETALHE DA PRODUÇÃO ──────────────────────────────
@@ -14489,8 +14586,9 @@ function mVerProdBV(id){
   });
   if(!saidasHTML)saidasHTML='<div style="text-align:center;padding:16px;color:var(--mt);font-size:12px">Nenhum material registrado ainda</div>';
 
+  var pausaAtiva=p.pausas&&p.pausas.length&&!p.pausas[p.pausas.length-1].fim;
   var html='<div class="mf">'
-    +'<div style="font-size:12px;color:var(--mt)">👷 '+p.func+' · '+p.data+' '+p.hora+'</div>'
+    +'<div style="font-size:12px;color:var(--mt)">👷 '+p.func+' · '+p.data+' '+p.hora+(p.horaFim?' &rarr; '+p.horaFim:'')+(_isAdm()?' <a href="#" onclick="event.preventDefault();mEditarHoraProd('+p.id+')" style="color:var(--bl)">&#9998;</a>':'')+(pausaAtiva?' · <span style="color:var(--or);font-weight:700">&#9208; PAUSADA</span>':'')+'</div>'
     +'<div style="font-size:16px;font-weight:800;margin:4px 0 2px">'+p.matEntrada+'</div>'
     +(p.lote?'<div style="font-size:12px;color:var(--pu);margin-bottom:4px">📦 '+p.lote+'</div>':'')
     +(_isAdm()&&p.custoEntradaLote>0?'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">💰 Custo considerado: '+fR(p.custoEntradaLote)+'/kg</div>':'<div style="margin-bottom:10px"></div>')
@@ -14503,7 +14601,11 @@ function mVerProdBV(id){
     +'<div style="border-top:1px solid var(--bd);margin:12px 0;padding-top:10px"><div style="font-size:11px;font-weight:700;color:var(--mt);text-transform:uppercase;margin-bottom:8px">Materiais gerados</div>'+saidasHTML+'</div>';
 
   if(p.status==='aberta'){
-    html+='<div style="border-top:1px solid var(--bd);padding-top:10px"><div style="font-size:11px;font-weight:700;color:var(--gr);text-transform:uppercase;margin-bottom:8px">+ Registrar material</div>'
+    html+='<div style="border-top:1px solid var(--bd);padding-top:10px"><div style="font-size:11px;font-weight:700;color:var(--bl);text-transform:uppercase;margin-bottom:8px">+ Adicionar mais material (mesmo lote)</div>'
+      +'<div style="font-size:10px;color:var(--mt);margin-bottom:8px">Pra quando sobrou material da mesma leva pra pesar — soma aqui em vez de abrir produção nova. Se for de outra compra/origem, feche essa e abra uma nova.</div>'
+      +'<div style="display:flex;gap:7px"><input class="inp" type="number" inputmode="decimal" step="0.001" id="ae-peso" placeholder="Peso bruto (kg)" style="flex:1">'
+      +'<button class="btnO bOb" onclick="addEntradaProdBV('+p.id+')" style="white-space:nowrap">+ Somar</button></div></div>'
+      +'<div style="border-top:1px solid var(--bd);margin-top:14px;padding-top:10px"><div style="font-size:11px;font-weight:700;color:var(--gr);text-transform:uppercase;margin-bottom:8px">+ Registrar material</div>'
       +'<div class="fld"><label>Material</label>'
       +'<div class="pdd" id="pdd-rs-mat">'
       +'<button class="pdd-trigger" onclick="_toggleProdPicker(\'rs-mat\')" type="button">'
@@ -14516,11 +14618,67 @@ function mVerProdBV(id){
       +'<input type="hidden" id="rs-mat-id"></div>'
       +'<div class="fld"><label>Peso (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="rs-peso"></div>'
       +'<button class="btn" onclick="addSaidaProdBV('+p.id+')" style="margin-bottom:10px">+ Adicionar</button>'
-      +'<div style="border-top:1px solid var(--bd);padding-top:10px">'
-      +'<button class="btn" style="background:var(--bl);color:#fff;margin-bottom:8px" onclick="fecharProdBV('+p.id+')">🏁 Fechar Produção</button></div></div>';
+      +'<div style="border-top:1px solid var(--bd);padding-top:10px;display:flex;gap:8px">'
+      +(pausaAtiva
+        ?'<button class="btnO" style="flex:1;border-color:var(--gr);color:var(--gr)" onclick="retomarProdBV('+p.id+')">&#9654; Retomar</button>'
+        :'<button class="btnO" style="flex:1;border-color:var(--or);color:var(--or)" onclick="pausarProdBV('+p.id+')">&#9208; Pausar</button>')
+      +'<button class="btn" style="flex:2;background:var(--bl);color:#fff" onclick="fecharProdBV('+p.id+')">🏁 Fechar Produção</button></div></div>';
   }
   html+='<div class="brow"><button class="btnO bOgr" onclick="closeM();go(\'producao\')">Fechar</button></div></div>';
   openM((p.status==='aberta'?'⏳':'✅')+' Produção',html,560);
+}
+// Soma mais peso de entrada na MESMA produção aberta (mesma leva/lote) — desconta
+// do estoque do mesmo material, sem mexer no horário de início nem criar outra
+// produção. Pra material de origem diferente, a pessoa deve fechar e abrir nova.
+function addEntradaProdBV(prodId){
+  var pesoNovo=parseFloat(document.getElementById('ae-peso').value)||0;
+  if(pesoNovo<=0){toast('Informe o peso!','var(--rd)');return;}
+  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
+  if(!p)return;
+  var matProd=gP(p.matEntradaId);
+  if(matProd)matProd.est=+((matProd.est||0)-pesoNovo).toFixed(3);
+  p.pesoEntrada=+(p.pesoEntrada+pesoNovo).toFixed(3);
+  p.pesoBruto=+((p.pesoBruto||0)+pesoNovo).toFixed(3);
+  saveDB();closeM();mVerProdBV(prodId);toast(fKg(pesoNovo)+'kg somado ao lote!','var(--bl)');
+}
+// Pausa/retoma o cronômetro de uma produção aberta — o tempo pausado é descontado
+// na hora de calcular quanto tempo foi realmente trabalhado (ver _prodDuracaoMin).
+function pausarProdBV(prodId){
+  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
+  if(!p)return;
+  if(!p.pausas)p.pausas=[];
+  var h=new Date();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
+  p.pausas.push({inicio:hora,fim:null});
+  saveDB();closeM();mVerProdBV(prodId);toast('Produção pausada','var(--or)');
+}
+function retomarProdBV(prodId){
+  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
+  if(!p||!p.pausas||!p.pausas.length)return;
+  var h=new Date();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
+  p.pausas[p.pausas.length-1].fim=hora;
+  saveDB();closeM();mVerProdBV(prodId);toast('Produção retomada','var(--gr)');
+}
+// Corrige manualmente o horário de início/fim — pra quando alguém esqueceu de
+// fechar na hora certa e a duração calculada ficou errada. Só Admin vê o link.
+function mEditarHoraProd(id){
+  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===id){p=DB.producoes[i];break;}
+  if(!p)return;
+  openM('&#9998; Corrigir Horário',
+    '<div class="mf">'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:12px">Use só pra corrigir um esquecimento (ex: fechou tarde e o horário registrado não reflete o tempo real trabalhado).</div>'
+    +'<div class="fld"><label>Horário de início</label><input class="inp" type="time" id="eh-ini" value="'+(p.hora||'')+'"></div>'
+    +(p.status==='fechada'?'<div class="fld"><label>Horário de fim</label><input class="inp" type="time" id="eh-fim" value="'+(p.horaFim||'')+'"></div>':'')
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM();mVerProdBV('+id+')">Cancelar</button><button class="btn" onclick="confirmarEditarHoraProd('+id+')">Salvar</button></div>'
+    +'</div>',420);
+}
+function confirmarEditarHoraProd(id){
+  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===id){p=DB.producoes[i];break;}
+  if(!p)return;
+  var ini=document.getElementById('eh-ini').value;
+  if(ini)p.hora=ini;
+  var fimEl=document.getElementById('eh-fim');
+  if(fimEl&&fimEl.value)p.horaFim=fimEl.value;
+  saveDB();closeM();mVerProdBV(id);toast('Horário corrigido!','var(--bl)');
 }
 function addSaidaProdBV(prodId){
   var matIdEl=document.getElementById('rs-mat-id');
@@ -14600,8 +14758,9 @@ function exportarRelatorioProducao(){
     var ce=_prodCustoEntradaP(p)*p.pesoEntrada;
     totalCustoEntrada+=ce;
     var chave=_chaveFunc(p.func);
-    if(!porFunc[chave])porFunc[chave]={nome:p.func.trim(),entrada:0,saida:0,valorSaida:0,custoEntrada:0,prods:0};
+    if(!porFunc[chave])porFunc[chave]={nome:p.func.trim(),entrada:0,saida:0,valorSaida:0,custoEntrada:0,prods:0,tempoMin:0};
     porFunc[chave].entrada+=p.pesoEntrada;porFunc[chave].custoEntrada+=ce;porFunc[chave].prods++;
+    porFunc[chave].tempoMin+=_prodDuracaoMin(p);
     p.saidas.forEach(function(s){
       totalSaida+=s.peso;
       var val=_prodPrecoVenda(s.prodId)*s.peso;
@@ -14625,10 +14784,11 @@ function exportarRelatorioProducao(){
   // Por funcionário
   html+='<h3 style="font-size:13px;margin:14px 0 6px">Produtividade por Funcionário</h3>';
   var funcs=Object.keys(porFunc).sort(function(a,b){return porFunc[b].valorSaida-porFunc[a].valorSaida;});
-  html+='<table><thead><tr><th>Funcionário</th><th>Produções</th><th>Kg Entrada</th><th>Kg Saída</th><th>Aproveitamento</th><th>Lucro Est.</th></tr></thead><tbody>';
+  html+='<table><thead><tr><th>Funcionário</th><th>Produções</th><th>Kg Entrada</th><th>Kg Saída</th><th>Aproveitamento</th><th>Tempo</th><th>R$/hora</th><th>Lucro Est.</th></tr></thead><tbody>';
   funcs.forEach(function(k){
     var d=porFunc[k];var ap=d.entrada>0?(d.saida/d.entrada*100):0;var luc=d.valorSaida-d.custoEntrada;
-    html+='<tr><td>'+d.nome+'</td><td>'+d.prods+'</td><td>'+fKg(d.entrada)+'kg</td><td>'+fKg(d.saida)+'kg</td><td>'+ap.toFixed(1)+'%</td><td>'+fR(luc)+'</td></tr>';
+    var horasD=(d.tempoMin||0)/60;
+    html+='<tr><td>'+d.nome+'</td><td>'+d.prods+'</td><td>'+fKg(d.entrada)+'kg</td><td>'+fKg(d.saida)+'kg</td><td>'+ap.toFixed(1)+'%</td><td>'+_fmtDuracao(d.tempoMin||0)+'</td><td>'+(horasD>0?fR(luc/horasD):'&mdash;')+'</td><td>'+fR(luc)+'</td></tr>';
   });
   html+='</tbody></table>';
 
@@ -14656,6 +14816,63 @@ function exportarRelatorioProducao(){
 }
 
 // ── ANÁLISE (só Admin) ───────────────────────────────
+// ── Lotes: custo, receita e lucro de cada lote (pra decidir quanto vale a pena
+// pagar num leilão parecido) — mesma base do "Rendimento Médio" da Análise, só
+// que com os valores em R$ também, não só composição em %.
+function _prodLotes(todasFechadas){
+  var periodos=[{k:'hoje',l:'Hoje'},{k:'semana',l:'Semana'},{k:'mes',l:'Mês'},{k:'trim',l:'Trimestre'},{k:'ano',l:'Ano'},{k:'tudo',l:'Todo Período'}];
+  var perBar='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px">';
+  periodos.forEach(function(pp){
+    perBar+='<button onclick="prodPeriodo=\''+pp.k+'\';go(\'producao\')" class="tabbtn'+(prodPeriodo===pp.k?' on':'')+'">'+pp.l+'</button>';
+  });
+  perBar+='</div>';
+
+  var fechadas=_prodFiltrar(todasFechadas);
+  var comLote=fechadas.filter(function(p){return p.lote&&p.lote.trim();});
+  if(!comLote.length)return perBar+'<div class="card" style="text-align:center;padding:40px;color:var(--mt)"><div style="font-size:32px;margin-bottom:10px">📦</div><div style="font-weight:700">Nenhum lote com apelido neste período</div><div style="font-size:12px;margin-top:4px">Dê um apelido ao abrir a produção (campo opcional) pra ela aparecer aqui</div></div>';
+
+  var porLote={};
+  comLote.forEach(function(p){
+    var chave=p.lote.trim().replace(/\s+/g,' ').toLowerCase();
+    if(!porLote[chave])porLote[chave]={nome:p.lote.trim(),entrada:0,ocorrencias:0,materiais:{},custo:0,receita:0};
+    var ce=_prodCustoEntradaP(p)*p.pesoEntrada;
+    porLote[chave].entrada+=p.pesoEntrada;
+    porLote[chave].ocorrencias++;
+    porLote[chave].custo+=ce;
+    p.saidas.forEach(function(s){
+      if(!porLote[chave].materiais[s.prodId])porLote[chave].materiais[s.prodId]=0;
+      porLote[chave].materiais[s.prodId]+=s.peso;
+      porLote[chave].receita+=_prodPrecoVenda(s.prodId)*s.peso;
+    });
+  });
+
+  var lotesKeys=Object.keys(porLote).sort(function(a,b){return (porLote[b].receita-porLote[b].custo)-(porLote[a].receita-porLote[a].custo);});
+  var html=perBar;
+  lotesKeys.forEach(function(k){
+    var d=porLote[k];
+    var lucro=d.receita-d.custo;
+    var custoKg=d.entrada>0?d.custo/d.entrada:0;
+    var receitaKg=d.entrada>0?d.receita/d.entrada:0;
+    var lucroKg=d.entrada>0?lucro/d.entrada:0;
+    html+='<div class="card" style="margin-bottom:10px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:14px;font-weight:800">'+d.nome+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+d.ocorrencias+' vez(es) · '+fKg(d.entrada)+'kg no total</div></div>'
+      +'<div style="text-align:right"><div style="font-size:16px;font-weight:800;color:'+(lucro>=0?'var(--gr)':'var(--rd)')+'">'+fR(lucro)+'</div><div style="font-size:10px;color:var(--mt)">lucro total</div></div></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px">'
+      +'<div style="background:var(--s2);border-radius:6px;padding:7px;text-align:center"><div style="font-size:13px;font-weight:700">'+fR(custoKg)+'</div><div style="font-size:9px;color:var(--mt)">custo/kg</div></div>'
+      +'<div style="background:var(--s2);border-radius:6px;padding:7px;text-align:center"><div style="font-size:13px;font-weight:700;color:var(--bl)">'+fR(receitaKg)+'</div><div style="font-size:9px;color:var(--mt)">receita/kg</div></div>'
+      +'<div style="background:var(--s2);border-radius:6px;padding:7px;text-align:center"><div style="font-size:13px;font-weight:700;color:'+(lucroKg>=0?'var(--gr)':'var(--rd)')+'">'+fR(lucroKg)+'</div><div style="font-size:9px;color:var(--mt)">lucro/kg</div></div>'
+      +'</div>'
+      +'<div style="margin-top:10px;border-top:1px solid var(--bd);padding-top:8px">';
+    Object.keys(d.materiais).sort(function(a,b){return d.materiais[b]-d.materiais[a];}).forEach(function(pid){
+      var prod=gP(parseFloat(pid));var nome=prod?prod.ic+' '+prod.nome:'?';
+      var pct=d.entrada>0?(d.materiais[pid]/d.entrada*100):0;
+      html+='<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0"><span>'+nome+'</span><span style="color:var(--mt)">'+pct.toFixed(1)+'% · ~'+fKg(d.materiais[pid]/d.ocorrencias)+'kg/vez</span></div>';
+    });
+    html+='</div></div>';
+  });
+  return html;
+}
 function _prodAnalise(todasFechadas){
   // Seletor de período
   var periodos=[{k:'hoje',l:'Hoje'},{k:'semana',l:'Semana'},{k:'mes',l:'Mês'},{k:'trim',l:'Trimestre'},{k:'ano',l:'Ano'},{k:'tudo',l:'Todo Período'}];
@@ -14682,8 +14899,9 @@ function _prodAnalise(todasFechadas){
     var ce=_prodCustoEntradaP(p)*p.pesoEntrada;
     totalCustoEntrada+=ce;
     var chave=_chaveFunc(p.func);
-    if(!porFunc[chave])porFunc[chave]={nome:p.func.trim(),entrada:0,saida:0,valorSaida:0,custoEntrada:0,prods:0};
+    if(!porFunc[chave])porFunc[chave]={nome:p.func.trim(),entrada:0,saida:0,valorSaida:0,custoEntrada:0,prods:0,tempoMin:0};
     porFunc[chave].entrada+=p.pesoEntrada;porFunc[chave].custoEntrada+=ce;porFunc[chave].prods++;
+    porFunc[chave].tempoMin+=_prodDuracaoMin(p);
     p.saidas.forEach(function(s){
       totalSaida+=s.peso;
       var pv=_prodPrecoVenda(s.prodId);var val=pv*s.peso;
@@ -14721,19 +14939,33 @@ function _prodAnalise(todasFechadas){
     html+='</div>';
   }
 
+  // Lucro por hora — geral (soma de todos) + dentro de cada funcionário. Só fica
+  // confiável se o horário de cada produção estiver certo — por isso a Pausa e a
+  // correção manual de horário existem (ver ✏️ no detalhe de cada produção).
+  var funcs=Object.keys(porFunc).sort(function(a,b){return porFunc[b].valorSaida-porFunc[a].valorSaida;});
+  var tempoTotalGeral=0,lucroTotalGeral=0;
+  funcs.forEach(function(f){var d=porFunc[f];tempoTotalGeral+=d.tempoMin||0;lucroTotalGeral+=(d.valorSaida-d.custoEntrada);});
+  var horasTotalGeral=tempoTotalGeral/60;
+  if(tempoTotalGeral>0){
+    html+='<div class="card" style="background:linear-gradient(135deg,var(--s1),rgba(168,85,247,.08));border-color:rgba(168,85,247,.2);margin-bottom:14px;text-align:center">'
+      +'<div style="font-size:11px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">&#9201; Lucro por Hora Trabalhada (geral)</div>'
+      +'<div style="font-size:26px;font-weight:800;color:var(--pu)">'+fR(lucroTotalGeral/horasTotalGeral)+'/h</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+_fmtDuracao(tempoTotalGeral)+' trabalhadas no período · '+fR(lucroTotalGeral)+' de lucro</div>'
+      +'</div>';
+  }
   // Por funcionário
   html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:10px">👷 Produtividade por Funcionário</div>';
-  var funcs=Object.keys(porFunc).sort(function(a,b){return porFunc[b].valorSaida-porFunc[a].valorSaida;});
   funcs.forEach(function(f){
     var d=porFunc[f];var ap=d.entrada>0?(d.saida/d.entrada*100):0;var luc=d.valorSaida-d.custoEntrada;
-    html+='<div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px">'
+    var horasF=(d.tempoMin||0)/60;var rhora=horasF>0?luc/horasF:null;
+    html+='<div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" onclick="mVerFuncionarioProducao(\''+f.replace(/'/g,"\\'")+'\')">'
       +'<div style="display:flex;justify-content:space-between;align-items:center">'
       +'<div><div style="font-size:14px;font-weight:700">'+d.nome+'</div>'
-      +'<div style="font-size:11px;color:var(--mt)">'+d.prods+' prod · '+fKg(d.entrada)+'kg</div></div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+d.prods+' prod · '+fKg(d.entrada)+'kg'+(d.tempoMin?' · &#9200; '+_fmtDuracao(d.tempoMin):'')+'</div></div>'
       +'<div style="text-align:right"><div style="font-size:14px;font-weight:800;color:'+(luc>=0?'var(--gr)':'var(--rd)')+'">'+fR(luc)+'</div>'
       +'<div style="font-size:10px;color:var(--mt)">lucro est.</div></div></div>'
       +'<div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden;margin-top:8px"><div style="height:100%;border-radius:3px;width:'+ap+'%;background:'+(ap>70?'var(--gr)':ap>40?'var(--or)':'var(--rd)')+'"></div></div>'
-      +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Aprov: '+ap.toFixed(1)+'% · '+fKg(d.saida)+'kg · '+fR(d.valorSaida)+'</div></div>';
+      +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Aprov: '+ap.toFixed(1)+'% · '+fKg(d.saida)+'kg · '+fR(d.valorSaida)+(rhora!==null?' · <span style="color:var(--pu);font-weight:700">'+fR(rhora)+'/h</span>':'')+' · <span style="color:var(--bl)">ver histórico &#8250;</span></div></div>';
   });
   html+='</div>';
 
@@ -14802,22 +15034,31 @@ function _prodAnalise(todasFechadas){
 }
 
 // ── CONFIGURAÇÃO: tabelas + materiais de entrada ─────
-function _prodConfig(){
-  var tabVenda=DB.tabelas.filter(function(t){return t.tipo==='venda';});
-
-  // Materiais em destaque — os mais usados, pra não ficar rolando a lista toda vez
-  var html='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:6px">⭐ Materiais em Destaque</div>'
-    +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Marque os materiais que você desmonta com mais frequência — eles aparecem primeiro nas listas de entrada e saída da Produção, sem precisar rolar até achar.</div>';
+// Materiais em destaque — os mais usados, pra não ficar rolando a lista toda vez.
+// Virou modal separado (era estranho ficar misturado com Vincular Tabela de Venda).
+function mMateriaisDestaque(){
+  var html='<div class="mf">'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:14px">Marque os materiais que você desmonta com mais frequência — eles aparecem primeiro nas listas de entrada e saída da Produção, sem precisar rolar até achar.</div>';
   if(!DB.produtos.length){
     html+='<div style="text-align:center;padding:14px;color:var(--mt);font-size:12px">Nenhum produto cadastrado ainda.</div>';
   } else {
+    html+='<div style="max-height:420px;overflow-y:auto">';
     DB.produtos.forEach(function(p){
-      html+='<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer">'
+      html+='<label style="display:flex;align-items:center;gap:8px;padding:7px 0;cursor:pointer;border-bottom:1px solid var(--bd)">'
         +'<input type="checkbox" '+(p.prodDestaque?'checked':'')+' onchange="_toggleProdDestaque('+p.id+',this.checked)" style="width:16px;height:16px">'
         +'<span style="font-size:13px">'+p.ic+' '+p.nome+'</span></label>';
     });
+    html+='</div>';
   }
   html+='</div>';
+  openM('&#11088; Materiais em Destaque',html,480);
+}
+function _prodConfig(){
+  var tabVenda=DB.tabelas.filter(function(t){return t.tipo==='venda';});
+
+  var html='<div style="display:flex;justify-content:flex-end;margin-bottom:10px">'
+    +'<button class="btnO bOgr" onclick="mMateriaisDestaque()" style="font-size:12px;padding:6px 12px">&#11088; Materiais em Destaque</button>'
+    +'</div>';
 
   // Vínculos material de saída → tabela de venda
   html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:6px">📋 Vincular Material → Tabela de Venda</div>'
@@ -16232,7 +16473,10 @@ function mRelCli(idx){
   var c=DB.clientes[idx];if(!c)return;
   var tipo=c.tipo;
   var per=window._relCliPer||'tudo';
-  var rows=[];var total=0;var pesoTotal=0;
+  // Agrupa por PEDIDO (não por material) — um pedido pode ter várias linhas de
+  // material, e antes cada linha virava uma "transação" separada, inflando a
+  // contagem e distorcendo o ticket médio.
+  var pedidos={};var ordemPedidos=[];
 
   function _proc(ah,data){
     if(tipo==='fornecedor'&&ah.tipo!=='Compra')return;
@@ -16240,17 +16484,19 @@ function mRelCli(idx){
     if(!_perFiltro(data,per,'',''))return;
     var match=String(ah.cliId)===String(c.id)||(ah.label&&ah.label===c.nome);
     if(!match)return;
+    var chave=(data||ah.hora||'—')+'|'+(ah.num||('x'+ordemPedidos.length));
+    if(!pedidos[chave]){pedidos[chave]={data:data||ah.hora||'—',num:'#'+(ah.num||''),tipo:ah.tipo,total:0,peso:0,itens:[]};ordemPedidos.push(chave);}
     var itens=ah.itens||ah.itensList||[];
     if(itens.length){
       for(var j=0;j<itens.length;j++){
         var it=itens[j];var p=gP(it.pId||it.prodId);
         var val=_itVal(it);var kg=it.peso||0;
-        total+=val;pesoTotal+=kg;
-        rows.push({data:data||ah.hora||'—',num:'#'+(ah.num||''),prod:p?p.nome:it.nome||'—',kg:kg,preco:it.preco||0,val:val,tipo:ah.tipo});
+        pedidos[chave].total+=val;pedidos[chave].peso+=kg;
+        pedidos[chave].itens.push({prod:p?p.nome:it.nome||'—',kg:kg,val:val});
       }
     } else {
-      total+=ah.total||0;
-      rows.push({data:data||ah.hora||'—',num:'#'+(ah.num||''),prod:'Pedido #'+(ah.num||''),kg:0,preco:0,val:ah.total||0,tipo:ah.tipo});
+      pedidos[chave].total+=ah.total||0;
+      pedidos[chave].itens.push({prod:'Pedido '+(ah.num||''),kg:0,val:ah.total||0});
     }
   }
 
@@ -16262,41 +16508,68 @@ function mRelCli(idx){
     }
   }
 
+  var total=0,pesoTotal=0;
+  ordemPedidos.forEach(function(k){total+=pedidos[k].total;pesoTotal+=pedidos[k].peso;});
+  var numPedidos=ordemPedidos.length;
+
   var cor=tipo==='fornecedor'?'var(--rd)':'var(--gr)';
   var perOps=['tudo','mes','mespass','30dias','ano'].map(function(p2){
     var ls={tudo:'Todos',mes:'Este mês',mespass:'Mês passado',30:'30 dias',ano:'Este ano'};
     return '<button onclick="window._relCliPer=\''+p2+'\';mRelCli('+idx+')" style="border:1px solid '+(per===p2?'var(--gr)':'var(--bd)')+';background:'+(per===p2?'var(--grb)':'transparent')+';color:'+(per===p2?'var(--gr)':'var(--mt)')+';border-radius:20px;padding:3px 10px;font-size:11px;cursor:pointer">'+(ls[p2]||p2)+'</button>';
   }).join('');
 
-  // Resumo
-  var avgTicket=rows.length>0?total/rows.length:0;
+  // Resumo — agora "Transações" e "Ticket Médio" contam PEDIDOS de verdade
+  var avgTicket=numPedidos>0?total/numPedidos:0;
   var resumo='<div class="g3" style="margin-bottom:12px">'
     +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Total</div><div style="font-size:18px;font-weight:800;color:'+cor+';font-family:monospace">'+fR(total)+'</div></div>'
-    +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Transações</div><div style="font-size:18px;font-weight:800;color:var(--bl);font-family:monospace">'+rows.length+'</div></div>'
+    +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Pedidos</div><div style="font-size:18px;font-weight:800;color:var(--bl);font-family:monospace">'+numPedidos+'</div></div>'
     +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Ticket Médio</div><div style="font-size:18px;font-weight:800;color:var(--or);font-family:monospace">'+fR(avgTicket)+'</div></div>'
     +'</div>';
 
-  // Tabela
-  var tblRows='';
-  for(var i=0;i<rows.length;i++){
-    var r=rows[i];
-    tblRows+='<tr><td style="padding:6px 8px;font-size:11px;color:var(--mt)">'+r.data+'</td>'
-      +'<td style="padding:6px 8px;font-size:11px">'+r.num+'</td>'
-      +'<td style="padding:6px 8px;font-size:12px;font-weight:600">'+r.prod+'</td>'
-      +(r.kg>0?'<td style="padding:6px 8px;text-align:right;font-family:monospace;font-size:11px">'+fKg(r.kg)+' kg</td>':'<td style="padding:6px 8px;text-align:center;color:var(--mt)">—</td>')
-      +'<td style="padding:6px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:'+cor+'">'+fR(r.val)+'</td>'
-      +'</tr>';
+  // Recorrência — responde "é fidelizado/recorrente ou só apareceu uma vez?"
+  var datasOrdenadas=ordemPedidos.map(function(k){return pedidos[k].data;}).filter(function(d){return d&&d!=='—';})
+    .map(_parseDataBR).sort(function(a,b){return a-b;});
+  var recorrenciaHtml='';
+  if(datasOrdenadas.length>=2){
+    var intervalos=[];
+    for(var i=1;i<datasOrdenadas.length;i++)intervalos.push((datasOrdenadas[i]-datasOrdenadas[i-1])/86400000);
+    var mediaIntervalo=intervalos.reduce(function(a,b){return a+b;},0)/intervalos.length;
+    var diasDesdeUltima=Math.floor((new Date()-datasOrdenadas[datasOrdenadas.length-1])/86400000);
+    var sumiu=diasDesdeUltima>mediaIntervalo*2.5;
+    recorrenciaHtml='<div class="g2" style="margin-bottom:12px">'
+      +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Intervalo Médio</div><div style="font-size:16px;font-weight:800;color:var(--pu)">'+mediaIntervalo.toFixed(0)+' dias</div><div style="font-size:9px;color:var(--mt)">entre '+(tipo==='fornecedor'?'compras':'vendas')+'</div></div>'
+      +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Última Vez</div><div style="font-size:16px;font-weight:800;color:'+(sumiu?'var(--rd)':'var(--tx)')+'">'+(diasDesdeUltima===0?'Hoje':diasDesdeUltima+' dias atrás')+'</div>'+(sumiu?'<div style="font-size:9px;color:var(--rd)">&#9888; acima do normal</div>':'')+'</div>'
+      +'</div>';
   }
+
+  // Tabela agrupada por pedido — clica pra expandir e ver os materiais daquele pedido
+  var tblRows='';
+  ordemPedidos.forEach(function(k,idx2){
+    var pd=pedidos[k];
+    var rowId='relcli-'+idx+'-'+idx2;
+    var itensHtml=pd.itens.map(function(it){
+      return '<div style="display:flex;justify-content:space-between;padding:4px 10px;font-size:11px;border-top:1px solid var(--bd)"><span>'+it.prod+(it.kg>0?' · '+fKg(it.kg)+'kg':'')+'</span><span style="font-weight:600">'+fR(it.val)+'</span></div>';
+    }).join('');
+    tblRows+='<tr style="cursor:pointer" onclick="_toggleRelCliPedido(\''+rowId+'\')">'
+      +'<td style="padding:7px 8px;font-size:11px;color:var(--mt)">'+pd.data+'</td>'
+      +'<td style="padding:7px 8px;font-size:11px">'+pd.num+' <span style="color:var(--mt)">('+pd.itens.length+' item'+(pd.itens.length===1?'':'s')+')</span></td>'
+      +'<td style="padding:7px 8px;text-align:right;font-family:monospace;font-size:11px">'+(pd.peso>0?fKg(pd.peso)+' kg':'—')+'</td>'
+      +'<td style="padding:7px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:'+cor+'">'+fR(pd.total)+'</td>'
+      +'<td style="padding:7px 4px;text-align:center;color:var(--mt);font-size:10px" id="'+rowId+'-seta">&#9660;</td>'
+      +'</tr>'
+      +'<tr id="'+rowId+'" style="display:none"><td colspan="5" style="padding:0">'+itensHtml+'</td></tr>';
+  });
 
   var html='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">'+perOps+'</div>'
     +resumo
-    +(rows.length?'<div class="card" style="padding:0;overflow:hidden">'
+    +recorrenciaHtml
+    +(numPedidos?'<div class="card" style="padding:0;overflow:hidden">'
     +'<table style="width:100%;border-collapse:collapse"><thead><tr>'
     +'<th style="padding:7px 8px;font-size:9px;text-align:left;background:var(--s2);color:var(--mt)">Data</th>'
     +'<th style="padding:7px 8px;font-size:9px;text-align:left;background:var(--s2);color:var(--mt)">Pedido</th>'
-    +'<th style="padding:7px 8px;font-size:9px;text-align:left;background:var(--s2);color:var(--mt)">Material</th>'
     +'<th style="padding:7px 8px;font-size:9px;text-align:right;background:var(--s2);color:var(--mt)">Peso</th>'
     +'<th style="padding:7px 8px;font-size:9px;text-align:right;background:var(--s2);color:var(--mt)">Total</th>'
+    +'<th style="background:var(--s2)"></th>'
     +'</tr></thead><tbody>'+tblRows+'</tbody></table></div>'
     :'<div style="text-align:center;padding:20px;color:var(--mt)">Nenhum registro neste período.</div>')
     +'<div style="display:flex;gap:8px;margin-top:10px">'
@@ -16305,6 +16578,14 @@ function mRelCli(idx){
     +'</div>';
 
   openM('&#128202; Relatório — '+c.nome, html, 560);
+}
+function _toggleRelCliPedido(rowId){
+  var row=document.getElementById(rowId);
+  var seta=document.getElementById(rowId+'-seta');
+  if(!row)return;
+  var abrindo=row.style.display==='none';
+  row.style.display=abrindo?'table-row':'none';
+  if(seta)seta.innerHTML=abrindo?'&#9650;':'&#9660;';
 }
 
 function _exportRelCli(idx,fmt){
