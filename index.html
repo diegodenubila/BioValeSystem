@@ -311,17 +311,6 @@ var APP_VERSION='5.6';
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[
-    // ── EXEMPLO/DEMONSTRAÇÃO — desmontagem de HD, material intermediário volta pro
-    // balaio genérico "Sucata Eletrônica" em vez de virar um produto novo pra cada peça.
-    // Remova quando não precisar mais do exemplo.
-    {id:9001,nome:'Sucata Eletrônica',ic:'💾',vC:0.60,vV:0,est:4.300,prodDestaque:true},
-    {id:9002,nome:'Alumínio Mole',ic:'🥫',vC:0,vV:8,est:0.200,prodDestaque:true},
-    {id:9003,nome:'Alumínio Duro',ic:'🔩',vC:0,vV:10,est:0.050,prodDestaque:true},
-    {id:9004,nome:'Sucata de Ferro',ic:'⚙️',vC:0,vV:1.5,est:0.180,prodDestaque:true},
-    {id:9005,nome:'Cobre Misto',ic:'🟠',vC:0,vV:42,est:0.080,prodDestaque:true},
-    {id:9006,nome:'Cobre Mel',ic:'🟤',vC:0,vV:38,est:0,prodDestaque:true},
-    {id:9007,nome:'Pós Garimpo',ic:'✨',vC:0,vV:200,est:0.010,prodDestaque:true},
-    {id:9008,nome:'Placa HD',ic:'🔌',vC:0,vV:35,est:0.030},
   ],
   transf:[],
   entradas:[],
@@ -386,38 +375,14 @@ var DB={
   preAgenda:[],
   preAgendaLimite:3,
   eventos:[],
-  producoes:[
-    // ── EXEMPLO/DEMONSTRAÇÃO — 1ª desmontagem: parte finalizada sai como Placa HD,
-    // o resto (carcaça, disco, ponta leitora, cabo, tudo misturado e sujo) VOLTA pro
-    // mesmo balaio de Sucata Eletrônica, em vez de virar produto novo no catálogo.
-    {id:9101,func:'Carlos Antônio',matEntradaId:9001,matEntrada:'Sucata Eletrônica',
-      lote:'Exemplo — 1ª Desmontagem de HD',pesoEntrada:0.700,tara:0,pesoBruto:0.700,
-      data:'28/08/2026',hora:'10:00',horaFim:'10:45',status:'fechada',
-      saidas:[
-        {prodId:9008,mat:'Placa HD',peso:0.030},
-        {prodId:9001,mat:'Sucata Eletrônica',peso:0.570}
-      ],
-      sobra:0.100,destinoSobra:'perda'}, // poeira, parafusos e plástico sem valor
-    // ── EXEMPLO/DEMONSTRAÇÃO — 2ª rodada: pega aquela Sucata Eletrônica que voltou
-    // do balaio e agora sim separa de vez nos materiais finais prontos pra vender.
-    {id:9102,func:'Carlos Antônio',matEntradaId:9001,matEntrada:'Sucata Eletrônica',
-      lote:'Exemplo — Separação Final',pesoEntrada:0.570,tara:0,pesoBruto:0.570,
-      data:'28/08/2026',hora:'14:00',horaFim:'14:40',status:'fechada',
-      saidas:[
-        {prodId:9005,mat:'Cobre Misto',peso:0.080},
-        {prodId:9002,mat:'Alumínio Mole',peso:0.200},
-        {prodId:9003,mat:'Alumínio Duro',peso:0.050},
-        {prodId:9004,mat:'Sucata de Ferro',peso:0.180},
-        {prodId:9007,mat:'Pós Garimpo',peso:0.010}
-      ],
-      sobra:0.050,destinoSobra:'perda'} // resíduo/pó sem valor que se perde na separação
-  ],
+  producoes:[],
   gestoraHistorico:[], // conversa/análise da Gestora IA — persistida pra não sumir ao trocar de aba
   gestoraPeriodoSalvo:null,
   prodVinculos:{},    // {materialId: tabelaVendaId} — qual tabela usar pra projetar cada material
   prodCustoTab:null,  // id da tabela de compra usada como custo de entrada
   prodMatEntrada:['Eletrônico p/ desmontar','Motor p/ desmontar','Alumínio p/ limpar','Informática','Telecomunicação','Linha Branca','Sucata Geral'],
   prodCustoEntrada:{}, // {nomeMatEntrada: precoKg} — custo manual por tipo de entrada
+  prodJornada:null,    // expediente usado pra contar tempo trabalhado (null = padrão, ver _PROD_JORNADA_PADRAO)
   clientes:[],
   tabelas:[
     {id:1,nome:'Padrao',tipo:'venda', itens:[]},
@@ -623,7 +588,7 @@ function buildLoginList(){
     h+='<button class="lu" onclick="selU('+u.id+',this)">'
       +'<div class="lav" style="background:'+u.cor+'22;border:2px solid '+u.cor+';color:'+u.cor+'">'+u.av+'</div>'
       +'<div style="text-align:left;flex:1"><div style="font-size:13px;font-weight:600">'+u.nome+'</div>'
-      +'<div style="font-size:11px;color:var(--mt)">'+PNOME[u.perfil]+'</div></div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+(getRoleById(u.perfil)?getRoleName(u.perfil):'<span style="color:var(--or)">&#9888; função ainda não sincronizada</span>')+'</div></div>'
       +(pesPendente?'<span style="font-size:16px" title="Pesagem pendente">⚠️</span>':'')
       +'</button>';
   }
@@ -642,6 +607,16 @@ function doLogin(){
   if(!SU)return;
   if(document.getElementById('pi').value!==SU.pin){document.getElementById('pe').textContent='PIN incorreto!';return;}
   if(SU.bloqueado){document.getElementById('pe').textContent='Usuario bloqueado. Contate o administrador.';return;}
+  // Primeira aba real da função. Se a função não existe neste aparelho (ainda não
+  // sincronizou), avisa em vez de entrar com menu vazio e tela do login anterior.
+  var _rl=getRoleById(SU.perfil);var _pgs=_rl?_rl.pages:(PPAGES[SU.perfil]||[]);
+  var _pri=null;
+  for(var _pi=0;_pi<_pgs.length;_pi++){if(_pgs[_pi]!=='producao_analise'){_pri=_pgs[_pi];break;}}
+  if(!_pri){
+    document.getElementById('pe').textContent='A função deste usuário ainda não chegou neste aparelho. Aguarde alguns segundos e tente de novo.';
+    _recarregarAcessosNuvem();
+    return;
+  }
   CU=SU;
   document.getElementById('ls').classList.add('H');document.getElementById('wrap').classList.remove('H');
   buildSidebar();buildBottomNav();
@@ -669,7 +644,7 @@ function doLogin(){
         +'</div>', 380);
     }, 600);
   }else{
-    go(PPAGES[CU.perfil][0]);
+    go(_pri);
   }
   setTimeout(_atualizarBadgeNotif,500);
   _auditLog('Login realizado');
@@ -778,20 +753,20 @@ function buildSidebar(){
   var cfgBtn=document.getElementById('sb-cfg-btn');
   if(cfgBtn){cfgBtn.style.display=perms.indexOf('configuracoes')>=0?'':'none';}
   document.getElementById('sbav').textContent=CU.av;document.getElementById('sbun').textContent=CU.nome;
-  document.getElementById('sbur').textContent=PNOME[CU.perfil];
+  document.getElementById('sbur').textContent=getRoleName(CU.perfil);
   // Atualiza topbar mobile
   var tav=document.getElementById('topbar-av');
   var tun=document.getElementById('topbar-un');
   var tur=document.getElementById('topbar-ur');
   if(tav){tav.textContent=CU.av;tav.style.background=CU.cor+'22';tav.style.borderColor=CU.cor;tav.style.color=CU.cor;}
   if(tun)tun.textContent=CU.nome;
-  if(tur)tur.textContent=PNOME[CU.perfil];
+  if(tur)tur.textContent=getRoleName(CU.perfil);
 }
 function mTopbarUser(){
   var html='<div style="padding:4px 0">'
     +'<div style="display:flex;align-items:center;gap:10px;padding:8px 16px;margin-bottom:8px;background:var(--s2);border-radius:var(--r)">'
     +'<div style="width:40px;height:40px;border-radius:50%;background:'+(CU.cor||'var(--bl)')+'22;border:2px solid '+(CU.cor||'var(--bl)')+';display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:'+(CU.cor||'var(--bl)')+'">'+(CU.av||'?')+'</div>'
-    +'<div><div style="font-size:14px;font-weight:700">'+CU.nome+'</div><div style="font-size:11px;color:var(--mt)">'+PNOME[CU.perfil]+'</div></div>'
+    +'<div><div style="font-size:14px;font-weight:700">'+CU.nome+'</div><div style="font-size:11px;color:var(--mt)">'+getRoleName(CU.perfil)+'</div></div>'
     +'</div>'
     +'<button class="btn btn-rd" style="width:100%;margin-top:4px" onclick="closeM();doLogout()">&#9211; Sair / Trocar Usuário</button>'
     +'</div>';
@@ -1181,20 +1156,11 @@ function _sbStartRealtime(){
         }}
 
         if(chave === 'bv_users'){
-          try{
-            var us = JSON.parse(payload.new.valor);
-            if(us && Array.isArray(us) && us.length){
-              USERS = us;
-              buildLoginList();
-              // Atualiza sidebar se logado
-              if(CU){
-                var me = null;
-                for(var i=0;i<USERS.length;i++){if(USERS[i].id===CU.id){me=USERS[i];break;}}
-                if(me) CU=me;
-                buildSidebar(); buildBottomNav();
-              }
-            }
-          }catch(e){}
+          try{_aplicarUsersNuvem(JSON.parse(payload.new.valor));}catch(e){}
+        }
+        // Funções (permissões) — antes não eram ouvidas em tempo real, só no F5
+        if(chave === 'bv_roles'){
+          try{_aplicarRolesNuvem(JSON.parse(payload.new.valor));}catch(e){}
         }
       }
     )
@@ -1231,8 +1197,10 @@ function _sbPollStart(){
   _pollTimer = setInterval(_sbPoll, 8000); // a cada 8s
 }
 
+var _pollAcessosN=0;
 function _sbPoll(){
   if(!_sbReady||!_sbClient||!_cloudLoaded)return;
+  if((++_pollAcessosN)%8===0)_recarregarAcessosNuvem();
   // Busca só o timestamp da última atualização (leve)
   _sbClient.from('biovale_dados')
     .select('atualizado_em')
@@ -1288,7 +1256,7 @@ function saveDB(){
       atendNum:DB.atendNum,produtos:DB.produtos,movs:DB.movs,contas:DB.contas,
       revenda:DB.revenda,revendaCats:DB.revendaCats,revendaStates:DB.revendaStates,
       entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
-      transf:DB.transf,coletas:DB.coletas,preAgenda:DB.preAgenda,preAgendaLimite:DB.preAgendaLimite,eventos:DB.eventos,producoes:DB.producoes,prodVinculos:DB.prodVinculos,prodCustoTab:DB.prodCustoTab,prodMatEntrada:DB.prodMatEntrada,prodCustoEntrada:DB.prodCustoEntrada,gestoraHistorico:DB.gestoraHistorico,gestoraPeriodoSalvo:DB.gestoraPeriodoSalvo,revProxCodigo:DB.revProxCodigo,funcs:DB.funcs,clientes:DB.clientes,
+      transf:DB.transf,coletas:DB.coletas,preAgenda:DB.preAgenda,preAgendaLimite:DB.preAgendaLimite,eventos:DB.eventos,producoes:DB.producoes,prodVinculos:DB.prodVinculos,prodCustoTab:DB.prodCustoTab,prodMatEntrada:DB.prodMatEntrada,prodCustoEntrada:DB.prodCustoEntrada,prodJornada:DB.prodJornada,gestoraHistorico:DB.gestoraHistorico,gestoraPeriodoSalvo:DB.gestoraPeriodoSalvo,revProxCodigo:DB.revProxCodigo,funcs:DB.funcs,clientes:DB.clientes,
       gerarTabsCustom:DB.gerarTabsCustom,
       pclCatsCustom:DB.pclCatsCustom||{},
       pclCatOrder:DB.pclCatOrder||[],
@@ -1377,15 +1345,24 @@ function _saveToCloudGuarded(snap){
         _lastCloudTs = new Date().toISOString();
         var _agora=new Date();
         var _hm=String(_agora.getHours()).padStart(2,'0')+':'+String(_agora.getMinutes()).padStart(2,'0')+':'+String(_agora.getSeconds()).padStart(2,'0');
-        _sbSet('bv_users', USERS, function(ok2){
-          _sbSet('bv_roles',{base:BASE_ROLES,custom:CUSTOM_ROLES},function(){
-            _sbSet('bv_cfg', CFG, function(){
-              if(ok2) _syncBadge('idle','✓ Salvo '+_hm);
-              else     _syncBadge('error','Erro na nuvem');
-              setTimeout(function(){_syncBadge('idle','Nuvem ativa');},4000);
-            });
+        // Usuários e funções só sobem se ESTE aparelho mudou algo neles. Antes subiam
+        // a cada gravação, e um aparelho com cópia antiga apagava o que outro criou.
+        var _uj=JSON.stringify(USERS),_rj=_rolesJson();
+        var _passoCfg=function(ok2){
+          _sbSet('bv_cfg', CFG, function(){
+            if(ok2) _syncBadge('idle','✓ Salvo '+_hm);
+            else     _syncBadge('error','Erro na nuvem');
+            setTimeout(function(){_syncBadge('idle','Nuvem ativa');},4000);
           });
-        });
+        };
+        var _passoRoles=function(ok2){
+          if(_rj!==_rolesCloudJson){
+            _sbSet('bv_roles',JSON.parse(_rj),function(okr){if(okr)_rolesCloudJson=_rj;_passoCfg(ok2);});
+          } else _passoCfg(ok2);
+        };
+        if(_uj!==_usersCloudJson){
+          _sbSet('bv_users', USERS, function(ok2){if(ok2)_usersCloudJson=_uj;_passoRoles(ok2);});
+        } else _passoRoles(true);
       } else {
         _syncBadge('error','Erro na nuvem');
       }
@@ -1417,11 +1394,10 @@ function loadDB(){
       if(ro.base&&Array.isArray(ro.base))BASE_ROLES=ro.base;
       if(ro.custom&&Array.isArray(ro.custom))CUSTOM_ROLES=ro.custom;
       _patchRestoredRoles();
-      // Rebuilds PPAGES from restored roles
-      var _allR=BASE_ROLES.concat(CUSTOM_ROLES);
-      for(var _ri=0;_ri<_allR.length;_ri++){PPAGES[_allR[_ri].id]=_allR[_ri].pages;}
+      _rebuildRoleMaps();
     }
   }catch(e){}
+  try{_rolesCloudJson=_rolesJson();_usersCloudJson=JSON.stringify(USERS);}catch(e){}
   return localOk;
 }
 var _SPECS_DEFAULT={
@@ -1541,7 +1517,11 @@ function _applySnap(s){
       if(e.dataFim){var d=_parseDataBR(e.dataFim);if(d&&d.getFullYear()>2000)e.dataFim=_fmtDataBR(d);}
     });
   }
-  if(s.producoes)DB.producoes=s.producoes;
+  if(s.producoes){
+    // Remove as 2 produções de demonstração (HD) caso tenham sido salvas junto com dados reais
+    DB.producoes=s.producoes.filter(function(p){return !((p.id===9101||p.id===9102)&&/^Exemplo/.test(p.lote||''));});
+  }
+  if(s.prodJornada)DB.prodJornada=s.prodJornada;
   if(s.gestoraHistorico)DB.gestoraHistorico=s.gestoraHistorico;
   if(s.revProxCodigo)DB.revProxCodigo=s.revProxCodigo;
   if(s.gestoraPeriodoSalvo)DB.gestoraPeriodoSalvo=s.gestoraPeriodoSalvo;
@@ -3431,7 +3411,7 @@ function liquidarPendencia(pendId){
     +'<div style="background:var(--s2);border-radius:var(--r);padding:11px 13px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:12px;color:var(--mt)">Cliente</span><span style="font-size:13px;font-weight:600">'+cliNome+'</span></div>'
     +(pend.obs?'<div style="font-size:12px;color:var(--mt)">Obs: '+pend.obs+'</div>':'')+'</div>'
     +'<div style="max-height:150px;overflow-y:auto">'+itensSumH+'</div>'
-    +'<div class="fld"><label>Data da operação (venda/compra) *</label><input class="inp" type="date" id="liq-data" value="'+_isoDateBR(hj())+'">'
+    +'<div class="fld"><label>Data da operação (venda/compra) *</label><input class="inp" type="date" id="liq-data" value="'+_isoDateBR(pend.suspendoData||hj())+'">'
     +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Se o negócio foi fechado em outro dia e só está sendo liquidado agora, ajuste aqui — o Financeiro vai contabilizar no mês certo.</div></div>'
     +'<div style="background:var(--bg);border-radius:var(--r);padding:11px 13px">'
     +(valReceb>0?'<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--gr);font-size:12px">&#11014; A Receber (Venda)</span><span style="font-weight:700;font-family:monospace;color:var(--gr)">+'+fR(valReceb)+'</span></div>':'')
@@ -3471,18 +3451,30 @@ function confirmarLiquidacao(pendId,valReceb,valPagei){
   var pend=null,pendIdx=-1;
   for(var i=0;i<DB.pesagensEmAberto.length;i++){if(String(DB.pesagensEmAberto[i].id)===String(pendId)){pend=DB.pesagensEmAberto[i];pendIdx=i;break;}}
   if(!pend)return;
+  // Exige caixa aberto pra liquidar — sem isso o movimento não tem onde ser gravado
+  // fisicamente e some do histórico do Caixa (mesmo ficando certo no Financeiro).
+  if(!DB.caixaDia){
+    closeM();
+    openM('Caixa Fechado','<div class="mf"><div class="al aly">Abra o caixa do dia antes de liquidar essa pendência — sem caixa aberto, o movimento não entra no histórico do Caixa.</div>'
+      +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
+      +'<button class="btn btn-bl" onclick="closeM();go(\'caixa_dia\')">Ir para Caixa</button></div></div>');
+    return;
+  }
   var conta=document.getElementById('liq-conta')?document.getElementById('liq-conta').value:'Caixa';
   var forma=document.getElementById('liq-forma-val')?document.getElementById('liq-forma-val').value:'Dinheiro';
   // Data real da operação (pode ser diferente de hoje, se o negócio foi fechado antes
-  // e só está sendo liquidado agora) — assim o Financeiro contabiliza no mês certo.
+  // e só está sendo liquidado agora) — assim o Financeiro e o Relatório de
+  // cliente/fornecedor contabilizam no mês certo. O Caixa em si sempre grava no dia
+  // de hoje (é o que está fisicamente aberto agora) — as duas coisas são separadas.
   var dataEl=document.getElementById('liq-data');
   var dataOp=dataEl&&dataEl.value?dataEl.value.split('-').reverse().join('/'):hj();
   var num=pend.num;
   var totLiq=+(valReceb-valPagei).toFixed(2);
   var _liqCat=pend.tipo==='Logistica Reversa'?'Logistica Reversa':'Venda';if(valReceb>0){DB.movs.unshift({id:nid(),data:dataOp,desc:'Liquidacao '+_liqCat+' #'+num+' ('+forma+')',tipo:'entrada',cat:_liqCat,valor:valReceb,conta:conta});for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo+valReceb).toFixed(2);break;}}}
   if(valPagei>0){DB.movs.unshift({id:nid(),data:dataOp,desc:'Liquidacao Compra #'+num+' ('+forma+')',tipo:'saida',cat:'Compra',valor:valPagei,conta:conta});for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo-valPagei).toFixed(2);break;}}}
-  if(DB.caixaDia){if(!DB.caixaDia.movimentos)DB.caixaDia.movimentos=[];DB.caixaDia.movimentos.unshift({num:num,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),itens:pend.itens.length,total:totLiq,venda:valReceb,compra:valPagei,methods:[{label:forma,valor:Math.abs(totLiq),conta:conta}],obs:pend.obs,itensList:pend.itens.slice(),label:pend.label,tipo:pend.tipo,cliId:pend.cliId,tabId:pend.tabId,liquidadoPendencia:true});}
-  atendHist.unshift({id:nid(),label:pend.label,tipo:pend.tipo,itens:pend.itens.slice(),num:num,total:totLiq,methods:[{label:forma,valor:Math.abs(totLiq),conta:conta}],obs:pend.obs,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
+  if(!DB.caixaDia.movimentos)DB.caixaDia.movimentos=[];
+  DB.caixaDia.movimentos.unshift({num:num,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),itens:pend.itens.length,total:totLiq,venda:valReceb,compra:valPagei,methods:[{label:forma,valor:Math.abs(totLiq),conta:conta}],obs:pend.obs,itensList:pend.itens.slice(),label:pend.label,tipo:pend.tipo,cliId:pend.cliId,tabId:pend.tabId,liquidadoPendencia:true});
+  atendHist.unshift({id:nid(),label:pend.label,tipo:pend.tipo,itens:pend.itens.slice(),num:num,total:totLiq,methods:[{label:forma,valor:Math.abs(totLiq),conta:conta}],obs:pend.obs,data:dataOp,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
   DB.pesagensEmAberto.splice(pendIdx,1);
   closeM();autoSave();
   var msg=document.createElement('div');msg.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--gr2);color:#fff;padding:11px 20px;border-radius:8px;font-size:13px;font-weight:700;z-index:999;box-shadow:0 4px 14px rgba(0,0,0,.4)';
@@ -14266,22 +14258,22 @@ function mVerFuncionarioProducao(chaveFunc){
   var fechadas=_prodFiltrar(todasFechadas);
   function _chaveFunc2(n){return (n||'').trim().replace(/\s+/g,' ').toLowerCase();}
   var doFunc=fechadas.filter(function(p){return _chaveFunc2(p.func)===chaveFunc;});
-  if(!doFunc.length){alert('Nada encontrado nesse período.');return;}
+  if(!doFunc.length){toast('Nada encontrado nesse período.','var(--or)');return;}
   var nomeExibir=doFunc[0].func.trim();
   var tempoTotal=0,entradaTotal=0,saidaTotal=0,valorTotal=0;
-  doFunc.sort(function(a,b){return (b.data+(b.hora||'')).localeCompare(a.data+(a.hora||''));});
+  doFunc.sort(function(a,b){return (_prodDT(b.data,b.hora||'00:00')||0)-(_prodDT(a.data,a.hora||'00:00')||0);});
   var linhas='';
   doFunc.forEach(function(p){
     var dur=_prodDuracaoMin(p);
     tempoTotal+=dur;
-    entradaTotal+=p.pesoEntrada;
+    entradaTotal+=_prodPesoProc(p);
     var saidaP=0,valorP=0;
     p.saidas.forEach(function(s){saidaP+=s.peso;valorP+=_prodPrecoVenda(s.prodId)*s.peso;});
     saidaTotal+=saidaP;valorTotal+=valorP;
     linhas+='<div style="padding:9px 0;border-bottom:1px solid var(--bd)">'
       +'<div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:700">'+(p.lote||p.matEntrada||'')+'</span><span style="font-size:11px;color:var(--mt)">'+p.data+'</span></div>'
-      +'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+(p.hora&&p.horaFim?'&#9200; '+p.hora+' &rarr; '+p.horaFim+' ('+_fmtDuracao(dur)+')'+(_prodDuracaoSuspeita(p)?' <span style="color:var(--or)">&#9888; conferir</span>':''):'&#9200; sem horário registrado')+'</div>'
-      +'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+fKg(p.pesoEntrada)+'kg entrada &rarr; '+fKg(saidaP)+'kg saída &middot; '+fR(valorP)+'</div>'
+      +'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+(p.hora&&p.horaFim?'&#9200; '+p.hora+' &rarr; '+_prodFimLbl(p)+' ('+_fmtDuracao(dur)+')'+(_prodDuracaoSuspeita(p)?' <span style="color:var(--or)">&#9888; conferir</span>':''):'&#9200; sem horário registrado')+'</div>'
+      +'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+fKg(_prodPesoProc(p))+'kg desmontados &rarr; '+fKg(saidaP)+'kg saída &middot; '+fR(valorP)+(p.destinoSobra==='pendente'&&p.sobra>0?' &middot; '+fKg(p.sobra)+'kg voltaram pro estoque':'')+'</div>'
       +'</div>';
   });
   var resumo='<div class="g4" style="margin-bottom:14px">'
@@ -14292,34 +14284,127 @@ function mVerFuncionarioProducao(chaveFunc){
     +'</div>';
   openM('&#128119; '+nomeExibir,'<div class="mf">'+resumo+'<div style="max-height:400px;overflow-y:auto">'+linhas+'</div></div>',560);
 }
-function _prodDuracaoMin(p){
-  if(!p.hora||!p.horaFim)return 0;
-  var hi=p.hora.split(':');var hf=p.horaFim.split(':');
-  if(hi.length<2||hf.length<2)return 0;
-  var minIni=(+hi[0])*60+(+hi[1]);
-  var minFim=(+hf[0])*60+(+hf[1]);
-  var dur=minFim-minIni;
-  if(dur<0)dur+=24*60; // passou da meia-noite
-  // Desconta o tempo das pausas (⏸️ Pausar/Retomar) — só conta tempo de trabalho real
-  if(p.pausas&&p.pausas.length){
-    p.pausas.forEach(function(pa){
-      if(!pa.inicio||!pa.fim)return;
-      var pi=pa.inicio.split(':');var pf=pa.fim.split(':');
-      if(pi.length<2||pf.length<2)return;
-      var pMinIni=(+pi[0])*60+(+pi[1]);
-      var pMinFim=(+pf[0])*60+(+pf[1]);
-      var pDur=pMinFim-pMinIni;
-      if(pDur<0)pDur+=24*60;
-      dur-=pDur;
-    });
-  }
-  return Math.max(0,dur);
+function _horaAgora(){var h=new Date();return ('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);}
+// Peso realmente desmontado: entrada menos a sobra que VOLTOU pro estoque
+// ("não deu tempo de desmontar"). É a base de custo e de aproveitamento —
+// material devolvido não foi trabalhado, então não pode pesar no resultado.
+function _prodPesoProc(p){
+  var dev=(p.destinoSobra==='pendente'&&p.sobra>0)?p.sobra:0;
+  return Math.max(0,+((p.pesoEntrada||0)-dev).toFixed(3));
 }
-// Duração é "suspeita" quando passa de 6h numa produção só — provavelmente
-// esqueceram de fechar/pausar na hora certa. Usado só pra marcar visualmente,
-// nunca bloqueia nada.
+// ── TEMPO TRABALHADO ─────────────────────────────────
+// Expediente da empresa: só o que cai DENTRO dele conta como tempo trabalhado.
+// Assim almoço, café, noite e fim de semana saem da conta sozinhos — ninguém
+// precisa lembrar de pausar, e uma produção que vira o dia não vira 20 horas.
+// Editável em Produção > ⚙️ Tabelas > Expediente.
+var _PROD_JORNADA_PADRAO={ativo:true,ini:'08:00',fim:'17:00',dias:[1,2,3,4,5],
+  intervalos:[{nome:'Café da manhã',ini:'10:00',fim:'10:15'},{nome:'Almoço',ini:'12:00',fim:'13:00'},{nome:'Café da tarde',ini:'14:00',fim:'14:15'}]};
+function _prodJornada(){return DB.prodJornada||_PROD_JORNADA_PADRAO;}
+function _hm2min(str){var a=(str||'').split(':');if(a.length<2)return null;var v=(+a[0])*60+(+a[1]);return isNaN(v)?null:v;}
+// data BR + HH:MM -> milissegundos
+function _prodDT(dataBR,hhmm){
+  var d=_parseDataBR(dataBR);var m=_hm2min(hhmm);
+  if(!d||m===null||isNaN(d.getTime())||d.getFullYear()<2000)return null;
+  return new Date(d.getFullYear(),d.getMonth(),d.getDate(),Math.floor(m/60),m%60).getTime();
+}
+// próxima vez que o relógio marca HH:MM a partir de "base" (pra registros antigos sem data)
+function _proxOcorr(base,hhmm){
+  var m=_hm2min(hhmm);if(m===null)return null;
+  var d=new Date(base);
+  var t=new Date(d.getFullYear(),d.getMonth(),d.getDate(),Math.floor(m/60),m%60).getTime();
+  if(t<base)t+=864e5;
+  return t;
+}
+// [início, fim] da produção em ms. ateAgora=true: produção aberta conta até agora.
+function _prodIniFim(p,ateAgora){
+  var S=_prodDT(p.data,p.hora);if(S===null)return null;
+  var fd=p.dataFim,fh=p.horaFim;
+  if(p.status==='aberta'&&p.reabertaDe){fd=p.reabertaDe.dataFim;fh=p.reabertaDe.horaFim;} // reaberta pra correção: vale o fim original
+  var E=null;
+  if(fh){E=_prodDT(fd||p.data,fh);if(E!==null&&!fd&&E<S)E+=864e5;} // registro antigo sem data de fim: passou da meia-noite
+  else if(ateAgora){var n=new Date();n.setSeconds(0,0);E=n.getTime();}
+  if(E===null||E<S)return null;
+  return [S,E];
+}
+function _prodPausasMs(p,S,E){
+  var out=[],cur=S;
+  (p.pausas||[]).forEach(function(pa){
+    var a=pa.dIni?_prodDT(pa.dIni,pa.inicio):_proxOcorr(cur,pa.inicio);
+    if(a===null)return;
+    // Pausa sem fim = fechou (ou ainda está) pausada: vale até o fim da produção
+    var b=pa.fim?(pa.dFim?_prodDT(pa.dFim,pa.fim):_proxOcorr(a,pa.fim)):E;
+    if(b===null)b=E;
+    a=Math.max(a,S);b=Math.min(b,E);
+    if(b>a){out.push([a,b]);cur=b;}
+  });
+  return out;
+}
+// Trechos de expediente dentro de [S,E]
+function _prodJanelas(S,E){
+  var j=_prodJornada();
+  if(!j||!j.ativo)return [[S,E]];
+  var ji=_hm2min(j.ini),jf=_hm2min(j.fim);
+  if(ji===null||jf===null||jf<=ji)return [[S,E]];
+  var dias=j.dias&&j.dias.length?j.dias:[1,2,3,4,5];
+  var out=[];var d0=new Date(S);var d=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate());
+  var guard=0;
+  while(d.getTime()<=E&&guard++<120){
+    if(dias.indexOf(d.getDay())>=0){
+      var base=d.getTime();
+      var segs=[[ji,jf]];
+      (j.intervalos||[]).forEach(function(iv){
+        var a=_hm2min(iv.ini),b=_hm2min(iv.fim);if(a===null||b===null||b<=a)return;
+        var novo=[];
+        segs.forEach(function(sg){
+          if(b<=sg[0]||a>=sg[1]){novo.push(sg);return;}
+          if(a>sg[0])novo.push([sg[0],a]);
+          if(b<sg[1])novo.push([b,sg[1]]);
+        });
+        segs=novo;
+      });
+      segs.forEach(function(sg){var a=Math.max(S,base+sg[0]*6e4),b=Math.min(E,base+sg[1]*6e4);if(b>a)out.push([a,b]);});
+    }
+    d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1);
+  }
+  return out;
+}
+function _prodMinEm(janelas,pausas){
+  var tot=0;
+  janelas.forEach(function(w){
+    var len=w[1]-w[0];
+    pausas.forEach(function(z){var a=Math.max(w[0],z[0]),b=Math.min(w[1],z[1]);if(b>a)len-=(b-a);});
+    tot+=Math.max(0,len);
+  });
+  return Math.round(tot/6e4);
+}
+// Minutos realmente trabalhados: dentro do expediente, fora das pausas manuais.
+// Se a produção aconteceu INTEIRA fora do expediente (hora extra, sábado), conta
+// o tempo corrido — senão o trabalho apareceria como zero.
+function _prodDuracaoMin(p,ateAgora){
+  var se=_prodIniFim(p,ateAgora);if(!se)return 0;
+  var pz=_prodPausasMs(p,se[0],se[1]);
+  var min=_prodMinEm(_prodJanelas(se[0],se[1]),pz);
+  if(min===0)min=_prodMinEm([[se[0],se[1]]],pz);
+  return min;
+}
+// Duração "suspeita": só marca visualmente pra conferir, nunca bloqueia nada.
+// Com expediente ligado, mais de 3 dias úteis numa produção só; sem ele, mais de 6h.
 function _prodDuracaoSuspeita(p){
-  return _prodDuracaoMin(p)>360;
+  var j=_prodJornada();
+  return _prodDuracaoMin(p)>((j&&j.ativo)?1350:360);
+}
+// Data em que a produção conta nos relatórios: a de fechamento (ou a de abertura, nos registros antigos)
+function _prodDataRef(p){return p.dataFim||p.data;}
+function _prodFimLbl(p){return (p.dataFim&&p.dataFim!==p.data?p.dataFim.slice(0,5)+' ':'')+(p.horaFim||'');}
+function _brToIso(d){var a=(d||'').split('/');return a.length===3?a[2]+'-'+a[1]+'-'+a[0]:'';}
+function _isoToBr(d){var a=(d||'').split('-');return a.length===3?a[2]+'/'+a[1]+'/'+a[0]:'';}
+function _prodJornadaResumo(){
+  var j=_prodJornada();
+  if(!j||!j.ativo)return 'Desligado — conta o tempo corrido entre abrir e fechar, menos as pausas.';
+  var nomes=['dom','seg','ter','qua','qui','sex','sáb'];
+  var dias=(j.dias||[]).slice().sort().map(function(d){return nomes[d];}).join(', ');
+  var ivs=(j.intervalos||[]).filter(function(iv){return iv.ini&&iv.fim;}).map(function(iv){return iv.nome+' '+iv.ini+'–'+iv.fim;}).join(' · ');
+  return j.ini+' às '+j.fim+' ('+dias+')'+(ivs?' · sem contar: '+ivs:'');
 }
 function _fmtDuracao(min){
   if(!min)return '0min';
@@ -14357,12 +14442,12 @@ function _prodFiltrar(lista){
   var hj=_today();
   var ini;
   if(prodPeriodo==='hoje'){ini=new Date(hj.getFullYear(),hj.getMonth(),hj.getDate());}
-  else if(prodPeriodo==='semana'){ini=new Date(hj);ini.setDate(ini.getDate()-ini.getDay());}
+  else if(prodPeriodo==='semana'){ini=new Date(hj.getFullYear(),hj.getMonth(),hj.getDate()-hj.getDay());}
   else if(prodPeriodo==='mes'){ini=new Date(hj.getFullYear(),hj.getMonth(),1);}
   else if(prodPeriodo==='trim'){ini=new Date(hj.getFullYear(),hj.getMonth()-2,1);}
   else if(prodPeriodo==='ano'){ini=new Date(hj.getFullYear(),0,1);}
   return lista.filter(function(p){
-    var parts=p.data.split('/');var d=new Date(+parts[2],+parts[1]-1,+parts[0]);
+    var parts=_prodDataRef(p).split('/');var d=new Date(+parts[2],+parts[1]-1,+parts[0]);
     return d>=ini;
   });
 }
@@ -14370,7 +14455,7 @@ function _prodFiltrar(lista){
 function pgProducao(){
   var abertas=(DB.producoes||[]).filter(function(p){return p.status==='aberta';});
   var fechadas=(DB.producoes||[]).filter(function(p){return p.status==='fechada';});
-  var hjFech=fechadas.filter(function(p){return p.data===_fmtDataBR(_today());});
+  var hjFech=fechadas.filter(function(p){return _prodDataRef(p)===_fmtDataBR(_today());});
   var adm=_isAdm();
 
   // Sub-abas: Operador vê só Registro; Admin vê tudo
@@ -14409,8 +14494,11 @@ function _prodRegistro(abertas,hjFech){
         +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
         +'<div><div style="font-size:14px;font-weight:700">👷 '+p.func+'</div>'
         +'<div style="font-size:11px;color:var(--mt)">'+p.matEntrada+' · Entrada: '+fKg(p.pesoEntrada)+'kg</div>'
-        +'<div style="font-size:11px;color:var(--mt)">'+p.saidas.length+' material(is) · '+fKg(ts)+'kg gerados</div></div>'
-        +'<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:var(--orb);color:var(--or)">Aberta</span>'
+        +'<div style="font-size:11px;color:var(--mt)">'+p.saidas.length+' material(is) · '+fKg(ts)+'kg gerados</div>'
+        +'<div style="font-size:11px;color:var(--mt)">&#9200; desde '+(p.data!==_fmtDataBR(_today())?p.data+' ':'')+p.hora+' · '+_fmtDuracao(_prodDuracaoMin(p,true))+' trabalhadas</div></div>'
+        +((p.pausas&&p.pausas.length&&!p.pausas[p.pausas.length-1].fim)
+          ?'<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:var(--s3);color:var(--or);border:1px solid var(--or)">&#9208; Pausada</span>'
+          :'<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:var(--orb);color:var(--or)">Aberta</span>')
         +'</div></div>';
     });
   }
@@ -14421,7 +14509,7 @@ function _prodRegistro(abertas,hjFech){
       html+='<div class="card" style="cursor:pointer" onclick="mVerProdBV('+p.id+')">'
         +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
         +'<div><div style="font-size:14px;font-weight:700">👷 '+p.func+'</div>'
-        +'<div style="font-size:11px;color:var(--mt)">'+p.matEntrada+' · '+fKg(p.pesoEntrada)+'kg → '+fKg(ts)+'kg · '+(p.hora&&p.horaFim?p.hora+' &rarr; '+p.horaFim+' ('+_fmtDuracao(_prodDuracaoMin(p))+')'+(_prodDuracaoSuspeita(p)?' <span style="color:var(--or)">&#9888;</span>':''):p.hora)+'</div></div>'
+        +'<div style="font-size:11px;color:var(--mt)">'+p.matEntrada+' · '+fKg(p.pesoEntrada)+'kg → '+fKg(ts)+'kg · '+(p.hora&&p.horaFim?p.hora+' &rarr; '+_prodFimLbl(p)+' ('+_fmtDuracao(_prodDuracaoMin(p))+')'+(_prodDuracaoSuspeita(p)?' <span style="color:var(--or)">&#9888;</span>':''):p.hora)+'</div></div>'
         +'<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:var(--grb);color:var(--gr)">Fechada</span>'
         +'</div></div>';
     });
@@ -14534,6 +14622,7 @@ function salvarNovaProdBV(forcar){
   if(!func){toast('Selecione ou digite quem está fazendo!','var(--rd)');return;}
   if(!prodEnt){toast('Selecione o material de entrada!','var(--rd)');return;}
   if(peso<=0){toast('Informe o peso!','var(--rd)');return;}
+  if(tara<0||peso-tara<=0){toast('A tara precisa ser menor que o peso bruto!','var(--rd)');return;}
   // Avisa (não bloqueia) se essa pessoa já tem outra produção aberta — isso faz o
   // tempo trabalhado contar errado se as duas ficarem rodando "ao mesmo tempo".
   if(!forcar){
@@ -14548,7 +14637,7 @@ function salvarNovaProdBV(forcar){
   // separado pra desmontar, mesmo antes de terminar o processo.
   prodEnt.est=+((prodEnt.est||0)-pesoEntrada).toFixed(3);
   var h=new Date();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
-  DB.producoes.push({id:nid(),func:func,matEntradaId:prodEnt.id,matEntrada:prodEnt.nome,custoEntradaLote:custoLote,lote:lote,pesoEntrada:pesoEntrada,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,pausas:[],saidas:[],status:'aberta'});
+  DB.producoes.push({id:nid(),func:func,matEntradaId:prodEnt.id,matEntrada:prodEnt.nome,custoEntradaLote:custoLote,lote:lote,pesoEntrada:pesoEntrada,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,pausas:[],saidas:[],entradas:[{bruto:peso,tara:tara,peso:pesoEntrada,data:_fmtDataBR(_today()),hora:hora}],status:'aberta'});
   saveDB();closeM();go('producao');toast('Produção iniciada!','var(--gr)');
 }
 // Mostra um aviso DENTRO do formulário que já está aberto (não troca de modal —
@@ -14568,44 +14657,130 @@ function _prodAvisoInline(msgHtml,fnNome,args,labelContinuar){
   aviso.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
+// Levas de entrada e pesagens de saída ficam guardadas uma a uma (com dia e hora),
+// pra dar pra conferir e apagar só a que foi lançada errada. Registros antigos, que
+// só tinham o total, aparecem como uma linha única.
+function _prodEntradas(p){
+  if(p.entradas&&p.entradas.length)return p.entradas;
+  return [{bruto:p.pesoBruto||p.pesoEntrada,tara:p.tara||0,peso:p.pesoEntrada,data:p.data,hora:p.hora}];
+}
+function _prodPesagens(sd){
+  if(sd.pesagens&&sd.pesagens.length)return sd.pesagens;
+  return [{peso:sd.peso}];
+}
+function _prodPesLbl(x){
+  if(!x.hora&&!x.data)return '&mdash;';
+  return (x.data?x.data.slice(0,5)+' ':'')+(x.hora||'');
+}
+function _prodAchar(id){for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===id)return DB.producoes[i];return null;}
+// Abre/fecha o formulário de lançar (entrada ou saída) dentro do próprio detalhe
+function _prodTgForm(qual){
+  ['pv-form-ent','pv-form-sai'].forEach(function(fid){
+    var el=document.getElementById(fid);if(!el)return;
+    var abrir=(fid===qual)&&el.style.display==='none';
+    el.style.display=abrir?'block':'none';
+    if(abrir){
+      var inp=el.querySelector('input[type=number]');
+      el.scrollIntoView({behavior:'smooth',block:'nearest'});
+      if(fid==='pv-form-ent'&&inp)setTimeout(function(){inp.focus();},80);
+    }
+  });
+}
+
 // ── DETALHE DA PRODUÇÃO ──────────────────────────────
 function mVerProdBV(id){
-  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===id){p=DB.producoes[i];break;}
+  var p=_prodAchar(id);
   if(!p)return;
-  var ts=p.saidas.reduce(function(s,x){return s+x.peso;},0);
+  var aberta=p.status==='aberta';
+  var ts=+p.saidas.reduce(function(t,x){return t+x.peso;},0).toFixed(3);
   var pct=p.pesoEntrada>0?Math.min(100,(ts/p.pesoEntrada*100)):0;
+  var falta=+(p.pesoEntrada-ts).toFixed(3);
+  var pausaAtiva=p.pausas&&p.pausas.length&&!p.pausas[p.pausas.length-1].fim;
+  var btnX='background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer';
+  var linhaPes='display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;border-top:1px solid var(--bd)';
+  var tituloBloco='font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px';
 
-  var saidasHTML='';
-  p.saidas.forEach(function(s,idx){
-    var prod=gP(s.prodId);var nome=prod?prod.ic+' '+prod.nome:(s.mat||'?');
-    saidasHTML+='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border-radius:8px;margin-bottom:5px">'
-      +'<div style="flex:1;font-size:13px;font-weight:700">'+nome+'</div>'
-      +'<div style="font-size:13px;color:var(--gr);font-weight:700">'+fKg(s.peso)+'kg</div>'
-      +(p.status==='aberta'?'<button onclick="remSaidaProdBV('+p.id+','+idx+')" style="background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer">✕</button>':'')
+  // ── Entrada: levas ──
+  var levas=_prodEntradas(p);
+  var levasHTML='';
+  levas.forEach(function(lv,idx){
+    var conta=lv.ajuste?'ajuste do Admin':(lv.tara>0?fKg(lv.bruto)+' &minus; '+fKg(lv.tara)+' tara':'sem tara');
+    levasHTML+='<div style="'+linhaPes+'">'
+      +'<span style="color:var(--mt);min-width:78px">'+_prodPesLbl(lv)+'</span>'
+      +'<span style="flex:1;color:var(--mt);font-size:11px">'+conta+'</span>'
+      +'<span style="font-weight:700">'+(lv.ajuste&&lv.peso>0?'+':'')+fKg(lv.peso)+'kg</span>'
+      +(aberta&&levas.length>1&&p.entradas?'<button onclick="remEntradaProdBV('+p.id+','+idx+')" style="'+btnX+'">&#10005;</button>':'')
       +'</div>';
   });
-  if(!saidasHTML)saidasHTML='<div style="text-align:center;padding:16px;color:var(--mt);font-size:12px">Nenhum material registrado ainda</div>';
 
-  var pausaAtiva=p.pausas&&p.pausas.length&&!p.pausas[p.pausas.length-1].fim;
+  // ── Saídas: um bloco por material, com as pesagens dentro ──
+  var saidasHTML='';
+  p.saidas.forEach(function(sd,sIdx){
+    var prod=gP(sd.prodId);var nome=prod?prod.ic+' '+prod.nome:(sd.mat||'?');
+    var pes=_prodPesagens(sd);
+    var mostrarPes=aberta||pes.length>1;
+    saidasHTML+='<div style="background:var(--s2);border-radius:8px;padding:9px 10px;margin-bottom:6px">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:700">'+nome+'</div>'
+      +'<div style="font-size:10px;color:var(--mt)">'+pes.length+' pesagem'+(pes.length>1?'s':'')+(p.pesoEntrada>0?' &middot; '+(sd.peso/p.pesoEntrada*100).toFixed(1)+'% da entrada':'')+'</div></div>'
+      +'<div style="font-size:15px;color:var(--gr);font-weight:800">'+fKg(sd.peso)+'kg</div></div>';
+    if(mostrarPes){
+      saidasHTML+='<div style="margin-top:6px">';
+      pes.forEach(function(pg,pIdx){
+        saidasHTML+='<div style="'+linhaPes+'">'
+          +'<span style="color:var(--mt);min-width:78px">'+_prodPesLbl(pg)+'</span>'
+          +'<span style="flex:1;color:var(--mt);font-size:11px">'+(pg.tara>0?fKg(pg.bruto)+' &minus; '+fKg(pg.tara)+' tara':'')+'</span>'
+          +'<span style="font-weight:700">'+fKg(pg.peso)+'kg</span>'
+          +(aberta?'<button onclick="remPesagemProdBV('+p.id+','+sIdx+','+pIdx+')" style="'+btnX+'">&#10005;</button>':'')
+          +'</div>';
+      });
+      saidasHTML+='</div>';
+    }
+    saidasHTML+='</div>';
+  });
+  if(!saidasHTML)saidasHTML='<div style="text-align:center;padding:14px;color:var(--mt);font-size:12px">Nenhum material pesado ainda</div>';
+
+  var corFalta=falta<-0.001?'var(--rd)':(falta>0.001?'var(--or)':'var(--gr)');
   var html='<div class="mf">'
-    +'<div style="font-size:12px;color:var(--mt)">👷 '+p.func+' · '+p.data+' '+p.hora+(p.horaFim?' &rarr; '+p.horaFim:'')+(_isAdm()?' <a href="#" onclick="event.preventDefault();mEditarHoraProd('+p.id+')" style="color:var(--bl)">&#9998;</a>':'')+(pausaAtiva?' · <span style="color:var(--or);font-weight:700">&#9208; PAUSADA</span>':'')+'</div>'
+    +'<div style="font-size:12px;color:var(--mt)">👷 '+p.func+' · '+p.data+' '+p.hora+(p.horaFim?' &rarr; '+_prodFimLbl(p)+' ('+_fmtDuracao(_prodDuracaoMin(p))+')':'')+(_isAdm()?' <a href="#" onclick="event.preventDefault();mEditarHoraProd('+p.id+')" style="color:var(--bl)">&#9998;</a>':'')+(pausaAtiva?' · <span style="color:var(--or);font-weight:700">&#9208; PAUSADA</span>':'')+'</div>'
     +'<div style="font-size:16px;font-weight:800;margin:4px 0 2px">'+p.matEntrada+'</div>'
     +(p.lote?'<div style="font-size:12px;color:var(--pu);margin-bottom:4px">📦 '+p.lote+'</div>':'')
     +(_isAdm()&&p.custoEntradaLote>0?'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">💰 Custo considerado: '+fR(p.custoEntradaLote)+'/kg</div>':'<div style="margin-bottom:10px"></div>')
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
-    +'<div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:800">'+fKg(p.pesoEntrada)+'</div><div style="font-size:10px;color:var(--mt)">KG ENTRADA</div></div>'
-    +'<div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:18px;font-weight:800;color:var(--gr)">'+fKg(ts)+'</div><div style="font-size:10px;color:var(--mt)">KG GERADOS</div></div>'
+    // Resumo
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">'
+    +'<div style="background:var(--s2);border-radius:8px;padding:9px 4px;text-align:center"><div style="font-size:16px;font-weight:800">'+fKg(p.pesoEntrada)+'</div><div style="font-size:9px;color:var(--mt)">KG ENTROU</div></div>'
+    +'<div style="background:var(--s2);border-radius:8px;padding:9px 4px;text-align:center"><div style="font-size:16px;font-weight:800;color:var(--gr)">'+fKg(ts)+'</div><div style="font-size:9px;color:var(--mt)">KG JÁ PESADO</div></div>'
+    +'<div style="background:var(--s2);border-radius:8px;padding:9px 4px;text-align:center"><div style="font-size:16px;font-weight:800;color:'+corFalta+'">'+fKg(Math.abs(falta))+'</div><div style="font-size:9px;color:var(--mt)">'+(falta<-0.001?'KG A MAIS':(aberta?'KG FALTA PESAR':'KG SOBRA'))+'</div></div>'
     +'</div>'
-    +'<div style="margin-top:8px"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--mt)"><span>Aproveitamento</span><span>'+pct.toFixed(1)+'%</span></div>'
-    +'<div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden;margin-top:4px"><div style="height:100%;border-radius:3px;width:'+pct+'%;background:'+(pct>80?'var(--gr)':pct>50?'var(--or)':'var(--rd)')+'"></div></div></div>'
-    +'<div style="border-top:1px solid var(--bd);margin:12px 0;padding-top:10px"><div style="font-size:11px;font-weight:700;color:var(--mt);text-transform:uppercase;margin-bottom:8px">Materiais gerados</div>'+saidasHTML+'</div>';
+    +'<div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden;margin-top:8px"><div style="height:100%;border-radius:3px;width:'+pct+'%;background:'+(aberta?'var(--bl)':(pct>80?'var(--gr)':pct>50?'var(--or)':'var(--rd)'))+'"></div></div>'
+    +'<div style="font-size:10px;color:var(--mt);text-align:right;margin-top:3px">'+pct.toFixed(1)+(aberta?'% já pesado':'% aproveitado')+'</div>';
 
-  if(p.status==='aberta'){
-    html+='<div style="border-top:1px solid var(--bd);padding-top:10px"><div style="font-size:11px;font-weight:700;color:var(--bl);text-transform:uppercase;margin-bottom:8px">+ Adicionar mais material (mesmo lote)</div>'
-      +'<div style="font-size:10px;color:var(--mt);margin-bottom:8px">Pra quando sobrou material da mesma leva pra pesar — soma aqui em vez de abrir produção nova. Se for de outra compra/origem, feche essa e abra uma nova.</div>'
-      +'<div style="display:flex;gap:7px"><input class="inp" type="number" inputmode="decimal" step="0.001" id="ae-peso" placeholder="Peso bruto (kg)" style="flex:1">'
-      +'<button class="btnO bOb" onclick="addEntradaProdBV('+p.id+')" style="white-space:nowrap">+ Somar</button></div></div>'
-      +'<div style="border-top:1px solid var(--bd);margin-top:14px;padding-top:10px"><div style="font-size:11px;font-weight:700;color:var(--gr);text-transform:uppercase;margin-bottom:8px">+ Registrar material</div>'
+  // ── Bloco ENTRADA ──
+  html+='<div style="border-top:1px solid var(--bd);margin-top:10px;padding-top:10px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+    +'<div style="'+tituloBloco+';color:var(--bl)">📥 Entrada · '+levas.length+' leva'+(levas.length>1?'s':'')+'</div>'
+    +(aberta?'<button class="btnO bOb" style="font-size:12px;padding:6px 11px" onclick="_prodTgForm(\'pv-form-ent\')">+ Pegar mais material</button>':'')
+    +'</div>'
+    +levasHTML;
+  if(aberta){
+    html+='<div id="pv-form-ent" style="display:none;background:var(--s2);border:1px solid rgba(59,130,246,.35);border-radius:8px;padding:10px;margin-top:8px">'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+      +'<div class="fld"><label>Peso bruto (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="ae-peso"></div>'
+      +'<div class="fld"><label>Tara (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="ae-tara"></div></div>'
+      +'<div style="font-size:10px;color:var(--mt);margin:6px 0 8px">Só pra material da mesma leva/origem. Se for de outra compra, feche esta produção e abra uma nova.</div>'
+      +'<button class="btn" style="width:100%;background:var(--bl)" onclick="addEntradaProdBV('+p.id+')">Somar à entrada</button></div>';
+  }
+  html+='</div>';
+
+  // ── Bloco MATERIAIS GERADOS ──
+  html+='<div style="border-top:1px solid var(--bd);margin-top:12px;padding-top:10px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+    +'<div style="'+tituloBloco+';color:var(--gr)">📤 Materiais gerados</div>'
+    +(aberta?'<button class="btn" style="font-size:12px;padding:6px 11px" onclick="_prodTgForm(\'pv-form-sai\')">+ Pesar material</button>':'')
+    +'</div>';
+  if(aberta){
+    var taraRef=(levas[0]&&levas[0].tara>0)?levas[0].tara:(p.tara||0);
+    html+='<div id="pv-form-sai" style="display:none;background:var(--s2);border:1px solid rgba(34,197,94,.35);border-radius:8px;padding:10px;margin-bottom:8px">'
       +'<div class="fld"><label>Material</label>'
       +'<div class="pdd" id="pdd-rs-mat">'
       +'<button class="pdd-trigger" onclick="_toggleProdPicker(\'rs-mat\')" type="button">'
@@ -14616,30 +14791,68 @@ function mVerProdBV(id){
       +'<div class="pdd-list" id="rs-mat-list"></div>'
       +'</div></div>'
       +'<input type="hidden" id="rs-mat-id"></div>'
-      +'<div class="fld"><label>Peso (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="rs-peso"></div>'
-      +'<button class="btn" onclick="addSaidaProdBV('+p.id+')" style="margin-bottom:10px">+ Adicionar</button>'
-      +'<div style="border-top:1px solid var(--bd);padding-top:10px;display:flex;gap:8px">'
-      +(pausaAtiva
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'
+      +'<div class="fld"><label>Peso bruto (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="rs-peso"></div>'
+      +'<div class="fld"><label>Tara da caixa (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="rs-tara" placeholder="'+(taraRef>0?'entrada: '+fKg(taraRef):'0')+'"></div></div>'
+      +'<div style="font-size:10px;color:var(--mt);margin:6px 0 8px">'+(taraRef>0?'A caixa da entrada pesava '+fKg(taraRef)+'kg — é só referência, digite a tara da caixa que você usou agora. ':'')+'Sem caixa? Deixe a tara em branco.</div>'
+      +'<button class="btn" style="width:100%" onclick="addSaidaProdBV('+p.id+')">Lançar pesagem</button></div>';
+  }
+  html+=saidasHTML+'</div>';
+
+  // ── Ações ──
+  if(aberta){
+    html+='<div style="border-top:1px solid var(--bd);margin-top:8px;padding-top:10px;display:flex;gap:8px">'
+      +(p.reabertaDe?'':(pausaAtiva
         ?'<button class="btnO" style="flex:1;border-color:var(--gr);color:var(--gr)" onclick="retomarProdBV('+p.id+')">&#9654; Retomar</button>'
-        :'<button class="btnO" style="flex:1;border-color:var(--or);color:var(--or)" onclick="pausarProdBV('+p.id+')">&#9208; Pausar</button>')
-      +'<button class="btn" style="flex:2;background:var(--bl);color:#fff" onclick="fecharProdBV('+p.id+')">🏁 Fechar Produção</button></div></div>';
+        :'<button class="btnO" style="flex:1;border-color:var(--or);color:var(--or)" onclick="pausarProdBV('+p.id+')">&#9208; Pausar</button>'))
+      +'<button class="btn" style="flex:2;background:var(--bl);color:#fff" onclick="fecharProdBV('+p.id+')">🏁 Fechar Produção</button></div>'
+      +'<button class="btnO" style="width:100%;margin-top:8px;font-size:11px;padding:6px;border-color:rgba(239,68,68,.3);color:var(--rd)" onclick="mCancelarProdBV('+p.id+')">&#10005; Cancelar produção (aberta por engano)</button>';
+    if(p.reabertaDe){
+      html+='<div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.3);border-radius:8px;padding:9px 11px;margin-top:10px;font-size:11px;color:var(--bl)">&#9998; Reaberta pra correção. Ajuste os materiais e feche de novo — o horário de fechamento original ('+p.reabertaDe.dataFim+' '+p.reabertaDe.horaFim+') é mantido.</div>';
+    }
+  } else {
+    html+='<div style="margin-top:8px">';
+    if(p.sobra>0.001)html+='<div style="font-size:11px;color:var(--mt);margin-bottom:8px">Sobra: <b>'+fKg(p.sobra)+'kg</b> — '+(p.destinoSobra==='pendente'?'voltou pro estoque (não desmontado)':'perda / descarte')+'</div>';
+    if(_isAdm())html+='<button class="btnO" style="width:100%;margin-bottom:8px;font-size:12px;padding:7px;border-color:var(--bl);color:var(--bl)" onclick="mReabrirProdBV('+p.id+')">&#9998; Reabrir pra corrigir (peso ou material errado)</button>';
+    html+='</div>';
   }
   html+='<div class="brow"><button class="btnO bOgr" onclick="closeM();go(\'producao\')">Fechar</button></div></div>';
-  openM((p.status==='aberta'?'⏳':'✅')+' Produção',html,560);
+  openM((aberta?'⏳':'✅')+' Produção',html,560);
 }
-// Soma mais peso de entrada na MESMA produção aberta (mesma leva/lote) — desconta
-// do estoque do mesmo material, sem mexer no horário de início nem criar outra
-// produção. Pra material de origem diferente, a pessoa deve fechar e abrir nova.
+// Pega mais material da MESMA leva/lote: registra como uma nova leva de entrada e
+// desconta do estoque do mesmo material, sem mexer no horário de início.
 function addEntradaProdBV(prodId){
-  var pesoNovo=parseFloat(document.getElementById('ae-peso').value)||0;
-  if(pesoNovo<=0){toast('Informe o peso!','var(--rd)');return;}
-  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
-  if(!p)return;
+  var brutoNovo=parseFloat(document.getElementById('ae-peso').value)||0;
+  var taraEl=document.getElementById('ae-tara');
+  var taraNova=taraEl?(parseFloat(taraEl.value)||0):0;
+  if(brutoNovo<=0){toast('Informe o peso!','var(--rd)');return;}
+  if(taraNova<0||brutoNovo-taraNova<=0){toast('A tara precisa ser menor que o peso bruto!','var(--rd)');return;}
+  var pesoNovo=+(brutoNovo-taraNova).toFixed(3); // líquido
+  var p=_prodAchar(prodId);
+  if(!p||p.status!=='aberta')return;
   var matProd=gP(p.matEntradaId);
   if(matProd)matProd.est=+((matProd.est||0)-pesoNovo).toFixed(3);
+  p.entradas=_prodEntradas(p).slice();
+  p.entradas.push({bruto:brutoNovo,tara:taraNova,peso:pesoNovo,data:_fmtDataBR(_today()),hora:_horaAgora()});
   p.pesoEntrada=+(p.pesoEntrada+pesoNovo).toFixed(3);
-  p.pesoBruto=+((p.pesoBruto||0)+pesoNovo).toFixed(3);
-  saveDB();closeM();mVerProdBV(prodId);toast(fKg(pesoNovo)+'kg somado ao lote!','var(--bl)');
+  p.pesoBruto=+((p.pesoBruto||0)+brutoNovo).toFixed(3);
+  p.tara=+((p.tara||0)+taraNova).toFixed(3);
+  saveDB();closeM();mVerProdBV(prodId);toast(fKg(pesoNovo)+'kg somado à entrada!','var(--bl)');
+}
+// Apaga uma leva lançada errada: o peso dela volta pro estoque. A última leva não
+// sai por aqui — pra desfazer tudo existe o "Cancelar produção".
+function remEntradaProdBV(prodId,idx){
+  var p=_prodAchar(prodId);
+  if(!p||p.status!=='aberta'||!p.entradas||!p.entradas[idx])return;
+  if(p.entradas.length<=1){toast('É a única leva — pra desfazer, cancele a produção.','var(--or)');return;}
+  var lv=p.entradas[idx];
+  var matProd=gP(p.matEntradaId);
+  if(matProd)matProd.est=+((matProd.est||0)+lv.peso).toFixed(3);
+  p.entradas.splice(idx,1);
+  p.pesoEntrada=+(p.pesoEntrada-lv.peso).toFixed(3);
+  p.pesoBruto=+((p.pesoBruto||0)-(lv.bruto||lv.peso)).toFixed(3);
+  p.tara=Math.max(0,+((p.tara||0)-(lv.tara||0)).toFixed(3));
+  saveDB();closeM();mVerProdBV(prodId);toast('Leva de '+fKg(lv.peso)+'kg apagada — voltou pro estoque','var(--or)');
 }
 // Pausa/retoma o cronômetro de uma produção aberta — o tempo pausado é descontado
 // na hora de calcular quanto tempo foi realmente trabalhado (ver _prodDuracaoMin).
@@ -14648,14 +14861,14 @@ function pausarProdBV(prodId){
   if(!p)return;
   if(!p.pausas)p.pausas=[];
   var h=new Date();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
-  p.pausas.push({inicio:hora,fim:null});
+  p.pausas.push({inicio:hora,fim:null,dIni:_fmtDataBR(_today())});
   saveDB();closeM();mVerProdBV(prodId);toast('Produção pausada','var(--or)');
 }
 function retomarProdBV(prodId){
   var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
   if(!p||!p.pausas||!p.pausas.length)return;
   var h=new Date();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
-  p.pausas[p.pausas.length-1].fim=hora;
+  p.pausas[p.pausas.length-1].fim=hora;p.pausas[p.pausas.length-1].dFim=_fmtDataBR(_today());
   saveDB();closeM();mVerProdBV(prodId);toast('Produção retomada','var(--gr)');
 }
 // Corrige manualmente o horário de início/fim — pra quando alguém esqueceu de
@@ -14663,44 +14876,161 @@ function retomarProdBV(prodId){
 function mEditarHoraProd(id){
   var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===id){p=DB.producoes[i];break;}
   if(!p)return;
-  openM('&#9998; Corrigir Horário',
+  var fechada=p.status==='fechada';
+  openM('&#9998; Corrigir Dados',
     '<div class="mf">'
-    +'<div style="font-size:12px;color:var(--mt);margin-bottom:12px">Use só pra corrigir um esquecimento (ex: fechou tarde e o horário registrado não reflete o tempo real trabalhado).</div>'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:12px">Use só pra corrigir um engano (ex: abriu ou fechou na hora errada, ou digitou o peso de entrada errado).</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Dia de início</label><input class="inp" type="date" id="eh-dini" value="'+_brToIso(p.data)+'"></div>'
     +'<div class="fld"><label>Horário de início</label><input class="inp" type="time" id="eh-ini" value="'+(p.hora||'')+'"></div>'
-    +(p.status==='fechada'?'<div class="fld"><label>Horário de fim</label><input class="inp" type="time" id="eh-fim" value="'+(p.horaFim||'')+'"></div>':'')
+    +(fechada?'<div class="fld"><label>Dia de fim</label><input class="inp" type="date" id="eh-dfim" value="'+_brToIso(p.dataFim||p.data)+'"></div>'
+      +'<div class="fld"><label>Horário de fim</label><input class="inp" type="time" id="eh-fim" value="'+(p.horaFim||'')+'"></div>':'')
+    +'</div>'
+    +(!fechada?'<div class="fld"><label>Peso de entrada líquido (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="eh-peso" value="'+p.pesoEntrada+'">'
+      +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Se mudar, a diferença é acertada no estoque de '+p.matEntrada+'.</div></div>'
+      :'<div style="font-size:10px;color:var(--mt);margin-bottom:10px">Pra corrigir peso ou material de uma produção fechada, use "Reabrir pra corrigir".</div>')
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM();mVerProdBV('+id+')">Cancelar</button><button class="btn" onclick="confirmarEditarHoraProd('+id+')">Salvar</button></div>'
-    +'</div>',420);
+    +'</div>',460);
 }
 function confirmarEditarHoraProd(id){
   var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===id){p=DB.producoes[i];break;}
   if(!p)return;
-  var ini=document.getElementById('eh-ini').value;
-  if(ini)p.hora=ini;
-  var fimEl=document.getElementById('eh-fim');
-  if(fimEl&&fimEl.value)p.horaFim=fimEl.value;
-  saveDB();closeM();mVerProdBV(id);toast('Horário corrigido!','var(--bl)');
-}
-function addSaidaProdBV(prodId){
-  var matIdEl=document.getElementById('rs-mat-id');
-  var matId=matIdEl&&matIdEl.value?parseFloat(matIdEl.value):null;
-  var peso=parseFloat(document.getElementById('rs-peso').value)||0;
-  if(!matId||peso<=0){toast('Selecione material e peso!','var(--rd)');return;}
-  var prod=gP(matId);
-  for(var i=0;i<DB.producoes.length;i++){
-    if(DB.producoes[i].id===prodId){
-      var achou=false;
-      for(var j=0;j<DB.producoes[i].saidas.length;j++){
-        if(DB.producoes[i].saidas[j].prodId===matId){DB.producoes[i].saidas[j].peso+=peso;achou=true;break;}
-      }
-      if(!achou)DB.producoes[i].saidas.push({prodId:matId,mat:prod?prod.nome:'?',peso:peso});
-      break;
+  var nData=_isoToBr(document.getElementById('eh-dini').value)||p.data;
+  var nHora=document.getElementById('eh-ini').value||p.hora;
+  var dfEl=document.getElementById('eh-dfim'),hfEl=document.getElementById('eh-fim');
+  var nDataFim=dfEl?(_isoToBr(dfEl.value)||p.dataFim||nData):p.dataFim;
+  var nHoraFim=hfEl?(hfEl.value||p.horaFim):p.horaFim;
+  if(p.status==='fechada'){
+    var S=_prodDT(nData,nHora),E=_prodDT(nDataFim,nHoraFim);
+    if(S===null||E===null||E<S){toast('O fim precisa ser depois do início!','var(--rd)');return;}
+  }
+  var pesoEl=document.getElementById('eh-peso');
+  if(pesoEl){
+    var novo=parseFloat(pesoEl.value)||0;
+    if(novo<=0){toast('Informe um peso de entrada válido!','var(--rd)');return;}
+    var dif=+(novo-p.pesoEntrada).toFixed(3);
+    if(Math.abs(dif)>0.0005){
+      var mat=gP(p.matEntradaId);
+      if(mat)mat.est=+((mat.est||0)-dif).toFixed(3);
+      try{_auditLog('Produção: peso de entrada corrigido',p.func+' · '+p.matEntrada+' · '+fKg(p.pesoEntrada)+'kg → '+fKg(novo)+'kg');}catch(e){}
+      p.pesoEntrada=+novo.toFixed(3);
+      p.pesoBruto=+((p.pesoBruto||0)+dif).toFixed(3);
+      p.entradas=_prodEntradas(p).slice();
+      p.entradas.push({bruto:dif,tara:0,peso:dif,data:_fmtDataBR(_today()),hora:_horaAgora(),ajuste:true});
     }
   }
-  saveDB();closeM();mVerProdBV(prodId);toast(fKg(peso)+'kg registrado!','var(--gr)');
+  p.data=nData;p.hora=nHora;
+  if(p.status==='fechada'){p.dataFim=nDataFim;p.horaFim=nHoraFim;}
+  saveDB();closeM();mVerProdBV(id);toast('Dados corrigidos!','var(--bl)');
+}
+// Reabrir uma produção já fechada pra corrigir peso/material (só Admin). Desfaz no
+// estoque exatamente o que o fechamento tinha feito; ao fechar de novo, tudo é
+// lançado outra vez com os valores certos e o horário de fechamento original.
+function mReabrirProdBV(id){
+  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===id){p=DB.producoes[i];break;}
+  if(!p||p.status!=='fechada')return;
+  var ts=p.saidas.reduce(function(t,x){return t+x.peso;},0);
+  openM('&#9998; Reabrir produção',
+    '<div class="mf">'
+    +'<div style="font-size:14px;margin-bottom:8px">Reabrir a produção de <b>'+p.matEntrada+'</b> ('+p.func+', '+p.data+')?</div>'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:16px">Os <b>'+fKg(ts)+'kg</b> de materiais gerados saem do estoque'+(p.destinoSobra==='pendente'&&p.sobra>0.001?', e os '+fKg(p.sobra)+'kg que tinham voltado pro estoque saem de novo':'')+'. Você corrige o que precisar e fecha outra vez — aí tudo volta pro estoque com os valores certos. O horário de fechamento original é mantido.</div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="mVerProdBV('+id+')">Voltar</button>'
+    +'<button class="btn" style="background:var(--bl)" onclick="confReabrirProdBV('+id+')">Sim, reabrir</button></div>'
+    +'</div>',460);
+}
+function confReabrirProdBV(id){
+  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===id){p=DB.producoes[i];break;}
+  if(!p||p.status!=='fechada'){closeM();go('producao');return;}
+  p.saidas.forEach(function(sd){
+    var prod=gP(sd.prodId);
+    if(prod)prod.est=+((prod.est||0)-sd.peso).toFixed(3);
+  });
+  if(p.destinoSobra==='pendente'&&p.sobra>0.001&&p.matEntradaId){
+    var origem=gP(p.matEntradaId);
+    if(origem)origem.est=+((origem.est||0)-p.sobra).toFixed(3);
+  }
+  var se=_prodIniFim(p);
+  p.reabertaDe={dataFim:p.dataFim||(se?_fmtDataBR(new Date(se[1])):p.data),horaFim:p.horaFim||_horaAgora()};
+  p.status='aberta';
+  delete p.horaFim;delete p.dataFim;
+  p.sobra=0;p.destinoSobra=null;
+  try{_auditLog('Produção reaberta pra correção',p.func+' · '+p.matEntrada+' · '+p.data);}catch(e){}
+  saveDB();closeM();mVerProdBV(id);toast('Produção reaberta — corrija e feche de novo','var(--bl)');
+}
+function addSaidaProdBV(prodId,forcar){
+  var matIdEl=document.getElementById('rs-mat-id');
+  var matId=matIdEl&&matIdEl.value?parseFloat(matIdEl.value):null;
+  var bruto=parseFloat(document.getElementById('rs-peso').value)||0;
+  var taraEl=document.getElementById('rs-tara');
+  var tara=taraEl?(parseFloat(taraEl.value)||0):0;
+  if(!matId||bruto<=0){toast('Selecione material e peso!','var(--rd)');return;}
+  if(tara<0||bruto-tara<=0){toast('A tara precisa ser menor que o peso bruto!','var(--rd)');return;}
+  var peso=+(bruto-tara).toFixed(3); // líquido
+  var prod=gP(matId);
+  var p=_prodAchar(prodId);
+  if(!p||p.status!=='aberta')return;
+  // Avisa (não bloqueia) se as saídas passarem do que entrou — normalmente é erro
+  // de digitação ou faltou lançar o material que ele pegou a mais.
+  if(!forcar){
+    var somaNova=+(p.saidas.reduce(function(t,x){return t+x.peso;},0)+peso).toFixed(3);
+    if(somaNova>p.pesoEntrada+0.001){
+      _prodAvisoInline('&#9888; Com essa pesagem as saídas somam <b>'+fKg(somaNova)+'kg</b>, mais do que entrou (<b>'+fKg(p.pesoEntrada)+'kg</b>). Confira o peso e a tara, ou lance antes o material que faltou em "+ Pegar mais material".','addSaidaProdBV',[prodId],'Lançar mesmo assim');
+      return;
+    }
+  }
+  var pesagem={peso:peso,bruto:bruto,tara:tara,data:_fmtDataBR(_today()),hora:_horaAgora()};
+  var sd=null;
+  for(var j=0;j<p.saidas.length;j++){if(p.saidas[j].prodId===matId){sd=p.saidas[j];break;}}
+  if(sd){
+    sd.pesagens=_prodPesagens(sd).slice();
+    sd.pesagens.push(pesagem);
+    sd.peso=+sd.pesagens.reduce(function(t,x){return t+x.peso;},0).toFixed(3);
+  } else {
+    p.saidas.push({prodId:matId,mat:prod?prod.nome:'?',peso:peso,pesagens:[pesagem]});
+  }
+  saveDB();closeM();mVerProdBV(prodId);toast(fKg(peso)+'kg lançado!','var(--gr)');
+}
+// Apaga UMA pesagem (a que foi lançada errada). Se era a única daquele material,
+// o material sai da lista.
+function remPesagemProdBV(prodId,sIdx,pIdx){
+  var p=_prodAchar(prodId);
+  if(!p||p.status!=='aberta'||!p.saidas[sIdx])return;
+  var sd=p.saidas[sIdx];
+  var pes=_prodPesagens(sd).slice();
+  if(!pes[pIdx])return;
+  var tirada=pes.splice(pIdx,1)[0];
+  if(!pes.length)p.saidas.splice(sIdx,1);
+  else{sd.pesagens=pes;sd.peso=+pes.reduce(function(t,x){return t+x.peso;},0).toFixed(3);}
+  saveDB();closeM();mVerProdBV(prodId);toast('Pesagem de '+fKg(tirada.peso)+'kg apagada','var(--or)');
 }
 function remSaidaProdBV(prodId,idx){
-  for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){DB.producoes[i].saidas.splice(idx,1);break;}
+  var p=_prodAchar(prodId);
+  if(!p||p.status!=='aberta')return;
+  p.saidas.splice(idx,1);
   saveDB();closeM();mVerProdBV(prodId);
+}
+// Cancelar uma produção aberta por engano: devolve TODO o peso de entrada pro
+// estoque do material e apaga a produção (as saídas ainda não tinham ido pro
+// estoque, então não há mais nada a desfazer). Fica registrado na auditoria.
+function mCancelarProdBV(prodId){
+  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
+  if(!p||p.status!=='aberta')return;
+  openM('&#10005; Cancelar produção',
+    '<div class="mf">'
+    +'<div style="font-size:14px;margin-bottom:8px">Cancelar a produção de <b>'+p.matEntrada+'</b> ('+p.func+')?</div>'
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:16px">Os <b>'+fKg(p.pesoEntrada)+'kg</b> voltam pro estoque e '+(p.saidas.length?'os '+p.saidas.length+' material(is) já registrados são descartados':'nada mais é alterado')+'. Use só quando a produção foi aberta por engano — se o trabalho foi feito, feche normalmente.</div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="mVerProdBV('+prodId+')">Voltar</button>'
+    +'<button class="btn" style="background:var(--rd)" onclick="confCancelarProdBV('+prodId+')">Sim, cancelar produção</button></div>'
+    +'</div>',460);
+}
+function confCancelarProdBV(prodId){
+  var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
+  if(!p||p.status!=='aberta'){closeM();go('producao');return;}
+  var orig=gP(p.matEntradaId);
+  if(orig)orig.est=+((orig.est||0)+p.pesoEntrada).toFixed(3);
+  DB.producoes=DB.producoes.filter(function(x){return x.id!==prodId;});
+  try{_auditLog('Produção cancelada',p.func+' · '+p.matEntrada+' · '+fKg(p.pesoEntrada)+'kg devolvidos ao estoque');}catch(e){}
+  saveDB();closeM();go('producao');toast('Produção cancelada — estoque devolvido','var(--or)');
 }
 // Fechar produção: se sobrou peso não registrado como saída, pergunta o destino
 // (perda ou material ainda não desmontado) antes de distribuir tudo pro estoque real.
@@ -14738,7 +15068,14 @@ function _finalizarFechamentoProd(prodId,sobra,destinoSobra){
   }
   p.sobra=sobra;p.destinoSobra=destinoSobra;
   p.status='fechada';
-  var h=new Date();p.horaFim=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
+  if(p.reabertaDe){
+    // Foi reaberta só pra corrigir: o horário de fechamento continua o original
+    p.horaFim=p.reabertaDe.horaFim;p.dataFim=p.reabertaDe.dataFim;delete p.reabertaDe;
+  } else {
+    p.horaFim=_horaAgora();p.dataFim=_fmtDataBR(_today());
+  }
+  // Fechou enquanto estava pausada: a pausa termina junto com a produção
+  if(p.pausas)p.pausas.forEach(function(pa){if(!pa.fim){pa.fim=p.horaFim;pa.dFim=p.dataFim;}});
   saveDB();closeM();go('producao');toast('Produção fechada!','var(--gr)');
 }
 
@@ -14746,7 +15083,7 @@ function _finalizarFechamentoProd(prodId,sobra,destinoSobra){
 function exportarRelatorioProducao(){
   var todasFechadas=(DB.producoes||[]).filter(function(p){return p.status==='fechada';});
   var fechadas=_prodFiltrar(todasFechadas);
-  if(!fechadas.length){alert('Nenhuma produção fechada nesse período pra exportar.');return;}
+  if(!fechadas.length){toast('Nenhuma produção fechada nesse período pra exportar.','var(--or)');return;}
 
   var periodos={'hoje':'Hoje','semana':'Esta Semana','mes':'Este Mês','trim':'Trimestre','ano':'Este Ano','tudo':'Todo o Período'};
   var totalEntrada=0,totalSaida=0,totalValorSaida=0,totalCustoEntrada=0;
@@ -14754,12 +15091,13 @@ function exportarRelatorioProducao(){
   function _chaveFunc(n){return (n||'').trim().replace(/\s+/g,' ').toLowerCase();}
 
   fechadas.forEach(function(p){
-    totalEntrada+=p.pesoEntrada;
-    var ce=_prodCustoEntradaP(p)*p.pesoEntrada;
+    var pe=_prodPesoProc(p);
+    totalEntrada+=pe;
+    var ce=_prodCustoEntradaP(p)*pe;
     totalCustoEntrada+=ce;
     var chave=_chaveFunc(p.func);
     if(!porFunc[chave])porFunc[chave]={nome:p.func.trim(),entrada:0,saida:0,valorSaida:0,custoEntrada:0,prods:0,tempoMin:0};
-    porFunc[chave].entrada+=p.pesoEntrada;porFunc[chave].custoEntrada+=ce;porFunc[chave].prods++;
+    porFunc[chave].entrada+=pe;porFunc[chave].custoEntrada+=ce;porFunc[chave].prods++;
     porFunc[chave].tempoMin+=_prodDuracaoMin(p);
     p.saidas.forEach(function(s){
       totalSaida+=s.peso;
@@ -14775,7 +15113,7 @@ function exportarRelatorioProducao(){
 
   var html='<div style="display:flex;gap:10px;margin-bottom:14px">'
     +'<div style="flex:1;background:#f3f4f6;border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:#666">PERÍODO</div><div style="font-size:13px;font-weight:700">'+(periodos[prodPeriodo]||'Este Mês')+'</div></div>'
-    +'<div style="flex:1;background:#f3f4f6;border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:#666">KG ENTRADA</div><div style="font-size:13px;font-weight:700">'+fKg(totalEntrada)+'</div></div>'
+    +'<div style="flex:1;background:#f3f4f6;border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:#666">KG DESMONTADOS</div><div style="font-size:13px;font-weight:700">'+fKg(totalEntrada)+'</div></div>'
     +'<div style="flex:1;background:#f3f4f6;border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:#666">KG SAÍDA</div><div style="font-size:13px;font-weight:700">'+fKg(totalSaida)+'</div></div>'
     +'<div style="flex:1;background:#f3f4f6;border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:#666">APROVEITAMENTO</div><div style="font-size:13px;font-weight:700">'+aprov.toFixed(1)+'%</div></div>'
     +'<div style="flex:1;background:#f3f4f6;border-radius:6px;padding:10px;text-align:center"><div style="font-size:9px;color:#666">LUCRO EST.</div><div style="font-size:13px;font-weight:700">'+fR(lucro)+'</div></div>'
@@ -14795,17 +15133,19 @@ function exportarRelatorioProducao(){
   // Materiais gerados
   html+='<h3 style="font-size:13px;margin:14px 0 6px">Materiais Gerados</h3>';
   var matIds=Object.keys(porMatSaida).sort(function(a,b){return porMatSaida[b].valor-porMatSaida[a].valor;});
-  html+='<table><thead><tr><th>Material</th><th>Kg Total</th><th>Valor Total</th></tr></thead><tbody>';
+  html+='<table><thead><tr><th>Material</th><th>Kg Total</th><th>% do Desmontado</th><th>Valor Total</th></tr></thead><tbody>';
   matIds.forEach(function(pid){
     var d=porMatSaida[pid];var prod=gP(parseFloat(pid));var nome=prod?prod.nome:'?';
-    html+='<tr><td>'+nome+'</td><td>'+fKg(d.peso)+'kg</td><td>'+fR(d.valor)+'</td></tr>';
+    html+='<tr><td>'+nome+'</td><td>'+fKg(d.peso)+'kg</td><td>'+(totalEntrada>0?(d.peso/totalEntrada*100).toFixed(1):'0.0')+'%</td><td>'+(_prodPrecoVenda(parseFloat(pid))>0?fR(d.valor):'sem preço')+'</td></tr>';
   });
+  var perdaPdf=+(totalEntrada-totalSaida).toFixed(3);
+  if(perdaPdf>0.001)html+='<tr><td>Perda / descarte</td><td>'+fKg(perdaPdf)+'kg</td><td>'+(totalEntrada>0?(perdaPdf/totalEntrada*100).toFixed(1):'0.0')+'%</td><td>&mdash;</td></tr>';
   html+='</tbody></table>';
 
   // Histórico detalhado — produção por produção
   html+='<h3 style="font-size:13px;margin:14px 0 6px">Histórico Detalhado</h3>';
   html+='<table><thead><tr><th>Data</th><th>Funcionário</th><th>Material Entrada</th><th>Lote</th><th>Kg Entrada</th><th>Materiais Gerados</th></tr></thead><tbody>';
-  var ordenadas=fechadas.slice().sort(function(a,b){return _parseDataBR(b.data)-_parseDataBR(a.data);});
+  var ordenadas=fechadas.slice().sort(function(a,b){return _parseDataBR(_prodDataRef(b))-_parseDataBR(_prodDataRef(a));});
   ordenadas.forEach(function(p){
     var geradosStr=p.saidas.map(function(s){var prod=gP(s.prodId);return (prod?prod.nome:'?')+': '+fKg(s.peso)+'kg';}).join(', ');
     html+='<tr><td>'+p.data+'</td><td>'+p.func+'</td><td>'+p.matEntrada+'</td><td>'+(p.lote||'—')+'</td><td>'+fKg(p.pesoEntrada)+'kg</td><td style="font-size:9px">'+geradosStr+'</td></tr>';
@@ -14819,6 +15159,30 @@ function exportarRelatorioProducao(){
 // ── Lotes: custo, receita e lucro de cada lote (pra decidir quanto vale a pena
 // pagar num leilão parecido) — mesma base do "Rendimento Médio" da Análise, só
 // que com os valores em R$ também, não só composição em %.
+// Aviso: materiais gerados no período que estão valendo R$ 0 na conta (sem tabela
+// de venda vinculada, ou vinculados a uma tabela sem preço). Não inventa preço —
+// só avisa que o lucro mostrado está incompleto e leva pra tela de correção.
+function _prodAvisoSemPreco(fechadas){
+  var sem={};
+  fechadas.forEach(function(p){p.saidas.forEach(function(s){
+    if(_prodPrecoVenda(s.prodId)>0)return;
+    if(!sem[s.prodId])sem[s.prodId]=0;
+    sem[s.prodId]+=s.peso;
+  });});
+  var ids=Object.keys(sem);
+  if(!ids.length)return '';
+  var linhas=ids.sort(function(a,b){return sem[b]-sem[a];}).map(function(pid){
+    var prod=gP(parseFloat(pid));
+    var motivo=DB.prodVinculos[pid]?'tabela vinculada sem preço':'sem tabela vinculada';
+    return '<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0"><span>'+(prod?prod.ic+' '+prod.nome:'Material removido do cadastro')+' <span style="color:var(--mt)">· '+motivo+'</span></span><span style="font-weight:700">'+fKg(sem[pid])+'kg</span></div>';
+  }).join('');
+  return '<div class="card" style="border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.06)">'
+    +'<div style="font-size:13px;font-weight:800;color:var(--or);margin-bottom:4px">&#9888; Lucro incompleto — '+ids.length+' material(is) valendo R$ 0</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:8px">Esses materiais foram gerados no período mas não têm preço de venda, então entram como zero na receita e no lucro abaixo.</div>'
+    +linhas
+    +'<button class="btnO" style="margin-top:10px;font-size:12px;padding:6px 12px;border-color:var(--or);color:var(--or)" onclick="prodVw=\'config\';go(\'producao\')">&#9881; Corrigir em Tabelas</button>'
+    +'</div>';
+}
 function _prodLotes(todasFechadas){
   var periodos=[{k:'hoje',l:'Hoje'},{k:'semana',l:'Semana'},{k:'mes',l:'Mês'},{k:'trim',l:'Trimestre'},{k:'ano',l:'Ano'},{k:'tudo',l:'Todo Período'}];
   var perBar='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px">';
@@ -14835,8 +15199,9 @@ function _prodLotes(todasFechadas){
   comLote.forEach(function(p){
     var chave=p.lote.trim().replace(/\s+/g,' ').toLowerCase();
     if(!porLote[chave])porLote[chave]={nome:p.lote.trim(),entrada:0,ocorrencias:0,materiais:{},custo:0,receita:0};
-    var ce=_prodCustoEntradaP(p)*p.pesoEntrada;
-    porLote[chave].entrada+=p.pesoEntrada;
+    var pe=_prodPesoProc(p);
+    var ce=_prodCustoEntradaP(p)*pe;
+    porLote[chave].entrada+=pe;
     porLote[chave].ocorrencias++;
     porLote[chave].custo+=ce;
     p.saidas.forEach(function(s){
@@ -14847,7 +15212,7 @@ function _prodLotes(todasFechadas){
   });
 
   var lotesKeys=Object.keys(porLote).sort(function(a,b){return (porLote[b].receita-porLote[b].custo)-(porLote[a].receita-porLote[a].custo);});
-  var html=perBar;
+  var html=perBar+_prodAvisoSemPreco(comLote);
   lotesKeys.forEach(function(k){
     var d=porLote[k];
     var lucro=d.receita-d.custo;
@@ -14895,12 +15260,13 @@ function _prodAnalise(todasFechadas){
   function _chaveFunc(n){return (n||'').trim().replace(/\s+/g,' ').toLowerCase();}
 
   fechadas.forEach(function(p){
-    totalEntrada+=p.pesoEntrada;
-    var ce=_prodCustoEntradaP(p)*p.pesoEntrada;
+    var pe=_prodPesoProc(p);
+    totalEntrada+=pe;
+    var ce=_prodCustoEntradaP(p)*pe;
     totalCustoEntrada+=ce;
     var chave=_chaveFunc(p.func);
     if(!porFunc[chave])porFunc[chave]={nome:p.func.trim(),entrada:0,saida:0,valorSaida:0,custoEntrada:0,prods:0,tempoMin:0};
-    porFunc[chave].entrada+=p.pesoEntrada;porFunc[chave].custoEntrada+=ce;porFunc[chave].prods++;
+    porFunc[chave].entrada+=pe;porFunc[chave].custoEntrada+=ce;porFunc[chave].prods++;
     porFunc[chave].tempoMin+=_prodDuracaoMin(p);
     p.saidas.forEach(function(s){
       totalSaida+=s.peso;
@@ -14920,11 +15286,12 @@ function _prodAnalise(todasFechadas){
   var lucro=totalValorSaida-totalCustoEntrada;
 
   var html=perBar+'<div class="g4">'
-    +sc('📥','Entrada',fKg(totalEntrada)+'kg','','var(--bl)')
+    +sc('📥','Desmontado',fKg(totalEntrada)+'kg','','var(--bl)')
     +sc('📤','Saída',fKg(totalSaida)+'kg','','var(--gr)')
     +sc('📊','Aproveitamento',aprov.toFixed(1)+'%','','var(--pu)')
     +sc('💰','Lucro Estimado',fR(lucro),'',lucro>=0?'var(--gr)':'var(--rd)')
-    +'</div>';
+    +'</div>'
+    +_prodAvisoSemPreco(fechadas);
 
   // Por tabela
   var tabIds=Object.keys(porTabela).sort(function(a,b){return porTabela[b].valor-porTabela[a].valor;});
@@ -14951,6 +15318,7 @@ function _prodAnalise(todasFechadas){
       +'<div style="font-size:11px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">&#9201; Lucro por Hora Trabalhada (geral)</div>'
       +'<div style="font-size:26px;font-weight:800;color:var(--pu)">'+fR(lucroTotalGeral/horasTotalGeral)+'/h</div>'
       +'<div style="font-size:11px;color:var(--mt)">'+_fmtDuracao(tempoTotalGeral)+' trabalhadas no período · '+fR(lucroTotalGeral)+' de lucro</div>'
+      +'<div style="font-size:10px;color:var(--mt);margin-top:4px">Tempo contado: '+_prodJornadaResumo()+'</div>'
       +'</div>';
   }
   // Por funcionário
@@ -14964,58 +15332,39 @@ function _prodAnalise(todasFechadas){
       +'<div style="font-size:11px;color:var(--mt)">'+d.prods+' prod · '+fKg(d.entrada)+'kg'+(d.tempoMin?' · &#9200; '+_fmtDuracao(d.tempoMin):'')+'</div></div>'
       +'<div style="text-align:right"><div style="font-size:14px;font-weight:800;color:'+(luc>=0?'var(--gr)':'var(--rd)')+'">'+fR(luc)+'</div>'
       +'<div style="font-size:10px;color:var(--mt)">lucro est.</div></div></div>'
-      +'<div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden;margin-top:8px"><div style="height:100%;border-radius:3px;width:'+ap+'%;background:'+(ap>70?'var(--gr)':ap>40?'var(--or)':'var(--rd)')+'"></div></div>'
+      +'<div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden;margin-top:8px"><div style="height:100%;border-radius:3px;width:'+Math.min(100,ap)+'%;background:'+(ap>70?'var(--gr)':ap>40?'var(--or)':'var(--rd)')+'"></div></div>'
       +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Aprov: '+ap.toFixed(1)+'% · '+fKg(d.saida)+'kg · '+fR(d.valorSaida)+(rhora!==null?' · <span style="color:var(--pu);font-weight:700">'+fR(rhora)+'/h</span>':'')+' · <span style="color:var(--bl)">ver histórico &#8250;</span></div></div>';
   });
   html+='</div>';
 
-  // Rendimento médio por lote — ajuda a decidir quanto vale a pena pagar num leilão
-  // de um tipo de lote parecido, comparando o histórico de todas as vezes que você
-  // desmontou algo com o mesmo apelido.
-  var porLote={};
-  fechadas.forEach(function(p){
-    if(!p.lote)return;
-    var chave=p.lote.trim().replace(/\s+/g,' ').toLowerCase();
-    if(!chave)return;
-    if(!porLote[chave])porLote[chave]={nome:p.lote.trim(),entrada:0,ocorrencias:0,materiais:{}};
-    porLote[chave].entrada+=p.pesoEntrada;
-    porLote[chave].ocorrencias++;
-    p.saidas.forEach(function(s){
-      if(!porLote[chave].materiais[s.prodId])porLote[chave].materiais[s.prodId]=0;
-      porLote[chave].materiais[s.prodId]+=s.peso;
-    });
-  });
-  var lotesKeys=Object.keys(porLote);
-  if(lotesKeys.length){
-    html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:4px">📦 Rendimento Médio por Lote</div>'
-      +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Quanto cada 100kg desse tipo de lote costuma render — útil pra decidir quanto vale a pena pagar num leilão parecido.</div>';
-    lotesKeys.sort(function(a,b){return porLote[b].entrada-porLote[a].entrada;}).forEach(function(k){
-      var d=porLote[k];
-      html+='<div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px">'
-        +'<div style="font-size:13px;font-weight:700">'+d.nome+'</div>'
-        +'<div style="font-size:10px;color:var(--mt);margin-bottom:8px">'+d.ocorrencias+' vez(es) · '+fKg(d.entrada)+'kg no total</div>';
-      Object.keys(d.materiais).sort(function(a,b){return d.materiais[b]-d.materiais[a];}).forEach(function(pid){
-        var prod=gP(parseFloat(pid));var nome=prod?prod.ic+' '+prod.nome:'?';
-        var pct=d.entrada>0?(d.materiais[pid]/d.entrada*100):0;
-        html+='<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0"><span>'+nome+'</span><span style="color:var(--mt)">'+pct.toFixed(1)+'% · ~'+fKg(d.materiais[pid]/d.ocorrencias)+'kg/vez</span></div>';
-      });
-      html+='</div>';
-    });
-    html+='</div>';
-  }
+  // (Rendimento por lote fica só na subaba Lotes, que mostra o mesmo com R$.)
 
   // Materiais
-  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:10px">📦 Materiais Gerados</div>';
-  var matIds=Object.keys(porMatSaida).sort(function(a,b){return porMatSaida[b].valor-porMatSaida[a].valor;});
+  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:4px">📦 Materiais Gerados</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">O % é quanto cada material representa dos '+fKg(totalEntrada)+'kg desmontados no período.</div>';
+  var matIds=Object.keys(porMatSaida).sort(function(a,b){return porMatSaida[b].peso-porMatSaida[a].peso;});
   matIds.forEach(function(mid){
     var d=porMatSaida[mid];var prod=gP(parseFloat(mid));var nome=prod?prod.ic+' '+prod.nome:'?';
     var pv=_prodPrecoVenda(parseFloat(mid));
     var tabId=DB.prodVinculos[parseFloat(mid)];var tabNome=tabId?_nomeTab(tabId):'sem tabela';
-    html+='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border-radius:8px;margin-bottom:5px">'
+    var pctM=totalEntrada>0?(d.peso/totalEntrada*100):0;
+    html+='<div style="padding:8px 10px;background:var(--s2);border-radius:8px;margin-bottom:5px">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
       +'<div style="flex:1"><div style="font-size:13px;font-weight:700">'+nome+'</div>'
       +'<div style="font-size:10px;color:var(--mt)">'+fKg(d.peso)+'kg · '+fR(pv)+'/kg · → '+tabNome+'</div></div>'
-      +'<div style="font-size:13px;font-weight:700;color:var(--gr)">'+fR(d.valor)+'</div></div>';
+      +'<div style="text-align:right"><div style="font-size:14px;font-weight:800;color:var(--bl)">'+pctM.toFixed(1)+'%</div>'
+      +'<div style="font-size:11px;font-weight:700;color:'+(pv>0?'var(--gr)':'var(--or)')+'">'+(pv>0?fR(d.valor):'sem preço')+'</div></div></div>'
+      +'<div style="height:4px;background:var(--s3);border-radius:2px;overflow:hidden;margin-top:6px"><div style="height:100%;width:'+Math.min(100,pctM)+'%;background:var(--bl)"></div></div>'
+      +'</div>';
   });
+  var perdaKg=+(totalEntrada-totalSaida).toFixed(3);
+  if(perdaKg>0.001){
+    var pctP=totalEntrada>0?(perdaKg/totalEntrada*100):0;
+    html+='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px dashed var(--bd);border-radius:8px">'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--mt)">🗑️ Perda / descarte</div>'
+      +'<div style="font-size:10px;color:var(--mt)">'+fKg(perdaKg)+'kg que entraram e não viraram material</div></div>'
+      +'<div style="font-size:14px;font-weight:800;color:var(--mt)">'+pctP.toFixed(1)+'%</div></div>';
+  }
   html+='</div>';
 
   // Histórico
@@ -15060,6 +15409,12 @@ function _prodConfig(){
     +'<button class="btnO bOgr" onclick="mMateriaisDestaque()" style="font-size:12px;padding:6px 12px">&#11088; Materiais em Destaque</button>'
     +'</div>';
 
+  // Expediente — base do tempo trabalhado e do lucro por hora
+  html+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'
+    +'<div><div style="font-size:13px;font-weight:800;margin-bottom:4px">&#128343; Expediente (tempo trabalhado)</div>'
+    +'<div style="font-size:11px;color:var(--mt)">'+_prodJornadaResumo()+'</div></div>'
+    +'<button class="btnO bOgr" onclick="mProdJornada()" style="font-size:12px;padding:6px 12px;white-space:nowrap">&#9998; Editar</button></div></div>';
+
   // Vínculos material de saída → tabela de venda
   html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:6px">📋 Vincular Material → Tabela de Venda</div>'
     +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Escolha qual tabela usar pra projetar o valor de cada material gerado. O preço vem automaticamente da tabela.</div>';
@@ -15098,6 +15453,49 @@ function _prodConfig(){
   return html;
 }
 
+function mProdJornada(){
+  var j=_prodJornada();
+  var nomes=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  var diasH='';
+  for(var d=0;d<7;d++){
+    diasH+='<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="checkbox" id="pj-d'+d+'"'+((j.dias||[]).indexOf(d)>=0?' checked':'')+'> '+nomes[d]+'</label>';
+  }
+  var ivs=(j.intervalos||[]).slice();
+  while(ivs.length<4)ivs.push({nome:'',ini:'',fim:''});
+  var ivH='';
+  ivs.forEach(function(iv,k){
+    ivH+='<div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:6px;margin-bottom:6px">'
+      +'<input class="inp" id="pj-n'+k+'" value="'+(iv.nome||'')+'" placeholder="Nome (ex: Almoço)">'
+      +'<input class="inp" type="time" id="pj-i'+k+'" value="'+(iv.ini||'')+'">'
+      +'<input class="inp" type="time" id="pj-f'+k+'" value="'+(iv.fim||'')+'"></div>';
+  });
+  openM('&#128343; Expediente',
+    '<div class="mf">'
+    +'<label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="pj-ativo"'+(j.ativo?' checked':'')+' style="width:16px;height:16px"><span style="font-size:13px;font-weight:700">Contar só o tempo dentro do expediente</span></label>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:12px">Ligado: almoço, cafés, noite e dias sem expediente saem da conta sozinhos. Desligado: conta o tempo corrido entre abrir e fechar, menos as pausas.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
+    +'<div class="fld"><label>Começa</label><input class="inp" type="time" id="pj-ini" value="'+j.ini+'"></div>'
+    +'<div class="fld"><label>Termina</label><input class="inp" type="time" id="pj-fim" value="'+j.fim+'"></div></div>'
+    +'<div class="fld"><label>Dias de expediente</label><div style="display:flex;gap:10px;flex-wrap:wrap">'+diasH+'</div></div>'
+    +'<div class="fld"><label>Intervalos que não contam (deixe em branco pra remover)</label>'+ivH+'</div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="salvarProdJornada()">Salvar</button></div>'
+    +'</div>',480);
+}
+function salvarProdJornada(){
+  var ini=document.getElementById('pj-ini').value,fim=document.getElementById('pj-fim').value;
+  if(_hm2min(ini)===null||_hm2min(fim)===null||_hm2min(fim)<=_hm2min(ini)){toast('O expediente precisa terminar depois de começar!','var(--rd)');return;}
+  var dias=[];for(var d=0;d<7;d++){if(document.getElementById('pj-d'+d).checked)dias.push(d);}
+  if(!dias.length){toast('Marque pelo menos um dia!','var(--rd)');return;}
+  var ivs=[];
+  for(var k=0;k<4;k++){
+    var a=document.getElementById('pj-i'+k).value,b=document.getElementById('pj-f'+k).value;
+    if(!a||!b)continue;
+    if(_hm2min(b)<=_hm2min(a)){toast('Intervalo '+(k+1)+': o fim precisa ser depois do início!','var(--rd)');return;}
+    ivs.push({nome:document.getElementById('pj-n'+k).value.trim()||'Intervalo',ini:a,fim:b});
+  }
+  DB.prodJornada={ativo:document.getElementById('pj-ativo').checked,ini:ini,fim:fim,dias:dias,intervalos:ivs};
+  saveDB();closeM();go('producao');toast('Expediente salvo!','var(--gr)');
+}
 function _setProdVinc(prodId,tabId){
   if(tabId)DB.prodVinculos[prodId]=parseFloat(tabId);
   else delete DB.prodVinculos[prodId];
@@ -15109,7 +15507,7 @@ function _setProdVinc(prodId,tabId){
 function mAddPrecoTabelaProd(prodId){
   var prod=gP(prodId);if(!prod)return;
   var tabVenda=DB.tabelas.filter(function(t){return t.tipo==='venda';});
-  if(!tabVenda.length){alert('Você ainda não tem nenhuma tabela de venda cadastrada. Crie uma na aba Tabelas primeiro.');return;}
+  if(!tabVenda.length){toast('Crie uma tabela de venda na aba Tabelas primeiro.','var(--or)');return;}
   var tabOpts=tabVenda.map(function(t){return '<option value="'+t.id+'">'+t.nome+'</option>';}).join('');
   openM('+ Preço — '+prod.ic+' '+prod.nome,
     '<div class="mf">'
@@ -16500,17 +16898,40 @@ function mRelCli(idx){
     }
   }
 
-  for(var i=0;i<atendHist.length;i++) _proc(atendHist[i],hj());
+  for(var i=0;i<atendHist.length;i++) _proc(atendHist[i],atendHist[i].data||hj());
   if(DB.caixasHist){
     for(var i=0;i<DB.caixasHist.length;i++){
       var cx=DB.caixasHist[i];var mvs=cx.movimentos||[];
       for(var j=0;j<mvs.length;j++) _proc({tipo:mvs[j].tipo,cliId:mvs[j].cliId,label:mvs[j].label,num:mvs[j].num,itens:mvs[j].itensList||[],total:mvs[j].total||0},cx.data||'');
     }
   }
+  // Pendências "Em Aberto" — ainda não foram pagas, mas já são atividade real com
+  // essa pessoa/empresa (senão parece que a pesagem "sumiu"). Entram marcadas como
+  // pendente; não contam no total financeiro porque o dinheiro ainda não entrou.
+  if(DB.pesagensEmAberto){
+    DB.pesagensEmAberto.forEach(function(at){
+      if(tipo==='fornecedor'&&at.tipo!=='Compra')return;
+      if(tipo==='cliente'&&at.tipo!=='Venda')return;
+      if(String(at.cliId)!==String(c.id))return;
+      if(!_perFiltro(at.suspendoData,per,'',''))return;
+      var itensP=[];var totalP=0,pesoP=0;
+      (at.itens||[]).forEach(function(it){
+        var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;
+        var val=it.uni?it.preco:pesoEf*it.preco;
+        totalP+=val;pesoP+=pesoEf||0;
+        itensP.push({prod:(it.ic?it.ic+' ':'')+it.nome,kg:pesoEf,val:val});
+      });
+      var chave='pend-'+at.num;
+      pedidos[chave]={data:at.suspendoData||'—',num:'#'+at.num,tipo:at.tipo,total:totalP,peso:pesoP,itens:itensP,pendente:true};
+      ordemPedidos.push(chave);
+    });
+  }
 
   var total=0,pesoTotal=0;
-  ordemPedidos.forEach(function(k){total+=pedidos[k].total;pesoTotal+=pedidos[k].peso;});
+  ordemPedidos.sort(function(a,b){return _parseDataBR(pedidos[b].data)-_parseDataBR(pedidos[a].data);});
+  ordemPedidos.forEach(function(k){if(pedidos[k].pendente)return;total+=pedidos[k].total;pesoTotal+=pedidos[k].peso;});
   var numPedidos=ordemPedidos.length;
+  var numPedidosPagos=ordemPedidos.filter(function(k){return !pedidos[k].pendente;}).length;
 
   var cor=tipo==='fornecedor'?'var(--rd)':'var(--gr)';
   var perOps=['tudo','mes','mespass','30dias','ano'].map(function(p2){
@@ -16519,7 +16940,7 @@ function mRelCli(idx){
   }).join('');
 
   // Resumo — agora "Transações" e "Ticket Médio" contam PEDIDOS de verdade
-  var avgTicket=numPedidos>0?total/numPedidos:0;
+  var avgTicket=numPedidosPagos>0?total/numPedidosPagos:0;
   var resumo='<div class="g3" style="margin-bottom:12px">'
     +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Total</div><div style="font-size:18px;font-weight:800;color:'+cor+';font-family:monospace">'+fR(total)+'</div></div>'
     +'<div style="background:var(--s2);border-radius:var(--r);padding:10px;text-align:center"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Pedidos</div><div style="font-size:18px;font-weight:800;color:var(--bl);font-family:monospace">'+numPedidos+'</div></div>'
@@ -16552,9 +16973,9 @@ function mRelCli(idx){
     }).join('');
     tblRows+='<tr style="cursor:pointer" onclick="_toggleRelCliPedido(\''+rowId+'\')">'
       +'<td style="padding:7px 8px;font-size:11px;color:var(--mt)">'+pd.data+'</td>'
-      +'<td style="padding:7px 8px;font-size:11px">'+pd.num+' <span style="color:var(--mt)">('+pd.itens.length+' item'+(pd.itens.length===1?'':'s')+')</span></td>'
+      +'<td style="padding:7px 8px;font-size:11px">'+pd.num+' <span style="color:var(--mt)">('+pd.itens.length+' item'+(pd.itens.length===1?'':'s')+')</span>'+(pd.pendente?' <span style="background:rgba(245,158,11,.15);color:var(--or);font-size:9px;font-weight:700;padding:1px 7px;border-radius:10px">&#8987; PENDENTE</span>':'')+'</td>'
       +'<td style="padding:7px 8px;text-align:right;font-family:monospace;font-size:11px">'+(pd.peso>0?fKg(pd.peso)+' kg':'—')+'</td>'
-      +'<td style="padding:7px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:'+cor+'">'+fR(pd.total)+'</td>'
+      +'<td style="padding:7px 8px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:'+(pd.pendente?'var(--or)':cor)+'">'+fR(pd.total)+'</td>'
       +'<td style="padding:7px 4px;text-align:center;color:var(--mt);font-size:10px" id="'+rowId+'-seta">&#9660;</td>'
       +'</tr>'
       +'<tr id="'+rowId+'" style="display:none"><td colspan="5" style="padding:0">'+itensHtml+'</td></tr>';
@@ -16611,7 +17032,7 @@ function _exportRelCli(idx,fmt){
       rows.push([data||ah.hora||'—','#'+(ah.num||''),'Pedido #'+(ah.num||''),'—','—',fR(ah.total||0),ah.tipo]);
     }
   }
-  for(var i=0;i<atendHist.length;i++) _proc(atendHist[i],hj());
+  for(var i=0;i<atendHist.length;i++) _proc(atendHist[i],atendHist[i].data||hj());
   if(DB.caixasHist){for(var i=0;i<DB.caixasHist.length;i++){var cx=DB.caixasHist[i];var mvs=cx.movimentos||[];for(var j=0;j<mvs.length;j++) _proc({tipo:mvs[j].tipo,cliId:mvs[j].cliId,label:mvs[j].label,num:mvs[j].num,itens:mvs[j].itensList||[],total:mvs[j].total||0},cx.data||'');}}
   rows.push(['TOTAL','','','','',fR(total),'']);
 
@@ -19018,6 +19439,67 @@ var CUSTOM_ROLES=[];
 function getAllRoles(){return BASE_ROLES.concat(CUSTOM_ROLES);}
 function getRoleById(id){var all=getAllRoles();for(var i=0;i<all.length;i++){if(all[i].id===id)return all[i];}return null;}
 function getRoleName(id){var r=getRoleById(id);return r?r.nome:id;}
+// Reconstrói PPAGES (abas) e PNOME (nome exibido) a partir das funções carregadas.
+// Antes só o PPAGES era refeito — por isso uma função criada em outro aparelho
+// aparecia como "undefined" na tela de login.
+function _rebuildRoleMaps(){
+  var all=BASE_ROLES.concat(CUSTOM_ROLES);
+  for(var i=0;i<all.length;i++){
+    if(!all[i]||!all[i].id)continue;
+    PPAGES[all[i].id]=all[i].pages||[];
+    PNOME[all[i].id]=all[i].nome||all[i].id;
+  }
+}
+function _rolesJson(){return JSON.stringify({base:BASE_ROLES,custom:CUSTOM_ROLES});}
+// Última versão de funções/usuários que ESTE aparelho sabe que está na nuvem.
+// Só sobe de novo quando o aparelho mudou algo de verdade — evita que um aparelho
+// com dados antigos apague uma função/usuário criado em outro.
+var _rolesCloudJson=null,_usersCloudJson=null;
+function _aplicarRolesNuvem(ro){
+  if(!ro||!Array.isArray(ro.base))return false;
+  BASE_ROLES=ro.base;
+  if(Array.isArray(ro.custom))CUSTOM_ROLES=ro.custom;
+  _patchRestoredRoles();
+  _rebuildRoleMaps();
+  _rolesCloudJson=_rolesJson();
+  try{localStorage.setItem('bv_roles',_rolesCloudJson);}catch(e){}
+  try{buildLoginList();if(CU){buildSidebar();buildBottomNav();}}catch(e){}
+  return true;
+}
+function _aplicarUsersNuvem(us){
+  if(!us||!Array.isArray(us)||!us.length)return false;
+  USERS=us;
+  _usersCloudJson=JSON.stringify(USERS);
+  try{localStorage.setItem('bv_users',_usersCloudJson);}catch(e){}
+  try{
+    buildLoginList();
+    if(CU){
+      var me=null;
+      for(var i=0;i<USERS.length;i++){if(USERS[i].id===CU.id){me=USERS[i];break;}}
+      if(me)CU=me;
+      buildSidebar();buildBottomNav();
+    }
+  }catch(e){}
+  return true;
+}
+// Busca funções e usuários na nuvem — só aplica se este aparelho não tem
+// alteração própria ainda não enviada.
+function _recarregarAcessosNuvem(){
+  if(!_sbReady||!_sbClient)return;
+  _sbGet('bv_roles',function(ro){
+    if(!ro||!Array.isArray(ro.base))return;
+    if(_rolesCloudJson!==null&&_rolesJson()!==_rolesCloudJson)return; // mudança local pendente
+    if(JSON.stringify({base:ro.base,custom:ro.custom||[]})===_rolesCloudJson)return;
+    _aplicarRolesNuvem(ro);
+  });
+  _sbGet('bv_users',function(us){
+    if(!us||!Array.isArray(us)||!us.length)return;
+    var loc=JSON.stringify(USERS);
+    if(_usersCloudJson!==null&&loc!==_usersCloudJson)return;
+    if(JSON.stringify(us)===loc)return;
+    _aplicarUsersNuvem(us);
+  });
+}
 function _goUsuarios(){
   // Se estamos dentro de Configuracoes > Usuarios, recarrega configuracoes
   if(pgAtiva==='configuracoes'&&cfgAba==='usuarios'){
@@ -19031,13 +19513,13 @@ function _goUsuarios(){
 // localStorage (cache do navegador), então sem isso um usuário criado/editado
 // num aparelho nunca aparece nos outros, e pode até sumir se o cache for limpo.
 function _syncUsers(){
-  try{_sbSet('bv_users',USERS,function(){});}catch(e){}
+  try{var _uj=JSON.stringify(USERS);_sbSet('bv_users',USERS,function(ok){if(ok)_usersCloudJson=_uj;});}catch(e){}
 }
 // Mesma lógica pras Funções (papéis/permissões) — saveDB() também só grava local
 // pra BASE_ROLES/CUSTOM_ROLES, então uma função criada ou editada num aparelho
 // nunca aparecia nos outros sem isso.
 function _syncRoles(){
-  try{_sbSet('bv_roles',{base:BASE_ROLES,custom:CUSTOM_ROLES},function(){});}catch(e){}
+  try{_rebuildRoleMaps();var _rj=_rolesJson();_sbSet('bv_roles',JSON.parse(_rj),function(ok){if(ok)_rolesCloudJson=_rj;});}catch(e){}
 }
 function moveUser(idx,dir){
   var newIdx=idx+dir;
@@ -20260,8 +20742,7 @@ window.addEventListener('DOMContentLoaded', function(){
       // Carrega USERS da nuvem
       _sbGet('bv_users', function(u){
         if(u && Array.isArray(u) && u.length){
-          USERS=u;
-          buildLoginList();
+          _aplicarUsersNuvem(u);
         } else {
           // Nuvem vazia — salva o usuário admin padrão
           _sbSet('bv_users', USERS, function(){});
@@ -20269,14 +20750,7 @@ window.addEventListener('DOMContentLoaded', function(){
       });
       // Carrega ROLES da nuvem
       _sbGet('bv_roles', function(ro){
-        if(ro && ro.base && Array.isArray(ro.base)){
-          BASE_ROLES=ro.base;
-          if(ro.custom && Array.isArray(ro.custom)) CUSTOM_ROLES=ro.custom;
-          _patchRestoredRoles();
-          var _allR=BASE_ROLES.concat(CUSTOM_ROLES);
-          for(var _ri=0;_ri<_allR.length;_ri++){PPAGES[_allR[_ri].id]=_allR[_ri].pages;}
-          localStorage.setItem('bv_roles',JSON.stringify({base:BASE_ROLES,custom:CUSTOM_ROLES}));
-        }
+        _aplicarRolesNuvem(ro);
       });
       // Carrega CFG da nuvem
       _sbGet('bv_cfg', function(cfg){
