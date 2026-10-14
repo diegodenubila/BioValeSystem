@@ -232,6 +232,7 @@ select option{background:var(--s1)}.H{display:none!important}
   </div>
   <div class="lsub">Selecione seu perfil</div>
   <div id="ul"></div>
+  <div style="text-align:center;margin:2px 0 10px"><button type="button" onclick="sincronizarAgora()" style="background:none;border:1px solid var(--bd);color:var(--mt);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer">&#8635; Sincronizar agora</button></div>
   <div class="pin-a H" id="pa">
     <div style="font-size:13px;color:var(--mt);margin-bottom:7px" id="plbl"></div>
     <input type="password" inputmode="numeric" placeholder="&#8226;&#8226;&#8226;&#8226;" maxlength="4" id="pi" autocomplete="off">
@@ -390,6 +391,7 @@ var DB={
   ],
   concorrentes:[],
   cotacoesHist:[],
+  mercado:{dias:{},ferro:[],vinc:{}}, // cotações diárias da aba Mercado (LME, preciosos, dólar)
   metas:{kgMes:0,faturamento:0,compras:0,atendimentos:0},
   filtrosMat:[
     {id:1,nome:'Todos',      ic:'&#128230;',cor:'#22c55e'},
@@ -455,7 +457,27 @@ var DB={
 // ── HELPERS ──────────────────────────────────────────────────
 function fR(v){return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fKg(v){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:3,maximumFractionDigits:3});}
-function hj(){return new Date().toLocaleDateString('pt-BR');}
+// ── HORA CORRETA ─────────────────────────────────────────────────────────
+// O relógio de um aparelho pode estar errado (já houve PC 3h48 atrasado). Todos os registros que
+// dependem de data/hora usam a hora de Brasília corrigida pelo relógio do servidor da página.
+var _clockOffset=0;   // ms: hora certa − hora do aparelho (0 enquanto não medido ou se a diferença for pequena)
+var _agoraCache={s:-1,d:null};
+function _agoraMs(){return Date.now()+_clockOffset;}
+// Date cujos getters locais (getHours, getDate...) mostram a hora de Brasília
+function _agoraMG(){
+  var ms=_agoraMs(),sec=Math.floor(ms/1000);
+  if(_agoraCache.s===sec&&_agoraCache.d)return new Date(_agoraCache.d.getTime());
+  var d=null;
+  try{
+    var s=new Date(ms).toLocaleString('en-US',{timeZone:'America/Sao_Paulo',hour12:false});
+    var m=s.match(/(\d+)\/(\d+)\/(\d+),?\s+(\d+):(\d+):(\d+)/);
+    if(m){var hh=+m[4];if(hh===24)hh=0;d=new Date(+m[3],+m[1]-1,+m[2],hh,+m[5],+m[6]);}
+  }catch(e){}
+  if(!d)d=new Date(ms);
+  _agoraCache={s:sec,d:d};
+  return new Date(d.getTime());
+}
+function hj(){var d=_agoraMG();return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();}
 function _normId(id){if(id==null)return '';return String(Math.floor(parseFloat(id))||id);}
 function nid(){return Date.now()*1000+Math.floor(Math.random()*1000)|0||Date.now();}
 function gP(id){var n=_normId(id);for(var i=0;i<DB.produtos.length;i++){if(_normId(DB.produtos[i].id)===n)return DB.produtos[i];}return null;}
@@ -648,6 +670,7 @@ function doLogin(){
   }
   setTimeout(_atualizarBadgeNotif,500);
   _auditLog('Login realizado');
+  setTimeout(_mkAutoCheck,2500); // cotações do Mercado: 1x por dia útil
   // Verifica se a versão mudou desde o último acesso
   var lastVer=localStorage.getItem('bv_last_version');
   if(lastVer&&lastVer!==APP_VERSION){
@@ -686,6 +709,7 @@ var _MS_GROUPS=[
   {label:'Pessoas',   icon:'👥', ids:['funcionarios','clientes']},
   {label:'Tabelas',   icon:'📋', ids:['tabelas']},
   {label:'PCB',       icon:'♻', ids:['classificador']},
+  {label:'Mercado',   icon:'📈', ids:['mercado']},
 ];
 function buildSidebar(){
   var r=getRoleById(CU.perfil);
@@ -840,7 +864,6 @@ function _breadcrumb(pid){
 
 function go(pid){
   pgAtiva=pid;setNav(pid);closeSb();
-  if(pid!=='mercado'&&_mktInterval){clearInterval(_mktInterval);_mktInterval=null;}
   // Sanitiza revenda — corrige prod undefined antes de qualquer render
   if(DB&&DB.revenda){for(var _ri=0;_ri<DB.revenda.length;_ri++){if(!DB.revenda[_ri].prod)DB.revenda[_ri].prod=DB.revenda[_ri].nome||'Produto';}}
   try{
@@ -854,7 +877,7 @@ function go(pid){
     document.getElementById('ct').innerHTML='<div class="card" style="color:var(--rd);padding:20px">Erro ao carregar página <b>'+pid+'</b>: '+(_goErr.message||_goErr)+'</div>';
   }
   if(pid==='dashboard')setTimeout(function(){_dashCharts();if(CU&&CU.perfil==='adm')_mktFetchWidget();},80);
-  if(pid==='mercado')setTimeout(function(){_mktFetch();},80);
+  if(pid==='mercado')setTimeout(_mkDesenharGrafico,80);
   if(pid==='classificador')setTimeout(function(){_pclInit();},80);
   if(pid==='pesagem')renderPesagem();
   if(pid==='caixa_dia')renderCaixaDia();
@@ -948,6 +971,7 @@ function _syncBadge(cls,txt){
         var pendEl2=document.getElementById('bv-sync-pend');if(pendEl2)pendEl2.remove();
       }
     }
+    if(cls!=='local'){b.style.cursor='pointer';b.title='Toque para sincronizar agora';b.onclick=sincronizarAgora;}
   }catch(e){}
 }
 
@@ -996,6 +1020,88 @@ function _sbGetGuard(chave, onDone){
   }, function(){onDone({ok:false,snap:null});});             // rejeição da promise (offline)
 }
 
+// Leitura da linha inteira (valor + carimbo atualizado_em). ok=false é FALHA de leitura,
+// nunca "nuvem vazia": só row===null com ok=true significa que a chave ainda não existe.
+function _sbReadRow(chave, onDone){
+  if(!_sbReady||!_sbClient){onDone({ok:false,row:null,obj:null,ts:null});return;}
+  _sbClient.from('biovale_dados').select('valor,atualizado_em').eq('chave',chave).maybeSingle().then(function(r){
+    if(r.error){onDone({ok:false,row:null,obj:null,ts:null,erro:r.error.message});return;}
+    if(!r.data){onDone({ok:true,row:null,obj:null,ts:null});return;}
+    var obj=null;
+    try{obj=JSON.parse(r.data.valor);}catch(e){onDone({ok:false,row:null,obj:null,ts:null,erro:'valor ilegível'});return;}
+    onDone({ok:true,row:r.data,obj:obj,ts:r.data.atualizado_em});
+  },function(e){onDone({ok:false,row:null,obj:null,ts:null,erro:'sem conexão'});});
+}
+// Grava SÓ SE a nuvem ainda estiver exatamente como foi lida (compare-and-swap pelo carimbo).
+// Antes: lia, decidia e gravava em passos separados — dois aparelhos gravando ao mesmo tempo
+// liam a mesma versão e o último apagava o trabalho do primeiro. Agora, se outro aparelho
+// gravou nesse meio-tempo, a gravação é recusada e refeita: lê de novo, junta de novo, tenta de novo.
+// mergeFn(cloudObj) devolve {json,obj} (ou {skip:true} se nada a gravar).
+var _casIndisponivel=false;   // vira true se o banco recusar a gravação condicional (permissão): volta ao modo antigo
+function _sbCasWrite(chave, mergeFn, onDone, tentativa){
+  tentativa=tentativa||1;
+  _sbReadRow(chave,function(rd){
+    if(!rd.ok){onDone({ok:false,motivo:'leitura',erro:rd.erro});return;}
+    var out;
+    try{out=mergeFn(rd.obj);}catch(e){console.error('[BioVale] merge falhou',e);onDone({ok:false,motivo:'merge',erro:String(e&&e.message||e),cloud:rd.obj});return;}
+    if(!out||out.skip){onDone({ok:true,skipped:true,cloud:rd.obj,tentativas:tentativa});return;}
+    if(_casIndisponivel){
+      // Modo de segurança: grava sem a condição (ainda junta antes de gravar, mas sem proteção contra corrida)
+      _sbSetRaw(chave,out.json,function(ok){ if(ok)onDone({ok:true,out:out,cloud:rd.obj,ts:null,tentativas:tentativa}); else onDone({ok:false,motivo:'gravacao',cloud:rd.obj}); });
+      return;
+    }
+    var novoTs=new Date().toISOString();
+    var q=_sbClient.from('biovale_dados');
+    var req;
+    if(rd.row===null){
+      req=q.insert({chave:chave,valor:out.json,atualizado_em:novoTs}).select('chave');
+    } else {
+      var u=q.update({valor:out.json,atualizado_em:novoTs}).eq('chave',chave);
+      u=(rd.ts===null||rd.ts===undefined)?u.is('atualizado_em',null):u.eq('atualizado_em',rd.ts);
+      req=u.select('chave');
+    }
+    req.then(function(r){
+      if(r.error){
+        if(rd.row===null&&/duplicate|23505|already exists/i.test(r.error.message||'')&&tentativa<6){_sbCasWrite(chave,mergeFn,onDone,tentativa+1);return;} // outro criou a chave antes
+        if(/permission|policy|row-level|not allowed|42501|forbidden|401|403/i.test(r.error.message||'')&&!/fetch|network/i.test(r.error.message||'')&&tentativa<3){
+          _casIndisponivel=true;
+          console.warn('[BioVale] O banco recusou a gravação condicional ('+r.error.message+'). Usando o modo de gravação simples.');
+          _syncBadge('error','Sincronização em modo simples — avise o suporte');
+          _sbCasWrite(chave,mergeFn,onDone,tentativa+1);return;
+        }
+        onDone({ok:false,motivo:'gravacao',erro:r.error.message,cloud:rd.obj});return;
+      }
+      if(!r.data||r.data.length===0){
+        // Outro aparelho gravou entre a nossa leitura e a nossa gravação: refaz com o que ele gravou
+        if(tentativa<8){setTimeout(function(){_sbCasWrite(chave,mergeFn,onDone,tentativa+1);},40+Math.floor(Math.random()*160));return;}
+        onDone({ok:false,motivo:'conflito',cloud:rd.obj});return;
+      }
+      onDone({ok:true,out:out,cloud:rd.obj,ts:novoTs,tentativas:tentativa});
+    },function(){onDone({ok:false,motivo:'leitura',erro:'sem conexão',cloud:rd.obj});});
+  });
+}
+// Junta e grava uma chave auxiliar (usuários, funções, configuração) SEM apagar o que outro
+// aparelho mudou: três vias entre a última versão conhecida da nuvem, este aparelho e a nuvem agora.
+var _sbMergeBusy={},_sbMergeAgain={};
+function _sbMergeKey(chave, getLocal, getBaseJson, onOk, onFail){
+  if(_sbMergeBusy[chave]){_sbMergeAgain[chave]=[getLocal,getBaseJson,onOk,onFail];return;}
+  _sbMergeBusy[chave]=1;
+  _sbCasWrite(chave,function(cloud){
+    var loc=JSON.parse(JSON.stringify(getLocal()));
+    var base;try{var bj=getBaseJson();base=bj?JSON.parse(bj):undefined;}catch(e){base=undefined;}
+    var merged=(cloud===null||cloud===undefined)?loc:_m3(base,loc,cloud,'');
+    var js=JSON.stringify(merged);
+    if(cloud!==null&&cloud!==undefined&&js===JSON.stringify(cloud))return {skip:true};
+    return {json:js,obj:merged};
+  },function(res){
+    _sbMergeBusy[chave]=0;
+    if(res.ok){var m=res.skipped?res.cloud:res.out.obj;if(onOk)onOk(m,res);}
+    else if(onFail)onFail(res.motivo,res);
+    var again=_sbMergeAgain[chave];
+    if(again){_sbMergeAgain[chave]=null;_sbMergeKey(chave,again[0],again[1],again[2],again[3]);}
+  });
+}
+
 // ── BACKUP DIÁRIO AUTOMÁTICO NA NUVEM ─────────────────────────────────────
 // Salva uma cópia do estado completo com chave bv_backup_AAAA-MM-DD, uma vez
 // por dia. Mantém os últimos 30 dias. Permite recuperar dados de dias passados
@@ -1003,7 +1109,7 @@ function _sbGetGuard(chave, onDone){
 var _backupChecked = false; // mantido por compatibilidade — não usado
 
 function _dataChaveHoje(){
-  var d=new Date();
+  var d=_agoraMG();
   return 'bv_backup_'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
@@ -1034,7 +1140,7 @@ function _criarBackup(sufixo){
 
 // Backup de meio período — disparado automaticamente às 12:30
 function _checkBackupMeioPeriodo(){
-  var agora=new Date();
+  var agora=_agoraMG();
   var h=agora.getHours(), m=agora.getMinutes();
   // Janela: entre 12:28 e 12:45 (para não depender de timing exato)
   if(h===12 && m>=28 && m<=45){
@@ -1062,7 +1168,7 @@ function _limparBackupsAntigos(){
     var limite=new Date(); limite.setDate(limite.getDate()-30);
     for(var i=0;i<r.data.length;i++){
       var ch=r.data[i].chave;                       // formato: bv_backup_AAAA-MM-DD
-      var iso=ch.replace('bv_backup_','');
+      var iso=ch.replace('bv_backup_','').slice(0,10);
       var dt=new Date(iso+'T00:00:00');
       if(!isNaN(dt.getTime()) && dt < limite){
         _sbClient.from('biovale_dados').delete().eq('chave',ch).then(function(){});
@@ -1077,8 +1183,12 @@ function _listarBackups(onDone){
   _sbClient.from('biovale_dados').select('chave,atualizado_em').like('chave','bv_backup_%').then(function(r){
     if(r.error||!r.data){onDone([]);return;}
     var arr=r.data.map(function(x){
-      var ch=x.chave; // bv_backup_AAAA-MM-DD_meio ou _fim
+      var ch=x.chave; // bv_backup_AAAA-MM-DD_meio, _fim ou _hHH
       var semPref=ch.replace('bv_backup_','');
+      var _mh=semPref.match(/^(\d{4})-(\d{2})-(\d{2})_h(\d{2})(\d{2})$/);
+      if(_mh)return {chave:ch, data:_mh[1]+'-'+_mh[2]+'-'+_mh[3], dataBR:_mh[3]+'/'+_mh[2]+'/'+_mh[1], rotulo:'Automático das '+_mh[4]+':'+_mh[5], ts:x.atualizado_em};
+      var _mp=semPref.match(/^(\d{4})-(\d{2})-(\d{2})_pre(\d{2})(\d{2})$/);
+      if(_mp)return {chave:ch, data:_mp[1]+'-'+_mp[2]+'-'+_mp[3], dataBR:_mp[3]+'/'+_mp[2]+'/'+_mp[1], rotulo:'Antes da restauração das '+_mp[4]+':'+_mp[5], ts:x.atualizado_em};
       var sufixo=semPref.endsWith('_meio')?'_meio':semPref.endsWith('_fim')?'_fim':'';
       var dataIso=semPref.replace('_meio','').replace('_fim','');
       var partes=dataIso.split('-');
@@ -1089,10 +1199,84 @@ function _listarBackups(onDone){
     arr.sort(function(a,b){
       // Ordena por data desc, depois _fim antes de _meio
       if(b.data!==a.data) return b.data.localeCompare(a.data);
-      return (b.chave.endsWith('_fim')?1:0)-(a.chave.endsWith('_fim')?1:0);
+      var _df=(b.chave.endsWith('_fim')?1:0)-(a.chave.endsWith('_fim')?1:0);
+      return _df!==0?_df:b.chave.localeCompare(a.chave);
     });
     onDone(arr);
   });
+}
+
+// ── MEDE O RELÓGIO DO APARELHO ────────────────────────────────────────────
+// Compara com o cabeçalho "Date" do servidor que entrega esta página (mesma origem, sem CORS).
+function _medirRelogio(){
+  try{
+    if(location.protocol==='file:'||typeof fetch!=='function')return;
+    var t0=Date.now();
+    fetch(location.pathname||'./',{method:'HEAD',cache:'no-store'}).then(function(r){
+      var d=r.headers.get('date');if(!d)return;
+      var srv=new Date(d).getTime();if(isNaN(srv))return;
+      var t1=Date.now();
+      var off=(srv+500)-(t0+(t1-t0)/2);   // o cabeçalho tem precisão de 1s
+      _clockOffset=Math.abs(off)<120000?0:Math.round(off);
+      _agoraCache={s:-1,d:null};
+      _avisarRelogio();
+    }).catch(function(){});
+  }catch(e){}
+}
+function _avisarRelogio(){
+  try{
+    var el=document.getElementById('bv-clock-warn');
+    if(Math.abs(_clockOffset)<5*60000){if(el)el.remove();return;}
+    var min=Math.round(Math.abs(_clockOffset)/60000),hh=Math.floor(min/60),mm=min%60;
+    var txt=(hh?hh+'h ':'')+mm+'min '+(_clockOffset>0?'atrasado':'adiantado');
+    if(!el){el=document.createElement('div');el.id='bv-clock-warn';
+      el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#7c2d12;color:#fed7aa;padding:8px 14px;font-size:12px;font-weight:600;text-align:center;border-bottom:1px solid #9a3412;cursor:pointer';
+      el.onclick=function(){el.remove();};
+      document.body.appendChild(el);}
+    el.textContent='⚠ O relógio deste aparelho está '+txt+'. O BioVale já registra a hora certa, mas ajuste o relógio do aparelho (Data e hora automáticas). Toque para fechar.';
+  }catch(e){}
+}
+// Força a conferência com a nuvem agora (botão na tela de login e no selo de sincronização)
+function sincronizarAgora(){
+  if(!_sbReady||!_sbClient){toast('Sem conexão com a nuvem','var(--or)');return;}
+  toast('Sincronizando…','var(--bl)');
+  try{_recarregarAcessosNuvem();}catch(e){}
+  if(_pendingLocal){autoSave();toast('Enviando suas alterações pendentes…','var(--bl)');return;}
+  _sbGet('bv_db',function(s){
+    if(!s){toast('Não consegui ler a nuvem agora. Tente de novo.','var(--or)');return;}
+    if(_ownSavedAts[s.savedAt]||s.savedAt===_baseCloudSavedAt){toast('Já está atualizado ✓','var(--gr)');return;}
+    _aplicarDaNuvem(s);
+    toast('Dados atualizados da nuvem ✓','var(--gr)');
+  });
+}
+
+// ── BACKUP AUTOMÁTICO A CADA 30 MIN (6h–22h) ─────────────────────────────
+// Os backups de meio período/fechamento deixavam horas sem cobertura. Este guarda o estado
+// logo depois da primeira gravação de cada meia hora, e mantém os últimos 36 (~18h de uso).
+var _bkHoraFeito='';
+function _backupHoraSePreciso(js){
+  try{
+    if(!_sbReady||!_sbClient)return;
+    var d=_agoraMG(),hh=d.getHours();
+    if(hh<6||hh>22)return;
+    var chave='bv_backup_'+d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)+'_h'+('0'+hh).slice(-2)+(d.getMinutes()<30?'00':'30');
+    if(_bkHoraFeito===chave)return;
+    _bkHoraFeito=chave;
+    _sbClient.from('biovale_dados').select('chave').eq('chave',chave).maybeSingle().then(function(r){
+      if(r.error||r.data)return;
+      var corpo='{"criadoEm":'+JSON.stringify(new Date().toISOString())+',"versao":'+JSON.stringify(typeof APP_VERSION!=='undefined'?APP_VERSION:'BioVale')+',"sufixo":"_hora","DB":'+js+',"CFG":'+JSON.stringify(CFG)+'}';
+      _sbSetRaw(chave,corpo,function(ok){if(ok)_limparBackupsHora();else _bkHoraFeito='';});
+    },function(){_bkHoraFeito='';});
+  }catch(e){}
+}
+function _limparBackupsHora(){
+  try{
+    _sbClient.from('biovale_dados').select('chave').like('chave','bv_backup_%_h%').then(function(r){
+      if(r.error||!r.data)return;
+      var ks=r.data.map(function(x){return x.chave;}).filter(function(c){return /^bv_backup_\d{4}-\d{2}-\d{2}_h\d{4}$/.test(c);}).sort();
+      while(ks.length>36){var del=ks.shift();_sbClient.from('biovale_dados').delete().eq('chave',del).then(function(){});}
+    });
+  }catch(e){}
 }
 
 // Inicia Supabase assim que a lib CDN estiver disponível
@@ -1132,6 +1316,9 @@ function _sbSetRaw(chave, jsonStr, onDone){
     else{if(onDone)onDone(true);}
   }, function(){if(onDone)onDone(false);});
 }
+// Milissegundo + fração aleatória: duas gravações de aparelhos diferentes nunca têm a mesma identificação
+// (antes, gravações no mesmo milissegundo faziam um aparelho tomar a do outro como sua e gravar por cima)
+function _novoSavedAt(){return Date.now()+Math.floor(Math.random()*999999+1)/1000000;}
 function _m3js(x){return x===undefined?'\u0000':JSON.stringify(x);}
 function _m3obj(x){return x!==null&&typeof x==='object'&&!Array.isArray(x);}
 function _m3idArr(x){
@@ -1144,12 +1331,28 @@ function _m3idArr(x){
   }
   return true;
 }
+function _m3objArr(x){
+  if(!Array.isArray(x))return false;
+  for(var i=0;i<x.length;i++){if(!_m3obj(x[i]))return false;}
+  return true;
+}
+// Identidade de um item de lista: o id, ou o conteúdo quando não há id. Repetidos ganham #2, #3...
+function _m3key(r,vistos){
+  var k=(r.id!==undefined&&r.id!==null)?'i:'+r.id:'h:'+JSON.stringify(r);
+  var n=(vistos[k]=(vistos[k]||0)+1);
+  return n>1?k+'#'+n:k;
+}
 // Contadores/saldos em que as duas alterações se SOMAM (ex: estoque: um aparelho
 // tirou 5kg e outro pôs 3kg -> vale o efeito dos dois).
-var _M3_SOMA={est:1,atendNum:1,revProxCodigo:1};
+var _M3_SOMA={est:1,atendNum:1,revProxCodigo:1,saldo:1,qtdEstoque:1}; // saldo das contas e quantidade da revenda também somam
 // base = último estado comum · loc = este aparelho · cloud = o que está na nuvem agora
 function _m3(base,loc,cloud,chave){
   var jb=_m3js(base),jl=_m3js(loc),jc=_m3js(cloud);
+  // Contadores: se os DOIS aparelhos mudaram, vale o efeito dos dois — mesmo que tenham chegado no
+  // mesmo número (dois atendimentos fechados ao mesmo tempo = dois incrementos, não um só).
+  if(_M3_SOMA[chave]&&typeof loc==='number'&&typeof cloud==='number'&&typeof base==='number'&&jl!==jb&&jc!==jb){
+    return +(cloud+(loc-base)).toFixed(6);
+  }
   if(jl===jb)return cloud;   // só a nuvem mudou
   if(jc===jb)return loc;     // só este aparelho mudou
   if(jl===jc)return loc;     // os dois fizeram a mesma coisa
@@ -1168,21 +1371,25 @@ function _m3(base,loc,cloud,chave){
     }
     return out;
   }
-  if(_m3idArr(loc)&&_m3idArr(cloud)&&(base===undefined||base===null||_m3idArr(base))){
-    var bm={},lm={},cm={},i;
-    (base||[]).forEach(function(r){bm[r.id]=r;});
-    loc.forEach(function(r){lm[r.id]=r;});
-    cloud.forEach(function(r){cm[r.id]=r;});
+  if(_m3objArr(loc)&&_m3objArr(cloud)&&(base===undefined||base===null||_m3objArr(base))){
+    // Lista de objetos: cada item é identificado pelo id (ou, se não tiver id, pelo conteúdo).
+    // Antes, UM item sem id fazia a lista inteira deste aparelho vencer e apagar o que veio dos outros.
+    var bm={},lm={},cm={},bs={},ls={},cs={};
+    (base||[]).forEach(function(r){bm[_m3key(r,bs)]=r;});
+    var lk=loc.map(function(r){var k=_m3key(r,ls);lm[k]=r;return k;});
+    var ck=cloud.map(function(r){var k=_m3key(r,cs);cm[k]=r;return k;});
     var res=[];
-    cloud.forEach(function(r){
-      if(lm[r.id]!==undefined)res.push(_m3(bm[r.id],lm[r.id],r,''));
-      else if(bm[r.id]===undefined)res.push(r);                               // novo na nuvem
-      else if(_m3js(r)!==_m3js(bm[r.id]))res.push(r);                         // apagado aqui, mas alterado lá: mantém
+    cloud.forEach(function(r,i){
+      var k=ck[i];
+      if(lm[k]!==undefined)res.push(_m3(bm[k],lm[k],r,''));
+      else if(bm[k]===undefined)res.push(r);                                 // novo na nuvem
+      else if(_m3js(r)!==_m3js(bm[k]))res.push(r);                           // apagado aqui, mas alterado lá: mantém
     });
     var novosLoc=[];
     loc.forEach(function(r,idx){
-      if(cm[r.id]!==undefined)return;
-      if(bm[r.id]===undefined||_m3js(r)!==_m3js(bm[r.id]))novosLoc.push({r:r,idx:idx}); // novo aqui (ou alterado aqui e apagado lá)
+      var k=lk[idx];
+      if(cm[k]!==undefined)return;
+      if(bm[k]===undefined||_m3js(r)!==_m3js(bm[k]))novosLoc.push({r:r,idx:idx}); // novo aqui (ou alterado aqui e apagado lá)
     });
     if(novosLoc.length){
       var noInicio=novosLoc[0].idx===0; // listas "mais novo primeiro" continuam assim
@@ -1191,7 +1398,58 @@ function _m3(base,loc,cloud,chave){
     }
     return res;
   }
-  return loc; // valor simples ou lista sem id: vale a ação deste aparelho
+  // Lista de valores simples (textos/números): junta os itens dos dois lados.
+  // Antes, se os dois aparelhos adicionassem itens, valia só a lista de um deles.
+  if(Array.isArray(loc)&&Array.isArray(cloud)&&_m3primArr(loc)&&_m3primArr(cloud)&&(base===undefined||base===null||(Array.isArray(base)&&_m3primArr(base)))){
+    var bset={},lset={},cset={};(base||[]).forEach(function(v){bset[_m3js(v)]=1;});loc.forEach(function(v){lset[_m3js(v)]=1;});cloud.forEach(function(v){cset[_m3js(v)]=1;});
+    var outA=[],vist={};
+    cloud.forEach(function(v){var k=_m3js(v);if(vist[k])return;if(bset[k]&&!lset[k])return;/* apagado aqui */vist[k]=1;outA.push(v);});
+    loc.forEach(function(v){var k=_m3js(v);if(vist[k])return;if(bset[k]&&!cset[k])return;/* apagado lá */vist[k]=1;outA.push(v);});
+    return outA;
+  }
+  return loc; // valor simples: vale a ação deste aparelho
+}
+function _m3primArr(x){for(var i=0;i<x.length;i++){if(x[i]!==null&&typeof x[i]==='object')return false;}return true;}
+// Junção do bloco inteiro + correções que dependem de mais de um campo
+function _m3Root(base,loc,cloud){
+  var r=_m3(base,loc,cloud,'');
+  try{_m3FixCaixa(base,loc,cloud,r);}catch(e){console.warn('[BioVale] fixCaixa',e);}
+  return r;
+}
+// Um aparelho fechou o caixa enquanto outro ainda gravava atendimentos nele:
+// os atendimentos que chegaram depois vão para o caixa arquivado (nada se perde).
+function _m3FixCaixa(base,loc,cloud,r){
+  var b=base&&base.caixaDia;if(!b||!b.data||!r)return;
+  // Algum lado FECHOU o caixa do dia? (o caixa saiu de caixaDia e entrou no histórico)
+  var baseHist={};((base&&base.caixasHist)||[]).forEach(function(c){if(c&&c.data===b.data)baseHist[_m3js(c)]=1;});
+  var fechou=null;
+  [loc,cloud].forEach(function(lado){
+    if(fechou||!lado)return;
+    var aindaAberto=lado.caixaDia&&lado.caixaDia.data===b.data;
+    if(aindaAberto)return;
+    var novoNoHist=(lado.caixasHist||[]).some(function(c){return c&&c.data===b.data&&!baseHist[_m3js(c)];});
+    if(novoNoHist)fechou=lado;
+  });
+  if(!fechou)return; // ninguém fechou: nada a corrigir
+  // O fechamento prevalece: o caixa não pode ser reaberto pela gravação atrasada do outro aparelho
+  r.caixaDia=fechou.caixaDia===undefined?null:fechou.caixaDia;
+  var arq=null;(r.caixasHist||[]).forEach(function(c){if(!arq&&c&&c.data===b.data&&!baseHist[_m3js(c)])arq=c;});
+  if(!arq)return;
+  var chMov=function(m){return (m.num!=null?m.num:'')+'|'+(m.hora||'')+'|'+(m.total||0);};
+  var tem={};(arq.movimentos||[]).forEach(function(m){tem[chMov(m)]=1;});
+  var baseTem={};(b.movimentos||[]).forEach(function(m){baseTem[chMov(m)]=1;});
+  [loc,cloud].forEach(function(lado){
+    var cx=lado&&lado.caixaDia;if(!cx||cx.data!==b.data)return;
+    (cx.movimentos||[]).forEach(function(m){
+      var k=chMov(m);if(tem[k]||baseTem[k])return;
+      if(!arq.movimentos)arq.movimentos=[];arq.movimentos.unshift(m);tem[k]=1;
+      arq.movsDepoisDoFechamento=(arq.movsDepoisDoFechamento||0)+1;
+    });
+    ['sangrias','reforcos'].forEach(function(t){
+      var ja={};(arq[t]||[]).forEach(function(x){ja[_m3js(x)]=1;});(b[t]||[]).forEach(function(x){ja[_m3js(x)]=1;});
+      (cx[t]||[]).forEach(function(x){if(!ja[_m3js(x)]){if(!arq[t])arq[t]=[];arq[t].push(x);ja[_m3js(x)]=1;arq.movsDepoisDoFechamento=(arq.movsDepoisDoFechamento||0)+1;}});
+    });
+  });
 }
 // Aplica um estado vindo da nuvem (ou da junção) na memória e na tela
 function _aplicarDaNuvem(snap,jsonStr){
@@ -1326,10 +1584,11 @@ var _dbSaveTimer=null;
 function saveDB(){
   _lastSaveTs = Date.now();
   _localHasChanges = true;
+  var _eraPendente = _pendingLocal;
   _pendingLocal = true;
   try{
     var snap={
-      savedAt:Date.now(),geminiKey:DB.geminiKey,caixaDia:DB.caixaDia,caixaOntem:DB.caixaOntem,caixasHist:DB.caixasHist,
+      savedAt:_novoSavedAt(),geminiKey:DB.geminiKey,caixaDia:DB.caixaDia,caixaOntem:DB.caixaOntem,caixasHist:DB.caixasHist,
       atendNum:DB.atendNum,produtos:DB.produtos,movs:DB.movs,contas:DB.contas,
       revenda:DB.revenda,revendaCats:DB.revendaCats,revendaStates:DB.revendaStates,
       entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
@@ -1337,19 +1596,32 @@ function saveDB(){
       gerarTabsCustom:DB.gerarTabsCustom,
       pclCatsCustom:DB.pclCatsCustom||{},
       pclCatOrder:DB.pclCatOrder||[],
-      tabelas:DB.tabelas,contasFixas:DB.contasFixas,contasReceber:DB.contasReceber,centroCusto:DB.centroCusto,cotacoesHist:DB.cotacoesHist,metas:DB.metas,filtrosMat:DB.filtrosMat,
+      tabelas:DB.tabelas,contasFixas:DB.contasFixas,contasReceber:DB.contasReceber,centroCusto:DB.centroCusto,cotacoesHist:DB.cotacoesHist,mercado:DB.mercado,auditLogs:DB.auditLogs||[],metas:DB.metas,filtrosMat:DB.filtrosMat,
       concorrentes:DB.concorrentes,
       cfgSistema:CFG.sistema, // sincroniza configurações do sistema (inclui chave Anthropic, glossário PCB, critérios)
       pesAbasCloud:pesAbas,pesAtivaCloud:pesAtiva,pesAbasTs:Date.now()
     };
-    // 1. Salva local como fallback imediato (sempre — nunca perde dado local)
-    localStorage.setItem('bv_db',JSON.stringify(snap));
-    localStorage.setItem('bv_db_savedAt',String(snap.savedAt));
-    localStorage.setItem('bv_users',JSON.stringify(USERS));
-    localStorage.setItem('bv_roles',JSON.stringify({base:BASE_ROLES,custom:CUSTOM_ROLES}));
-    localStorage.setItem('bv_cfg',JSON.stringify(CFG));
+    // 1. Salva local como fallback imediato. Cada gravação local é independente: se o armazenamento
+    //    do navegador encher, a gravação na nuvem continua acontecendo (antes ela era pulada em silêncio).
+    var _snapJson=JSON.stringify(snap);
+    _tamDados=_snapJson.length;
+    var _lsOk=true;
+    try{localStorage.setItem('bv_db',_snapJson);localStorage.setItem('bv_db_savedAt',String(snap.savedAt));}catch(e){_lsOk=false;}
+    try{localStorage.setItem('bv_users',JSON.stringify(USERS));}catch(e){}
+    try{localStorage.setItem('bv_roles',JSON.stringify({base:BASE_ROLES,custom:CUSTOM_ROLES}));}catch(e){}
+    try{localStorage.setItem('bv_cfg',JSON.stringify(CFG));}catch(e){}
+    if(!_lsOk&&!_avisouLS){_avisouLS=true;console.warn('[BioVale] armazenamento local cheio — usando a cópia segura (IndexedDB)');}
     _lastSnapAt = snap.savedAt;
     _ultimoSnap = snap;
+    // Se a página fechar antes de a nuvem confirmar, na próxima abertura o sistema junta
+    // o que ficou pendente aqui com o que a nuvem tem (em vez de descartar).
+    if(!_eraPendente)_pendBaseJson=_baseSnapJson;
+    try{
+      if(!_eraPendente&&_baseSnapJson){localStorage.setItem('bv_base',_baseSnapJson);}
+      localStorage.setItem('bv_pending','1');
+    }catch(e){try{localStorage.removeItem('bv_base');}catch(_e){}}
+    // Cópia segura no IndexedDB (cabe muito mais que o localStorage): o pendente e a base sempre cabem
+    _idbPut('bv_pend',{local:_snapJson,base:_pendBaseJson||null,em:Date.now()});
     // 2. Sincroniza na nuvem COM proteção anti-sobrescrita
     if(_sbReady){
       _syncBadge('saving','Salvando…');
@@ -1362,121 +1634,178 @@ function saveDB(){
 // além da base que este dispositivo carregou. Protege contra um dispositivo
 // "zumbi" (aba/celular que ficou aberto com dados antigos) apagar o trabalho
 // salvo por outros dispositivos.
+var _syncFalhas=0;
+var _saveGen=0;
+var _cfgCloudJson=null;
+// JSON com chaves em ordem fixa — compara conteúdo sem depender da ordem em que as chaves foram escritas
+function _canon(x){
+  if(Array.isArray(x))return '['+x.map(_canon).join(',')+']';
+  if(x!==null&&typeof x==='object'){return '{'+Object.keys(x).sort().map(function(k){return JSON.stringify(k)+':'+_canon(x[k]);}).join(',')+'}';}
+  return JSON.stringify(x);
+}
+function _limparPendenciaLocal(){try{localStorage.setItem('bv_pending','0');localStorage.removeItem('bv_base');}catch(e){}_pendBaseJson=null;_idbDel('bv_pend');}
+// ── Cópia segura no IndexedDB ────────────────────────────────────────────
+var _tamDados=0,_avisouLS=false,_pendBaseJson=null,_idbDb=null,_idbFila=[];
+function _idbAbrir(cb){
+  if(_idbDb){cb(_idbDb);return;}
+  if(!window.indexedDB){cb(null);return;}
+  _idbFila.push(cb);if(_idbFila.length>1)return;
+  try{
+    var rq=indexedDB.open('biovale',1);
+    rq.onupgradeneeded=function(){try{rq.result.createObjectStore('kv');}catch(e){}};
+    rq.onsuccess=function(){_idbDb=rq.result;var f=_idbFila;_idbFila=[];f.forEach(function(c){c(_idbDb);});};
+    rq.onerror=function(){var f=_idbFila;_idbFila=[];f.forEach(function(c){c(null);});};
+  }catch(e){var f=_idbFila;_idbFila=[];f.forEach(function(c){c(null);});}
+}
+function _idbPut(k,v){_idbAbrir(function(db){if(!db)return;try{db.transaction('kv','readwrite').objectStore('kv').put(v,k);}catch(e){}});}
+function _idbDel(k){_idbAbrir(function(db){if(!db)return;try{db.transaction('kv','readwrite').objectStore('kv').delete(k);}catch(e){}});}
+function _idbGet(k,cb){
+  var feito=false,fim=function(v){if(!feito){feito=true;cb(v);}};
+  setTimeout(function(){fim(null);},3000); // nunca trava a abertura
+  _idbAbrir(function(db){if(!db){fim(null);return;}try{var rq=db.transaction('kv','readonly').objectStore('kv').get(k);rq.onsuccess=function(){fim(rq.result||null);};rq.onerror=function(){fim(null);};}catch(e){fim(null);}});
+}
+function _fmtTam(n){return n>=1048576?(n/1048576).toFixed(2).replace('.',',')+' MB':Math.round(n/1024)+' KB';}
+function _podarOwnSavedAts(){
+  try{
+    var ks=Object.keys(_ownSavedAts);
+    if(ks.length>60){ks.sort(function(a,b){return a-b;});for(var i=0;i<ks.length-40;i++)delete _ownSavedAts[ks[i]];}
+  }catch(e){}
+}
+// Não conseguiu juntar as alterações deste aparelho com as dos outros: guarda uma cópia local e
+// fica com a nuvem (nunca grava às cegas por cima do trabalho dos outros).
+function _conflitoNaoResolvido(snap,res){
+  try{
+    localStorage.setItem('bv_conflito_'+Date.now(),JSON.stringify(snap));
+    var ks=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('bv_conflito_')===0)ks.push(k);}
+    ks.sort();while(ks.length>2)localStorage.removeItem(ks.shift());
+  }catch(e){}
+  toast('⚠ Não consegui juntar suas últimas alterações com as de outro aparelho. Uma cópia ficou guardada neste aparelho. Confira o último lançamento e avise o suporte.','var(--rd)');
+  if(res&&res.cloud)_aplicarDaNuvem(res.cloud);
+  _pendingLocal=false;_limparPendenciaLocal();
+}
+function _syncAcessoSeMudou(){
+  try{if(JSON.stringify(USERS)!==_usersCloudJson)_syncUsers(true);}catch(e){}
+  try{if(_rolesJson()!==_rolesCloudJson)_syncRoles(true);}catch(e){}
+}
+function _aplicarCfgNuvem(cfg){
+  if(!cfg||typeof cfg!=='object')return;
+  if(cfg.empresa)Object.assign(CFG.empresa,cfg.empresa);
+  if(cfg.sistema)Object.assign(CFG.sistema,cfg.sistema);
+  if(cfg.integracao)Object.assign(CFG.integracao,cfg.integracao);
+  if(cfg.motivosSangria)CFG.motivosSangria=cfg.motivosSangria;
+  if(cfg.motivosReforco)CFG.motivosReforco=cfg.motivosReforco;
+  if(cfg.saldoAberturaPadrao!=null)CFG.saldoAberturaPadrao=cfg.saldoAberturaPadrao;
+}
+function _syncCfgSeMudou(){
+  try{
+    if(_canon(CFG)===_cfgCloudJson)return;
+    _sbMergeKey('bv_cfg',function(){return CFG;},function(){return _cfgCloudJson;},function(m){
+      try{_aplicarCfgNuvem(m);localStorage.setItem('bv_cfg',JSON.stringify(CFG));}catch(e){}
+      _cfgCloudJson=_canon(m);
+    },function(){});
+  }catch(e){}
+}
+
+// Sobe o snapshot para a nuvem SOMENTE depois de conferir o que a nuvem tem agora.
+// - Se a nuvem é a versão que este aparelho conhece: grava direto.
+// - Se outro aparelho gravou nesse meio-tempo: JUNTA (três vias) e grava o resultado.
+// - A gravação é atômica (compare-and-swap): se alguém gravar entre a leitura e a escrita,
+//   a escrita é recusada e refeita sobre o que o outro gravou. Ninguém apaga o trabalho de ninguém.
 function _saveToCloudGuarded(snap){
   // Aguarda o carregamento inicial da nuvem antes de qualquer save guardado.
-  // Sem isso, _baseCloudSavedAt=0 e o guard bloquearia saves legítimos do
-  // dispositivo principal logo após abrir.
   if(!_cloudLoaded){
     setTimeout(function(){ _saveToCloudGuarded(snap); }, 500);
     return;
   }
   if(_saveInFlight){
-    // Em vez de descartar, reagenda para daqui a pouco
     setTimeout(function(){ if(_pendingLocal) autoSave(); }, 800);
     return;
   }
   _saveInFlight = true;
+  var gen=++_saveGen, _fim=false;
   // Se a leitura da nuvem travar (rede ruim), não deixa as próximas gravações presas pra sempre
-  var _respondeu=false;
   var _vigia=setTimeout(function(){
-    if(_respondeu)return;
-    _respondeu=true;_saveInFlight=false;
+    if(_fim||gen!==_saveGen)return;
+    _saveInFlight=false;_saveGen++;
     _syncBadge('error','Nuvem lenta — salvo localmente, tentando de novo…');
     setTimeout(function(){ if(_pendingLocal) autoSave(); }, 3000);
   },25000);
-  // Lê o estado atual da nuvem antes de gravar
-  _sbGetGuard('bv_db', function(res){
-    if(_respondeu)return;
-    _respondeu=true;clearTimeout(_vigia);
-    // FALHA DE LEITURA (rede): não grava às cegas. Mantém local salvo e reagenda.
+  var base=null;
+  try{ if(_baseSnapJson) base=JSON.parse(_baseSnapJson); }catch(e){ base=null; }
+  var locCopia=null, juntou=false, ultimoSavedAt=0;
+  _sbCasWrite('bv_db', function(cloud){
+    if(ultimoSavedAt) delete _ownSavedAts[ultimoSavedAt];
+    var cloudSavedAt=(cloud&&cloud.savedAt)?cloud.savedAt:0;
+    var enviar=snap; juntou=false;
+    // A nuvem tem uma versão DIFERENTE da que este aparelho conhece: outro aparelho gravou.
+    if(cloud && cloudSavedAt>0 && cloudSavedAt!==_baseCloudSavedAt && !_ownSavedAts[cloudSavedAt]){
+      if(!locCopia) locCopia=JSON.parse(JSON.stringify(snap)); // congela uma cópia pra comparar com segurança
+      enviar = base ? _m3Root(base, locCopia, cloud) : _m3Root(undefined, locCopia, cloud);   // sem base: junta tudo (nada é descartado)
+      var novo=_novoSavedAt(); if(novo<=cloudSavedAt) novo=cloudSavedAt+1+Math.random();
+      enviar.savedAt=novo; juntou=true;
+      console.warn('[BioVale] Nuvem mudou ('+cloudSavedAt+' ≠ base '+_baseCloudSavedAt+'). Juntando as alterações.');
+    }
+    ultimoSavedAt=enviar.savedAt;
+    _ownSavedAts[ultimoSavedAt]=1;
+    return {json:JSON.stringify(enviar),obj:enviar};
+  }, function(res){
+    _fim=true;clearTimeout(_vigia);
+    if(gen===_saveGen)_saveInFlight=false;
     if(!res.ok){
-      _saveInFlight = false;
-      _syncBadge('error','Sem conexão — salvo localmente, tentando de novo…');
-      // Tenta de novo em alguns segundos (sem perder o dado, que já está em localStorage)
-      setTimeout(function(){ if(_pendingLocal) autoSave(); }, 5000);
+      // Gravação falhou: o dado continua salvo neste aparelho e a gravação é repetida sozinha
+      if(ultimoSavedAt) delete _ownSavedAts[ultimoSavedAt];
+      if(res.motivo==='merge'){ _conflitoNaoResolvido(snap,res); return; }
+      _syncFalhas++;
+      _syncBadge('error',res.motivo==='conflito'?'Muitos aparelhos gravando — tentando de novo…':(res.motivo==='leitura'?'Sem conexão — salvo localmente, tentando de novo…':'Erro na nuvem — tentando de novo…'));
+      if(_syncFalhas===3)toast('⚠ Não está sincronizando com a nuvem. Seu trabalho está salvo neste aparelho e sobe sozinho quando a conexão voltar.','var(--or)');
+      setTimeout(function(){ if(_pendingLocal) autoSave(); }, res.motivo==='conflito'?1500:5000);
       return;
     }
-    var cloud = res.snap;
-    var cloudSavedAt = (cloud && cloud.savedAt) ? cloud.savedAt : 0;
-    var juntou = false;
-    var enviar = snap;
-    var locCopia = null;
-    // A nuvem tem uma versão DIFERENTE da que este aparelho conhece: outro aparelho
-    // gravou nesse meio-tempo. Em vez de descartar a nossa alteração (como era antes),
-    // junta as duas: o que mudamos aqui + o que mudaram lá.
-    if(cloud && cloudSavedAt > 0 && cloudSavedAt !== _baseCloudSavedAt && !_ownSavedAts[cloudSavedAt]){
-      var base = null;
-      try{ if(_baseSnapJson) base = JSON.parse(_baseSnapJson); }catch(e){ base = null; }
-      try{
-        // snap aponta pros objetos vivos; congela uma cópia pra comparar com segurança
-        locCopia = JSON.parse(JSON.stringify(snap));
-        enviar = base ? _m3(base, locCopia, cloud, '') : cloud; // sem base conhecida: fica com a nuvem (comportamento antigo)
-        enviar.savedAt = Date.now();
-        juntou = true;
-        console.warn('[BioVale] Nuvem mudou ('+cloudSavedAt+' ≠ base '+_baseCloudSavedAt+'). Juntando as alterações.');
-      }catch(e){
-        console.error('[BioVale] falha ao juntar, mantendo a nuvem',e);
-        enviar = cloud; juntou = true;
-      }
-    }
-    var js = JSON.stringify(enviar);
-    _ownSavedAts[enviar.savedAt] = 1;
-    _sbSetRaw('bv_db', js, function(ok){
-      _saveInFlight = false;
-      if(ok){
-        _lastCloudTs = new Date().toISOString();
-        var houveNova = (_lastSnapAt !== snap.savedAt); // o usuário fez outra ação enquanto gravava
-        if(juntou){
-          if(houveNova&&locCopia&&_ultimoSnap){
-            // O usuário fez outra ação enquanto a junção era gravada. Reaplica essa ação
-            // nova por cima do resultado juntado (pra não perder nem ela, nem o que veio
-            // dos outros aparelhos); a próxima gravação sobe o conjunto.
-            try{
-              var atual = JSON.parse(JSON.stringify(_ultimoSnap));
-              _aplicarDaNuvem(_m3(locCopia, atual, JSON.parse(js), ''));
-            }catch(e){ _aplicarDaNuvem(JSON.parse(js), js); houveNova=false; }
-            _baseSnapJson = js; _baseCloudSavedAt = enviar.savedAt;
-          } else {
-            _aplicarDaNuvem(JSON.parse(js), js); // _applySnap atualiza a base
-          }
-        } else {
-          _baseSnapJson = js; _baseCloudSavedAt = enviar.savedAt;
-        }
-        if(houveNova){ _pendingLocal = true; setTimeout(autoSave, 50); }
-        else _pendingLocal = false;
-        var _agora=new Date();
-        var _hm=String(_agora.getHours()).padStart(2,'0')+':'+String(_agora.getMinutes()).padStart(2,'0')+':'+String(_agora.getSeconds()).padStart(2,'0');
-        // Usuários e funções só sobem se ESTE aparelho mudou algo neles. Antes subiam
-        // a cada gravação, e um aparelho com cópia antiga apagava o que outro criou.
-        var _uj=JSON.stringify(USERS),_rj=_rolesJson();
-        var _passoCfg=function(ok2){
-          _sbSet('bv_cfg', CFG, function(){
-            if(ok2) _syncBadge('idle','✓ Salvo '+_hm+(juntou?' (junto com outro aparelho)':''));
-            else     _syncBadge('error','Erro na nuvem');
-            setTimeout(function(){_syncBadge('idle','Nuvem ativa');},4000);
-          });
-        };
-        var _passoRoles=function(ok2){
-          if(_rj!==_rolesCloudJson){
-            _sbSet('bv_roles',JSON.parse(_rj),function(okr){if(okr)_rolesCloudJson=_rj;_passoCfg(ok2);});
-          } else _passoCfg(ok2);
-        };
-        if(_uj!==_usersCloudJson){
-          _sbSet('bv_users', USERS, function(ok2){if(ok2)_usersCloudJson=_uj;_passoRoles(ok2);});
-        } else _passoRoles(true);
+    _syncFalhas=0;
+    var js=res.out.json, enviar=res.out.obj;
+    _podarOwnSavedAts();
+    _lastCloudTs = new Date().toISOString();
+    var houveNova = (_lastSnapAt !== snap.savedAt); // o usuário fez outra ação enquanto gravava
+    if(juntou){
+      if(houveNova&&locCopia&&_ultimoSnap){
+        // O usuário fez outra ação enquanto a junção era gravada. Reaplica essa ação nova por cima
+        // do resultado juntado (pra não perder nem ela, nem o que veio dos outros aparelhos).
+        try{
+          var atual = JSON.parse(JSON.stringify(_ultimoSnap));
+          _aplicarDaNuvem(_m3Root(locCopia, atual, JSON.parse(js)));
+        }catch(e){ _aplicarDaNuvem(JSON.parse(js), js); houveNova=false; }
+        _baseSnapJson = js; _baseCloudSavedAt = enviar.savedAt;
       } else {
-        // Gravação falhou: o dado continua salvo neste aparelho e a gravação é repetida sozinha
-        delete _ownSavedAts[enviar.savedAt];
-        _syncBadge('error','Erro na nuvem — tentando de novo…');
-        setTimeout(function(){ if(_pendingLocal) autoSave(); }, 5000);
+        _aplicarDaNuvem(JSON.parse(js), js); // _applySnap atualiza a base
       }
-    });
+    } else {
+      _baseSnapJson = js; _baseCloudSavedAt = enviar.savedAt;
+    }
+    if(houveNova){ _pendingLocal = true; setTimeout(autoSave, 50); }
+    else { _pendingLocal = false; _limparPendenciaLocal(); }
+    var _agora=new Date();
+    var _hm=String(_agora.getHours()).padStart(2,'0')+':'+String(_agora.getMinutes()).padStart(2,'0')+':'+String(_agora.getSeconds()).padStart(2,'0');
+    // Usuários, funções e configurações: só sobem se ESTE aparelho mudou algo, e sempre JUNTANDO
+    // com o que a nuvem tem (nunca substituindo a lista inteira).
+    _syncAcessoSeMudou();
+    _syncCfgSeMudou();
+    _syncBadge('idle','✓ Salvo '+_hm+(juntou?' (junto com outro aparelho)':''));
+    setTimeout(function(){_syncBadge('idle','Nuvem ativa');},4000);
+    if(typeof _backupHoraSePreciso==='function')_backupHoraSePreciso(js);
   });
 }
+var _startPending=false,_startBase=null,_startLocal=null,_pendIdbLido=false;
 function loadDB(){
   // Carrega imediatamente do localStorage (síncrono) — a nuvem é carregada no DOMContentLoaded
   var localOk=false;
   try{
+    // O que a sessão anterior deixou sem confirmar na nuvem (página fechada antes de gravar, sem internet...)
+    try{
+      _startPending=localStorage.getItem('bv_pending')==='1';
+      _startBase=localStorage.getItem('bv_base');
+      var _rawL=localStorage.getItem('bv_db');
+      _startLocal=(_startPending&&_rawL)?JSON.parse(_rawL):null;
+    }catch(e){_startPending=false;_startBase=null;_startLocal=null;}
     var raw=localStorage.getItem('bv_db');
     if(raw){var s=JSON.parse(raw);_applySnap(s);localOk=true;_sanitizeRevenda();}
     // Carrega USERS salvos localmente
@@ -1642,6 +1971,8 @@ function _applySnap(s){
   if(s.contasReceber)DB.contasReceber=s.contasReceber;
   if(s.centroCusto)DB.centroCusto=s.centroCusto;
   if(s.cotacoesHist)DB.cotacoesHist=s.cotacoesHist;
+  if(s.mercado)DB.mercado=s.mercado;
+  if(s.auditLogs)DB.auditLogs=s.auditLogs;
   if(s.metas)DB.metas=Object.assign({kgMes:0,faturamento:0,compras:0,atendimentos:0},s.metas);
   if(s.filtrosMat!==undefined)DB.filtrosMat=s.filtrosMat;
   if(s.concorrentes)DB.concorrentes=s.concorrentes;
@@ -1669,7 +2000,13 @@ function _applySnap(s){
   if(!temPadVenda) DB.tabelas.unshift({id:nid(),nome:'Padrao',tipo:'venda', itens:[]});
   if(!temPadCompra)DB.tabelas.push( {id:nid(),nome:'Padrao',tipo:'compra',itens:[]});
 }
-function autoSave(){if(_dbSaveTimer)clearTimeout(_dbSaveTimer);_dbSaveTimer=setTimeout(saveDB,400);}
+// A alteração vira pendente NA HORA (antes, nos 0,4 s de espera, uma atualização vinda de outro
+// aparelho podia ser aplicada por cima e a alteração sumia antes de ser gravada)
+function autoSave(){_pendingLocal=true;if(_dbSaveTimer)clearTimeout(_dbSaveTimer);_dbSaveTimer=setTimeout(function(){_dbSaveTimer=null;saveDB();},400);}
+// Ao fechar ou minimizar a página, grava na hora o que estiver esperando
+function _gravarJaSePendente(){if(_dbSaveTimer){clearTimeout(_dbSaveTimer);_dbSaveTimer=null;try{saveDB();}catch(e){}}}
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')_gravarJaSePendente();});
+window.addEventListener('pagehide',_gravarJaSePendente);
 function pgPesagem(){
   if(!caixaAberto())return '<div class="fc" style="align-items:center;justify-content:center;min-height:60vh;text-align:center"><div style="font-size:44px;margin-bottom:14px">&#128274;</div><div style="font-size:18px;font-weight:700;margin-bottom:8px">Caixa nao aberto</div><div style="font-size:13px;color:var(--mt);margin-bottom:20px">Abra o caixa do dia antes de realizar pesagens.</div><button class="btn btn-bl" onclick="go(\&apos;caixa_dia\&apos;)" style="padding:12px 22px;font-size:14px">Ir para Caixa</button></div>';
   // Restaurar atendimento em andamento se não há abas na memória
@@ -4572,12 +4909,114 @@ function cfgMotSalvar(){
   alert('Configuracoes salvas!');
 }
 
+// ── ARQUIVO PERMANENTE NA NUVEM ──────────────────────────────────────────
+// Registros antigos saem do bloco principal (que fica leve) e vão para chaves por mês:
+// bv_arq_caixas_AAAA-MM e bv_arq_audit_AAAA-MM. Só saem do bloco DEPOIS que a nuvem confirma o arquivo.
+var _arqRodando=false;
+function _arqMes(dataBR){var p=String(dataBR||'').split('/');return p.length===3?p[2]+'-'+('0'+p[1]).slice(-2):'sem-data';}
+function _arqGravar(chave,itens,cb){
+  _sbCasWrite(chave,function(cloud){
+    var atual=Array.isArray(cloud)?cloud.slice():[],tem={};
+    atual.forEach(function(x){tem[_canon(x)]=1;});
+    var mudou=false;itens.forEach(function(x){var k=_canon(x);if(!tem[k]){atual.push(x);tem[k]=1;mudou=true;}});
+    if(!mudou&&cloud)return {skip:true};
+    return {json:JSON.stringify(atual),obj:atual};
+  },function(res){cb(!!res.ok);});
+}
+function _arquivarExcesso(){
+  if(_arqRodando||!_sbReady||!_sbClient||!_cloudLoaded)return;
+  var grupos=[];
+  if(DB.caixasHist&&DB.caixasHist.length>60)grupos.push({lista:'caixasHist',tipo:'caixas',manter:60});
+  if(DB.auditLogs&&DB.auditLogs.length>200)grupos.push({lista:'auditLogs',tipo:'audit',manter:200});
+  if(!grupos.length)return;
+  _arqRodando=true;
+  var pend=0,movidos=[];
+  grupos.forEach(function(g){
+    var excesso=DB[g.lista].slice(g.manter),porMes={};
+    excesso.forEach(function(x){var m=_arqMes(x.data);(porMes[m]=porMes[m]||[]).push(x);});
+    Object.keys(porMes).forEach(function(m){
+      pend++;
+      _arqGravar('bv_arq_'+g.tipo+'_'+m,porMes[m],function(ok){
+        if(ok)movidos.push({lista:g.lista,itens:porMes[m]});
+        if(--pend===0){
+          // Remove do bloco principal só o que a nuvem confirmou no arquivo
+          movidos.forEach(function(mv){var sai={};mv.itens.forEach(function(x){sai[_canon(x)]=1;});DB[mv.lista]=DB[mv.lista].filter(function(x){return !sai[_canon(x)];});});
+          _arqRodando=false;
+          if(movidos.length){autoSave();console.log('[BioVale] registros antigos movidos para o Arquivo');}
+        }
+      });
+    });
+  });
+}
+function mArquivo(){
+  if(!_sbReady){alert('Nuvem não conectada.');return;}
+  openM('&#128451; Arquivo permanente','<div id="arq-lista" style="max-height:60vh;overflow-y:auto"><div style="text-align:center;padding:24px;color:var(--mt)">Carregando…</div></div>',480);
+  _sbClient.from('biovale_dados').select('chave').like('chave','bv_arq_%').then(function(r){
+    var el=document.getElementById('arq-lista');if(!el)return;
+    var ks=(r.data||[]).map(function(x){return x.chave;}).sort().reverse();
+    var h='<div style="font-size:12px;color:var(--mt);margin-bottom:10px;line-height:1.6">Caixas fechados há mais de 60 fechamentos e registros antigos da auditoria ficam guardados aqui para sempre, separados por mês.</div>'
+      +'<div style="font-size:12px;margin-bottom:10px">Tamanho dos dados principais: <b>'+_fmtTam(_tamDados)+'</b></div>';
+    if(!ks.length)h+='<div style="text-align:center;padding:16px;color:var(--mt);font-size:13px">Nada arquivado ainda.</div>';
+    ks.forEach(function(k){var m=k.match(/^bv_arq_(caixas|audit)_(.+)$/);if(!m)return;
+      h+='<div onclick="mArquivoVer(\''+k+'\')" style="display:flex;justify-content:space-between;padding:10px 12px;background:var(--s2);border:1px solid var(--bd);border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px"><span>'+(m[1]==='caixas'?'Caixas':'Auditoria')+' · '+m[2]+'</span><span style="color:var(--bl)">ver ›</span></div>';});
+    el.innerHTML=h;
+  });
+}
+function mArquivoVer(chave){
+  _sbGet(chave,function(arr){
+    arr=Array.isArray(arr)?arr:[];
+    var caixas=chave.indexOf('bv_arq_caixas_')===0,h='';
+    arr.forEach(function(x){
+      h+=caixas?'<div style="padding:8px 0;border-bottom:1px solid var(--bd);font-size:12px"><b>'+(x.data||'')+'</b> · '+((x.movimentos||[]).length)+' atendimento(s) · abertura '+fR(x.saldoAbertura||0)+' · final '+fR(x.saldoFinal||0)+(x.diferenca?' · dif. '+fR(x.diferenca):'')+'</div>'
+        :'<div style="padding:6px 0;border-bottom:1px solid var(--bd);font-size:12px"><b>'+(x.data||'')+' '+(x.hora||'')+'</b> · '+(x.user||'')+' · '+(x.acao||'')+(x.detalhe?' — '+x.detalhe:'')+'</div>';
+    });
+    openM('&#128451; '+chave.replace('bv_arq_','').replace('_',' · '),'<div style="max-height:60vh;overflow-y:auto">'+(h||'<div style="color:var(--mt)">Vazio</div>')+'</div><div class="brow"><button class="btnO bOgr" onclick="mArquivo()">Voltar</button></div>',520);
+  });
+}
+// Antes de ações sensíveis: envia o que está pendente e traz a versão mais nova da nuvem
+function _sincronizarAntes(cb,titulo){
+  if(!_sbReady||!_sbClient||!_cloudLoaded){cb(true);return;}
+  var t0=Date.now();toast('Conferindo a nuvem…','var(--bl)');
+  if(_pendingLocal&&!_saveInFlight)autoSave();
+  (function esperar(){
+    if(_pendingLocal||_saveInFlight){
+      if(Date.now()-t0>15000){cb(false);return;}
+      setTimeout(esperar,300);return;
+    }
+    _sbGet('bv_db',function(s){
+      if(!s){cb(false);return;}
+      if(!(_ownSavedAts[s.savedAt]||s.savedAt===_baseCloudSavedAt))_aplicarDaNuvem(s);
+      cb(true);
+    });
+  })();
+}
+function _pesagensAbertas(){
+  return (pesAbas||[]).filter(function(a){return a&&a.itens&&a.itens.length>0;});
+}
+function _bloqueioPesagem(abertas){
+  var lista=abertas.map(function(a){return '<div style="padding:7px 10px;background:var(--s2);border-radius:8px;margin-bottom:5px;font-size:13px">'+(a.label||'Atendimento')+' · '+a.itens.length+' item(ns)</div>';}).join('');
+  openM('&#9888; Há pesagem aberta','<div class="mf"><div class="al alr" style="font-size:13px;line-height:1.6">O caixa só pode ser fechado sem nenhuma pesagem aberta. Finalize cada uma ou finalize como <b>Em Aberto</b>.</div>'+lista
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Voltar</button><button class="btn" onclick="closeM();go(\'pesagem\')">Ir para Pesagem</button></div></div>',420);
+}
 function mFecharCaixa(){
+  _sincronizarAntes(function(ok){
+    if(!ok){
+      openM('&#9888; Sem conexão com a nuvem','<div class="mf"><div class="al aly" style="font-size:13px;line-height:1.6">Não consegui conferir a nuvem agora. Fechar o caixa sem conferir pode deixar de fora um atendimento feito em outro aparelho. O ideal é esperar a internet voltar.</div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Esperar</button><button class="btn btn-rd" onclick="closeM();_mFecharCaixaAbrir()">Fechar mesmo assim</button></div></div>',420);
+      return;
+    }
+    _mFecharCaixaAbrir();
+  });
+}
+function _mFecharCaixaAbrir(){
+  if(!DB.caixaDia){toast('O caixa já foi fechado em outro aparelho','var(--or)');renderCaixaDia();return;}
+  var _ab=_pesagensAbertas();if(_ab.length){_bloqueioPesagem(_ab);return;}
   var saldoAt=0;for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome==='Caixa'){saldoAt=DB.contas[i].saldo;break;}}
   openM('Fechar Caixa','<div class="mf"><div class="al aly">Voce esta prestes a fechar o caixa de hoje.</div><div style="background:var(--s2);border-radius:var(--r);padding:13px"><div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--bd)"><span style="color:var(--mt)">Abertura</span><span style="font-family:monospace">'+fR(DB.caixaDia.saldoAbertura)+'</span></div><div style="display:flex;justify-content:space-between;padding:7px 0;font-size:15px;font-weight:700"><span>Saldo esperado</span><span style="color:var(--gr);font-family:monospace">'+fR(saldoAt)+'</span></div></div><div class="fld"><label>Valor contado R$</label><input class="inp" type="number" inputmode="decimal" id="fc-v" value="'+saldoAt+'" style="font-size:20px;text-align:center;font-family:monospace" oninput="calcFD('+saldoAt+')"></div><div id="fc-dif"></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-rd" onclick="confirmarFech('+saldoAt+')">Fechar Caixa</button></div></div>');}
 function calcFD(esp){var v=parseFloat(document.getElementById('fc-v')?document.getElementById('fc-v').value:0)||0,dif=+(v-esp).toFixed(2);var el=document.getElementById('fc-dif');if(!el)return;if(Math.abs(dif)<0.01)el.innerHTML='<div class="al alg">&#10003; Caixa confere!</div>';else if(dif<0)el.innerHTML='<div class="al alr">Falta '+fR(Math.abs(dif))+'</div>';else el.innerHTML='<div class="al aly">Sobra '+fR(dif)+'</div>';}
 function confirmarFech(esp){
   var v=parseFloat(document.getElementById('fc-v').value)||0;
+  if(!DB.caixaDia){closeM();toast('O caixa já foi fechado em outro aparelho','var(--or)');renderCaixaDia();return;}
+  var _ab=_pesagensAbertas();if(_ab.length){_bloqueioPesagem(_ab);return;} // alguém abriu pesagem enquanto o modal estava aberto
   // Calcula peso total dos atendimentos do caixa
   var pesoTotal=0;
   var movs=DB.caixaDia.movimentos||[];
@@ -4621,8 +5060,8 @@ function confirmarFech(esp){
   // Arquiva na lista de histórico
   if(!DB.caixasHist)DB.caixasHist=[];
   DB.caixasHist.unshift(DB.caixaDia);
-  // Mantém só os últimos 60 caixas
-  if(DB.caixasHist.length>60)DB.caixasHist.length=60;
+  // Nada é apagado: acima de 60, os caixas mais antigos vão para o Arquivo na nuvem (ver _arquivarExcesso)
+  setTimeout(_arquivarExcesso,3000);
   DB.caixaOntem={data:DB.caixaDia.data,saldoFinal:esp,saldoContado:v,diferenca:+(v-esp).toFixed(2)};
   DB.caixaDia=null;
   closeM();autoSave();
@@ -5396,18 +5835,15 @@ function pgDash(){
 
     // ── Widget Mercado (só adm) ──
     +(CU&&CU.perfil==='adm'?'<div class="card" style="'+dcc+'background:linear-gradient(135deg,var(--s1),rgba(200,168,75,0.06));border-color:rgba(200,168,75,0.2);cursor:pointer" onclick="go(\'mercado\')" title="Ver Mercado" '+dca+'>'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
-    +'<div class="stl" style="margin-bottom:0"><div class="stb" style="background:#C8A84B"></div><div class="stx" style="color:#C8A84B">Mercado de Materiais <span style="opacity:.6;font-size:10px">›</span></div></div>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    +'<div class="stl" style="margin-bottom:0"><div class="stb" style="background:#C8A84B"></div><div class="stx" style="color:#C8A84B">Mercado <span style="opacity:.6;font-size:10px">›</span></div></div>'
     +'<div style="display:flex;align-items:center;gap:6px"><span id="mkt-dot" style="width:7px;height:7px;border-radius:50%;background:#6b7280;display:inline-block"></span>'
-    +'<span id="mkt-status" style="font-size:10px;color:var(--mt)">Carregando...</span>'
-    +'<button onclick="event.stopPropagation();_mktFetchWidget()" style="background:none;border:none;color:var(--mt);font-size:14px;cursor:pointer;padding:2px 4px" title="Atualizar">&#8635;</button></div></div>'
-    +'<div id="mkt-widget-prices" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">'
-    +'<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Cobre</div><div id="mkt-w-copper" style="font-size:13px;font-weight:700;color:#B87333;font-family:monospace">—</div><div id="mkt-w-copper-u" style="font-size:9px;color:var(--mt)">R$/kg</div></div>'
-    +'<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Alumínio</div><div id="mkt-w-aluminum" style="font-size:13px;font-weight:700;color:#A8C4D4;font-family:monospace">—</div><div id="mkt-w-aluminum-u" style="font-size:9px;color:var(--mt)">R$/kg</div></div>'
-    +'<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Latão</div><div id="mkt-w-brass" style="font-size:13px;font-weight:700;color:#C8A84B;font-family:monospace">—</div><div id="mkt-w-brass-u" style="font-size:9px;color:var(--mt)">R$/kg</div></div>'
-    +'<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Ouro</div><div id="mkt-w-gold" style="font-size:13px;font-weight:700;color:#D4AF37;font-family:monospace">—</div><div id="mkt-w-gold-u" style="font-size:9px;color:var(--mt)">R$/g</div></div>'
-    +'<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Prata</div><div id="mkt-w-silver" style="font-size:13px;font-weight:700;color:#C0C0C0;font-family:monospace">—</div><div id="mkt-w-silver-u" style="font-size:9px;color:var(--mt)">R$/g</div></div>'
-    +'<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Lítio</div><div id="mkt-w-lithium" style="font-size:13px;font-weight:700;color:#B0E0FF;font-family:monospace">—</div><div id="mkt-w-lithium-u" style="font-size:9px;color:var(--mt)">R$/kg</div></div>'
+    +'<span id="mkt-status" style="font-size:10px;color:var(--mt)">Carregando...</span></div></div>'
+    +'<div id="mkt-w-clima" style="font-size:12px;line-height:1.5;margin-bottom:8px">—</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">'
+    +'<div style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Dólar</div><div id="mkt-w-dolar" style="font-size:13px;font-weight:700;font-family:monospace">—</div><div style="font-size:9px;color:var(--mt)">R$/US$</div></div>'
+    +'<div style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Cobre</div><div id="mkt-w-cobre" style="font-size:13px;font-weight:700;color:#B87333;font-family:monospace">—</div><div id="mkt-w-cobre-v" style="font-size:9px;color:var(--mt)">R$/kg</div></div>'
+    +'<div style="text-align:center;padding:8px 4px;background:var(--bg);border-radius:8px;border:1px solid var(--bd)"><div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Ouro</div><div id="mkt-w-ouro" style="font-size:13px;font-weight:700;color:#D4AF37;font-family:monospace">—</div><div id="mkt-w-ouro-v" style="font-size:9px;color:var(--mt)">R$/g</div></div>'
     +'</div></div>':'')
 
     // Card Pesagens em Aberto (se houver)
@@ -5654,309 +6090,781 @@ function pgDash(){
 }
 
 
-// ── MÓDULO MERCADO (apenas adm) ──────────────────────────
 // ════════════════════════════════════════════════════════════
-var _mktPrices={gold:742,silver:13.65,copper:71.3,palladium:240,platinum:334.2,aluminum:17.89,lithium:116.8,rareearth:1.20,brass:28.42};
-var _mktChg={};
-var _mktInterval=null;
-if(!DB.cotacoesHist)DB.cotacoesHist=[];
-var _mktStatus='idle'; // 'idle' | 'loading' | 'live' | 'fallback'
-var _mktUpdAt='—';
-var _mktBrl=5.80;
-var _mktExpandido=null;
-
-var _mktMetals=[
-  {id:'gold',    nome:'Ouro',        sym:'Au',  unit:'g',   cor:'#D4AF37', chg:1.8},
-  {id:'silver',  nome:'Prata',       sym:'Ag',  unit:'g',   cor:'#C0C0C0', chg:2.4},
-  {id:'copper',  nome:'Cobre',       sym:'Cu',  unit:'kg',  cor:'#B87333', chg:4.6},
-  {id:'palladium',nome:'Paládio',    sym:'Pd',  unit:'g',   cor:'#8B8FA8', chg:-1.2},
-  {id:'platinum',nome:'Platina',     sym:'Pt',  unit:'g',   cor:'#E5E4E2', chg:0.9},
-  {id:'aluminum',nome:'Alumínio',    sym:'Al',  unit:'kg',  cor:'#A8C4D4', chg:3.1},
-  {id:'lithium', nome:'Lítio',       sym:'Li',  unit:'kg',  cor:'#B0E0FF', chg:5.2},
-  {id:'rareearth',nome:'Terras Raras',sym:'TR', unit:'g',   cor:'#7CB87C', chg:6.4},
-  {id:'brass',   nome:'Latão',       sym:'Cu+Zn',unit:'kg', cor:'#C8A84B', chg:4.1}
+// ── MÓDULO MERCADO (apenas adm) — v2: LME + dólar + preciosos ──
+// Fonte: Metals.dev (chave em Configurações → IA e Integrações).
+// Atualiza sozinho 1x por dia útil (primeira abertura do dia) e salva
+// na nuvem; os outros aparelhos só leem o que foi salvo.
+// Dados ficam em DB.mercado:
+//   dias:{'AAAA-MM-DD':{brl, m:{cobre,aluminio,zinco,niquel,chumbo (US$/kg), ouro,prata,platina,paladio (US$/g)}, fonte, em, por}}
+//   ferro:[{data:'AAAA-MM-DD', rkg:R$/kg}]  — preço informado à mão
+//   vinc:{prodId: metalId|''}                — vínculo material → metal
+//   ultimaBusca, histOk, erro
+// ════════════════════════════════════════════════════════════
+var _MK_METAIS=[
+  {id:'cobre',   nome:'Cobre',    key:'lme_copper',   grp:'base', cor:'#B87333', uso:'fio, placa e motor'},
+  {id:'aluminio',nome:'Alumínio', key:'lme_aluminum', grp:'base', cor:'#A8C4D4', uso:'latinha, perfil e dissipador'},
+  {id:'zinco',   nome:'Zinco',    key:'lme_zinc',     grp:'base', cor:'#7FB3B0', uso:'latão e peças galvanizadas'},
+  {id:'niquel',  nome:'Níquel',   key:'lme_nickel',   grp:'base', cor:'#6B8FB5', uso:'bateria e inox'},
+  {id:'chumbo',  nome:'Chumbo',   key:'lme_lead',     grp:'base', cor:'#8B9099', uso:'bateria e tubo de TV'},
+  {id:'ferro',   nome:'Ferro',    key:null,           grp:'base', cor:'#9CA3AF', uso:'gabinete, carcaça e sucata', manual:true},
+  {id:'ouro',    nome:'Ouro',     key:'gold',         grp:'prec', cor:'#D4AF37', uso:'placas e processadores'},
+  {id:'prata',   nome:'Prata',    key:'silver',       grp:'prec', cor:'#C0C0C0', uso:'placas e contatos'},
+  {id:'paladio', nome:'Paládio',  key:'palladium',    grp:'prec', cor:'#8B8FA8', uso:'capacitores e placas'},
+  {id:'platina', nome:'Platina',  key:'platinum',     grp:'prec', cor:'#E5E4E2', uso:'componentes industriais'}
 ];
+function _mkUnLbl(mt,un){
+  if(mt.grp==='prec')return un==='usd'?'US$/oz':'R$/g';
+  return un==='usd'?'US$/t':'R$/kg';
+}
+// Tendência: preço de hoje x média dos últimos 20 dias, e se essa média sobe ou desce
+function _mkTendencia(id){
+  var s=_mkSerie(id,'brl');
+  if(s.length<20)return {tipo:'sem',n:s.length};
+  var ma=function(fim){var t=0;for(var i=fim-19;i<=fim;i++)t+=s[i].v;return t/20;};
+  var n=s.length-1,m=ma(n),mAnt=s.length>=25?ma(n-5):ma(19),p=s[n].v;
+  var dist=(p-m)/m*100,incl=(m-mAnt)/mAnt*100,tipo='lateral';
+  if(p>m&&incl>0)tipo='alta';else if(p<m&&incl<0)tipo='queda';
+  return {tipo:tipo,forte:Math.abs(dist)>=3,dist:dist,n:s.length};
+}
+function _mkSelo(id,compacto){
+  var t=_mkTendencia(id);
+  if(t.tipo==='sem')return compacto?'':'<span style="font-size:11px;color:var(--mt)">Tendência: juntando histórico ('+t.n+' de 20 dias)</span>';
+  var cfg={alta:['&#8599; Alta','var(--gr)','var(--grb)'],queda:['&#8600; Queda','var(--rd)','var(--rdb)'],lateral:['&#8596; Lateral','var(--mt)','var(--s3)']}[t.tipo];
+  var txt=compacto?cfg[0]:'Tendência de '+cfg[0].split(' ')[1].toLowerCase()+(t.tipo!=='lateral'?(t.forte?' forte':' fraca'):'');
+  if(!compacto&&t.tipo==='lateral')txt='Lateral: sem direção clara';
+  return '<span style="display:inline-block;font-size:11px;font-weight:700;color:'+cfg[1]+';background:'+cfg[2]+';padding:2px 9px;border-radius:20px;white-space:nowrap">'+(compacto?cfg[0]:(t.tipo==='alta'?'&#8599; ':t.tipo==='queda'?'&#8600; ':'&#8596; ')+txt)+'</span>';
+}
+var _mk={sub:'resumo',metal:'cobre',per:'d',un:'brl',busy:false,chart:null,imp:null};
+var _MK_OZ=31.1035;
 
-var _mktForecasts=[
-  {id:'gold',    nome:'Ouro',       cor:'#D4AF37',ref:'US$ 4.712 / oz',status:'Excelente',statusCor:'#D4AF37',var:'+60% no ano',fatores:['Compras recordes dos bancos centrais','Tensões globais elevam demanda por proteção'],riscos:['Acordo de paz pode pressionar queda','Alta dos juros nos EUA seria negativo'],nota:'Momento favorável para segurar estoque físico ou aguardar valorização que pode render mais 10-14%.'},
-  {id:'copper',  nome:'Cobre',      cor:'#B87333',ref:'US$ 6,60 / lb',status:'Recorde',statusCor:'#E28743',var:'Histórico',fatores:['NOVO RECORDE: Máxima operacional atingida hoje','Demanda massiva de IA, Chips e Data Centers'],riscos:['Acordos no Oriente Médio podem normalizar oferta','Volatilidade por tarifas comerciais'],nota:'COBRE EM RECORDE. Melhor momento histórico para negociar sucatas, fios e placas de circuito.'},
-  {id:'silver',  nome:'Prata',      cor:'#C0C0C0',ref:'US$ 34,20 / oz',status:'Favorável',statusCor:'#A0A0A0',var:'+28% no ano',fatores:['Alta acompanhando rali do ouro','Demanda industrial crescente (painéis solares)'],riscos:['Mais volátil que o ouro','Menor liquidez imediata no varejo'],nota:'Placas eletrônicas contêm prata significativa. Alta favorece reciclagem em lote.'},
-  {id:'palladium',nome:'Paládio',   cor:'#8B8FA8',ref:'US$ 980 / oz',status:'Alerta',statusCor:'#F87171',var:'-12% no ano',fatores:['Oferta restrita (Rússia e África do Sul)','Tensões geopolíticas sustentam mínimos'],riscos:['Queda prevista no curto prazo','Substituição por platina em catalisadores'],nota:'⚠️ Tendência de queda estrutural. Considere liquidar estoque remanescente agora.'},
-  {id:'platinum',nome:'Platina',    cor:'#E5E4E2',ref:'US$ 1.120 / oz',status:'Alta Hist.',statusCor:'#E5E4E2',var:'+18% no ano',fatores:['Alta histórica consistente','Mercado com déficit de oferta contínuo'],riscos:['Alta de juros globais pode reduzir demanda industrial'],nota:'Platina em alta histórica consistente. Excelente momento para manter estoque operacional.'},
-  {id:'aluminum',nome:'Alumínio',   cor:'#A8C4D4',ref:'US$ 2.950 / t',status:'Pico',statusCor:'#A8C4D4',var:'+44% no ano',fatores:['Crise de logística no Oriente Médio','Forte demanda automotiva global'],riscos:['Normalização da oferta reduziria pressão imediatamente'],nota:'Alumínio perto do recorde de 4 anos. Momento excelente para negociar lotes de fundição.'},
-  {id:'lithium', nome:'Lítio',      cor:'#B0E0FF',ref:'US$ 14.200 / t',status:'Boom',statusCor:'#60A5FA',var:'+50% no ano',fatores:['Demanda de sistemas de armazenamento para data centers de IA','Infraestrutura de recarga em expansão'],riscos:['Estoques altos na China podem frear altas','Oferta australiana crescendo'],nota:'Baterias de celulares e notebooks têm lítio concentrado. Alta de +50% torna a reciclagem muito lucrativa.'},
-  {id:'rareearth',nome:'Terras Raras',cor:'#7CB87C',ref:'Preço sob consulta',status:'Restrito',statusCor:'#34D399',var:'+64% no ano',fatores:['China restringiu cotas de exportação','Demanda explosiva de ímãs para VEs'],riscos:['Aumento de plantas de refino fora da China','Substituição tecnológica no longo prazo'],nota:'Ímãs internos de eletrônicos pesados valem muito. Momento estratégico para comercialização rápida.'},
-  {id:'brass',   nome:'Latão',      cor:'#C8A84B',ref:'Cálculo proporcional',status:'Acompanha',statusCor:'#C8A84B',var:'+32% no ano',fatores:['Rali do cobre puxa diretamente o latão','Demanda em alta para conectores eletrônicos'],riscos:['Volatilidade inerente do cobre bruto afeta margens'],nota:'Latão em forte escalada com o cobre. Excelente indicador para separação e processamento de ligas metálicas.'}
-];
+function _mkM(id){for(var i=0;i<_MK_METAIS.length;i++){if(_MK_METAIS[i].id===id)return _MK_METAIS[i];}return null;}
+function _mkDB(){
+  if(!DB.mercado||typeof DB.mercado!=='object')DB.mercado={};
+  var m=DB.mercado;
+  if(!m.dias)m.dias={};if(!m.ferro)m.ferro=[];if(!m.vinc)m.vinc={};
+  return m;
+}
+function _mkIso(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function _mkHoje(){return _mkIso(new Date());}
+function _mkDate(iso){var p=iso.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+function _mkBR(iso){if(!iso)return '—';var p=iso.split('-');return p[2]+'/'+p[1];}
+function _mkFimSemana(d){var w=(d||new Date()).getDay();return w===0||w===6;}
+function _mkUltimoUtil(){var d=new Date();while(_mkFimSemana(d))d=_addDays(d,-1);return _mkIso(d);}
+function _mkPct(v){if(v===null||v===undefined||isNaN(v))return '—';return (v>=0?'+':'')+v.toFixed(1).replace('.',',')+'%';}
+function _mkCorPct(v){if(v===null||v===undefined||isNaN(v))return 'var(--mt)';if(v>0.05)return 'var(--gr)';if(v<-0.05)return 'var(--rd)';return 'var(--mt)';}
+function _mkNum(v,dec){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:dec,maximumFractionDigits:dec});}
+function _mkDias(){return Object.keys(_mkDB().dias).sort();}
 
-function _mktGetAlerts(){
-  var alerts=[];
-  var defs=[
-    {id:'gold',nome:'Ouro',cor:'#D4AF37'},
-    {id:'silver',nome:'Prata',cor:'#C0C0C0'},
-    {id:'copper',nome:'Cobre',cor:'#B87333'},
-    {id:'platinum',nome:'Platina',cor:'#E5E4E2'},
-    {id:'palladium',nome:'Paládio',cor:'#8B8FA8'},
-    {id:'aluminum',nome:'Alumínio',cor:'#A8C4D4'},
-    {id:'lithium',nome:'Lítio',cor:'#B0E0FF'},
-    {id:'brass',nome:'Latão',cor:'#C8A84B'}
-  ];
-  for(var i=0;i<defs.length;i++){
-    var m=defs[i];var chg=_mktChg[m.id]||0;var msg='';
-    if(chg>=3)msg='Alta de +'+chg.toFixed(1)+'% hoje. Bom momento para vender estoque.';
-    else if(chg>=1.5)msg='Subindo +'+chg.toFixed(1)+'% no dia. Tendência positiva.';
-    else if(chg<=-3)msg='Queda de '+Math.abs(chg).toFixed(1)+'% hoje. Reavalie preços de compra.';
-    else if(chg<=-1.5)msg='Caindo '+Math.abs(chg).toFixed(1)+'% no dia. Fique atento.';
-    if(msg)alerts.push({id:m.id,cor:m.cor,metal:m.nome,msg:msg,chg:chg});
+// Dólar do dia (ou do último dia anterior que tiver)
+function _mkBRL(iso){
+  var d=_mkDB().dias,ks=_mkDias();
+  for(var i=ks.length-1;i>=0;i--){if(ks[i]<=iso&&d[ks[i]].brl)return d[ks[i]].brl;}
+  for(var j=0;j<ks.length;j++){if(d[ks[j]].brl)return d[ks[j]].brl;}
+  return 0;
+}
+function _mkFerroEm(iso){
+  var f=_mkDB().ferro.slice().sort(function(a,b){return a.data<b.data?-1:1;});var v=null;
+  for(var i=0;i<f.length;i++){if(f[i].data<=iso)v=f[i].rkg;}
+  return v;
+}
+// Preço de um metal num dia. un='brl' → R$/kg (base) ou R$/g (preciosos); un='usd' → US$/t ou US$/oz
+function _mkPreco(iso,id,un){
+  var mt=_mkM(id);if(!mt)return null;
+  if(mt.manual){
+    var r=_mkFerroEm(iso);if(r===null)return null;
+    if(un==='usd'){var b=_mkBRL(iso);return b?r/b*1000:null;}
+    return r;
   }
-  alerts.sort(function(a,b){return Math.abs(b.chg)-Math.abs(a.chg);});
-  if(!alerts.length&&_mktStatus==='live')alerts.push({id:'info',cor:'#94a3b8',metal:'Mercado',msg:'Variações abaixo de 1,5% hoje. Preços estáveis.',chg:0});
-  return alerts;
+  var dia=_mkDB().dias[iso];if(!dia||!dia.m||!dia.m[id])return null;
+  var usd=dia.m[id];
+  if(un==='usd')return mt.grp==='base'?usd*1000:usd*_MK_OZ;
+  var brl=dia.brl||_mkBRL(iso);if(!brl)return null;
+  return usd*brl;
+}
+// Série diária [{d,v}] só com dias úteis que têm o valor
+function _mkSerie(id,un){
+  var mt=_mkM(id),ks=_mkDias(),out=[];
+  if(mt&&mt.manual){
+    var datas={};ks.forEach(function(k){datas[k]=1;});
+    _mkDB().ferro.forEach(function(f){datas[f.data]=1;});
+    ks=Object.keys(datas).sort();
+  }
+  for(var i=0;i<ks.length;i++){
+    if(_mkFimSemana(_mkDate(ks[i])))continue;
+    var v=_mkPreco(ks[i],id,un||'brl');
+    if(v!==null&&v>0)out.push({d:ks[i],v:v});
+  }
+  return out;
+}
+// Variação: último ponto contra o ponto de ~N dias corridos antes (N=0 → ponto anterior)
+function _mkVar(id,dias,un){
+  var s=_mkSerie(id,un);if(s.length<2)return null;
+  var ult=s[s.length-1],ref=null;
+  if(!dias){ref=s[s.length-2];}
+  else{
+    var lim=_mkIso(_addDays(_mkDate(ult.d),-dias));
+    for(var i=s.length-2;i>=0;i--){if(s[i].d<=lim){ref=s[i];break;}}
+    if(!ref){ref=s[0];if(ref.d===ult.d)return null;}
+  }
+  return {pct:(ult.v-ref.v)/ref.v*100,de:ref,para:ult};
+}
+function _mkUltimoApi(){
+  var ks=_mkDias();
+  for(var i=ks.length-1;i>=0;i--){var d=_mkDB().dias[ks[i]];if(d&&d.fonte==='api'&&d.m&&d.m.ouro)return ks[i];}
+  return null;
+}
+function _mkUltimoDia(){
+  var ks=_mkDias();
+  for(var i=ks.length-1;i>=0;i--){var d=_mkDB().dias[ks[i]];if(d&&d.m&&d.m.cobre)return ks[i];}
+  return null;
 }
 
-async function _mktFetch(forcar){
-  _mktStatus='loading';
-  _mktRenderPage();
-  var OZ=31.1035;var brl=5.80;
+// ── BUSCA NA FONTE ──────────────────────────────────────────
+function _mkErroAmigavel(st,txt){
+  var t=(txt||'').toLowerCase();
+  if(st===401||st===403||t.indexOf('invalid')>=0||t.indexOf('api key')>=0)return 'Chave do Metals.dev inválida. Confira em Configurações.';
+  if(st===429||t.indexOf('quota')>=0||t.indexOf('limit')>=0)return 'Limite de consultas do mês atingido no Metals.dev. Volta a funcionar no dia 1º.';
+  return 'Não foi possível buscar as cotações'+(st?' (erro '+st+')':'')+'. Tente de novo mais tarde.';
+}
+async function _mkGetJSON(url){
+  var r;
+  try{r=await fetch(url);}
+  catch(ef){var er=new Error('Não foi possível conectar ao Metals.dev (sem internet ou conexão bloqueada pelo navegador).');er.det=String(ef&&ef.message||ef);throw er;}
+  var txt=await r.text();var j=null;
+  try{j=JSON.parse(txt);}catch(e){}
+  if(!r.ok||!j||j.status==='failure'||j.status==='error'){var e2=new Error(_mkErroAmigavel(r.status,(j&&(j.error_message||j.message||j.error))||txt));e2.det='HTTP '+r.status+' '+String(txt).slice(0,140);throw e2;}
+  return j;
+}
+// Converte preço precioso vindo da API para US$/g, seja qual for a unidade
+function _mkPrecG(v,unidade){
+  if(!v)return 0;
+  if(unidade==='mt')return v/1e6;
+  if(unidade==='g')return v;
+  if(unidade==='toz')return v/_MK_OZ;
+  if(v>100000)return v/1e6; if(v<500)return v; return v/_MK_OZ; // heurística
+}
+async function _mkAtualizar(manual){
+  var key=(CFG.sistema&&CFG.sistema.metalsDevKey)||'';
+  if(!key){
+    if(manual)openM('&#128200; Configurar cotações','<div class="mf"><div style="font-size:13px;line-height:1.6">Para buscar as cotações, cole a chave do <b>Metals.dev</b> em Configurações → IA e Integrações.</div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Agora não</button><button class="btn" onclick="closeM();go(\'configuracoes\')">Ir para Configurações</button></div></div>',380);
+    return;
+  }
+  if(_mkFimSemana()){
+    if(manual)toast('LME fechada no fim de semana. Mostrando o fechamento de sexta.','var(--bl)');
+    return;
+  }
+  if(_mk.busy)return;
+  _mk.busy=true;_mkRender();
+  var db=_mkDB(),hoje=_mkHoje();
   try{
-    var rc=await fetch('https://api.frankfurter.app/latest?from=USD&to=BRL');
-    var dc=await rc.json();
-    if(dc&&dc.rates&&dc.rates.BRL){brl=dc.rates.BRL;_mktBrl=brl;}
-  }catch(e){_mktBrl=_mktBrl||5.80;}
-  try{
-    var p=Object.assign({},_mktPrices);
-    var [rG,rS,rPt,rPd,rCu]=await Promise.all([
-      fetch('https://api.gold-api.com/price/XAU'),
-      fetch('https://api.gold-api.com/price/XAG'),
-      fetch('https://api.gold-api.com/price/XPT'),
-      fetch('https://api.gold-api.com/price/XPD'),
-      fetch('https://api.gold-api.com/price/HG')
-    ]);
-    var [dG,dS,dPt,dPd,dCu]=await Promise.all([rG.json(),rS.json(),rPt.json(),rPd.json(),rCu.json()]);
-    if(dG&&dG.price){p.gold=(dG.price/OZ)*brl;_mktChg.gold=dG.chp||(dG.prev_close_price?((dG.price-dG.prev_close_price)/dG.prev_close_price*100):0);}
-    if(dS&&dS.price){p.silver=(dS.price/OZ)*brl;_mktChg.silver=dS.chp||(dS.prev_close_price?((dS.price-dS.prev_close_price)/dS.prev_close_price*100):0);}
-    if(dPt&&dPt.price){p.platinum=(dPt.price/OZ)*brl;_mktChg.platinum=dPt.chp||(dPt.prev_close_price?((dPt.price-dPt.prev_close_price)/dPt.prev_close_price*100):0);}
-    if(dPd&&dPd.price){p.palladium=(dPd.price/OZ)*brl;_mktChg.palladium=dPd.chp||(dPd.prev_close_price?((dPd.price-dPd.prev_close_price)/dPd.prev_close_price*100):0);}
-    if(dCu&&dCu.price){p.copper=(dCu.price/0.453592)*brl;_mktChg.copper=dCu.chp||(dCu.prev_close_price?((dCu.price-dCu.prev_close_price)/dCu.prev_close_price*100):0);}
-    p.aluminum=p.aluminum||(2.40/0.453592)*brl;
-    p.brass=p.copper?p.copper*0.40:p.brass;_mktChg.brass=_mktChg.copper||0;
-    p.rareearth=(244.9/1000)*brl;
-    p.lithium=(24.5/0.453592)*brl;
-    _mktPrices=p;
-    var n=new Date();
-    _mktUpdAt=n.toLocaleDateString('pt-BR')+' às '+n.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    _mktStatus='live';
-    if(!DB.cotacoesHist)DB.cotacoesHist=[];
-    var _hj=new Date().toLocaleDateString('pt-BR');
-    var _jaHj=false;var _iHj=-1;
-    for(var _ci=0;_ci<DB.cotacoesHist.length;_ci++){if(DB.cotacoesHist[_ci].data===_hj){_jaHj=true;_iHj=_ci;break;}}
-    if(!_jaHj){DB.cotacoesHist.unshift({data:_hj,brl:brl,prices:Object.assign({},p)});if(DB.cotacoesHist.length>90)DB.cotacoesHist.length=90;}
-    else if(forcar&&_iHj>=0){DB.cotacoesHist[_iHj]={data:_hj,brl:brl,prices:Object.assign({},p)};}
-    try{localStorage.setItem('bv_mkt_cache',JSON.stringify({prices:Object.assign({},p),chg:Object.assign({},_mktChg),brl:brl,updAt:_mktUpdAt,hist:DB.cotacoesHist.slice(0,90)}));}catch(e){}
+    var j=await _mkGetJSON('https://api.metals.dev/v1/latest?api_key='+encodeURIComponent(key)+'&currency=USD&unit=mt');
+    var ms=j.metals||{},cur=j.currencies||{};
+    if(!cur.BRL||!ms.lme_copper)throw new Error('A fonte respondeu sem os dados esperados. Tente de novo mais tarde.');
+    var m={};
+    _MK_METAIS.forEach(function(mt){
+      if(mt.manual||!ms[mt.key])return;
+      m[mt.id]=mt.grp==='base'?ms[mt.key]/1000:_mkPrecG(ms[mt.key],'mt');
+    });
+    db.dias[hoje]={brl:+(1/cur.BRL).toFixed(4),m:m,fonte:'api',em:new Date().toISOString(),por:CU?CU.nome:''};
+    db.ultimaBusca=hoje;db.erro=null;db.tentativa=null;
+    // Primeira vez: preenche 30 dias de preciosos e dólar (a fonte não traz histórico dos metais da LME)
+    if(!db.histOk){
+      try{
+        var ini=_mkIso(_addDays(new Date(),-30)),fim=_mkIso(_addDays(new Date(),-1));
+        var h=await _mkGetJSON('https://api.metals.dev/v1/timeseries?api_key='+encodeURIComponent(key)+'&start_date='+ini+'&end_date='+fim);
+        var rates=h.rates||{};
+        // Descobre a unidade pelo ouro (o mesmo para todos os metais da resposta)
+        var uni=h.unit||null;
+        if(!uni){var k0=Object.keys(rates)[0],r0=k0?(rates[k0].metals||rates[k0]):{},g0=r0.gold||0;uni=g0>100000?'mt':g0<500?'g':'toz';}
+        Object.keys(rates).forEach(function(dt){
+          if(_mkFimSemana(_mkDate(dt)))return;
+          var r=rates[dt]||{},rm=r.metals||r,rc=r.currencies||{};
+          var dia=db.dias[dt]||{m:{},fonte:'api-hist'};if(!dia.m)dia.m={};
+          if(!dia.brl&&rc.BRL)dia.brl=+(1/rc.BRL).toFixed(4);
+          ['ouro','prata','paladio','platina'].forEach(function(id){
+            var mt=_mkM(id);if(!dia.m[id]&&rm[mt.key])dia.m[id]=_mkPrecG(rm[mt.key],uni);
+          });
+          db.dias[dt]=dia;
+        });
+        db.histOk=true;
+      }catch(eh){console.warn('[Mercado] histórico não carregado:',eh);}
+    }
+    saveDB();
+    if(manual)toast('Cotações atualizadas');
   }catch(e){
-    try{var cached=localStorage.getItem('bv_mkt_cache');
-      if(cached){var c=JSON.parse(cached);_mktPrices=Object.assign({},c.prices);if(c.chg)Object.assign(_mktChg,c.chg);_mktBrl=c.brl||5.80;_mktUpdAt=c.updAt||'—';if(c.hist)DB.cotacoesHist=c.hist;}
-    }catch(e2){}
-    _mktStatus='fallback';
+    db.erro={msg:e.message||String(e),det:e.det||'',em:new Date().toISOString()};db.tentativa=hoje;
+    console.error('[Mercado] falha na busca:',e,e.det||'');
+    if(manual)toast(db.erro.msg,'var(--rd)');
   }
-  _mktRenderPage();
-  _mktUpdateWidget();
+  _mk.busy=false;
+  if(pgAtiva==='mercado')_mkRender();
+  _mkUpdateWidget();
+}
+// Chamado ao entrar no sistema e ao carregar a nuvem: busca sozinho 1x por dia útil
+function _mkAutoCheck(){
+  try{
+    if(!CU)return;
+    if(_sbReady&&!_cloudLoaded)return; // espera saber o que já está na nuvem
+    if(!(CFG.sistema&&CFG.sistema.metalsDevKey))return;
+    if(_mkFimSemana())return;
+    var db=_mkDB(),hoje=_mkHoje();
+    if(db.dias[hoje]&&db.dias[hoje].fonte==='api')return;
+    if(db.tentativa===hoje&&db.erro)return; // já tentou hoje e falhou: não insiste sozinho (use Tentar agora)
+    _mkAtualizar(false);
+  }catch(e){}
 }
 
-function _mktFetchWidget(){
-  _mktFetch();
+// ── VÍNCULO MATERIAL → METAL ───────────────────────────────
+function _mkPalpite(nome){
+  var n=(nome||'').toLowerCase();
+  if(/placa|processador|mem[oó]ria|pente|\bhd\b|celular|notebook/.test(n))return 'ouro'; // placas: o ouro indica a direção, não o valor
+  if(/cobre|lat[aã]o|bronze/.test(n))return 'cobre';
+  if(/alum[ií]nio|latinha|perfil/.test(n))return 'aluminio';
+  if(/inox|n[ií]quel/.test(n))return 'niquel';
+  if(/chumbo|bateria de carro/.test(n))return 'chumbo';
+  if(/zinco|zamac|zamak/.test(n))return 'zinco';
+  if(/ferro|a[cç]o|chaparia|carca[cç]a|gabinete/.test(n))return 'ferro';
+  return '';
+}
+function _mkVincDe(p){
+  var v=_mkDB().vinc,k=String(_normId(p.id));
+  if(Object.prototype.hasOwnProperty.call(v,k))return v[k];
+  return _mkPalpite(p.nome);
 }
 
-function _mktUpdateWidget(){
-  var ids=['copper','aluminum','brass','gold','silver','lithium'];
-  for(var i=0;i<ids.length;i++){
-    var el=document.getElementById('mkt-w-'+ids[i]);
-    if(el)el.textContent='R$ '+(_mktPrices[ids[i]]||0).toFixed(2);
+// ── ESTOQUE A PREÇO DE MERCADO ─────────────────────────────
+function _mkEstoque(){
+  var rows=[],total=0,semHist=0;
+  for(var i=0;i<DB.produtos.length;i++){
+    var p=DB.produtos[i];
+    if(!(p.est>0))continue;
+    var mid=_mkVincDe(p);if(!mid)continue;
+    var vr=_mkVar(mid,30);
+    var valor=p.est*(p.vV||0);
+    if(!vr){semHist++;rows.push({p:p,mid:mid,pct:null,ganho:null,valor:valor});continue;}
+    var g=valor*vr.pct/100;total+=g;
+    rows.push({p:p,mid:mid,pct:vr.pct,ganho:g,valor:valor});
   }
-  var dot=document.getElementById('mkt-dot');
-  var sta=document.getElementById('mkt-status');
-  if(dot){dot.style.background=_mktStatus==='live'?'#22c55e':_mktStatus==='fallback'?'#f59e0b':'#f59e0b';}
-  if(sta){sta.textContent=_mktStatus==='live'?'Ao vivo · '+_mktUpdAt:_mktStatus==='fallback'?'Última: '+_mktUpdAt:'Carregando...';}
+  rows.sort(function(a,b){return Math.abs(b.ganho||0)-Math.abs(a.ganho||0);});
+  return {rows:rows,total:total,semHist:semHist};
 }
 
-function _mktToggle(id){
-  _mktExpandido=(_mktExpandido===id?null:id);
-  _mktRenderPage();
-
-// Event delegation para clique nos cards de metal via data-mtid
-document.addEventListener('click',function(e){
-  var tog=e.target.closest?e.target.closest('.mkt-tog'):null;
-  if(tog){var id=tog.getAttribute('data-mtid');if(id)_mktToggle(id);}
-});
-
-}
-
-// Textos de orientação por metal baseados na variação real
-function _mktNota(id, chg, pr, brl){
-  var notas={
-    gold: function(c,p){
-      if(c<=-3)return 'Queda expressiva hoje. Moment para aguardar recuperação antes de vender placas douradas.';
-      if(c<=0)return 'Leve queda. Placas com ouro (Telefonia Especial, Processador Louça Dourado) sofrem impacto pequeno.';
-      if(c>=3)return 'Alta expressiva hoje. Bom momento para negociar placas com alto teor de ouro.';
-      return 'Estável. Ouro em R$ '+p.toFixed(2)+'/g. Referência para precificação das suas placas douradas.';
-    },
-    silver: function(c,p){
-      if(c<=-2)return 'Prata em queda. Placas eletrônicas com prata perdem valor levemente.';
-      if(c>=2)return 'Prata subindo. Momento favorável para venda de lotes com placas mistas.';
-      return 'Prata estável em R$ '+p.toFixed(2)+'/g.';
-    },
-    copper: function(c,p){
-      if(c<=-3)return 'Cobre em queda. Fios, conectores e placas pesadas valem menos agora.';
-      if(c<=0)return 'Cobre levemente negativo. Atenção ao preço de compra de sucata de cobre.';
-      if(c>=3)return 'Cobre em alta. Fios elétricos, conectores e placas com muito cobre estão valorizados.';
-      return 'Cobre em R$ '+p.toFixed(2)+'/kg. Base para fios, conectores e placas pesadas.';
-    },
-    palladium: function(c,p){
-      if(c<=-2)return 'Paládio caindo. Tendência de queda estrutural — considere liquidar estoque.';
-      if(c>=2)return 'Paládio em alta pontual. Componentes de catalisadores e alguns chips valorizam.';
-      return 'Paládio em R$ '+p.toFixed(2)+'/g. Metal presente em capacitores cerâmicos e conectores.';
-    },
-    platinum: function(c,p){
-      if(c>=2)return 'Platina subindo. Excelente para manter estoque de componentes com platina.';
-      if(c<=-2)return 'Platina em queda. Reavalie preços de compra de itens que contenham platina.';
-      return 'Platina em R$ '+p.toFixed(2)+'/g. Presente em catalisadores e alguns componentes industriais.';
-    },
-    aluminum: function(c,p){
-      if(c>=3)return 'Alumínio em alta. Dissipadores, gabinetes e estruturas de alumínio valorizados.';
-      if(c<=-2)return 'Alumínio em queda. Reveja preços de lotes com muito dissipador e estrutura metálica.';
-      return 'Alumínio em R$ '+p.toFixed(2)+'/kg. Impacta dissipadores e estruturas metálicas.';
-    },
-    lithium: function(c,p){
-      if(c>=3)return 'Lítio em alta. Baterias de celular, notebook e tablet estão mais valorizadas.';
-      if(c<=-2)return 'Lítio recuando. Baterias perdem valor — bom momento para comprar barato.';
-      return 'Lítio em R$ '+p.toFixed(2)+'/kg. Baterias de celular e notebook dependem desta cotação.';
-    },
-    rareearth: function(c,p){
-      return 'Terras raras em R$ '+p.toFixed(2)+'/g. Ímãs internos de eletrônicos e motores dependem desta cotação.';
-    },
-    brass: function(c,p){
-      if(c>=3)return 'Latão (cobre+zinco) em alta junto com o cobre. Conectores e terminais valorizados.';
-      if(c<=-2)return 'Latão recuando com o cobre. Conectores e terminais com menor valor.';
-      return 'Latão em R$ '+p.toFixed(2)+'/kg. Acompanha o cobre. Presente em conectores e terminais.';
-    }
-  };
-  var fn=notas[id];
-  return fn?fn(chg,pr):'';
-}
-
-function _mktRenderPage(){
-  var el=document.getElementById('pg-mercado-inner');
-  if(!el)return;
-  var dotCor=_mktStatus==='live'?'#22c55e':'#f59e0b';
-  var dotAnim=_mktStatus==='loading'?'animation:bvPulse .8s ease-in-out infinite':'';
-  var staLabel=_mktStatus==='live'?'Ao vivo: '+_mktUpdAt+' · auto 5min':_mktStatus==='loading'?'Buscando cotações...':'Última cotação: '+_mktUpdAt;
-  var brlFmt=parseFloat(_mktBrl||5.80).toFixed(2);
-
-  // ── Status + dólar em destaque ──
-  var h='<div class="card" style="padding:12px 14px">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
-    +'<div style="display:flex;align-items:center;gap:7px">'
-    +'<span style="width:8px;height:8px;border-radius:50%;background:'+dotCor+';display:inline-block;flex-shrink:0;'+dotAnim+'"></span>'
-    +'<span style="font-size:12px;color:var(--tx)">'+staLabel+'</span></div>'
-    +'<div style="display:flex;gap:6px">'
-    +'<button onclick="mHistCotacoes()" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.3);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer">&#128202; Histórico</button>'
-    +'<button onclick="_mktFetch(true)" style="background:none;border:none;color:var(--mt);font-size:18px;cursor:pointer;padding:4px" title="Atualizar">&#8635;</button>'
-    +'</div></div>'
-    +'<div style="background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">'
-    +'<div><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Dólar (USD/BRL)</div>'
-    +'<div style="font-size:22px;font-weight:800;color:var(--tx);font-family:monospace;margin-top:2px">R$ '+brlFmt+'</div>'
-    +'<div style="font-size:10px;color:var(--mt);margin-top:2px">Impacta todos os metais abaixo</div></div>'
-    +'<div style="font-size:30px">&#128181;</div>'
-    +'</div></div>';
-
-  // ── Alertas estratégicos dinâmicos ──
-  var alerts=_mktGetAlerts();
-  h+='<div class="card"><div class="stl"><div class="stb" style="background:#C8A84B"></div><div class="stx" style="color:#C8A84B">Alertas Estratégicos</div>'
-    +(_mktStatus==='live'?'<span style="font-size:10px;color:var(--mt);margin-left:auto">baseado nos dados de hoje</span>':'')+'</div>';
-  if(_mktStatus==='loading'){
-    h+='<div style="color:var(--mt);font-size:12px;padding:8px 0">Carregando alertas...</div>';
-  } else if(alerts.length){
-    for(var i=0;i<alerts.length;i++){
-      var al=alerts[i];var cc=al.chg>=0?'#22c55e':'#ef4444';
-      h+='<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--bd)">'
-        +'<div style="width:8px;height:8px;border-radius:50%;background:'+al.cor+';flex-shrink:0;margin-top:4px"></div>'
-        +'<div style="flex:1;min-width:0">'
-        +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'
-        +'<span style="font-size:12px;font-weight:700;color:'+al.cor+'">'+al.metal+'</span>'
-        +(_mktStatus==='live'&&al.chg!==0?'<span style="font-size:11px;font-weight:700;color:'+cc+'">'+(al.chg>=0?'&#9650; +':'&#9660; ')+Math.abs(al.chg).toFixed(1)+'%</span>':'')
-        +'</div>'
-        +'<span style="font-size:12px;color:var(--mt)">'+al.msg+'</span>'
-        +'</div></div>';
+// ── COMPRAS E VENDAS DE UM METAL (para o gráfico) ──────────
+function _mkOps(mid){
+  var out=[],vistos={};
+  function brIso(s){var d=_parseDataBR(s);return d&&d.getFullYear()>2000?_mkIso(d):null;}
+  function add(cx){
+    if(!cx||!cx.movimentos)return;
+    var iso=brIso(cx.data);if(!iso)return;
+    for(var i=0;i<cx.movimentos.length;i++){
+      var mv=cx.movimentos[i],ch=iso+'#'+mv.num;
+      if(vistos[ch])continue;vistos[ch]=1;
+      var its=mv.itensList||[];
+      for(var j=0;j<its.length;j++){
+        var it=its[j];if(it.uni||!it.prodId)continue;
+        if(it.tipo!=='Venda'&&it.tipo!=='Compra')continue;
+        var p=gP(it.prodId);if(!p||_mkVincDe(p)!==mid)continue;
+        var kg=it.pesoLiquido!=null?it.pesoLiquido:(it.peso||0);
+        out.push({d:iso,tipo:it.tipo,kg:kg,preco:it.preco||0,nome:p.nome,num:mv.num});
+      }
     }
   }
-  h+='</div>';
+  add(DB.caixaDia);
+  (DB.caixasHist||[]).forEach(add);
+  out.sort(function(a,b){return a.d<b.d?1:-1;});
+  return out;
+}
 
-  // ── Cotações do dia com variação real ──
-  h+='<div class="card"><div class="stl"><div class="stb"></div><div class="stx">Cotações do Dia</div></div>';
-  for(var i=0;i<_mktMetals.length;i++){
-    var mt=_mktMetals[i];var pr=(_mktPrices[mt.id]||0);
-    var chg=_mktChg[mt.id]!==undefined?_mktChg[mt.id]:null;
-    var chgStr=chg!==null?(chg>=0?'&#9650; +'+chg.toFixed(2)+'%':'&#9660; '+Math.abs(chg).toFixed(2)+'%'):'—';
-    var chgCor=chg!==null?(chg>=0?'#22c55e':'#ef4444'):'var(--mt)';
-    h+='<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bd)">'
-      +'<div style="width:36px;height:36px;border-radius:9px;background:'+mt.cor+'18;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700;color:'+mt.cor+'">'+mt.sym+'</div>'
-      +'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--tx)">'+mt.nome+'</div>'
-      +'<div style="font-size:10px;color:var(--mt)">'+mt.sym+' (R$/'+mt.unit+')</div></div>'
-      +'<div style="text-align:right">'
-      +'<div style="font-size:14px;font-weight:800;color:'+mt.cor+';font-family:monospace">R$ '+pr.toFixed(2)+'</div>'
-      +'<div style="font-size:11px;font-weight:700;color:'+chgCor+'">'+chgStr+'</div>'
-      +'</div></div>';
-  }
-  h+='</div>';
-
-  // ── Análise de mercado dinâmica (expansível por metal) ──
-  h+='<div class="card"><div class="stl"><div class="stb" style="background:#C8A84B"></div><div class="stx" style="color:#C8A84B">Análise por Metal</div></div>';
-  for(var i=0;i<_mktMetals.length;i++){
-    var mt=_mktMetals[i];
-    var pr=(_mktPrices[mt.id]||0);
-    var chg=_mktChg[mt.id]!==undefined?_mktChg[mt.id]:null;
-    var open=_mktExpandido===mt.id;
-    var tendCor=chg!==null?(chg>=0?'#22c55e':'#ef4444'):'var(--mt)';
-    var tendTxt=chg!==null?(chg>=3?'Alta expressiva':chg>=1?'Subindo':chg<=-3?'Queda expressiva':chg<=-1?'Caindo':'Estável'):'—';
-    h+='<div style="border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:8px">'
-      +'<div data-mtid="'+mt.id+'" style="display:flex;align-items:center;justify-content:space-between;padding:12px;cursor:pointer;background:var(--s2)">'
-      +'<div style="display:flex;align-items:center;gap:10px">'
-      +'<div style="width:36px;height:36px;border-radius:9px;background:'+mt.cor+'18;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:'+mt.cor+'">'+mt.sym+'</div>'
-      +'<div><div style="font-size:13px;font-weight:700;color:var(--tx)">'+mt.nome+'</div>'
-      +'<div style="font-size:10px;color:var(--mt)">R$/'+mt.unit+'</div></div></div>'
-      +'<div style="display:flex;align-items:center;gap:8px">'
-      +'<div style="text-align:right">'
-      +'<div style="font-size:13px;font-weight:700;color:'+mt.cor+';font-family:monospace">R$ '+pr.toFixed(2)+'</div>'
-      +'<div style="font-size:11px;font-weight:700;color:'+tendCor+'">'+tendTxt+'</div></div>'
-      +'<span style="color:var(--mt)">'+(open?'&#9650;':'&#9660;')+'</span>'
-      +'</div></div>';
-    if(open){
-      var nota=_mktNota(mt.id,chg||0,pr,_mktBrl);
-      h+='<div style="padding:12px;background:var(--bg);border-top:1px solid var(--bd)">'
-        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
-        +'<div style="padding:10px;background:var(--s2);border:1px solid var(--bd);border-radius:8px">'
-        +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Cotação atual</div>'
-        +'<div style="font-size:16px;font-weight:700;color:'+mt.cor+';font-family:monospace;margin-top:2px">R$ '+pr.toFixed(2)+'</div>'
-        +'<div style="font-size:9px;color:var(--mt)">por '+mt.unit+'</div></div>'
-        +'<div style="padding:10px;background:var(--s2);border:1px solid var(--bd);border-radius:8px">'
-        +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Variação hoje</div>'
-        +'<div style="font-size:16px;font-weight:700;margin-top:2px;color:'+tendCor+'">'
-        +(chg!==null?(chg>=0?'&#9650; +':' &#9660; ')+Math.abs(chg).toFixed(2)+'%':'—')
-        +'</div>'
-        +'<div style="font-size:9px;color:'+tendCor+'">'+tendTxt+'</div>'
-        +'</div></div>'
-        +(nota?'<div style="padding:10px;border-radius:8px;font-size:12px;font-weight:500;line-height:1.6;background:'+mt.cor+'12;color:var(--tx);border:1px solid '+mt.cor+'22">'+nota+'</div>':'')
-        +'</div>';
-    }
-    h+='</div>';
-  }
-  h+='</div>';
-
-  el.innerHTML=h;
-  // Registra handlers dos cards expansíveis via JS (evita problema de escape no onclick inline)
-  el.querySelectorAll('[data-mtid]').forEach(function(div){
-    div.addEventListener('click',function(){_mktToggle(this.getAttribute('data-mtid'));});
+// ── TEXTOS ──────────────────────────────────────────────────
+function _mkClima(){
+  var cand=['ouro','cobre','aluminio','ferro','zinco','niquel','chumbo'],alta=null,queda=null;
+  cand.forEach(function(id){
+    var v=_mkVar(id,30);if(!v)return;
+    if(v.pct>=2&&(!alta||v.pct>alta.pct))alta={id:id,pct:v.pct};
+    if(v.pct<=-2&&(!queda||v.pct<queda.pct))queda={id:id,pct:v.pct};
   });
+  var frases=[];
+  if(alta)frases.push(_mkM(alta.id).nome+' subiu '+_mkPct(alta.pct).replace('+','')+' no mês: bom momento para vender.');
+  if(queda)frases.push(_mkM(queda.id).nome+' caiu '+_mkPct(Math.abs(queda.pct)).replace('+','')+' no mês: cuidado com o preço de compra.');
+  var ks=_mkDias(),dolNow=null,dolAnt=null;
+  if(ks.length){dolNow=_mkBRL(ks[ks.length-1]);dolAnt=_mkBRL(_mkIso(_addDays(_mkDate(ks[ks.length-1]),-7)));}
+  if(dolNow&&dolAnt&&dolAnt!==dolNow){
+    var dv=(dolNow-dolAnt)/dolAnt*100;
+    if(dv>=1)frases.push('Dólar subindo na semana, o que valoriza a sucata em reais.');
+    else if(dv<=-1)frases.push('Dólar caindo na semana, o que segura o preço da sucata em reais.');
+  }
+  if(!frases.length){
+    var temHist=_mkVar('cobre',30)||_mkVar('ouro',30);
+    return temHist?'Mercado estável no mês, sem grandes movimentos. Siga com os preços atuais.':'Ainda juntando histórico. Com alguns dias de cotação, o resumo do mercado aparece aqui.';
+  }
+  return frases.join(' ');
+}
+function _mkStatusHtml(){
+  var db=_mkDB(),ult=_mkUltimoDia(),esperado=_mkUltimoUtil(),hoje=_mkHoje();
+  if(_mk.busy)return '<span style="color:var(--bl)"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--bl);animation:bvPulse .8s ease-in-out infinite"></span> Buscando cotações...</span>';
+  if(!ult)return '<span style="color:var(--mt)">Sem cotações ainda</span>';
+  var d=db.dias[ult],hora=d.em?new Date(d.em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'';
+  var txt=(_mkFimSemana()&&ult===esperado?'Fechamento de sexta, ':'Cotação de ')+_mkBR(ult)+(d.fonte==='api'&&hora?' · às '+hora+(d.por?' por '+d.por:''):d.fonte!=='api'?' · importada (sem preciosos)':'');
+  return '<span style="color:var(--mt)">'+txt+'</span>';
+}
+function _mkAvisoHtml(){
+  var db=_mkDB(),ult=_mkUltimoDia(),esperado=_mkUltimoUtil();
+  if(_mk.busy)return '';
+  var key=CFG.sistema&&CFG.sistema.metalsDevKey;
+  if(!key)return '<div class="al aly" style="font-size:12px">&#9888; Falta a chave do Metals.dev para buscar as cotações. <a href="#" onclick="go(\'configuracoes\');return false" style="color:inherit;font-weight:700">Configurar</a></div>';
+  // Considera em dia só se a busca automática (com ouro, prata etc.) trouxe o último dia útil.
+  // A tabela importada da Shock não traz os preciosos, então não conta.
+  var apiUlt=_mkUltimoApi();
+  if(apiUlt&&apiUlt>=esperado)return '';
+  var msg=db.erro?db.erro.msg:'A busca automática de hoje ainda não aconteceu.';
+  return '<div class="al alr" style="font-size:12px;line-height:1.6">&#9888; '+(apiUlt?'Cotação automática desatualizada (última de '+_mkBR(apiUlt)+'). ':'Ainda não há cotação automática (ouro, prata, paládio, platina e dólar do dia). ')+msg
+    +(db.erro&&db.erro.det?'<div style="font-size:10px;opacity:.75;margin-top:3px">Detalhe: '+String(db.erro.det).replace(/</g,'&lt;').slice(0,160)+'</div>':'')
+    +'<div style="margin-top:6px"><button class="btn btn-rd" style="font-size:12px;padding:5px 12px;min-height:30px" onclick="_mkAtualizar(true)">Tentar agora</button></div></div>';
+}
+
+// ── RENDER ──────────────────────────────────────────────────
+function pgMercado(){
+  _mkDB();
+  setTimeout(_mkAutoCheck,300);
+  try{_mkSnapPrecos();}catch(e){}
+  return '<div class="fc" id="pg-mercado-inner">'+_mkHtml()+'</div>';
+}
+function _mkRender(){
+  var el=document.getElementById('pg-mercado-inner');if(!el)return;
+  el.innerHTML=_mkHtml();
+  setTimeout(_mkDesenharGrafico,30);
+}
+function _mkSub(s){_mk.sub=s;_mkRender();}
+function _mkSelMetal(id){var mt=_mkM(id);if(_mk.un==='usd'&&mt&&_mkM(_mk.metal)&&_mkM(_mk.metal).grp!==mt.grp)_mk.un='brl';_mk.metal=id;_mk.sub=mt&&mt.grp==='prec'?'prec':'metais';_mkRender();var c=document.getElementById('ct');if(c)c.scrollTop=0;}
+function _mkSetPer(p){_mk.per=p;_mkRender();}
+function _mkSetUn(u){_mk.un=u;_mkRender();}
+
+function _mkHtml(){
+  var h='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">'
+    +'<div><div class="pl">Gestão</div><div class="pt">Mercado</div><div style="font-size:11px;margin-top:3px">'+_mkStatusHtml()+'</div></div>'
+    +'<button class="btn" style="background:var(--s2);border:1px solid var(--bd);color:var(--tx);font-size:12px" onclick="_mkAtualizar(true)"'+(_mk.busy?' disabled':'')+'>&#8635; Atualizar</button>'
+    +'</div>';
+  h+=_mkAvisoHtml();
+  h+='<div class="tabs" style="margin-bottom:0">'
+    +'<button class="tabbtn'+(_mk.sub==='resumo'?' on':'')+'" onclick="_mkSub(\'resumo\')">Resumo</button>'
+    +'<button class="tabbtn'+(_mk.sub==='metais'?' on':'')+'" onclick="_mkSub(\'metais\')">Metais</button>'
+    +'<button class="tabbtn'+(_mk.sub==='prec'?' on':'')+'" onclick="_mkSub(\'prec\')">Preciosos</button>'
+    +'<button class="tabbtn'+(_mk.sub==='precos'?' on':'')+'" onclick="_mkSub(\'precos\')">Seus preços</button>'
+    +'<button class="tabbtn'+(_mk.sub==='aprender'?' on':'')+'" onclick="_mkSub(\'aprender\')">Aprender</button>'
+    +'</div>';
+  if(_mk.sub==='aprender'){h+=_mkHtmlAprender();return h;}
+  if(!_mkUltimoDia()&&!_mkDB().ferro.length){
+    h+='<div class="card" style="text-align:center;padding:26px 16px"><div style="font-size:34px;margin-bottom:8px">&#128200;</div>'
+      +'<div style="font-size:15px;font-weight:700;margin-bottom:6px">Nenhuma cotação ainda</div>'
+      +'<div style="font-size:12px;color:var(--mt);margin-bottom:14px;line-height:1.6">Toque em Atualizar para buscar a cotação de hoje. Para os gráficos já começarem com o mês inteiro, importe a tabela do site da Shock Metais.</div>'
+      +'<div class="brow" style="justify-content:center"><button class="btn" onclick="_mkAtualizar(true)">&#8635; Buscar cotação</button><button class="btnO bOb" onclick="mMkImportar()">Importar histórico</button></div></div>';
+    return h;
+  }
+  h+=_mk.sub==='metais'?_mkHtmlMetais('base'):_mk.sub==='prec'?_mkHtmlMetais('prec'):_mk.sub==='precos'?_mkHtmlSeusPrecos():_mkHtmlResumo();
+  return h;
+}
+
+function _mkKpi(lbl,val,sub,cor){
+  return '<div style="background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:10px;min-width:0">'
+    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">'+lbl+'</div>'
+    +'<div style="font-size:17px;font-weight:800;font-family:monospace;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+val+'</div>'
+    +'<div style="font-size:10px;margin-top:2px;color:'+(cor||'var(--mt)')+'">'+sub+'</div></div>';
+}
+
+function _mkHtmlResumo(){
+  var ult=_mkUltimoDia()||_mkHoje();
+  var h='';
+  // Clima
+  h+='<div class="card" style="border-color:rgba(200,168,75,.35)"><div class="stl" style="margin-bottom:6px"><div class="stb" style="background:#C8A84B"></div><div class="stx" style="color:#C8A84B">Clima do mercado</div></div>'
+    +'<div style="font-size:14px;line-height:1.6">'+_mkClima()+'</div></div>';
+  // KPIs
+  var dol=_mkBRL(ult),dolAnt=_mkBRL(_mkIso(_addDays(_mkDate(ult),-7))),dv=dol&&dolAnt?(dol-dolAnt)/dolAnt*100:null;
+  var cu=_mkPreco(ult,'cobre','brl'),cuV=_mkVar('cobre',30);
+  var au=_mkPreco(ult,'ouro','brl'),auV=_mkVar('ouro',30);
+  h+='<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">'
+    +_mkKpi('Dólar',dol?'R$ '+_mkNum(dol,2):'—',dv!==null&&dolAnt!==dol?_mkPct(dv)+' semana':'semana —',_mkCorPct(dv))
+    +_mkKpi('Cobre',cu?'R$ '+_mkNum(cu,2):'—',cuV?_mkPct(cuV.pct)+' mês':'/kg puro',cuV?_mkCorPct(cuV.pct):null)
+    +'<div onclick="_mkSelMetal(\'ouro\')" style="cursor:pointer;min-width:0">'+_mkKpi('Ouro',au?'R$ '+_mkNum(au,2):'—',auV?_mkPct(auV.pct)+' mês':'/grama',auV?_mkCorPct(auV.pct):null)+'</div>'
+    +'</div>';
+  // Estoque a preço de mercado
+  var es=_mkEstoque();
+  h+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px">'
+    +'<div class="stl" style="margin-bottom:0"><div class="stb"></div><div class="stx">Seu estoque a preço de mercado</div></div>'
+    +'<button onclick="mMkVincular()" style="background:none;border:1px solid var(--bd);color:var(--mt);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer;white-space:nowrap">&#128279; Vincular</button></div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:8px">Quanto seu estoque ganhou ou perdeu com o mercado nos últimos 30 dias, pelo preço de venda de cada material.</div>';
+  if(!es.rows.length){
+    h+='<div style="font-size:12px;color:var(--mt);padding:8px 0">Nenhum material em estoque está ligado a um metal. Toque em Vincular para ligar.</div>';
+  }else{
+    var maior=null,pior=null;
+    es.rows.forEach(function(r){
+      var mt=_mkM(r.mid);
+      h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bd)">'
+        +'<div style="min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r.p.nome+'</div>'
+        +'<div style="font-size:10px;color:var(--mt)">'+fKg(r.p.est)+' kg · '+mt.nome+(r.pct!==null?' '+_mkPct(r.pct):'')+(mt.grp==='prec'?' · estimado pelo ouro':'')+'</div></div>'
+        +'<div style="font-size:13px;font-weight:700;font-family:monospace;white-space:nowrap;color:'+(r.ganho===null?'var(--mt)':_mkCorPct(r.ganho))+'">'
+        +(r.ganho===null?'sem histórico':(!r.valor?'sem preço':(r.ganho>=0?'+':'-')+fR(Math.abs(r.ganho))))+'</div></div>';
+      if(r.ganho!==null&&r.ganho>0&&(!maior||r.ganho>maior.ganho))maior=r;
+      if(r.ganho!==null&&r.ganho<0&&(!pior||r.ganho<pior.ganho))pior=r;
+    });
+    h+='<div style="display:flex;justify-content:space-between;padding:8px 0 2px;font-weight:800"><span>Total</span><span style="font-family:monospace;color:'+_mkCorPct(es.total)+'">'+(es.total>=0?'+':'-')+fR(Math.abs(es.total))+'</span></div>';
+    if(maior)h+='<div style="font-size:12px;color:var(--or);margin-top:4px">Maior ganho em '+maior.p.nome+': bom momento para vender.</div>';
+    else if(pior)h+='<div style="font-size:12px;color:var(--or);margin-top:4px">'+pior.p.nome+' perdeu valor: cuidado com o preço de compra.</div>';
+    if(es.semHist)h+='<div style="font-size:11px;color:var(--mt);margin-top:4px">Alguns metais ainda não têm 2 dias de cotação para comparar.</div>';
+  }
+  h+='</div>';
+  // Metais hoje (atalho para a subaba Metais)
+  h+='<div class="card"><div class="stl"><div class="stb" style="background:#B87333"></div><div class="stx">Metais hoje</div><span style="font-size:10px;color:var(--mt);margin-left:auto">toque para ver o gráfico</span></div>';
+  _MK_METAIS.forEach(function(mt){
+    if(mt.grp!=='base')return;
+    var v=_mkPreco(ult,mt.id,'brl');if(mt.manual)v=_mkFerroEm(ult);
+    var vm=_mkVar(mt.id,30);
+    h+='<div onclick="_mkSelMetal(\''+mt.id+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd);cursor:pointer">'
+      +'<span style="width:10px;height:10px;border-radius:50%;background:'+mt.cor+';flex-shrink:0"></span>'
+      +'<span style="flex:1;font-size:13px;font-weight:600;min-width:0">'+mt.nome+(mt.manual?' <span style="font-size:10px;color:var(--mt);font-weight:400">informado</span>':'')+' '+_mkSelo(mt.id,true)+'</span>'
+      +'<span style="font-family:monospace;font-size:13px">'+(v?'R$ '+_mkNum(v,2)+'/kg':'—')+'</span>'
+      +'<span style="font-size:11px;font-weight:700;width:52px;text-align:right;color:'+_mkCorPct(vm?vm.pct:null)+'">'+(vm?_mkPct(vm.pct):'—')+'</span></div>';
+  });
+  h+='<div style="font-size:10px;color:var(--mt);margin-top:6px">Preço do metal puro. A sucata vale uma parte disso: o comprador desconta impureza, frete e margem. Variação de 30 dias.</div></div>';
+  h+='<div style="font-size:10px;color:var(--mt);text-align:center;line-height:1.6">Fonte: Metals.dev (LME e Londres) · Ferro: preço informado por você<br><a href="https://shockmetais.com.br/lme" target="_blank" rel="noopener" style="color:var(--bl)">Conferir no site da Shock Metais</a> · <a href="#" onclick="mMkImportar();return false" style="color:var(--bl)">Importar histórico</a></div>';
+  return h;
+}
+
+function _mkHtmlMetais(grp){
+  grp=grp||'base';
+  var mt=_mkM(_mk.metal);
+  if(!mt||mt.grp!==grp){mt=grp==='prec'?_mkM('ouro'):_mkM('cobre');_mk.metal=mt.id;}
+  var h='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px">';
+  var lista=_MK_METAIS.filter(function(m){return m.grp===grp;});
+  lista.forEach(function(m){
+    var on=m.id===mt.id;
+    h+='<button onclick="_mkSelMetal(\''+m.id+'\')" style="flex-shrink:0;padding:6px 13px;border-radius:20px;font-size:12px;font-weight:'+(on?'700':'500')+';cursor:pointer;border:1px solid '+(on?m.cor:'var(--bd)')+';background:'+(on?m.cor+'22':'var(--s2)')+';color:'+(on?m.cor:'var(--mt)')+'">'+m.nome+'</button>';
+  });
+  h+='</div>';
+  if(mt.manual){
+    var fu=_mkDB().ferro.slice().sort(function(a,b){return a.data<b.data?1:-1;})[0];
+    h+='<div class="al alb" style="font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>O ferro não tem preço em bolsa. Use o preço de referência que você recebe dos compradores'+(fu?' (último: R$ '+_mkNum(fu.rkg,2)+'/kg em '+_mkBR(fu.data)+')':'')+'.</span><button class="btn" style="font-size:12px;padding:6px 12px;min-height:30px" onclick="mMkFerro()">Informar preço</button></div>';
+  }
+  if(mt.id==='ouro')h+='<div class="al aly" style="font-size:12px;line-height:1.6">O ouro é o metal que mais pesa no valor das placas. Use a direção dele (subindo ou caindo) como sinal para as placas, mas o preço de cada tipo de placa é o que seus compradores pagam.</div>';
+  h+='<div>'+_mkSelo(mt.id,false)+'</div>';
+  // Cartões dia / semana / mês
+  var cards=[['Dia',0],['Semana',7],['Mês',30]];
+  h+='<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">';
+  cards.forEach(function(c){
+    var v=_mkVar(mt.id,c[1],_mk.un);
+    h+='<div style="background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:10px;min-width:0">'
+      +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">'+c[0]+'</div>'
+      +'<div style="font-size:18px;font-weight:800;margin-top:3px;color:'+_mkCorPct(v?v.pct:null)+'">'+(v?(v.pct>0.05?'&#8599; ':v.pct<-0.05?'&#8600; ':'')+_mkPct(v.pct):'—')+'</div>'
+      +'<div style="font-size:10px;color:var(--mt);margin-top:2px">'+(v?_mkBR(v.de.d)+' → '+_mkBR(v.para.d):'sem dados')+'</div></div>';
+  });
+  h+='</div>';
+  // Gráfico
+  var pb=function(p,l){return '<button onclick="_mkSetPer(\''+p+'\')" class="tabbtn'+(_mk.per===p?' on':'')+'" style="min-height:30px;padding:4px 10px">'+l+'</button>';};
+  var ub=function(u,l){return '<button onclick="_mkSetUn(\''+u+'\')" class="tabbtn'+(_mk.un===u?' on':'')+'" style="min-height:30px;padding:4px 10px">'+l+'</button>';};
+  h+='<div class="card" style="padding:12px">'
+    +'<div style="display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-bottom:8px"><div style="display:flex;gap:4px">'+pb('d','Diário')+pb('s','Semanal')+pb('m','Mensal')+'</div><div style="display:flex;gap:4px">'+ub('brl',_mkUnLbl(mt,'brl'))+ub('usd',_mkUnLbl(mt,'usd'))+'</div></div>'
+    +'<div style="position:relative;height:230px"><canvas id="mk-chart"></canvas></div>'
+    +'<div id="mk-chart-vazio" style="display:none;text-align:center;color:var(--mt);font-size:12px;padding:10px">Poucos dias de cotação para o gráfico. Ele vai se formando a cada dia, ou importe o histórico.</div>'
+    +(_mk.per==='d'?'<div style="display:flex;gap:14px;font-size:10px;color:var(--mt);margin-top:6px"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e"></span> Você vendeu</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6"></span> Você comprou</span></div>':'')
+    +'</div>';
+  // Leitura
+  var vmB=_mkVar(mt.id,30,'brl'),vmU=mt.manual?null:_mkVar(mt.id,30,'usd'),txt='';
+  if(vmB){
+    txt=mt.nome+(vmB.pct>=0?' subiu ':' caiu ')+_mkPct(Math.abs(vmB.pct)).replace('+','')+' no mês em reais. Afeta o que você vende de '+mt.uso+'.';
+    if(vmU&&((vmU.pct<0&&vmB.pct>0)||(vmU.pct>0&&vmB.pct<0)))txt+=' Em dólar '+(vmU.pct>=0?'subiu ':'caiu ')+_mkPct(Math.abs(vmU.pct)).replace('+','')+': a diferença veio do dólar.';
+  }else txt='Ainda não há 2 dias de cotação de '+mt.nome.toLowerCase()+' para comparar.';
+  h+='<div class="al alb" style="font-size:12px;line-height:1.6">'+txt+'</div>';
+  // Suas operações
+  var ops=_mkOps(mt.id).slice(0,8),hj=_mkUltimoDia();
+  h+='<div class="card"><div class="stl"><div class="stb"></div><div class="stx">Suas compras e vendas de '+mt.nome.toLowerCase()+'</div></div>';
+  if(!ops.length)h+='<div style="font-size:12px;color:var(--mt)">Nenhuma operação com materiais ligados a '+mt.nome.toLowerCase()+'. <a href="#" onclick="mMkVincular();return false" style="color:var(--bl)">Vincular materiais</a></div>';
+  ops.forEach(function(o){
+    var pd=_mkPreco(o.d,mt.id,'brl'),ph=hj?_mkPreco(hj,mt.id,'brl'):null,leit='',cor='var(--mt)';
+    if(pd&&ph&&o.d!==hj){
+      var dd=(ph-pd)/pd*100;
+      if(o.tipo==='Venda'){if(dd>=2){leit='antes da alta';cor='var(--rd)';}else if(dd<=-2){leit='antes da queda';cor='var(--gr)';}else leit='preço estável';}
+      else{if(dd>=2){leit='bom preço';cor='var(--gr)';}else if(dd<=-2){leit='antes da queda';cor='var(--rd)';}else leit='preço estável';}
+    }
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bd);font-size:12px">'
+      +'<div style="min-width:0"><span style="color:'+(o.tipo==='Venda'?'#22c55e':'#3b82f6')+'">&#9679;</span> '+_mkBR(o.d)+' '+(o.tipo==='Venda'?'vendeu':'comprou')+' '+fKg(o.kg)+' kg<div style="font-size:10px;color:var(--mt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+o.nome+' · '+fR(o.preco)+'/kg · #'+o.num+'</div></div>'
+      +'<span style="font-size:11px;font-weight:700;color:'+cor+';white-space:nowrap">'+leit+'</span></div>';
+  });
+  h+='</div>';
+  // Tabela dos últimos dias
+  var s=_mkSerie(mt.id,'brl').slice(-10).reverse();
+  if(s.length){
+    h+='<div class="card" style="padding:12px"><div class="stl"><div class="stb"></div><div class="stx">Últimos dias</div></div><table class="tbl" style="font-size:12px"><thead><tr><th style="padding:6px 4px">Dia</th><th style="padding:6px 4px;text-align:right">'+_mkUnLbl(mt,'brl')+'</th><th style="padding:6px 4px;text-align:right">'+_mkUnLbl(mt,'usd')+'</th><th style="padding:6px 4px;text-align:right">Dólar</th></tr></thead><tbody>';
+    s.forEach(function(p){
+      var u=_mkPreco(p.d,mt.id,'usd');
+      h+='<tr><td style="padding:6px 4px">'+_mkBR(p.d)+'</td><td style="padding:6px 4px;text-align:right;font-family:monospace">'+_mkNum(p.v,2)+'</td><td style="padding:6px 4px;text-align:right;font-family:monospace;color:var(--mt)">'+(u?_mkNum(u,mt.grp==='base'?0:2):'—')+'</td><td style="padding:6px 4px;text-align:right;font-family:monospace;color:var(--mt)">'+_mkNum(_mkBRL(p.d),2)+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  return h;
+}
+
+// Agrupa a série por semana ou mês (média)
+function _mkAgrupar(s,modo){
+  var g={},ord=[];
+  s.forEach(function(p){
+    var d=_mkDate(p.d),k,lbl;
+    if(modo==='m'){k=p.d.slice(0,7);lbl=('0'+(d.getMonth()+1)).slice(-2)+'/'+String(d.getFullYear()).slice(-2);}
+    else{var seg=_addDays(d,-((d.getDay()+6)%7));k=_mkIso(seg);lbl='Sem '+_mkBR(k);}
+    if(!g[k]){g[k]={s:0,n:0,lbl:lbl};ord.push(k);}
+    g[k].s+=p.v;g[k].n++;
+  });
+  ord.sort();
+  return ord.map(function(k){return {lbl:g[k].lbl,v:g[k].s/g[k].n};});
+}
+function _mkDesenharGrafico(){
+  // Mantém a subaba ativa visível na faixa de abas (celular)
+  var tb=document.querySelector('#pg-mercado-inner .tabs .tabbtn.on');if(tb&&tb.parentNode)tb.parentNode.scrollLeft=Math.max(0,tb.offsetLeft-tb.parentNode.offsetLeft-16);
+  var cv=document.getElementById('mk-chart');if(!cv||typeof Chart==='undefined')return;
+  if(_mk.chart){try{_mk.chart.destroy();}catch(e){}_mk.chart=null;}
+  var mt=_mkM(_mk.metal),s=_mkSerie(mt.id,_mk.un),labels=[],vals=[],dsExtra=[];
+  if(_mk.per==='d'){
+    s=s.slice(-30);
+    labels=s.map(function(p){return _mkBR(p.d);});vals=s.map(function(p){return p.v;});
+    var ops=_mkOps(mt.id),vend=s.map(function(){return null;}),comp=s.map(function(){return null;});
+    s.forEach(function(p,i){ops.forEach(function(o){if(o.d===p.d){if(o.tipo==='Venda')vend[i]=p.v;else comp[i]=p.v;}});});
+    dsExtra=[{data:vend,borderColor:'#22c55e',backgroundColor:'#22c55e',pointRadius:7,pointHoverRadius:8,showLine:false},
+             {data:comp,borderColor:'#3b82f6',backgroundColor:'#3b82f6',pointRadius:7,pointHoverRadius:8,showLine:false}];
+  }else{
+    var a=_mkAgrupar(s,_mk.per).slice(-12);labels=a.map(function(x){return x.lbl;});vals=a.map(function(x){return x.v;});
+  }
+  var vazio=document.getElementById('mk-chart-vazio');
+  if(vals.length<2){cv.parentNode.style.display='none';if(vazio)vazio.style.display='block';return;}
+  var claro=document.body.classList.contains('tema-claro');
+  var un=_mkUnLbl(mt,_mk.un),dec=(_mk.un==='usd'&&mt.grp==='base')?0:2;
+  _mk.chart=new Chart(cv,{type:'line',
+    data:{labels:labels,datasets:[{data:vals,borderColor:mt.cor,backgroundColor:mt.cor+'26',fill:true,tension:.3,pointRadius:_mk.per==='d'?2:3,borderWidth:2}].concat(dsExtra)},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,
+      plugins:{legend:{display:false},tooltip:{filter:function(it){return it.raw!==null;},callbacks:{label:function(c){
+        var pre=c.datasetIndex===1?'Você vendeu · ':c.datasetIndex===2?'Você comprou · ':'';
+        return pre+_mkNum(c.parsed.y,dec)+' '+un;}}}},
+      scales:{x:{grid:{color:claro?'rgba(0,0,0,.06)':'rgba(255,255,255,.06)'},ticks:{color:'#7a90b0',font:{size:10},maxRotation:0,autoSkip:true,maxTicksLimit:6}},
+              y:{grid:{color:claro?'rgba(0,0,0,.06)':'rgba(255,255,255,.06)'},ticks:{color:'#7a90b0',font:{size:10},callback:function(v){return _mkNum(v,dec);}}}}}});
+}
+
+// ── MODAIS ──────────────────────────────────────────────────
+function mMkFerro(){
+  var f=_mkDB().ferro.slice().sort(function(a,b){return a.data<b.data?1:-1;}).slice(0,6);
+  var hist=f.map(function(x){return '<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--bd)"><span>'+_mkBR(x.data)+'</span><span style="font-family:monospace">R$ '+_mkNum(x.rkg,2)+'/kg</span></div>';}).join('');
+  openM('&#9881; Preço do ferro','<div class="mf">'
+    +'<div style="font-size:12px;color:var(--mt);line-height:1.6">Informe o preço de referência do ferro/aço por kg (o que os compradores estão pagando). Vale a partir de hoje até você informar outro.</div>'
+    +'<div class="fld"><label>R$ por kg</label><input class="inp" id="mk-ferro-v" type="number" inputmode="decimal" step="0.01" min="0" placeholder="1,95"></div>'
+    +(hist?'<div><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Últimos informados</div>'+hist+'</div>':'')
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="_mkSalvarFerro()">Salvar</button></div></div>',380);
+  setTimeout(function(){var i=document.getElementById('mk-ferro-v');if(i)i.focus();},100);
+}
+function _mkSalvarFerro(){
+  var v=parseFloat((document.getElementById('mk-ferro-v').value||'').replace(',','.'));
+  if(!(v>0)){toast('Informe um valor maior que zero','var(--rd)');return;}
+  var db=_mkDB(),hoje=_mkHoje();
+  db.ferro=db.ferro.filter(function(x){return x.data!==hoje;});
+  db.ferro.push({data:hoje,rkg:+v.toFixed(2)});
+  saveDB();closeM();_mkRender();toast('Preço do ferro salvo');
+}
+
+function mMkVincular(){
+  var ops='<option value="">— Nenhum —</option>';
+  _MK_METAIS.forEach(function(m){ops+='<option value="'+m.id+'">'+m.nome+'</option>';});
+  var lista=DB.produtos.slice().sort(function(a,b){return (b.est||0)-(a.est||0);});
+  var rows=lista.map(function(p){
+    var cur=_mkVincDe(p),pid=String(_normId(p.id));
+    var auto=!Object.prototype.hasOwnProperty.call(_mkDB().vinc,pid);
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd)">'
+      +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(p.ic||'')+' '+p.nome+'</div>'
+      +'<div style="font-size:10px;color:var(--mt)">'+fKg(p.est||0)+' kg em estoque'+(auto&&cur?' · sugerido':'')+'</div></div>'
+      +'<select class="inp mk-vinc" data-pid="'+pid+'" style="width:130px;padding:6px 8px;font-size:12px">'+ops.replace('value="'+cur+'"','value="'+cur+'" selected')+'</select></div>';
+  }).join('');
+  openM('&#128279; Vincular materiais','<div class="mf">'
+    +'<div style="font-size:12px;color:var(--mt);line-height:1.6">Ligue cada material ao metal que define o preço dele. Exemplo: Cobre Misto → Cobre, Latinha → Alumínio. Placas e processadores → Ouro (só para indicar a direção do mercado).</div>'
+    +'<div style="max-height:55vh;overflow-y:auto">'+rows+'</div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="_mkSalvarVinc()">Salvar</button></div></div>',460);
+}
+function _mkSalvarVinc(){
+  var db=_mkDB(),sels=document.querySelectorAll('.mk-vinc');
+  for(var i=0;i<sels.length;i++)db.vinc[sels[i].getAttribute('data-pid')]=sels[i].value;
+  saveDB();closeM();_mkRender();toast('Vínculos salvos');
+}
+
+// Importação da tabela copiada do site da Shock Metais (shockmetais.com.br/lme)
+var _MK_MESES={jan:1,fev:2,mar:3,abr:4,mai:5,jun:6,jul:7,ago:8,set:9,out:10,nov:11,dez:12};
+function _mkNumTxt(t){
+  if(/^feriado$/i.test(t))return null;
+  var s=t.replace(/[^\d.,]/g,'');if(!s)return null;
+  if(s.indexOf(',')>=0&&s.indexOf('.')>=0){s=s.lastIndexOf('.')>s.lastIndexOf(',')?s.replace(/,/g,''):s.replace(/\./g,'').replace(',','.');}
+  else if(s.indexOf(',')>=0)s=s.replace(',','.');
+  var v=parseFloat(s);return isNaN(v)?null:v;
+}
+function _mkParseShock(txt){
+  var tk=(txt||'').split(/[\s\t\n\r]+/),rows=[],cur=null,hoje=new Date();
+  var ordem=['cobre','zinco','aluminio','chumbo','estanho','niquel','dolar'];
+  for(var i=0;i<tk.length;i++){
+    var t=tk[i];if(!t)continue;
+    var md=t.match(/^(\d{1,2})\/([A-Za-zçÇ]{3})/);
+    if(md&&_MK_MESES[md[2].toLowerCase()]){
+      var mes=_MK_MESES[md[2].toLowerCase()],ano=hoje.getFullYear();
+      if(mes>hoje.getMonth()+1)ano--;
+      cur={d:ano+'-'+('0'+mes).slice(-2)+'-'+('0'+md[1]).slice(-2),v:[]};rows.push(cur);continue;
+    }
+    if(/^m[ée]dia$/i.test(t)){cur=null;continue;}
+    if(!cur||cur.v.length>=7)continue;
+    if(/^feriado$/i.test(t)){cur.v.push(null);continue;}
+    if(/\d/.test(t))cur.v.push(_mkNumTxt(t));
+  }
+  return rows.filter(function(r){return r.v.length===7&&r.v[0]>1000;}).map(function(r){
+    var o={d:r.d};ordem.forEach(function(k,i){o[k]=r.v[i];});return o;
+  });
+}
+function mMkImportar(){
+  _mk.imp=null;
+  openM('&#128229; Importar histórico da LME','<div class="mf">'
+    +'<div style="font-size:12px;color:var(--mt);line-height:1.6">1. Abra <a href="https://shockmetais.com.br/lme" target="_blank" rel="noopener" style="color:var(--bl)">shockmetais.com.br/lme</a><br>2. Selecione a tabela de informações diárias e copie<br>3. Cole abaixo e toque em Ler tabela</div>'
+    +'<textarea class="inp" id="mk-imp-txt" rows="7" placeholder="Cole aqui a tabela copiada" style="font-family:monospace;font-size:11px"></textarea>'
+    +'<div id="mk-imp-prev"></div>'
+    +'<div class="brow" id="mk-imp-btns"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="_mkImpLer()">Ler tabela</button></div></div>',480);
+}
+function _mkImpLer(){
+  var rows=_mkParseShock(document.getElementById('mk-imp-txt').value);
+  var prev=document.getElementById('mk-imp-prev');
+  if(!rows.length){prev.innerHTML='<div class="al alr" style="font-size:12px">Não encontrei dias na tabela colada. Copie a tabela inteira, incluindo a coluna Dia.</div>';return;}
+  _mk.imp=rows;
+  var t='<div class="al alg" style="font-size:12px;margin-bottom:6px">Encontrei '+rows.length+' dia(s), de '+_mkBR(rows[0].d)+' a '+_mkBR(rows[rows.length-1].d)+'. Confira antes de salvar.</div>'
+    +'<div style="max-height:180px;overflow-y:auto"><table class="tbl" style="font-size:11px"><thead><tr><th style="padding:4px">Dia</th><th style="padding:4px;text-align:right">Cobre US$/t</th><th style="padding:4px;text-align:right">Alumínio</th><th style="padding:4px;text-align:right">Dólar</th></tr></thead><tbody>';
+  rows.slice().reverse().forEach(function(r){
+    t+='<tr><td style="padding:4px">'+_mkBR(r.d)+'</td><td style="padding:4px;text-align:right;font-family:monospace">'+_mkNum(r.cobre,2)+'</td><td style="padding:4px;text-align:right;font-family:monospace">'+(r.aluminio?_mkNum(r.aluminio,2):'—')+'</td><td style="padding:4px;text-align:right;font-family:monospace">'+(r.dolar?_mkNum(r.dolar,4):'feriado')+'</td></tr>';
+  });
+  t+='</tbody></table></div>';
+  prev.innerHTML=t;
+  document.getElementById('mk-imp-btns').innerHTML='<button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="_mkImpSalvar()">Salvar '+rows.length+' dia(s)</button>';
+}
+function _mkImpSalvar(){
+  if(!_mk.imp||!_mk.imp.length)return;
+  var db=_mkDB(),novos=0,ultDol=null;
+  _mk.imp.slice().sort(function(a,b){return a.d<b.d?-1:1;}).forEach(function(r){
+    if(r.dolar)ultDol=r.dolar;
+    var dia=db.dias[r.d]||{m:{},fonte:'shock'};if(!dia.m)dia.m={};
+    if(!dia.m.cobre)novos++;
+    if(!dia.brl&&(r.dolar||ultDol))dia.brl=r.dolar||ultDol;
+    // Não sobrescreve o que já veio da fonte automática
+    [['cobre','cobre'],['aluminio','aluminio'],['zinco','zinco'],['niquel','niquel'],['chumbo','chumbo']].forEach(function(p){
+      if(!dia.m[p[0]]&&r[p[1]])dia.m[p[0]]=r[p[1]]/1000;
+    });
+    db.dias[r.d]=dia;
+  });
+  _mk.imp=null;saveDB();closeM();_mkRender();
+  toast(novos+' dia(s) importado(s)');
+}
+
+// ── SEUS PREÇOS: tabela de venda x mercado ─────────────────
+function _mkTabVendaId(){
+  for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].tipo==='venda'&&DB.tabelas[i].nome.toLowerCase()==='padrao')return DB.tabelas[i].id;}
+  return null;
+}
+function _mkPrecoVenda(p){try{return getPreco(p,'Venda',_mkTabVendaId())||0;}catch(e){return p.vV||0;}}
+// Guarda 1 foto por dia do preço de venda de cada material (para comparar com o mercado depois)
+function _mkSnapPrecos(){
+  if(!CU||CU.perfil!=='adm'||!DB.produtos||!DB.produtos.length)return;
+  var db=_mkDB(),hoje=_mkHoje();if(!db.precos)db.precos={};
+  if(db.precos[hoje])return;
+  var snap={};
+  DB.produtos.forEach(function(p){var v=_mkPrecoVenda(p);if(v>0)snap[String(_normId(p.id))]=v;});
+  db.precos[hoje]=snap;
+  var lim=_mkIso(_addDays(new Date(),-400));
+  Object.keys(db.precos).forEach(function(k){if(k<lim)delete db.precos[k];});
+  autoSave();
+}
+function _mkVarVenda(p){
+  var pr=_mkDB().precos||{},ks=Object.keys(pr).sort(),pid=String(_normId(p.id));
+  if(!ks.length)return null;
+  var hoje=ks[ks.length-1],lim=_mkIso(_addDays(_mkDate(hoje),-30)),ref=null;
+  for(var i=ks.length-1;i>=0;i--){if(ks[i]<=lim&&pr[ks[i]][pid]){ref=ks[i];break;}}
+  if(!ref){for(var j=0;j<ks.length;j++){if(pr[ks[j]][pid]){ref=ks[j];break;}}}
+  if(!ref||ref===hoje||!pr[hoje][pid])return {desde:ref||hoje};
+  return {pct:(pr[hoje][pid]-pr[ref][pid])/pr[ref][pid]*100,desde:ref};
+}
+function _mkHtmlSeusPrecos(){
+  var rows=[];
+  DB.produtos.forEach(function(p){var mid=_mkVincDe(p);if(mid)rows.push({p:p,mid:mid});});
+  var h='<div class="al alb" style="font-size:12px;line-height:1.6">Compara quanto o metal de referência andou com quanto o seu preço de venda andou em 30 dias. Se o mercado subiu e sua tabela não, você pode estar vendendo barato.</div>';
+  if(!rows.length)return h+'<div class="card" style="font-size:12px;color:var(--mt)">Nenhum material vinculado a um metal. <a href="#" onclick="mMkVincular();return false" style="color:var(--bl)">Vincular materiais</a></div>';
+  var semHistVenda=false,desdeMin=null;
+  rows.forEach(function(r){
+    var vm=_mkVar(r.mid,30),vv=_mkVarVenda(r.p),sinal='Em linha',cs='var(--gr)',bg='var(--grb)';
+    if(vv&&vv.pct==null){semHistVenda=true;if(!desdeMin||vv.desde<desdeMin)desdeMin=vv.desde;}
+    var vvp=vv&&vv.pct!=null?vv.pct:null;
+    if(!vm){sinal='Sem histórico';cs='var(--mt)';bg='var(--s3)';}
+    else if(vm.pct>=3&&(vvp===null||vvp<vm.pct-2)){sinal='Pedir mais';cs='var(--or)';bg='var(--orb)';}
+    else if(vm.pct<=-3){sinal='Rever compra';cs='var(--rd)';bg='var(--rdb)';}
+    r.vm=vm;r.vvp=vvp;r.sinal=sinal;r.cs=cs;r.bg=bg;
+    r.ord=sinal==='Pedir mais'?0:sinal==='Rever compra'?1:sinal==='Em linha'?2:3;
+  });
+  rows.sort(function(a,b){return a.ord-b.ord||a.p.nome.localeCompare(b.p.nome);});
+  h+='<div class="card" style="padding:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div class="stl" style="margin-bottom:0"><div class="stb"></div><div class="stx">Seus materiais x mercado</div></div>'
+    +'<button onclick="mMkVincular()" style="background:none;border:1px solid var(--bd);color:var(--mt);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer">&#128279; Vincular</button></div>';
+  rows.forEach(function(r){
+    var mt=_mkM(r.mid),pv=_mkPrecoVenda(r.p);
+    var ops=_mkOps(r.mid).filter(function(o){return o.tipo==='Venda'&&o.nome===r.p.nome;});
+    h+='<div style="padding:9px 0;border-bottom:1px solid var(--bd)">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
+      +'<div style="font-size:13px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r.p.nome+'</div>'
+      +'<span style="font-size:11px;font-weight:700;color:'+r.cs+';background:'+r.bg+';padding:2px 9px;border-radius:20px;white-space:nowrap">'+r.sinal+'</span></div>'
+      +'<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:5px;font-size:11px">'
+      +'<div><div style="color:var(--mt);font-size:10px">'+mt.nome+' (mercado)</div><b style="color:'+_mkCorPct(r.vm?r.vm.pct:null)+'">'+(r.vm?_mkPct(r.vm.pct):'—')+'</b></div>'
+      +'<div><div style="color:var(--mt);font-size:10px">Sua venda</div><b style="color:'+_mkCorPct(r.vvp)+'">'+(r.vvp!==null?_mkPct(r.vvp):'—')+'</b></div>'
+      +'<div><div style="color:var(--mt);font-size:10px">Tabela hoje</div><b style="font-family:monospace">'+(pv?fR(pv):'—')+'</b></div></div>'
+      +(ops.length?'<div style="font-size:10px;color:var(--mt);margin-top:4px">Última venda: '+_mkBR(ops[0].d)+' a '+fR(ops[0].preco)+'/kg</div>':'')
+      +'</div>';
+  });
+  h+='</div>';
+  if(semHistVenda)h+='<div style="font-size:11px;color:var(--mt);text-align:center;line-height:1.5">A coluna "Sua venda" registra seus preços de tabela desde '+_mkBR(desdeMin)+'. Em 30 dias ela passa a comparar mês a mês.</div>';
+  h+='<div style="font-size:11px;color:var(--mt);line-height:1.6"><b>Pedir mais:</b> o mercado subiu 3% ou mais e sua tabela não acompanhou. <b>Rever compra:</b> o mercado caiu 3% ou mais; cuidado para não pagar caro. <b>Em linha:</b> sem diferença relevante.</div>';
+  return h;
+}
+
+// ── APRENDER ────────────────────────────────────────────────
+function _mkHtmlAprender(){
+  var ult=_mkUltimoDia(),cuU=ult?_mkPreco(ult,'cobre','usd'):null,dol=ult?_mkBRL(ult):null,cuR=ult?_mkPreco(ult,'cobre','brl'):null;
+  var ex=cuU&&dol?'Hoje: cobre a US$ '+_mkNum(cuU,0)+'/t na LME ÷ 1.000 = US$ '+_mkNum(cuU/1000,2)+'/kg × dólar R$ '+_mkNum(dol,2)+' = <b>R$ '+_mkNum(cuR,2)+'/kg de cobre puro</b>. Se o seu cobre misto costuma valer 55% disso, o preço esperado fica perto de R$ '+_mkNum(cuR*0.55,2)+'/kg.'
+    :'Exemplo: cobre a US$ 14.600/t ÷ 1.000 = US$ 14,60/kg × dólar R$ 5,05 = R$ 73,73/kg de cobre puro.';
+  var it=function(t,c,aberto){return '<details class="card" style="padding:0"'+(aberto?' open':'')+'><summary style="padding:13px 14px;font-size:13px;font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center">'+t+'<span style="color:var(--mt);font-size:11px">&#9660;</span></summary><div style="padding:0 14px 14px;font-size:13px;line-height:1.7;color:var(--tx)">'+c+'</div></details>';};
+  var h='';
+  h+=it('O que é a LME','A London Metal Exchange (LME) é a bolsa de Londres onde se negocia metal puro em grandes volumes: cobre, alumínio, zinco, níquel, chumbo e estanho. O preço de lá vira a referência do mundo inteiro.<br><br>Sucata não é negociada na LME, mas segue ela: quando a LME sobe, fundições e compradores pagam mais pela sucata, geralmente alguns dias ou semanas depois.',true);
+  h+=it('Como o preço chega na sua sucata','A conta que todo comprador faz:<br><b>preço LME (US$) × dólar = valor do metal puro em reais → menos um desconto = preço da sucata</b><br><br>'+ex+'<br><br>O desconto cobre impureza, frete, refino e a margem de quem compra. Por isso a sucata vale uma porcentagem do metal puro, e essa porcentagem muda pouco. O que mexe no preço é a LME e o dólar.');
+  h+=it('Por que o dólar importa','Todo metal é cotado em dólar. Se o dólar sobe, o mesmo metal vale mais reais, mesmo com a LME parada. Por isso às vezes o cobre cai em Londres mas sobe em reais: o dólar compensou. A aba mostra os preços já em reais, com o dólar de cada dia.');
+  h+=it('Metais preciosos e as placas','Ouro, prata, paládio e platina não são da LME: são cotados no mercado de Londres de metais preciosos. Numa placa eletrônica há muito pouco ouro por quilo, mas como ele vale centenas de reais por grama, responde pela maior parte do valor.<br><br>Por isso, quando o ouro sobe, as placas tendem a valorizar. Mas cada tipo de placa tem teores muito diferentes, e não existe cotação pública de placa: o preço real é o que seus compradores pagam. Para saber o teor exato das suas placas, só com laudo de refinadora.');
+  h+=it('Como ler a tendência','O selo compara o preço de hoje com a média dos últimos 20 dias e vê se essa média está subindo ou descendo.<br>&#8599; <b>Alta:</b> preço acima de uma média que sobe.<br>&#8600; <b>Queda:</b> preço abaixo de uma média que cai.<br>&#8596; <b>Lateral:</b> sem direção clara.<br>"Forte" quer dizer que o preço está 3% ou mais longe da média.<br><br>É uma leitura do caminho até aqui, não uma previsão. Uma notícia forte pode virar o mercado em um dia.');
+  h+=it('Como usar no dia a dia','<b>Mercado subindo:</b> se puder, segure o estoque alguns dias e renegocie a venda. Confira em Seus preços se sua tabela acompanhou.<br><b>Mercado caindo:</b> venda o que está parado e reduza o preço de compra antes que o comprador reduza o seu.<br><b>Lateral:</b> mantenha os preços e foque em volume.<br><br>Olhe sempre a tendência de 30 dias, não a variação de um dia: um dia isolado é ruído.');
+  h+='<div class="card"><div class="stl"><div class="stb"></div><div class="stx">Fontes e notícias</div></div><div style="display:flex;flex-direction:column;gap:6px">';
+  [['Preços da LME (site oficial)','https://www.lme.com/en/metals/non-ferrous'],['Tabela LME diária · Shock Metais','https://shockmetais.com.br/lme'],['Dólar oficial · Banco Central','https://www.bcb.gov.br/estabilidadefinanceira/historicocotacoes'],
+   ['Notícias: preço do cobre','https://news.google.com/search?q=pre%C3%A7o%20do%20cobre&hl=pt-BR&gl=BR&ceid=BR:pt-419'],['Notícias: sucata e reciclagem de metais','https://news.google.com/search?q=sucata%20metais%20reciclagem&hl=pt-BR&gl=BR&ceid=BR:pt-419'],['Notícias: lixo eletrônico','https://news.google.com/search?q=lixo%20eletr%C3%B4nico%20reciclagem&hl=pt-BR&gl=BR&ceid=BR:pt-419']].forEach(function(l){
+    h+='<a href="'+l[1]+'" target="_blank" rel="noopener" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);color:var(--tx);text-decoration:none;font-size:13px">'+l[0]+'<span style="color:var(--bl)">&#8599;</span></a>';
+  });
+  h+='</div><div style="font-size:10px;color:var(--mt);margin-top:8px">Cotações automáticas: Metals.dev. Ferro: preço informado por você.</div></div>';
+  return h;
+}
+
+// ── WIDGET DO DASHBOARD ─────────────────────────────────────
+function _mktFetchWidget(){_mkUpdateWidget();setTimeout(_mkAutoCheck,500);}
+function _mkUpdateWidget(){
+  var ult=_mkUltimoDia();
+  var put=function(id,v){var e=document.getElementById(id);if(e)e.innerHTML=v;};
+  put('mkt-w-clima',ult?_mkClima():'Sem cotações ainda. Abra a aba Mercado para buscar.');
+  if(ult){
+    var dol=_mkBRL(ult),cu=_mkPreco(ult,'cobre','brl'),au=_mkPreco(ult,'ouro','brl');
+    var cv=_mkVar('cobre',30),av=_mkVar('ouro',30);
+    put('mkt-w-dolar',dol?'R$ '+_mkNum(dol,2):'—');
+    put('mkt-w-cobre',cu?'R$ '+_mkNum(cu,2):'—');
+    put('mkt-w-ouro',au?'R$ '+_mkNum(au,2):'—');
+    put('mkt-w-cobre-v',cv?'<span style="color:'+_mkCorPct(cv.pct)+'">'+_mkPct(cv.pct)+' mês</span>':'R$/kg');
+    put('mkt-w-ouro-v',av?'<span style="color:'+_mkCorPct(av.pct)+'">'+_mkPct(av.pct)+' mês</span>':'R$/g');
+  }
+  var st=document.getElementById('mkt-status');
+  if(st)st.textContent=_mk.busy?'Buscando...':ult?'Cotação de '+_mkBR(ult):'Sem dados';
+  var dot=document.getElementById('mkt-dot');
+  if(dot)dot.style.background=_mk.busy?'#3b82f6':(ult&&ult>=_mkUltimoUtil()?'#22c55e':'#f59e0b');
 }
 
 
@@ -6044,30 +6952,6 @@ function runPG(){
     html+='<div onclick="closeM();'+it.fn+'" style="display:flex;align-items:center;gap:10px;padding:9px;background:var(--s2);border-radius:var(--r);margin-bottom:5px;cursor:pointer;border:1px solid var(--bd)" onmouseover=\"this.style.background=\'var(--s3)\'\" onmouseout=\"this.style.background=\'var(--s2)\'\">'      +'<span style="font-size:20px">'+it.ic+'</span>'      +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+it.titulo+'</div>'      +'<div style="font-size:10px;color:var(--mt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+it.sub+'</div></div>'      +'<span style="font-size:10px;background:var(--s1);color:'+it.cor+';border:1px solid '+it.cor+';border-radius:20px;padding:1px 8px;white-space:nowrap">'+it.tipo+'</span>'      +'</div>';
   }
   res.innerHTML=html;
-}
-
-function pgMercado(){
-  if(_mktInterval)clearInterval(_mktInterval);
-  _mktInterval=setInterval(function(){_mktFetch();},5*60*1000);
-  setTimeout(function(){_mktFetch();},60);
-  return '<div class="fc" id="pg-mercado-inner"><div style="text-align:center;padding:40px;color:var(--mt)">Carregando cotações...</div></div>';
-}
-function mHistCotacoes(){
-  if(!DB.cotacoesHist||!DB.cotacoesHist.length){alert('Nenhum histórico salvo ainda. As cotações são salvas automaticamente uma vez por dia quando o módulo Mercado é acessado.');return;}
-  var NOMES={gold:'Ouro',silver:'Prata',copper:'Cobre',aluminum:'Alumínio',lithium:'Lítio',brass:'Latão',palladium:'Paládio',platinum:'Platina',rareearth:'T. Raras'};
-  var rows='';
-  for(var i=0;i<Math.min(DB.cotacoesHist.length,30);i++){
-    var h=DB.cotacoesHist[i];
-    rows+='<div style="padding:10px 0;border-bottom:1px solid var(--bd)">'      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'      +'<span style="font-size:12px;font-weight:700">'+h.data+'</span>'      +'<span style="font-size:11px;color:var(--mt)">USD/BRL: '+parseFloat(h.brl||5.15).toFixed(2)+'</span>'      +'</div>'      +'<div style="display:flex;flex-wrap:wrap;gap:5px">';
-    var keys=Object.keys(NOMES);
-    for(var j=0;j<keys.length;j++){
-      var k=keys[j];var v=h.prices?h.prices[k]:null;
-      if(!v)continue;
-      rows+='<span style="font-size:10px;background:var(--s2);border:1px solid var(--bd);border-radius:20px;padding:2px 8px;white-space:nowrap">'+NOMES[k]+': <b style="font-family:monospace">R$'+parseFloat(v).toFixed(2)+'</b></span>';
-    }
-    rows+='</div></div>';
-  }
-  openM('📈 Histórico de Cotações','<div style="max-height:65vh;overflow-y:auto">'+rows+'</div>',480);
 }
 
 function _estTab(modo){
@@ -13031,7 +13915,7 @@ function stAcoes(col){
 }
 
 // ── date helpers ───────────────────────────────────────────
-function _today(){return new Date();}
+function _today(){return _agoraMG();}
 function _fmtDataBR(d){return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();}
 function _parseDataBR(s){var p=(s||'').split('/');if(p.length<3)return new Date(0);return new Date(+p[2],+p[1]-1,+p[0]);}
 function _isoDateBR(s){var p=s.split('/');return p[2]+'-'+p[1]+'-'+p[0];}
@@ -14382,7 +15266,7 @@ function _prodCustoEntrada(matNome){return DB.prodCustoEntrada[matNome]||0;}
 // (ambos já são salvos automaticamente ao abrir/fechar cada produção).
 // Histórico completo de um funcionário no período selecionado — cada produção
 // com data, horário de início/fim, duração e o que rendeu.
-function _horaAgora(){var h=new Date();return ('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);}
+function _horaAgora(){var h=_agoraMG();return ('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);}
 // Peso realmente desmontado: entrada menos a sobra que VOLTOU pro estoque
 // ("não deu tempo de desmontar"). É a base de custo e de aproveitamento —
 // material devolvido não foi trabalhado, então não pode pesar no resultado.
@@ -14420,7 +15304,7 @@ function _prodIniFim(p,ateAgora){
   if(p.status==='aberta'&&p.reabertaDe){fd=p.reabertaDe.dataFim;fh=p.reabertaDe.horaFim;} // reaberta pra correção: vale o fim original
   var E=null;
   if(fh){E=_prodDT(fd||p.data,fh);if(E!==null&&!fd&&E<S)E+=864e5;} // registro antigo sem data de fim: passou da meia-noite
-  else if(ateAgora){var n=new Date();n.setSeconds(0,0);E=n.getTime();}
+  else if(ateAgora){var n=_agoraMG();n.setSeconds(0,0);E=n.getTime();}
   if(E===null||E<S)return null;
   return [S,E];
 }
@@ -14749,7 +15633,7 @@ function salvarNovaProdBV(semApelidoOk,forcar){
   // Desconta do estoque na abertura — o material sai da pilha bruta assim que é
   // separado pra desmontar, mesmo antes de terminar o processo.
   prodEnt.est=+((prodEnt.est||0)-pesoEntrada).toFixed(3);
-  var h=new Date();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
+  var h=_agoraMG();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
   DB.producoes.push({id:nid(),func:func,matEntradaId:prodEnt.id,matEntrada:prodEnt.nome,custoEntradaLote:custoLote,lote:lote,pesoEntrada:pesoEntrada,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,pausas:[],saidas:[],entradas:[{bruto:peso,tara:tara,peso:pesoEntrada,data:_fmtDataBR(_today()),hora:hora}],status:'aberta'});
   saveDB();closeM();go('producao');toast('Produção iniciada!','var(--gr)');
 }
@@ -14973,14 +15857,14 @@ function pausarProdBV(prodId){
   var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
   if(!p)return;
   if(!p.pausas)p.pausas=[];
-  var h=new Date();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
+  var h=_agoraMG();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
   p.pausas.push({inicio:hora,fim:null,dIni:_fmtDataBR(_today())});
   saveDB();closeM();mVerProdBV(prodId);toast('Produção pausada','var(--or)');
 }
 function retomarProdBV(prodId){
   var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
   if(!p||!p.pausas||!p.pausas.length)return;
-  var h=new Date();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
+  var h=_agoraMG();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
   p.pausas[p.pausas.length-1].fim=hora;p.pausas[p.pausas.length-1].dFim=_fmtDataBR(_today());
   saveDB();closeM();mVerProdBV(prodId);toast('Produção retomada','var(--gr)');
 }
@@ -19157,10 +20041,10 @@ function _auditLog(acao, detalhe){
     detalhe:detalhe||'',
     user:CU?CU.nome:'Sistema',
     data:hj(),
-    hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
+    hora:_agoraMG().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})
   });
-  // Mantém só os últimos 200 logs
-  if(DB.auditLogs.length>200)DB.auditLogs.length=200;
+  // Nada é apagado: acima de 200, os registros mais antigos vão para o Arquivo na nuvem
+  if(DB.auditLogs.length>220)setTimeout(_arquivarExcesso,3000);
 }
 
 // ── Sistema de Notificações ──────────────────────────────────
@@ -19857,37 +20741,27 @@ function _goUsuarios(){
 // Salva a lista de usuários na nuvem também — saveDB() sozinho só grava no
 // localStorage (cache do navegador), então sem isso um usuário criado/editado
 // num aparelho nunca aparece nos outros, e pode até sumir se o cache for limpo.
-function _syncUsers(){
-  if(!_sbReady||!_sbClient){toast('Sem conexão com a nuvem — usuário salvo só neste aparelho por enquanto','var(--or)');return;}
-  try{
-    var _uj=JSON.stringify(USERS);
-    _sbClient.from('biovale_dados').upsert({chave:'bv_users',valor:_uj,atualizado_em:new Date().toISOString()},{onConflict:'chave'}).then(function(r){
-      if(r.error){console.warn('bv_users:',r.error.message);toast('Usuário NÃO foi salvo na nuvem: '+r.error.message,'var(--rd)');}
-      else _usersCloudJson=_uj;
-    },function(){toast('Usuário NÃO foi salvo na nuvem (sem conexão)','var(--rd)');});
-  }catch(e){}
+function _syncUsers(silencioso){
+  if(!_sbReady||!_sbClient){if(!silencioso)toast('Sem conexão com a nuvem — usuário salvo só neste aparelho por enquanto','var(--or)');return;}
+  // Junta com a lista da nuvem (um aparelho com lista antiga não apaga mais o usuário criado em outro)
+  _sbMergeKey('bv_users',function(){return USERS;},function(){return _usersCloudJson;},function(m){
+    if(Array.isArray(m)&&m.length)_aplicarUsersNuvem(m);
+  },function(motivo,res){
+    toast('Usuário NÃO foi salvo na nuvem ('+((res&&res.erro)||motivo)+')','var(--rd)');
+  });
 }
-// Mesma lógica pras Funções (papéis/permissões). Depois de gravar, LÊ de volta pra
-// confirmar que ficou na nuvem, e avisa na tela se não ficou (com o motivo).
+// Mesma lógica pras Funções (papéis/permissões): juntam com as da nuvem e avisam na tela se não gravou.
 function _syncRoles(silencioso){
   try{
     _rebuildRoleMaps();
     try{localStorage.setItem('bv_roles',_rolesJson());}catch(e){}
     if(!_sbReady||!_sbClient){if(!silencioso)toast('Sem conexão com a nuvem — função salva só neste aparelho por enquanto','var(--or)');return;}
-    var _rj=_rolesJson();
-    _sbClient.from('biovale_dados').upsert({chave:'bv_roles',valor:_rj,atualizado_em:new Date().toISOString()},{onConflict:'chave'}).then(function(r){
-      if(r.error){
-        console.warn('bv_roles:',r.error.message);
-        toast('Função NÃO foi salva na nuvem: '+r.error.message,'var(--rd)');
-        return;
-      }
-      _sbGet('bv_roles',function(ro){
-        var ok=false;
-        try{ok=!!ro&&JSON.stringify({base:ro.base,custom:ro.custom||[]})===_rj;}catch(e){}
-        if(ok){_rolesCloudJson=_rj;if(!silencioso)toast('Função salva na nuvem ✓','var(--gr)');}
-        else toast('A nuvem não guardou a função (a leitura de conferência veio diferente). Me avise desse aviso.','var(--rd)');
-      });
-    },function(){toast('Função NÃO foi salva na nuvem (sem conexão)','var(--rd)');});
+    _sbMergeKey('bv_roles',function(){return {base:BASE_ROLES,custom:CUSTOM_ROLES};},function(){return _rolesCloudJson;},function(m){
+      if(m&&Array.isArray(m.base))_aplicarRolesNuvem(m);
+      if(!silencioso)toast('Função salva na nuvem ✓','var(--gr)');
+    },function(motivo,res){
+      toast('Função NÃO foi salva na nuvem ('+((res&&res.erro)||motivo)+')','var(--rd)');
+    });
   }catch(e){}
 }
 function moveUser(idx,dir){
@@ -20391,11 +21265,19 @@ function restaurarBackup(input){
     reader.onload=function(e){
       try{
         var dados=JSON.parse(e.target.result);
-        if(dados.DB)_applySnap(dados.DB);
-        if(dados.CFG)Object.assign(CFG,dados.CFG);
-        saveDB();
-        alert('Backup restaurado com sucesso!');
-        go('dashboard');
+        if(!dados.DB){alert('Erro ao restaurar: arquivo sem dados.');return;}
+        _backupAntesDeRestaurar(function(){
+          dados.DB.savedAt=_novoSavedAt();
+          _applySnap(dados.DB);
+          if(dados.CFG)Object.assign(CFG,dados.CFG);
+          // Restaurar é uma substituição intencional: grava direto (a junção desfaria a restauração)
+          _sbSetRaw('bv_db',JSON.stringify(dados.DB),function(ok){
+            _baseSnapJson=JSON.stringify(dados.DB);_baseCloudSavedAt=dados.DB.savedAt;_pendingLocal=false;_limparPendenciaLocal();
+            try{localStorage.setItem('bv_db',_baseSnapJson);}catch(e2){}
+            alert(ok?'Backup restaurado com sucesso! Uma cópia do estado anterior ficou na lista de backups.':'Backup aplicado neste aparelho, mas a nuvem não confirmou. Tente de novo com internet.');
+            go('dashboard');
+          });
+        });
       }catch(err){
         alert('Erro ao restaurar: arquivo inválido.');
       }
@@ -20404,10 +21286,19 @@ function restaurarBackup(input){
   });
 }
 
+// Antes de qualquer restauração, guarda o estado atual da nuvem como backup (restaurar não apaga nada)
+function _backupAntesDeRestaurar(cb){
+  if(!_sbReady){cb();return;}
+  _sbGet('bv_db',function(atual){
+    if(!atual){cb();return;}
+    var d=_agoraMG(),ch='bv_backup_'+d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)+'_pre'+('0'+d.getHours()).slice(-2)+('0'+d.getMinutes()).slice(-2);
+    _sbSet(ch,{criadoEm:new Date().toISOString(),sufixo:'_pre',DB:atual,CFG:JSON.parse(JSON.stringify(CFG))},function(){cb();});
+  });
+}
 // Modal: lista os backups diários da nuvem e permite restaurar
 function mRestaurarBackupNuvem(){
   if(!_sbReady){alert('Nuvem não conectada. Conecte-se à internet para ver os backups.');return;}
-  openM('&#9729; Backups Diários na Nuvem','<div id="bkp-lista" style="max-height:55vh;overflow-y:auto"><div style="text-align:center;padding:30px;color:var(--mt);font-size:13px">Carregando backups…</div></div>',460);
+  openM('&#9729; Backups Diários na Nuvem','<div style="margin-bottom:10px"><button class="btnO bOb" style="width:100%" onclick="mArquivo()">&#128451; Arquivo permanente (caixas e auditoria antigos)</button></div><div id="bkp-lista" style="max-height:55vh;overflow-y:auto"><div style="text-align:center;padding:30px;color:var(--mt);font-size:13px">Carregando backups…</div></div>',460);
   _listarBackups(function(arr){
     var cont=document.getElementById('bkp-lista');
     if(!cont)return;
@@ -20436,7 +21327,9 @@ function restaurarBackupNuvem(chave, dataBR){
       _syncBadge('saving','Restaurando backup…');
       _sbGet(chave, function(backup){
         if(!backup || !backup.DB){alert('Erro: backup inválido ou não encontrado.');_syncBadge('error','Erro ao restaurar');return;}
+        _backupAntesDeRestaurar(function(){
         try{
+          backup.DB.savedAt=_novoSavedAt(); // versão nova: os outros aparelhos reconhecem e aplicam
           _applySnap(backup.DB);
           if(backup.CFG)Object.assign(CFG,backup.CFG);
           _sanitizeRevenda();
@@ -20466,6 +21359,7 @@ function restaurarBackupNuvem(chave, dataBR){
           alert('Erro ao restaurar: '+err.message);
           _syncBadge('error','Erro ao restaurar');
         }
+        });
       });
     });
   });
@@ -21078,21 +21972,68 @@ window.addEventListener('DOMContentLoaded', function(){
   //    (evita tela em branco se internet demorar)
   var _localLoaded = loadDB();
   buildLoginList();
+  _medirRelogio();setInterval(_medirRelogio,30*60000);
 
   // 2. Aguarda Supabase e carrega da nuvem — NUVEM SEMPRE PREVALECE
   (function _waitSBAndLoad(){
+    if(_sbReady&&!_pendIdbLido){
+      _pendIdbLido=true;
+      _idbGet('bv_pend',function(p){
+        try{
+          if(p&&p.local){
+            if(!_startLocal){_startLocal=JSON.parse(p.local);}
+            if(!_startBase&&p.base)_startBase=p.base;
+            _startPending=true;
+          }
+        }catch(e){}
+        _waitSBAndLoad();
+      });
+      return;
+    }
     if(_sbReady){
       _syncBadge('saving','Carregando nuvem…');
       // Carrega DB principal — nuvem sempre tem prioridade
       _sbGet('bv_db', function(s){
         if(s){
-          // SEMPRE aplica da nuvem — ela é a fonte da verdade
-          _applySnap(s);
-          _sanitizeRevenda();
-          try{
-            localStorage.setItem('bv_db',JSON.stringify(s));
-            localStorage.setItem('bv_db_savedAt',String(s.savedAt||Date.now()));
-          }catch(e){}
+          var _juntouPend=false;
+          // O que ficou pendente na sessão anterior NÃO é descartado: junta com o que a nuvem tem agora.
+          if(_startPending&&_startLocal&&_startBase){
+            try{
+              var _b0=JSON.parse(_startBase);
+              var _mg=_m3Root(_b0,_startLocal,s);
+              if(_canon(_mg)!==_canon(s)){
+                _mg.savedAt=_novoSavedAt();
+                _applySnap(_mg);
+                _baseCloudSavedAt=s.savedAt||0;           // a base continua sendo o que está na nuvem
+                try{_baseSnapJson=JSON.stringify(s);}catch(e){_baseSnapJson=null;}
+                _pendingLocal=true;_juntouPend=true;
+                try{localStorage.setItem('bv_base',_baseSnapJson||'');localStorage.setItem('bv_pending','1');}catch(e){}
+                setTimeout(autoSave,300);
+                console.warn('[BioVale] Alterações pendentes da sessão anterior foram juntadas com a nuvem.');
+              }
+            }catch(e){console.error('[BioVale] falha ao juntar pendência',e);_juntouPend=false;}
+          } else if(_startPending&&_startLocal&&!_startBase&&_canon(_startLocal)!==_canon(s)){
+            // Havia pendência sem a base: junta sem apagar nada (o que existir em qualquer lado fica)
+            try{localStorage.setItem('bv_conflito_'+Date.now(),JSON.stringify(_startLocal));}catch(e){}
+            try{
+              var _mg2=_m3Root(undefined,_startLocal,s);
+              if(_canon(_mg2)!==_canon(s)){
+                _mg2.savedAt=_novoSavedAt();_applySnap(_mg2);
+                _baseCloudSavedAt=s.savedAt||0;try{_baseSnapJson=JSON.stringify(s);}catch(e){_baseSnapJson=null;}
+                _pendingLocal=true;_juntouPend=true;setTimeout(autoSave,300);
+              }
+            }catch(e){console.error('[BioVale] falha ao juntar pendência sem base',e);}
+          }
+          if(!_juntouPend){
+            // Sem pendência: a nuvem é a fonte da verdade
+            _applySnap(s);
+            _sanitizeRevenda();
+            try{
+              localStorage.setItem('bv_db',JSON.stringify(s));
+              localStorage.setItem('bv_db_savedAt',String(s.savedAt||Date.now()));
+            }catch(e){}
+            _limparPendenciaLocal();
+          } else { _sanitizeRevenda(); }
           _syncBadge('idle','Nuvem ativa');
           _cloudLoaded = true; // a partir daqui saves guardados são liberados
           // Guarda timestamp do último sync
@@ -21101,20 +22042,32 @@ window.addEventListener('DOMContentLoaded', function(){
           if(pgAtiva){go(pgAtiva);}
           // Inicia verificador de backup de meio período (12:30)
           setTimeout(_startBackupMeioPeriodo, 2000);
+          setTimeout(_arquivarExcesso, 8000); // move para o Arquivo o que passou do limite (nada é apagado)
         } else {
-          // Nuvem vazia — primeira vez, sobe o que tem localmente
-          _syncBadge('saving','Iniciando nuvem…');
-          _cloudLoaded = true;
-          saveDB();
+          // sbGet devolve null tanto para "nuvem vazia" quanto para ERRO de leitura. Só sobe o que
+          // há localmente se a nuvem estiver REALMENTE vazia — nunca por causa de uma falha de rede.
+          _sbReadRow('bv_db',function(rd){
+            if(rd.ok&&rd.row===null){
+              _syncBadge('saving','Iniciando nuvem…');
+              _cloudLoaded = true;
+              saveDB();
+            } else {
+              _syncBadge('error','Sem conexão com a nuvem — tentando de novo…');
+              setTimeout(_waitSBAndLoad,3000);
+            }
+          });
         }
       });
-      // Carrega USERS da nuvem
-      _sbGet('bv_users', function(u){
+      // Carrega USERS da nuvem — erro de leitura NÃO é "nuvem vazia" (antes, uma falha de rede
+      // fazia este aparelho gravar a lista local por cima da lista da nuvem)
+      _sbReadRow('bv_users', function(rd){
+        if(!rd.ok)return;
+        var u=rd.obj;
         if(u && Array.isArray(u) && u.length){
           _aplicarUsersNuvem(u);
-        } else {
-          // Nuvem vazia — salva o usuário admin padrão
-          _sbSet('bv_users', USERS, function(){});
+        } else if(rd.row===null){
+          // Nuvem realmente vazia — salva o usuário admin padrão
+          _sbMergeKey('bv_users',function(){return USERS;},function(){return null;},function(m){_usersCloudJson=JSON.stringify(USERS);},function(){});
         }
       });
       // Carrega ROLES da nuvem
@@ -21124,13 +22077,9 @@ window.addEventListener('DOMContentLoaded', function(){
       // Carrega CFG da nuvem
       _sbGet('bv_cfg', function(cfg){
         if(cfg && typeof cfg === 'object'){
-          if(cfg.empresa) Object.assign(CFG.empresa, cfg.empresa);
-          if(cfg.sistema) Object.assign(CFG.sistema, cfg.sistema);
-          if(cfg.integracao) Object.assign(CFG.integracao, cfg.integracao);
-          if(cfg.motivosSangria) CFG.motivosSangria=cfg.motivosSangria;
-          if(cfg.motivosReforco) CFG.motivosReforco=cfg.motivosReforco;
-          if(cfg.saldoAberturaPadrao!=null) CFG.saldoAberturaPadrao=cfg.saldoAberturaPadrao;
-          localStorage.setItem('bv_cfg',JSON.stringify(CFG));
+          _aplicarCfgNuvem(cfg);
+          _cfgCloudJson=_canon(cfg);
+          try{localStorage.setItem('bv_cfg',JSON.stringify(CFG));}catch(e){}
         }
       });
     } else {
@@ -21168,6 +22117,17 @@ function _cfgIA(){
     +'<input class="inp" id="cfg-anthropic-key" type="password" placeholder="sk-ant-..." value="'+(CFG.sistema.anthropicKey||'')+'" style="font-family:monospace;letter-spacing:1px"></div>'
     +'<div class="al alb" style="font-size:12px">&#128274; A chave fica salva apenas no seu navegador (localStorage). Nunca enviada para terceiros.</div>'
     +'<button class="btn" onclick="_saveCfgIA()">Salvar Chave</button>'
+    +'</div></div>'
+    +'<div class="card" style="margin-top:12px">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd)">'
+    +'<div style="font-size:22px">&#128200;</div>'
+    +'<div><div style="font-size:14px;font-weight:700">Cotações do Mercado (Metals.dev)</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-top:1px">Chave usada pela aba Mercado para buscar LME, metais preciosos e dólar</div></div></div>'
+    +'<div style="padding:16px;display:flex;flex-direction:column;gap:14px">'
+    +'<div class="fld"><label>Chave API Metals.dev</label>'
+    +'<input class="inp" id="cfg-metals-key" type="password" placeholder="Cole a chave do painel do metals.dev" value="'+((CFG.sistema&&CFG.sistema.metalsDevKey)||'')+'" style="font-family:monospace;letter-spacing:1px"></div>'
+    +'<div class="al alb" style="font-size:12px">Plano grátis: 100 consultas por mês. O sistema usa 1 por dia útil (cerca de 22 por mês). A chave é sincronizada com a nuvem para funcionar em todos os aparelhos.</div>'
+    +'<button class="btn" onclick="_saveCfgMetals()">Salvar Chave</button>'
     +'</div></div>'
     +'<div class="card" style="margin-top:12px">'
     +'<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd)">'
@@ -21262,6 +22222,14 @@ function _resetCfgPclGlossario(){
     saveDB();
     go('configuracoes','ia');
   });
+}
+function _saveCfgMetals(){
+  var k=document.getElementById('cfg-metals-key');
+  if(!k)return;
+  CFG.sistema.metalsDevKey=k.value.trim();
+  _saveCFG();
+  saveDB();
+  var btn=event.target;btn.textContent='\u2713 Salvo!';setTimeout(function(){btn.textContent='Salvar Chave';},2000);
 }
 function _saveCfgIA(){
   var k=document.getElementById('cfg-anthropic-key');
