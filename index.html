@@ -308,7 +308,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.8';var DADOS_VERSAO=2;
+var APP_VERSION='5.11';var DADOS_VERSAO=2;
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[
@@ -6576,9 +6576,9 @@ async function _mkAtualizar(manual){
     db.dias[hoje]={brl:+(1/cur.BRL).toFixed(4),m:m,fonte:'api',em:new Date().toISOString(),por:CU?CU.nome:''};
     db.ultimaBusca=hoje;db.erro=null;db.tentativa=null;
     // Primeira vez: preenche 30 dias de preciosos e dólar (a fonte não traz histórico dos metais da LME)
-    if(!db.histOk){
+    if(!db.histOk||_mkSerie('ouro','usd').length<15){
       try{
-        var ini=_mkIso(_addDays(new Date(),-30)),fim=_mkIso(_addDays(new Date(),-1));
+        var ini=_mkIso(_addDays(new Date(),-31)),fim=_mkIso(new Date());
         var h=await _mkGetJSON('https://api.metals.dev/v1/timeseries?api_key='+encodeURIComponent(key)+'&start_date='+ini+'&end_date='+fim);
         var rates=h.rates||{};
         // Descobre a unidade pelo ouro (o mesmo para todos os metais da resposta)
@@ -6594,7 +6594,7 @@ async function _mkAtualizar(manual){
           });
           db.dias[dt]=dia;
         });
-        db.histOk=true;
+        db.histOk=_mkSerie('ouro','usd').length>=15;
       }catch(eh){console.warn('[Mercado] histórico não carregado:',eh);}
     }
     saveDB();
@@ -6625,7 +6625,8 @@ function _mkAutoCheck(){
 // ── VÍNCULO MATERIAL → METAL ───────────────────────────────
 function _mkPalpite(nome){
   var n=(nome||'').toLowerCase();
-  if(/placa|processador|mem[oó]ria|pente|\bhd\b|celular|notebook/.test(n))return 'ouro'; // placas: o ouro indica a direção, não o valor
+  // Placas e eletrônicos NÃO acompanham um metal só (o preço vem da tabela do comprador): ficam sem vínculo
+  if(/placa|processador|mem[oó]ria|pente|\bhd\b|celular|notebook|eletr[oô]nic/.test(n))return '';
   if(/cobre|lat[aã]o|bronze/.test(n))return 'cobre';
   if(/alum[ií]nio|latinha|perfil/.test(n))return 'aluminio';
   if(/inox|n[ií]quel/.test(n))return 'niquel';
@@ -6636,17 +6637,19 @@ function _mkPalpite(nome){
 }
 function _mkVincDe(p){
   var v=_mkDB().vinc,k=String(_normId(p.id));
-  if(Object.prototype.hasOwnProperty.call(v,k))return v[k];
-  return _mkPalpite(p.nome);
+  var mid=Object.prototype.hasOwnProperty.call(v,k)?v[k]:_mkPalpite(p.nome);
+  var mt=mid&&_mkM(mid);
+  return (mt&&mt.grp==='prec')?'':(mid||''); // metal precioso não define o preço de nenhum material
 }
 
 // ── ESTOQUE A PREÇO DE MERCADO ─────────────────────────────
 function _mkEstoque(){
-  var rows=[],total=0,semHist=0;
+  var rows=[],total=0,semHist=0,semRef={n:0,kg:0,valor:0};
   for(var i=0;i<DB.produtos.length;i++){
     var p=DB.produtos[i];
     if(!(p.est>0))continue;
-    var mid=_mkVincDe(p);if(!mid)continue;
+    var mid=_mkVincDe(p);
+    if(!mid){semRef.n++;semRef.kg+=p.est;semRef.valor+=p.est*(p.vV||0);continue;}
     var vr=_mkVar(mid,30);
     var valor=p.est*(p.vV||0);
     if(!vr){semHist++;rows.push({p:p,mid:mid,pct:null,ganho:null,valor:valor});continue;}
@@ -6654,7 +6657,7 @@ function _mkEstoque(){
     rows.push({p:p,mid:mid,pct:vr.pct,ganho:g,valor:valor});
   }
   rows.sort(function(a,b){return Math.abs(b.ganho||0)-Math.abs(a.ganho||0);});
-  return {rows:rows,total:total,semHist:semHist};
+  return {rows:rows,total:total,semHist:semHist,semRef:semRef};
 }
 
 // ── COMPRAS E VENDAS DE UM METAL (para o gráfico) ──────────
@@ -6808,7 +6811,7 @@ function _mkHtmlResumo(){
       var mt=_mkM(r.mid);
       h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bd)">'
         +'<div style="min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r.p.nome+'</div>'
-        +'<div style="font-size:10px;color:var(--mt)">'+fKg(r.p.est)+' kg · '+mt.nome+(r.pct!==null?' '+_mkPct(r.pct):'')+(mt.grp==='prec'?' · estimado pelo ouro':'')+'</div></div>'
+        +'<div style="font-size:10px;color:var(--mt)">'+fKg(r.p.est)+' kg · '+mt.nome+(r.pct!==null?' '+_mkPct(r.pct):'')+'</div></div>'
         +'<div style="font-size:13px;font-weight:700;font-family:monospace;white-space:nowrap;color:'+(r.ganho===null?'var(--mt)':_mkCorPct(r.ganho))+'">'
         +(r.ganho===null?'sem histórico':(!r.valor?'sem preço':(r.ganho>=0?'+':'-')+fR(Math.abs(r.ganho))))+'</div></div>';
       if(r.ganho!==null&&r.ganho>0&&(!maior||r.ganho>maior.ganho))maior=r;
@@ -6819,6 +6822,9 @@ function _mkHtmlResumo(){
     else if(pior)h+='<div style="font-size:12px;color:var(--or);margin-top:4px">'+pior.p.nome+' perdeu valor: cuidado com o preço de compra.</div>';
     if(es.semHist)h+='<div style="font-size:11px;color:var(--mt);margin-top:4px">Alguns metais ainda não têm 2 dias de cotação para comparar.</div>';
   }
+  if(es.semRef.n)h+='<div style="margin-top:10px;padding:9px 11px;background:var(--s2);border-radius:8px;font-size:12px;line-height:1.5">'
+    +'<div style="display:flex;justify-content:space-between;gap:8px"><b>Placas, eletrônicos e outros</b><span style="font-family:monospace;white-space:nowrap">'+fKg(es.semRef.kg)+' kg</span></div>'
+    +'<div style="font-size:11px;color:var(--mt)">'+es.semRef.n+' material(is) sem referência de mercado: o preço vem da tabela do comprador, não da LME'+(es.semRef.valor?' · '+_mask(fR(es.semRef.valor))+' em estoque pelo seu preço de venda':'')+'.</div></div>';
   h+='</div>';
   // Metais hoje (atalho para a subaba Metais)
   h+='<div class="card"><div class="stl"><div class="stb" style="background:#B87333"></div><div class="stx">Metais hoje</div><span style="font-size:10px;color:var(--mt);margin-left:auto">toque para ver o gráfico</span></div>';
@@ -6852,7 +6858,7 @@ function _mkHtmlMetais(grp){
     var fu=_mkDB().ferro.slice().sort(function(a,b){return a.data<b.data?1:-1;})[0];
     h+='<div class="al alb" style="font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>O ferro não tem preço em bolsa. Use o preço de referência que você recebe dos compradores'+(fu?' (último: R$ '+_mkNum(fu.rkg,2)+'/kg em '+_mkBR(fu.data)+')':'')+'.</span><button class="btn" style="font-size:12px;padding:6px 12px;min-height:30px" onclick="mMkFerro()">Informar preço</button></div>';
   }
-  if(mt.id==='ouro')h+='<div class="al aly" style="font-size:12px;line-height:1.6">O ouro é o metal que mais pesa no valor das placas. Use a direção dele (subindo ou caindo) como sinal para as placas, mas o preço de cada tipo de placa é o que seus compradores pagam.</div>';
+  if(grp==='prec')h+='<div class="al alb" style="font-size:12px;line-height:1.6">Metais preciosos aparecem só como informação de mercado. O preço das placas não acompanha o ouro: ele vem da tabela do comprador.</div>';
   h+='<div>'+_mkSelo(mt.id,false)+'</div>';
   // Cartões dia / semana / mês
   var cards=[['Dia',0],['Semana',7],['Mês',30]];
@@ -6872,19 +6878,19 @@ function _mkHtmlMetais(grp){
     +'<div style="display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-bottom:8px"><div style="display:flex;gap:4px">'+pb('d','Diário')+pb('s','Semanal')+pb('m','Mensal')+'</div><div style="display:flex;gap:4px">'+ub('brl',_mkUnLbl(mt,'brl'))+ub('usd',_mkUnLbl(mt,'usd'))+'</div></div>'
     +'<div style="position:relative;height:230px"><canvas id="mk-chart"></canvas></div>'
     +'<div id="mk-chart-vazio" style="display:none;text-align:center;color:var(--mt);font-size:12px;padding:10px">Poucos dias de cotação para o gráfico. Ele vai se formando a cada dia, ou importe o histórico.</div>'
-    +(_mk.per==='d'?'<div style="display:flex;gap:14px;font-size:10px;color:var(--mt);margin-top:6px"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e"></span> Você vendeu</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6"></span> Você comprou</span></div>':'')
+    +(_mk.per==='d'&&grp==='base'?'<div style="display:flex;gap:14px;font-size:10px;color:var(--mt);margin-top:6px"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e"></span> Você vendeu</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6"></span> Você comprou</span></div>':'')
     +'</div>';
   // Leitura
   var vmB=_mkVar(mt.id,30,'brl'),vmU=mt.manual?null:_mkVar(mt.id,30,'usd'),txt='';
   if(vmB){
-    txt=mt.nome+(vmB.pct>=0?' subiu ':' caiu ')+_mkPct(Math.abs(vmB.pct)).replace('+','')+' no mês em reais. Afeta o que você vende de '+mt.uso+'.';
+    txt=mt.nome+(vmB.pct>=0?' subiu ':' caiu ')+_mkPct(Math.abs(vmB.pct)).replace('+','')+' no mês em reais.'+(grp==='base'?' Afeta o que você vende de '+mt.uso+'.':'');
     if(vmU&&((vmU.pct<0&&vmB.pct>0)||(vmU.pct>0&&vmB.pct<0)))txt+=' Em dólar '+(vmU.pct>=0?'subiu ':'caiu ')+_mkPct(Math.abs(vmU.pct)).replace('+','')+': a diferença veio do dólar.';
   }else txt='Ainda não há 2 dias de cotação de '+mt.nome.toLowerCase()+' para comparar.';
   h+='<div class="al alb" style="font-size:12px;line-height:1.6">'+txt+'</div>';
   // Suas operações
-  var ops=_mkOps(mt.id).slice(0,8),hj=_mkUltimoDia();
-  h+='<div class="card"><div class="stl"><div class="stb"></div><div class="stx">Suas compras e vendas de '+mt.nome.toLowerCase()+'</div></div>';
-  if(!ops.length)h+='<div style="font-size:12px;color:var(--mt)">Nenhuma operação com materiais ligados a '+mt.nome.toLowerCase()+'. <a href="#" onclick="mMkVincular();return false" style="color:var(--bl)">Vincular materiais</a></div>';
+  var ops=grp==='base'?_mkOps(mt.id).slice(0,8):[],hj=_mkUltimoDia();
+  if(grp==='base')h+='<div class="card"><div class="stl"><div class="stb"></div><div class="stx">Suas compras e vendas de '+mt.nome.toLowerCase()+'</div></div>';
+  if(grp==='base'&&!ops.length)h+='<div style="font-size:12px;color:var(--mt)">Nenhuma operação com materiais ligados a '+mt.nome.toLowerCase()+'. <a href="#" onclick="mMkVincular();return false" style="color:var(--bl)">Vincular materiais</a></div>';
   ops.forEach(function(o){
     var pd=_mkPreco(o.d,mt.id,'brl'),ph=hj?_mkPreco(hj,mt.id,'brl'):null,leit='',cor='var(--mt)';
     if(pd&&ph&&o.d!==hj){
@@ -6896,14 +6902,16 @@ function _mkHtmlMetais(grp){
       +'<div style="min-width:0"><span style="color:'+(o.tipo==='Venda'?'#22c55e':'#3b82f6')+'">&#9679;</span> '+_mkBR(o.d)+' '+(o.tipo==='Venda'?'vendeu':'comprou')+' '+fKg(o.kg)+' kg<div style="font-size:10px;color:var(--mt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+o.nome+' · '+fR(o.preco)+'/kg · #'+o.num+'</div></div>'
       +'<span style="font-size:11px;font-weight:700;color:'+cor+';white-space:nowrap">'+leit+'</span></div>';
   });
-  h+='</div>';
+  if(grp==='base')h+='</div>';
   // Tabela dos últimos dias
-  var s=_mkSerie(mt.id,'brl').slice(-10).reverse();
+  var s0=_mkSerie(mt.id,'brl').slice(-11);
+  // variação de cada dia em relação ao dia anterior com cotação (em reais)
+  var s=s0.map(function(p,i){return {d:p.d,v:p.v,pct:(i>0&&s0[i-1].v)?(p.v/s0[i-1].v-1)*100:null};}).slice(-10).reverse();
   if(s.length){
-    h+='<div class="card" style="padding:12px"><div class="stl"><div class="stb"></div><div class="stx">Últimos dias</div></div><table class="tbl" style="font-size:12px"><thead><tr><th style="padding:6px 4px">Dia</th><th style="padding:6px 4px;text-align:right">'+_mkUnLbl(mt,'brl')+'</th><th style="padding:6px 4px;text-align:right">'+_mkUnLbl(mt,'usd')+'</th><th style="padding:6px 4px;text-align:right">Dólar</th></tr></thead><tbody>';
+    h+='<div class="card" style="padding:12px"><div class="stl"><div class="stb"></div><div class="stx">Últimos dias</div></div><table class="tbl" style="font-size:12px"><thead><tr><th style="padding:6px 4px">Dia</th><th style="padding:6px 4px;text-align:right">'+_mkUnLbl(mt,'brl')+'</th><th style="padding:6px 4px;text-align:right">Var.</th><th style="padding:6px 4px;text-align:right">'+_mkUnLbl(mt,'usd')+'</th><th style="padding:6px 4px;text-align:right">Dólar</th></tr></thead><tbody>';
     s.forEach(function(p){
       var u=_mkPreco(p.d,mt.id,'usd');
-      h+='<tr><td style="padding:6px 4px">'+_mkBR(p.d)+'</td><td style="padding:6px 4px;text-align:right;font-family:monospace">'+_mkNum(p.v,2)+'</td><td style="padding:6px 4px;text-align:right;font-family:monospace;color:var(--mt)">'+(u?_mkNum(u,mt.grp==='base'?0:2):'—')+'</td><td style="padding:6px 4px;text-align:right;font-family:monospace;color:var(--mt)">'+_mkNum(_mkBRL(p.d),2)+'</td></tr>';
+      h+='<tr><td style="padding:6px 4px">'+_mkBR(p.d)+'</td><td style="padding:6px 4px;text-align:right;font-family:monospace">'+_mkNum(p.v,2)+'</td><td style="padding:6px 4px;text-align:right;font-family:monospace;font-weight:700;white-space:nowrap;color:'+(p.pct===null?'var(--mt)':_mkCorPct(p.pct))+'">'+(p.pct===null?'—':(p.pct>0?'▲ +':p.pct<0?'▼ ':'')+_mkNum(p.pct,1)+'%')+'</td><td style="padding:6px 4px;text-align:right;font-family:monospace;color:var(--mt)">'+(u?_mkNum(u,mt.grp==='base'?0:2):'—')+'</td><td style="padding:6px 4px;text-align:right;font-family:monospace;color:var(--mt)">'+_mkNum(_mkBRL(p.d),2)+'</td></tr>';
     });
     h+='</tbody></table></div>';
   }
@@ -6975,7 +6983,7 @@ function _mkSalvarFerro(){
 
 function mMkVincular(){
   var ops='<option value="">— Nenhum —</option>';
-  _MK_METAIS.forEach(function(m){ops+='<option value="'+m.id+'">'+m.nome+'</option>';});
+  _MK_METAIS.forEach(function(m){if(m.grp==='prec')return;ops+='<option value="'+m.id+'">'+m.nome+'</option>';});
   var lista=DB.produtos.slice().sort(function(a,b){return (b.est||0)-(a.est||0);});
   var rows=lista.map(function(p){
     var cur=_mkVincDe(p),pid=String(_normId(p.id));
@@ -6986,7 +6994,7 @@ function mMkVincular(){
       +'<select class="inp mk-vinc" data-pid="'+pid+'" style="width:130px;padding:6px 8px;font-size:12px">'+ops.replace('value="'+cur+'"','value="'+cur+'" selected')+'</select></div>';
   }).join('');
   openM('&#128279; Vincular materiais','<div class="mf">'
-    +'<div style="font-size:12px;color:var(--mt);line-height:1.6">Ligue cada material ao metal que define o preço dele. Exemplo: Cobre Misto → Cobre, Latinha → Alumínio. Placas e processadores → Ouro (só para indicar a direção do mercado).</div>'
+    +'<div style="font-size:12px;color:var(--mt);line-height:1.6">Ligue cada material ao metal que define o preço dele. Exemplo: Cobre Misto → Cobre, Latinha → Alumínio. Placas, processadores e eletrônicos ficam em <b>Nenhum</b>: o preço deles vem da tabela do comprador, não da LME.</div>'
     +'<div style="max-height:55vh;overflow-y:auto">'+rows+'</div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="_mkSalvarVinc()">Salvar</button></div></div>',460);
 }
