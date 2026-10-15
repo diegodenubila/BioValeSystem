@@ -223,6 +223,89 @@ select option{background:var(--s1)}.H{display:none!important}
 @keyframes bvPulse{0%,100%{opacity:1}50%{opacity:.3}}
 @media(max-width:768px){#bv-sync-badge{bottom:66px}}
 </style>
+<style id="est-css">
+/* ── Estoque v5.12 ── */
+.mono{font-family:monospace}
+.est-kpi{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));background:var(--s1);border:1px solid var(--bd);border-radius:var(--r2);overflow:hidden}
+.est-kpi>div{padding:10px 14px;border-right:1px solid var(--bd);min-width:0}
+.est-kpi>div:last-child{border-right:none}
+.est-kpi .kl{font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.est-kpi .kv{font-size:18px;font-weight:800;font-family:monospace;line-height:1.15;overflow-wrap:anywhere}
+.est-kpi .kv small{font-size:11px;font-weight:600}
+.est-kpi .kpc-click{cursor:pointer}.est-kpi .kpc-click:hover{background:var(--s2)}
+.est-kpi.est-kpi3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.est-kpi.est-kpi3>div:nth-child(n){display:block}
+.est-kpi.est-kpi3 .kv{font-size:16px}
+.est-mob-i{display:none}
+.est-busca{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.est-ord{width:auto;max-width:210px;font-size:12px;padding:7px 8px}
+.est-vbtn{background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:6px 10px;color:var(--mt);font-size:14px;min-height:36px;flex-shrink:0}
+.est-vbtn.on{border-color:var(--gr);color:var(--gr);background:var(--grb)}
+.est-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+.est-chips::-webkit-scrollbar{display:none}
+.est-chip{flex-shrink:0;display:inline-flex;align-items:center;gap:4px;border:1px solid var(--bd);background:var(--s2);color:var(--mt);border-radius:20px;padding:5px 12px;font-size:12px;white-space:nowrap;cursor:pointer}
+.est-chip .n{font-size:10px;opacity:.7}
+.est-chip.on{border-color:var(--gr);color:var(--gr);background:var(--grb);font-weight:700}
+.est-chip.rd{border-color:rgba(239,68,68,.45);color:var(--rd)}.est-chip.rd.on{background:rgba(239,68,68,.12)}
+.est-chip.or{border-color:rgba(245,158,11,.45);color:var(--or)}.est-chip.or.on{background:rgba(245,158,11,.12)}
+.est-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--bd);cursor:pointer;min-width:0}
+.est-row:last-child{border-bottom:none}.est-row:active{background:var(--s2)}
+.est-row.neg,.est-tbl tr.neg td{background:rgba(239,68,68,.06)}
+.est-ic{font-size:22px;width:28px;text-align:center;flex-shrink:0}
+.est-mid{flex:1;min-width:0}
+.est-nm{font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.est-sb{font-size:11px;color:var(--mt);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.est-rt{text-align:right;flex-shrink:0}
+.est-kg{font-family:monospace;font-weight:800;font-size:14.5px;white-space:nowrap}
+.est-vl{font-size:10.5px;color:var(--or);font-family:monospace;white-space:nowrap}
+.est-chev{color:var(--mt);font-size:18px;flex-shrink:0}
+.est-tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:9.5px;font-weight:700;border:1px solid var(--bd);color:var(--mt);white-space:nowrap}
+.est-tbl td{font-size:13px;vertical-align:middle}.est-tbl tbody tr{cursor:pointer}.est-tbl tbody tr:hover td{background:var(--s2)}
+.est-tbl .est-acts{display:inline-flex;gap:4px;opacity:.4;transition:opacity .15s}
+.est-tbl tr:hover .est-acts{opacity:1}
+.est-tbl .est-acts .bsm{background:var(--s2);border:1px solid var(--bd);color:var(--tx);padding:3px 8px}
+.est-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.est-card{cursor:pointer;min-width:0;padding:13px}.est-card .est-sb{white-space:normal}.est-card.neg{border-color:rgba(239,68,68,.45)}
+.est-acoes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.est-acao{background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:12px 8px;color:var(--tx);font-size:13px;font-weight:600;cursor:pointer;min-height:46px}
+.est-acao:hover{border-color:var(--gr)}
+.est-link{background:none;border:none;color:var(--mt);font-size:12px;cursor:pointer;padding:6px}
+.est-nav{display:flex;justify-content:space-between;align-items:center;background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:4px;margin-bottom:10px}
+.est-nav span{font-size:14px;font-weight:700}
+.est-nav button{background:none;border:none;color:var(--bl);font-size:15px;padding:6px 14px;cursor:pointer;min-height:36px}
+.est-nav button:disabled{color:var(--ft);cursor:default}
+.est-sw{display:flex;background:var(--s2);border-radius:var(--r);padding:3px;margin-bottom:8px}
+.est-sw button{flex:1;background:none;border:none;border-radius:8px;padding:7px 6px;font-size:12px;color:var(--mt);cursor:pointer}
+.est-sw button.on{background:var(--s1);color:var(--tx);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.est-ttl{font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.est-bars{display:flex;align-items:flex-end;gap:8px;height:110px;border-bottom:1px solid var(--bd)}
+.est-bg{flex:1;display:flex;gap:2px;align-items:flex-end;height:100%;cursor:pointer;border-radius:4px 4px 0 0;padding:0 2px}
+.est-bg.on{background:var(--s2)}
+.est-bg i{flex:1;display:block;border-radius:3px 3px 0 0;min-height:1px}
+.est-blb{display:flex;gap:8px;margin-top:4px}.est-blb span{flex:1;text-align:center;font-size:10px;color:var(--mt)}.est-blb span.on{color:var(--tx);font-weight:700}
+.est-lg{display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;color:var(--mt);margin-top:8px}.est-lg b{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.est-lr{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--bd)}.est-lr:last-child{border-bottom:none}
+.est-mt td,.est-mt th{padding:7px 8px}
+.ext-ln{display:flex;justify-content:space-between;gap:10px;padding:8px 2px;border-bottom:1px solid var(--bd)}
+@media(max-width:768px){
+  .est-kpi{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .est-kpi:not(.est-kpi3)>div:nth-child(n+4){display:none}
+  .est-kpi>div{padding:8px 9px}
+  .est-kpi>div:nth-child(3){border-right:none}
+  .est-kpi .kv{font-size:13.5px}.est-kpi.est-kpi3 .kv{font-size:14px}
+  .est-pc-i{display:none}.est-mob-i{display:inline}
+  .est-pc{display:none!important}
+  .est-ord{max-width:none;flex:1;min-width:0}
+  .est-cards{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+  .est-bars{gap:4px}
+}
+@media(min-width:769px){.est-mob{display:none!important}}
+.est-kpi.es-kpi{grid-template-columns:repeat(4,minmax(0,1fr))}
+.es-card{padding:11px 13px;margin-bottom:8px}.es-card.ab{border-color:rgba(245,158,11,.5)}
+.es-it{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--mt);padding-top:4px}.es-it b{color:var(--tx);font-weight:600;white-space:nowrap}
+.est-tbl tr.es-ab td{background:rgba(245,158,11,.06)}
+@media(max-width:768px){.est-kpi.es-kpi{grid-template-columns:1fr 1fr}.est-kpi.es-kpi>div{display:block!important;border-right:1px solid var(--bd)}.est-kpi.es-kpi>div:nth-child(2n){border-right:none}.est-kpi.es-kpi>div:nth-child(-n+2){border-bottom:1px solid var(--bd)}}
+</style>
 </head><body>
 <div id="bv-sync-badge" class="idle"><div id="bv-sync-dot"></div><span id="bv-sync-txt">Nuvem ativa</span></div>
 <div id="ls"><div class="lbox">
@@ -308,7 +391,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.11';var DADOS_VERSAO=2;
+var APP_VERSION='5.15';var DADOS_VERSAO=2;
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[
@@ -2453,7 +2536,7 @@ function renderPesagem(){
   var prodCards='';
   var tabNomeGlobal='Padrao';if(ab.tabId){for(var j=0;j<DB.tabelas.length;j++){if(String(DB.tabelas[j].id)===String(ab.tabId)){tabNomeGlobal=DB.tabelas[j].nome;break;}}}
   for(var i=0;i<DB.produtos.length;i++){
-    var p=DB.produtos[i];var preco=getPreco(p,ab.tipo,ab.tabId);
+    var p=DB.produtos[i];if(p.arquivado)continue;var preco=getPreco(p,ab.tipo,ab.tabId);
     var semEst=ab.tipo==='Venda'&&p.est===0;
     var estColor=semEst?'#ef4444':'#22c55e';
     prodCards+='<div class="prod-card" data-nome="'+p.nome.toLowerCase()+'" onclick="selProdCard('+p.id+')" >' 
@@ -3314,7 +3397,7 @@ function confAddU(uid){
 // Cria o item já como "Disponivel" e adiciona direto no carrinho da venda atual.
 function mRevendaRapida(){
   var prodO='<option value="">-- Não informar agora --</option>';
-  for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];prodO+='<option value="'+p.id+'">'+p.ic+' '+p.nome+' (Est: '+fKg(p.est)+'kg)</option>';}
+  for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];if(p.arquivado)continue;prodO+='<option value="'+p.id+'">'+p.ic+' '+p.nome+' (Est: '+fKg(p.est)+'kg)</option>';}
   openM('&#9889; Revenda Rápida',
     '<div class="mf">'
     +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Pra item que não estava cadastrado. Preço fixo por peça — o peso serve só pra dar baixa correta no estoque, não entra na conta do preço.</div>'
@@ -3337,7 +3420,7 @@ function salvarRevendaRapida(){
   if(!nome){alert('Digite o nome do item!');return;}
   if(peso<=0){alert('Informe o peso!');return;}
   if(preco<=0){alert('Informe o preço!');return;}
-  var novo={id:nid(),prod:nome,desc:'',peso:peso,cond:'',preco:preco,status:'Disponivel',cat:'',estProdId:origemId?parseFloat(origemId):null};
+  var novo={id:nid(),prod:nome,desc:'',peso:peso,cond:'',preco:preco,status:'Disponivel',cat:'',estProdId:origemId?parseFloat(origemId):null,dataCad:hj()};
   DB.revenda.push(novo);
   // Abate do estoque do material de origem, igual o cadastro completo já faz
   if(origemId){
@@ -3377,7 +3460,7 @@ var _transfLinhaCount=1;
 function mMostrarEstoqueInsuf(prodId,pesoLiquido,preco,falta){
   var prod=gP(prodId);
   var opts='<option value="">-- Selecione --</option>';
-  for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];if(p.id!==prodId&&p.est>0)opts+='<option value="'+p.nome+'">'+p.ic+' '+p.nome+' ('+fKg(p.est)+'kg)</option>';}
+  for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];if(p.id!==prodId&&p.est>0&&!p.arquivado)opts+='<option value="'+p.nome+'">'+p.ic+' '+p.nome+' ('+fKg(p.est)+'kg)</option>';}
   window._transfProdId=prodId;window._transfPeso=pesoLiquido;window._transfPreco=preco;window._transfOpts=opts;window._transfFalta=falta;
   _transfLinhaCount=1;
   openM('Estoque Insuficiente',
@@ -3436,9 +3519,9 @@ function confTransfPMulti(){
   if(!transfs.length){alert('Preencha ao menos um material de origem com peso!');return;}
   transfs.forEach(function(t){
     var pOri=null;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].nome===t.nome){pOri=DB.produtos[i];break;}}
-    if(pOri)pOri.est=+(pOri.est-t.peso).toFixed(2);
-    pDest.est=+(pDest.est+t.peso).toFixed(2);
-    DB.transf.unshift({id:nid(),data:hj(),de:t.nome,para:pDest.nome,pS:t.peso,pE:t.peso,obs:'Desmontagem para venda de '+pDest.nome});
+    if(pOri)pOri.est=+(pOri.est-t.peso).toFixed(3);
+    pDest.est=+(pDest.est+t.peso).toFixed(3);
+    DB.transf.unshift({id:nid(),data:hj(),hora:_horaAgora(),de:t.nome,deId:pOri?pOri.id:null,para:pDest.nome,paraId:pDest.id,pS:t.peso,pE:t.peso,obs:'Desmontagem para venda de '+pDest.nome,user:CU?CU.nome:''});
   });
   var ab=pesAbas[pesAtiva];var tabN='Padrao';
   if(ab.tabId){for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].id==ab.tabId){tabN=DB.tabelas[i].nome;break;}}}
@@ -3932,21 +4015,21 @@ function _finalizarPesagem(){
     }else if(it.tipo==='Venda'){
       var p=gP(it.prodId);
       var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;
-      if(p)p.est=+(p.est-pesoEf).toFixed(2);
+      if(p)p.est=+(p.est-pesoEf).toFixed(3);
     }else if(it.tipo==='Compra'){
       var p=gP(it.prodId);
       var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;
-      if(p)p.est=+(p.est+pesoEf).toFixed(2);
+      if(p)p.est=+(p.est+pesoEf).toFixed(3);
       DB.entradas.unshift({id:nid(),data:hj(),forn:obs||(_cliNomeSnap||ab.label)||'Compra',tipo:'Compra',pId:it.prodId,peso:pesoEf,vKg:it.preco,total:+(it.preco*pesoEf).toFixed(2),status:'Triagem'});
     }else if(it.tipo==='Logistica Reversa'){
       var p=gP(it.prodId);
       var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;
-      if(p)p.est=+(p.est+pesoEf).toFixed(2);
+      if(p)p.est=+(p.est+pesoEf).toFixed(3);
       DB.entradas.unshift({id:nid(),data:hj(),forn:obs||'Logistica Reversa',tipo:'Logistica Reversa',pId:it.prodId,peso:pesoEf,vKg:it.preco,total:+(it.preco*pesoEf).toFixed(2),status:'Triagem'});
     }else{
       var p=gP(it.prodId);
       var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;
-      if(p)p.est=+(p.est+pesoEf).toFixed(2);
+      if(p)p.est=+(p.est+pesoEf).toFixed(3);
       DB.entradas.unshift({id:nid(),data:hj(),forn:obs||'Doacao',tipo:'Doacao',pId:it.prodId,peso:pesoEf,vKg:0,total:0,status:'Triagem'});
     }
   }
@@ -4033,11 +4116,11 @@ function suspenderAtendimento(){
   for(var i=0;i<ab.itens.length;i++){
     var it=ab.itens[i];
     if(it.uni){for(var j=0;j<DB.revenda.length;j++){if(DB.revenda[j].id===it.uid){DB.revenda[j].status='Reservado';break;}}}
-    else if(it.tipo==='Venda'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est-pesoEf).toFixed(2);}
-    else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(2);}
+    else if(it.tipo==='Venda'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est-pesoEf).toFixed(3);}
+    else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'||it.tipo==='Doacao'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(3);}
   }
   if(!DB.pesagensEmAberto)DB.pesagensEmAberto=[];
-  DB.pesagensEmAberto.unshift({id:nid(),num:num,label:ab.label,tipo:ab.tipo,cliId:ab.cliId,tabId:ab.tabId,itens:ab.itens.slice(),obs:obs,valTotal:valTotal,valTotalLiq:valTotalLiq,suspendoEm:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),suspendoData:hj(),nfNum:ab.nfNum||''});
+  DB.pesagensEmAberto.unshift({id:nid(),num:num,label:ab.label,tipo:ab.tipo,cliId:ab.cliId,tabId:ab.tabId,itens:ab.itens.slice(),obs:obs,valTotal:valTotal,valTotalLiq:valTotalLiq,estDoacao:true,suspendoEm:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),suspendoData:hj(),nfNum:ab.nfNum||''});
   closeM();pesAbas.splice(pesAtiva,1);
   if(!pesAbas.length){clearPesState();novaPesAba();}else{pesAtiva=Math.min(pesAtiva,pesAbas.length-1);savePesState();renderPesagem();}
   autoSave();
@@ -4113,13 +4196,13 @@ function reabrirPendencia(pendId){
   for(var i=0;i<pend.itens.length;i++){
     var it=pend.itens[i];
     if(it.uni){for(var j=0;j<DB.revenda.length;j++){if(DB.revenda[j].id===it.uid){DB.revenda[j].status='Disponivel';break;}}}
-    else if(it.tipo==='Venda'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(2);}
-    else if(it.tipo==='Compra'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est-pesoEf).toFixed(2);}
+    else if(it.tipo==='Venda'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(3);}
+    else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'||(it.tipo==='Doacao'&&pend.estDoacao)){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est-pesoEf).toFixed(3);}
   }
   DB.pesagensEmAberto.splice(pendIdx,1);
   if(!caixaAberto()){
     openM('Caixa Fechado','<div class="mf"><div class="al aly">Abra o caixa do dia antes de reabrir atendimentos.</div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-bl" onclick="closeM();go(&apos;caixa_dia&apos;)">Ir para Caixa</button></div></div>');
-    for(var i=0;i<pend.itens.length;i++){var it=pend.itens[i];if(it.uni){for(var j=0;j<DB.revenda.length;j++){if(DB.revenda[j].id===it.uid){DB.revenda[j].status='Reservado';break;}}}else if(it.tipo==='Venda'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est-pesoEf).toFixed(2);}else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(2);}}
+    for(var i=0;i<pend.itens.length;i++){var it=pend.itens[i];if(it.uni){for(var j=0;j<DB.revenda.length;j++){if(DB.revenda[j].id===it.uid){DB.revenda[j].status='Reservado';break;}}}else if(it.tipo==='Venda'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est-pesoEf).toFixed(3);}else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'||(it.tipo==='Doacao'&&pend.estDoacao)){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(3);}}
     DB.pesagensEmAberto.splice(pendIdx,0,pend);autoSave();return;
   }
   pesAbas.push({id:nid(),label:'Pen.#'+pend.num,tipo:pend.tipo,cliId:pend.cliId,tabId:pend.tabId,itens:pend.itens.slice(),obs:pend.obs||'',showUnit:false,numAtend:pend.num,nfNum:pend.nfNum||''});
@@ -4219,7 +4302,7 @@ function _confirmarLiquidacaoCont(pendId,valReceb,valPagei){
   var _liqCat=pend.tipo==='Logistica Reversa'?'Logistica Reversa':'Venda';if(valReceb>0){DB.movs.unshift({id:nid(),data:dataOp,desc:'Liquidacao '+_liqCat+' #'+num+' ('+forma+')',tipo:'entrada',cat:_liqCat,valor:valReceb,conta:conta});for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo+valReceb).toFixed(2);break;}}}
   if(valPagei>0){DB.movs.unshift({id:nid(),data:dataOp,desc:'Liquidacao Compra #'+num+' ('+forma+')',tipo:'saida',cat:'Compra',valor:valPagei,conta:conta});for(var i=0;i<DB.contas.length;i++){if(DB.contas[i].nome===conta){DB.contas[i].saldo=+(DB.contas[i].saldo-valPagei).toFixed(2);break;}}}
   if(!DB.caixaDia.movimentos)DB.caixaDia.movimentos=[];
-  DB.caixaDia.movimentos.unshift({num:num,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),itens:pend.itens.length,total:totLiq,venda:valReceb,compra:valPagei,methods:[{label:forma,valor:Math.abs(totLiq),conta:conta}],obs:pend.obs,itensList:pend.itens.slice(),label:pend.label,tipo:pend.tipo,cliId:pend.cliId,tabId:pend.tabId,liquidadoPendencia:true});
+  DB.caixaDia.movimentos.unshift({num:num,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),itens:pend.itens.length,total:totLiq,venda:valReceb,compra:valPagei,methods:[{label:forma,valor:Math.abs(totLiq),conta:conta}],obs:pend.obs,itensList:pend.itens.slice(),label:pend.label,tipo:pend.tipo,cliId:pend.cliId,tabId:pend.tabId,liquidadoPendencia:true,dataEstoque:pend.suspendoData||'',estDoacao:!!pend.estDoacao});
   atendHist.unshift({id:nid(),label:pend.label,tipo:pend.tipo,itens:pend.itens.slice(),num:num,total:totLiq,methods:[{label:forma,valor:Math.abs(totLiq),conta:conta}],obs:pend.obs,data:dataOp,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
   DB.pesagensEmAberto.splice(pendIdx,1);
   closeM();autoSave();
@@ -4249,8 +4332,8 @@ function reabrirA(i){
   for(var j=0;j<snap.itens.length;j++){
     var it=snap.itens[j];
     if(it.uni){for(var k=0;k<DB.revenda.length;k++){if(DB.revenda[k].id===it.uid){DB.revenda[k].status='Disponivel';break;}}}
-    else if(it.tipo==='Venda'){var p=gP(it.prodId);if(p)p.est=+(p.est+it.peso).toFixed(2);}
-    else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'){var p=gP(it.prodId);if(p)p.est=+(p.est-it.peso).toFixed(2);}
+    else if(it.tipo==='Venda'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(3);}
+    else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'||it.tipo==='Doacao'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est-pesoEf).toFixed(3);}
   }
   if(DB.caixaDia&&DB.caixaDia.movimentos){for(var j=0;j<DB.caixaDia.movimentos.length;j++){if(DB.caixaDia.movimentos[j].num===snap.num){DB.caixaDia.movimentos.splice(j,1);break;}}}
   // Reverse financial movements
@@ -4271,8 +4354,8 @@ function execReabrirDoCaixa(numAtend){
   for(var j=0;j<snap.itensList.length;j++){
     var it=snap.itensList[j];
     if(it.uni){for(var k=0;k<DB.revenda.length;k++){if(DB.revenda[k].id===it.uid){DB.revenda[k].status='Disponivel';break;}}}
-    else if(it.tipo==='Venda'){var p=gP(it.prodId);if(p)p.est=+(p.est+it.peso).toFixed(2);}
-    else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'){var p=gP(it.prodId);if(p)p.est=+(p.est-it.peso).toFixed(2);}
+    else if(it.tipo==='Venda'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(3);}
+    else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'||(it.tipo==='Doacao'&&!(snap.liquidadoPendencia&&!snap.estDoacao))){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est-pesoEf).toFixed(3);}
   }
   // Reverse financial movements
   for(var j=DB.movs.length-1;j>=0;j--){
@@ -4788,8 +4871,8 @@ function execReabrirHistAtend(histIdx,numAtend){
   for(var j=0;j<snap.itensList.length;j++){
     var it=snap.itensList[j];var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;
     if(it.uni){for(var k=0;k<DB.revenda.length;k++){if(DB.revenda[k].id===it.uid){DB.revenda[k].status='Disponivel';break;}}}
-    else if(it.tipo==='Venda'){var p=gP(it.prodId);if(p)p.est=+(p.est+pesoEf).toFixed(2);}
-    else if(it.tipo==='Compra'){var p=gP(it.prodId);if(p)p.est=+(p.est-pesoEf).toFixed(2);}
+    else if(it.tipo==='Venda'){var p=gP(it.prodId);if(p)p.est=+(p.est+pesoEf).toFixed(3);}
+    else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'||(it.tipo==='Doacao'&&!(snap.liquidadoPendencia&&!snap.estDoacao))){var p=gP(it.prodId);if(p)p.est=+(p.est-pesoEf).toFixed(3);}
   }
   for(var j=DB.movs.length-1;j>=0;j--){
     if(DB.movs[j].desc&&DB.movs[j].desc.indexOf('#'+snap.num)>=0){
@@ -5479,10 +5562,11 @@ function _parseDataBR(s){
   return new Date(parseInt(pts[2]),parseInt(pts[1])-1,parseInt(pts[0]));
 }
 function _entrPeriodo(per){
+  var _ENT=_estEntradasCompat(); // 5.13: entradas montadas das pesagens (inclui Em Aberto, sem repetição)
   // Compras (entradas físicas)
   var pesoKg=0,valorR=0;
-  for(var i=0;i<DB.entradas.length;i++){
-    var e=DB.entradas[i];
+  for(var i=0;i<_ENT.length;i++){
+    var e=_ENT[i];
     if(_perFiltro(e.data,per,_dashPerD1,_dashPerD2)){pesoKg+=e.peso;valorR+=e.total||0;}
   }
   return {kg:pesoKg,val:valorR};
@@ -5521,6 +5605,7 @@ function _vendasPeriodo(per){
 
 // ── CHART RENDERERS ──────────────────────────────────────────
 function _dashCharts(){
+  var _ENT=_estEntradasCompat(); // 5.13: entradas montadas das pesagens (inclui Em Aberto, sem repetição)
   // 1. Barras: entradas por período
   (function(){
     var c=document.getElementById('ch-barras');if(!c)return;
@@ -5571,7 +5656,7 @@ function _dashCharts(){
     var entByDay=[];
     for(var d=0;d<dias.length;d++){
       var dk=dias[d].toLocaleDateString('pt-BR');
-      var soma=0;for(var i=0;i<DB.entradas.length;i++){if(DB.entradas[i].data===dk)soma+=DB.entradas[i].peso;}
+      var soma=0;for(var i=0;i<_ENT.length;i++){if(_ENT[i].data===dk)soma+=_ENT[i].peso;}
       entByDay.push(soma);
     }
     // Reconstrói: ponto de hoje = estoque atual, dias anteriores = estoque - entradas posteriores
@@ -5615,12 +5700,12 @@ function _dashCharts(){
     var sz=Math.min(c.offsetWidth||140,140);
     c.width=sz;c.height=sz;
     var tipos={Compra:0,Doacao:0,Coleta:0,'Logistica Reversa':0};
-    for(var i=0;i<DB.entradas.length;i++){
-      var t=DB.entradas[i].tipo;
+    for(var i=0;i<_ENT.length;i++){
+      var t=_ENT[i].tipo;
       var tNorm=t?t.charAt(0).toUpperCase()+t.slice(1):t;
-      if(tipos[t]!==undefined)tipos[t]+=DB.entradas[i].peso;
-      else if(tipos[tNorm]!==undefined)tipos[tNorm]+=DB.entradas[i].peso;
-      else tipos['Coleta']+=DB.entradas[i].peso;
+      if(tipos[t]!==undefined)tipos[t]+=_ENT[i].peso;
+      else if(tipos[tNorm]!==undefined)tipos[tNorm]+=_ENT[i].peso;
+      else tipos['Coleta']+=_ENT[i].peso;
     }
     var keys=Object.keys(tipos);var total=0;for(var i=0;i<keys.length;i++)total+=tipos[keys[i]];
     if(!total){ctx.fillStyle='#2a3a52';ctx.beginPath();ctx.arc(sz/2,sz/2,sz/2-4,0,Math.PI*2);ctx.fill();return;}
@@ -5688,6 +5773,7 @@ function _dashPendCard(){
 }
 
 function pgDash(){
+  var _ENT=_estEntradasCompat(); // 5.13: entradas montadas das pesagens (inclui Em Aberto, sem repetição)
   // ── Totais de estoque ──
   var totEstKg=0,totEstVal=0;
   for(var i=0;i<DB.produtos.length;i++){totEstKg+=DB.produtos[i].est;totEstVal+=DB.produtos[i].est*DB.produtos[i].vV;}
@@ -5695,7 +5781,7 @@ function pgDash(){
 
   // ── Doações ──
   var docKg=0,docQtd=0;
-  for(var i=0;i<DB.entradas.length;i++){if(DB.entradas[i].tipo==='Doacao'){docKg+=DB.entradas[i].peso;docQtd++;}}
+  for(var i=0;i<_ENT.length;i++){if(_ENT[i].tipo==='Doacao'){docKg+=_ENT[i].peso;docQtd++;}}
 
   // ── Caixa físico ──
   var caixaFis=0;
@@ -5775,8 +5861,8 @@ function pgDash(){
   // calcular entradas por produto para cada período
   var _agora2=new Date();
   var _entProd={dia:{},semana:{},mes:{}};
-  for(var _ei=0;_ei<DB.entradas.length;_ei++){
-    var _ee=DB.entradas[_ei];var _dd=_parseDataBR(_ee.data);if(!_dd||!_ee.pId)continue;
+  for(var _ei=0;_ei<_ENT.length;_ei++){
+    var _ee=_ENT[_ei];var _dd=_parseDataBR(_ee.data);if(!_dd||!_ee.pId)continue;
     var _esDia=(_dd.getDate()===_agora2.getDate()&&_dd.getMonth()===_agora2.getMonth()&&_dd.getFullYear()===_agora2.getFullYear());
     var _esSem=(Math.floor((_agora2-_dd)/(864e5))>=0&&Math.floor((_agora2-_dd)/(864e5))<7);
     var _esMes=(_dd.getMonth()===_agora2.getMonth()&&_dd.getFullYear()===_agora2.getFullYear());
@@ -5822,8 +5908,8 @@ function pgDash(){
 
   // ── Últimas entradas ──
   var entrH='';var ec2=0;
-  for(var i=0;i<DB.entradas.length&&ec2<5;i++){
-    var e=DB.entradas[i];var tcol=e.tipo==='Compra'?'var(--gr)':e.tipo==='Doacao'?'var(--bl)':'var(--or)';
+  for(var i=0;i<_ENT.length&&ec2<5;i++){
+    var e=_ENT[i];var tcol=e.tipo==='Compra'?'var(--gr)':e.tipo==='Doacao'?'var(--bl)':'var(--or)';
     entrH+='<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--bd)">'
       +'<div style="width:3px;height:32px;background:'+tcol+';border-radius:2px;flex-shrink:0"></div>'
       +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600">'+e.forn+'</div>'
@@ -5852,7 +5938,7 @@ function pgDash(){
 
   // ── Pizza legenda ──
   var tiposEntr={Compra:0,Doacao:0,Coleta:0,'Logistica Reversa':0};
-  for(var i=0;i<DB.entradas.length;i++){var t=DB.entradas[i].tipo;var tN=t?t.charAt(0).toUpperCase()+t.slice(1):t;if(tiposEntr[t]!==undefined)tiposEntr[t]+=DB.entradas[i].peso;else if(tiposEntr[tN]!==undefined)tiposEntr[tN]+=DB.entradas[i].peso;else tiposEntr['Coleta']+=DB.entradas[i].peso;}
+  for(var i=0;i<_ENT.length;i++){var t=_ENT[i].tipo;var tN=t?t.charAt(0).toUpperCase()+t.slice(1):t;if(tiposEntr[t]!==undefined)tiposEntr[t]+=_ENT[i].peso;else if(tiposEntr[tN]!==undefined)tiposEntr[tN]+=_ENT[i].peso;else tiposEntr['Coleta']+=_ENT[i].peso;}
   var totEntr=tiposEntr.Compra+tiposEntr.Doacao+tiposEntr.Coleta+tiposEntr['Logistica Reversa']||1;
   var pzLegH='<div style="display:flex;flex-direction:column;gap:7px;justify-content:center">';
   var pzDat=[{k:'Compra',c:'#22c55e'},{k:'Doacao',c:'#3b82f6'},{k:'Coleta',c:'#f59e0b'},{k:'Logistica Reversa',c:'#a855f7'}];
@@ -7353,26 +7439,816 @@ function _evtTab(idx){
 var _eTabEntrFiltro='Todos';
 function _swEntrFiltro(f){_eTabEntrFiltro=f;go('estoque');}
 
+// ══════════════════════════════════════════════════════════════════════════
+// ESTOQUE v5.12 — lista nova, painel de ações, Extrato do material e
+// Movimentação (kg) por período. O Extrato e a Movimentação são MONTADOS a partir
+// dos registros que já existem (caixas, Em Aberto, Produção, Revenda,
+// Reclassificações e Ajustes) — nada novo é gravado só para eles.
+// ══════════════════════════════════════════════════════════════════════════
 var eTab='p';
 var _estBusca='';
-var _estFiltro='Todos';
-var _estOrdem='id'; // id | nome | preco | cat | est
-var _estOrdemDir=1; // 1=asc -1=desc
-function _swEstOrdem(o){if(_estOrdem===o)_estOrdemDir*=-1;else{_estOrdem=o;_estOrdemDir=1;}go('estoque');}
+var _estFiltro='Todos';      // 'Todos' | nome da categoria | '__neg' | '__par' | '__arq'
+var _estOrdem='est_desc';    // est_desc | est_asc | nome | valor | preco | ult | parado | id
+var eVista='lista';          // 'lista' | 'card'
+var _estUlt={};              // última movimentação por material (preenchido a cada render)
+var _EST_PARADO_DIAS=30;
 
+function _estN(v){return Math.round((+v||0)*1000)/1000;}
+function _estEsc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function _estD(s){var p=String(s||'').split('/');if(p.length<3)return null;var d=new Date(+p[2],+p[1]-1,+p[0]);return isNaN(d.getTime())?null:d;}
+function _estHoje(){var a=_agoraMG();return new Date(a.getFullYear(),a.getMonth(),a.getDate());}
+function _estDias(d){return Math.round((_estHoje()-d)/864e5);}
+function _estQuando(d){if(!d)return 'sem registro';var n=_estDias(d);if(n<=0)return 'hoje';if(n===1)return 'ontem';return n+' dias';}
+function _estKgS(v){v=_estN(v);return (v>0?'+':v<0?'−':'')+fKg(Math.abs(v));}
+function _estIdArg(id){return typeof id==='number'?String(id):"'"+String(id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+"'";}
+function _estIdPorNome(nome){if(!nome)return null;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].nome===nome)return DB.produtos[i].id;}return null;}
+function _estCliNome(cliId,fb){if(cliId){for(var i=0;i<(DB.clientes||[]).length;i++){if(DB.clientes[i].id==cliId)return DB.clientes[i].nome;}}return fb||'Avulso';}
+function _estCat(p){return (DB.filtrosMat||[]).find(function(f){return f.nome===p.cat;})||{cor:'#64748b',ic:''};}
+
+// ── Tipos de movimento ────────────────────────────────────────────────────
+// ext=true: entra/sai da empresa (visão "Empresa"). semEstoque=true: não mexe no
+// estoque (a perda da produção já saiu na abertura; só aparece na visão Empresa).
+var _EST_TIPOS={
+  compra:    {l:'Compra',ic:'&#128229;',cor:'var(--gr)',ext:true,g:'compras'},
+  doacao:    {l:'Doação',ic:'&#127873;',cor:'var(--bl)',ext:true,g:'compras'},
+  lr:        {l:'Logística reversa',ic:'&#9851;',cor:'#a855f7',ext:true,g:'compras'},
+  venda:     {l:'Venda',ic:'&#128228;',cor:'var(--rd)',ext:true,g:'vendas'},
+  revenda:   {l:'Revenda (peças)',ic:'&#127991;',cor:'#ec4899',ext:true,g:'revenda'},
+  ajuste:    {l:'Ajuste de inventário',ic:'&#9878;',cor:'var(--or)',ext:true,g:'ajustes'},
+  perda:     {l:'Perda da produção',ic:'&#128465;',cor:'var(--mt)',ext:true,g:'producao',semEstoque:true},
+  prod_ent:  {l:'Produção · consumo',ic:'&#127981;',cor:'#a855f7',ext:false,g:'producao'},
+  prod_sai:  {l:'Produção · gerado',ic:'&#127981;',cor:'#a855f7',ext:false,g:'producao'},
+  prod_sobra:{l:'Produção · sobra devolvida',ic:'&#127981;',cor:'#a855f7',ext:false,g:'producao'},
+  reclass:   {l:'Reclassificação',ic:'&#8644;',cor:'var(--bl)',ext:false,g:'reclass'}
+};
+
+// ── Caixas do Arquivo permanente (fechamentos antigos que saíram do bloco principal)
+var _estArqCx=null,_estArqStatus='';
+// Começa a carregar o arquivo (1x por sessão). Só chama cb quando TERMINA uma carga nova.
+function _estCarregarArquivo(cb){
+  if(_estArqCx||_estArqStatus==='carregando')return false;
+  if(!_sbReady||!_sbClient){_estArqStatus='off';return false;}
+  _estArqStatus='carregando';
+  _sbClient.from('biovale_dados').select('chave').like('chave','bv_arq_caixas_%').then(function(r){
+    var ks=((r&&r.data)||[]).map(function(x){return x.chave;});
+    var pend=ks.length,out=[];
+    if(!pend){_estArqCx=[];_estArqStatus='ok';if(cb)cb();return;}
+    ks.forEach(function(k){_sbGet(k,function(arr){
+      if(Array.isArray(arr))out=out.concat(arr);
+      if(--pend===0){_estArqCx=out;_estArqStatus='ok';if(cb)cb();}
+    });});
+  },function(){_estArqStatus='erro';if(cb)cb();});
+  return true;
+}
+function _estArqAviso(){
+  if(_estArqStatus==='carregando')return '<div style="font-size:11px;color:var(--bl);margin-bottom:8px">&#8987; Incluindo os caixas antigos do Arquivo…</div>';
+  if(_estArqStatus==='erro')return '<div style="font-size:11px;color:var(--or);margin-bottom:8px">&#9888; Não foi possível ler o Arquivo agora: caixas mais antigos podem faltar.</div>';
+  return '';
+}
+
+// ── Monta todos os movimentos de estoque a partir dos registros ───────────
+function _estMovs(){
+  var out=[];
+  function add(m){
+    if(m.pId==null||m.pId==='')return;
+    m.kg=_estN(m.kg);if(!m.kg)return;
+    m.pId=_normId(m.pId);m.d=_estD(m.data);out.push(m);
+  }
+  function pesoIt(it){return _estN(it.pesoLiquido!=null?it.pesoLiquido:(it.peso||0));}
+  function tipoIt(t){t=String(t||'');if(t==='Venda')return 'venda';if(t==='Compra')return 'compra';if(t==='Logistica Reversa')return 'lr';if(t==='Doacao'||t==='Doação')return 'doacao';return null;}
+  // 1) Pesagens finalizadas — caixa aberto, caixas fechados e Arquivo
+  var cxs=[],vistos={};
+  function addCx(cx){if(!cx||!cx.movimentos)return;var k=(cx.data||'')+'|'+(cx.saldoAbertura||0)+'|'+cx.movimentos.length+'|'+(cx.saldoFinal==null?'':cx.saldoFinal);if(vistos[k])return;vistos[k]=1;cxs.push(cx);}
+  addCx(DB.caixaDia);(DB.caixasHist||[]).forEach(addCx);(_estArqCx||[]).forEach(addCx);
+  cxs.forEach(function(cx){
+    var aberto=cx===DB.caixaDia;
+    cx.movimentos.forEach(function(mv){
+      (mv.itensList||[]).forEach(function(it){
+        if(it.uni)return;
+        var pid=it.prodId!=null?it.prodId:it.pId;if(pid==null)return;
+        var tp=tipoIt(it.tipo||mv.tipo);if(!tp)return;
+        // Em Aberto: o estoque mexeu na suspensão (doação suspensa nunca mexeu no estoque)
+        if(mv.liquidadoPendencia&&tp==='doacao'&&!mv.estDoacao)return;
+        var kg=pesoIt(it);if(!kg)return;
+        var dt=mv.liquidadoPendencia?(mv.dataEstoque||cx.data):cx.data;
+        add({pId:pid,kg:tp==='venda'?-kg:kg,tipo:tp,preco:+it.preco||0,
+          pes:{k:'cx|'+dt+'|'+(mv.num||'')+'|'+(mv.hora||''),cliId:mv.cliId,nome:_estCliNome(mv.cliId,mv.label),num:mv.num,hora:mv.liquidadoPendencia?'':(mv.hora||''),obs:mv.obs||'',liq:!!mv.liquidadoPendencia},
+          data:dt,
+          hora:mv.liquidadoPendencia?'':(mv.hora||''),
+          desc:_estCliNome(mv.cliId,mv.label)+' · #'+(mv.num||'?')+(mv.liquidadoPendencia?' (Em Aberto, já liquidado)':'')+(aberto?' · caixa aberto':''),
+          val:+((it.preco||0)*kg).toFixed(2)});
+      });
+    });
+  });
+  // 2) Em Aberto ainda não liquidados (estoque já mexeu)
+  (DB.pesagensEmAberto||[]).forEach(function(pd){
+    (pd.itens||[]).forEach(function(it){
+      if(it.uni)return;
+      var tp=tipoIt(it.tipo||pd.tipo);if(!tp||(tp==='doacao'&&!pd.estDoacao))return;
+      var kg=pesoIt(it);
+      add({pId:it.prodId!=null?it.prodId:it.pId,kg:tp==='venda'?-kg:kg,tipo:tp,data:pd.suspendoData,hora:pd.suspendoEm||'',preco:+it.preco||0,
+        pes:{k:'pd|'+pd.id,cliId:pd.cliId,nome:_estCliNome(pd.cliId,pd.label),num:pd.num,hora:pd.suspendoEm||'',obs:pd.obs||'',aberto:true},
+        desc:_estCliNome(pd.cliId,pd.label)+' · #'+(pd.num||'?')+' (Em Aberto, aguardando)',val:+((it.preco||0)*kg).toFixed(2),aberto:true});
+    });
+  });
+  // 3) Produção
+  (DB.producoes||[]).forEach(function(p){
+    var nm=(p.lote?'Lote “'+p.lote+'”':'Produção')+(p.func?' · '+p.func:'');
+    var ents=(p.entradas&&p.entradas.length)?p.entradas:[{peso:p.pesoEntrada,data:p.data,hora:p.hora}];
+    ents.forEach(function(e){add({pId:p.matEntradaId,kg:-(+e.peso||0),tipo:'prod_ent',data:e.data||p.data,hora:e.hora||'',desc:nm+(e.ajuste?' (correção de peso)':'')+(p.status!=='fechada'?' · em andamento':'')});});
+    if(p.status==='fechada'){
+      var df=p.dataFim||p.data,hf=p.horaFim||'';
+      (p.saidas||[]).forEach(function(s){add({pId:s.prodId,kg:+s.peso||0,tipo:'prod_sai',data:df,hora:hf,desc:nm+' · de '+(p.matEntrada||'?')});});
+      if(p.sobra>0.001){
+        if(p.destinoSobra==='pendente')add({pId:p.matEntradaId,kg:p.sobra,tipo:'prod_sobra',data:df,hora:hf,desc:nm+' · não desmontado'});
+        else if(p.destinoSobra==='perda')add({pId:p.matEntradaId,kg:-p.sobra,tipo:'perda',data:df,hora:hf,desc:nm+' · perda/descarte',pes:{k:'pr|'+p.id,nome:nm,hora:hf}});
+      }
+    }
+  });
+  // 4) Revenda: peças tiradas de um material do estoque
+  (DB.revenda||[]).forEach(function(r){
+    if(r.estProdId==null||!(r.peso>0))return;
+    var u=r.tipoUnidade==='quantidade'?(r.qtdCad||r.qtdEstoque||0):1;if(!u)return;
+    add({pId:r.estProdId,kg:-(r.peso*u),tipo:'revenda',data:r.dataCad||'',hora:'',pes:{k:'rv|'+r.id,nome:(r.codCurto?r.codCurto+' · ':'')+(r.prod||'Peça')+(u>1?' ('+u+' un.)':''),hora:''},desc:(r.codCurto?r.codCurto+' · ':'')+(r.prod||'Peça')+(u>1?' ('+u+' un.)':'')});
+  });
+  // 5) Reclassificações (antigas "transferências"; inclui as feitas na Pesagem)
+  (DB.transf||[]).forEach(function(t){
+    var kg=+t.pE||+t.pS||0;if(!kg)return;
+    var de=t.deId!=null?t.deId:_estIdPorNome(t.de),pa=t.paraId!=null?t.paraId:_estIdPorNome(t.para);
+    var naVenda=/^Desmontagem para venda/.test(t.obs||'');
+    var ob=naVenda?'na venda':(t.obs||'');
+    if(de!=null)add({pId:de,kg:-kg,tipo:'reclass',data:t.data,hora:t.hora||'',desc:'para '+(t.para||'?')+(ob?' · '+ob:'')});
+    if(pa!=null)add({pId:pa,kg:kg,tipo:'reclass',data:t.data,hora:t.hora||'',desc:'de '+(t.de||'?')+(ob?' · '+ob:'')});
+  });
+  // 6) Ajustes de inventário
+  DB.produtos.forEach(function(p){
+    (p.ajustes||[]).forEach(function(a){add({pId:p.id,kg:+a.delta||0,tipo:'ajuste',data:a.data,hora:a.hora||'',desc:(a.obs||'')+(a.user?' · '+a.user:'')});});
+  });
+  out.sort(function(a,b){
+    var ta=a.d?a.d.getTime():-1,tb=b.d?b.d.getTime():-1;
+    if(ta!==tb)return tb-ta;
+    return String(b.hora||'').localeCompare(String(a.hora||''));
+  });
+  return out;
+}
+function _estUltMov(movs){
+  var m={};
+  movs.forEach(function(x){if(_EST_TIPOS[x.tipo].semEstoque||!x.d)return;if(!m[x.pId]||x.d>m[x.pId].d)m[x.pId]=x;});
+  return m;
+}
+function _estParado(p){
+  if(p.arquivado||!(p.est>0.0005))return false;
+  var u=_estUlt[_normId(p.id)];
+  return !u||_estDias(u.d)>_EST_PARADO_DIAS;
+}
+
+// ── Períodos (calendário) ────────────────────────────────────────────────
+var _EST_MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+var _EST_MES3=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+var _EST_SEM=['dom','seg','ter','qua','qui','sex','sáb'];
+var _EST_PERS=[{k:'dia',l:'Dia'},{k:'semana',l:'Semana'},{k:'mes',l:'Mês'},{k:'tri',l:'Trimestre'},{k:'sem',l:'Semestre'},{k:'ano',l:'Ano'},{k:'tudo',l:'Tudo'}];
+function _estDM(d){return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2);}
+function _estPerRange(per,off){
+  off=off||0;
+  var h=_estHoje(),y=h.getFullYear(),m=h.getMonth(),ini,fim,lab,curto;
+  if(per==='dia'){ini=new Date(y,m,h.getDate()+off);fim=new Date(y,m,h.getDate()+off+1);lab=off===0?'Hoje':off===-1?'Ontem':_EST_SEM[ini.getDay()]+', '+_fmtDataBR(ini);curto=_estDM(ini);}
+  else if(per==='semana'){var dw=(h.getDay()+6)%7;ini=new Date(y,m,h.getDate()-dw+7*off);fim=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate()+7);var ul=new Date(fim.getFullYear(),fim.getMonth(),fim.getDate()-1);lab=_estDM(ini)+' a '+_fmtDataBR(ul);curto=_estDM(ini);}
+  else if(per==='mes'){ini=new Date(y,m+off,1);fim=new Date(y,m+off+1,1);lab=_EST_MESES[ini.getMonth()]+' '+ini.getFullYear();curto=_EST_MES3[ini.getMonth()];}
+  else if(per==='tri'){var q=Math.floor(m/3)+off;ini=new Date(y,q*3,1);fim=new Date(y,q*3+3,1);var qn=Math.floor(ini.getMonth()/3)+1;lab=qn+'º trimestre '+ini.getFullYear();curto=qn+'T'+String(ini.getFullYear()).slice(2);}
+  else if(per==='sem'){var s=Math.floor(m/6)+off;ini=new Date(y,s*6,1);fim=new Date(y,s*6+6,1);var sn=ini.getMonth()<6?1:2;lab=sn+'º semestre '+ini.getFullYear();curto=sn+'S'+String(ini.getFullYear()).slice(2);}
+  else if(per==='ano'){ini=new Date(y+off,0,1);fim=new Date(y+off+1,0,1);lab=String(y+off);curto=lab;}
+  else return {ini:null,fim:null,lab:'Todo o tempo',curto:'Tudo',tudo:true};
+  return {ini:ini,fim:fim,lab:lab,curto:curto};
+}
+function _estNoPer(m,r){if(r.tudo)return true;return !!m.d&&m.d>=r.ini&&m.d<r.fim;}
+// Barra de período reaproveitada (Movimentação e Extrato)
+function _estPerBarH(per,off,fnPer,fnOff){
+  var r=_estPerRange(per,off);
+  var h='<div class="est-chips" style="margin-bottom:8px">';
+  _EST_PERS.forEach(function(o){var on=o.k===per;h+='<button class="est-chip'+(on?' on':'')+'" onclick="'+fnPer+'(\''+o.k+'\')">'+o.l+'</button>';});
+  h+='</div>';
+  if(per!=='tudo'){
+    h+='<div class="est-nav"><button onclick="'+fnOff+'('+(off-1)+')" title="Anterior">&#9664;</button><span>'+r.lab+'</span>'
+      +'<button onclick="'+fnOff+'('+(off+1)+')" '+(off>=0?'disabled':'')+' title="Próximo">&#9654;</button></div>';
+  }
+  return h;
+}
+
+// ── Página ────────────────────────────────────────────────────────────────
+function swET(t){eTab=t;go('estoque');}
+function swEVista(v){eVista=v;go('estoque');}
 function _swEstFiltro(nome){_estFiltro=nome;go('estoque');}
+function _swEstOrdemSel(v){_estOrdem=v;var ct=document.getElementById('est-produtos-ct');if(ct)ct.innerHTML=_buildEstProdutos();else go('estoque');}
+function _swEstOrdemCol(k){
+  var pares={est:['est_desc','est_asc'],nome:['nome','nome'],valor:['valor','valor'],ult:['ult','parado']};
+  var p=pares[k];if(!p)return;_estOrdem=(_estOrdem===p[0]&&p[0]!==p[1])?p[1]:p[0];_swEstOrdemSel(_estOrdem);
+}
 function _onEstBusca(v){
   _estBusca=v;
-  // Atualiza só os cards/lista sem re-renderizar a página toda
   var ct=document.getElementById('est-produtos-ct');
-  if(ct){
-    ct.innerHTML=_buildEstProdutos();
-    // Mantém o foco no campo
-    var inp=document.getElementById('est-busca');
-    if(inp){var pos=inp.value.length;inp.setSelectionRange(pos,pos);}
-  } else {
-    go('estoque');
+  if(ct)ct.innerHTML=_buildEstProdutos();else go('estoque');
+}
+
+function pgEstoque(){
+  var movs=_estMovs();_estUlt=_estUltMov(movs);
+  if(eTab==='mov'||eTab==='p'||eTab==='e')_estCarregarArquivo(function(){if(pgAtiva==='estoque'&&(eTab==='mov'||eTab==='p'||eTab==='e'))go('estoque');});
+  var ativos=DB.produtos.filter(function(p){return !p.arquivado;});
+  var totKg=0,totV=0,totC=0,nNeg=0,nPar=0,nArq=DB.produtos.length-ativos.length;
+  ativos.forEach(function(p){totKg+=p.est;totV+=p.est*p.vV;totC+=p.est*p.vC;if(p.est<-0.0005)nNeg++;if(_estParado(p))nPar++;});
+  var semCent=function(v){return 'R$ '+Math.round(v).toLocaleString('pt-BR');};
+  var kpi='<div class="est-kpi">'
+    +'<div><div class="kl">Em estoque</div><div class="kv" style="color:var(--gr)">'+fKg(totKg)+' <small>kg</small></div></div>'
+    +'<div><div class="kl">Valor (venda)</div><div class="kv" style="color:var(--or)"><span class="est-pc-i">'+fR(totV)+'</span><span class="est-mob-i">'+semCent(totV)+'</span></div></div>'
+    +'<div><div class="kl">Valor (compra)</div><div class="kv" style="color:var(--bl)"><span class="est-pc-i">'+fR(totC)+'</span><span class="est-mob-i">'+semCent(totC)+'</span></div></div>'
+    +'<div><div class="kl">Materiais</div><div class="kv">'+ativos.length+'</div></div>'
+    +'<div class="kpc-click" onclick="eTab=\'p\';_swEstFiltro(\'__neg\')"><div class="kl">Negativos</div><div class="kv" style="color:'+(nNeg?'var(--rd)':'var(--mt)')+'">'+nNeg+'</div></div>'
+    +'<div class="kpc-click" onclick="eTab=\'p\';_swEstFiltro(\'__par\')"><div class="kl">Parados +'+_EST_PARADO_DIAS+' dias</div><div class="kv" style="color:'+(nPar?'var(--or)':'var(--mt)')+'">'+nPar+'</div></div>'
+    +'</div>';
+  var abas=[['p','Produtos'],['mov','&#128202; Movimentação'],['e','&#128229; Entradas e Saídas'],['t','&#8644; Reclassificações'],['pr','&#9998; Preços'],['rel','Relatório']];
+  var tabsH='<div class="tabs">'+abas.map(function(a){return '<button class="tabbtn'+(eTab===a[0]?' on':'')+'" onclick="swET(\''+a[0]+'\')">'+a[1]+'</button>';}).join('')+'</div>';
+  var corpo='';
+  if(eTab==='p')corpo=_estAbaProdutos(ativos.length,nNeg,nPar,nArq);
+  else if(eTab==='mov')corpo=_buildEstMovimentacao(movs);
+  else if(eTab==='e')corpo=_buildEstEntradasSaidas(movs);
+  else if(eTab==='t')corpo=_estAbaReclass();
+  else if(eTab==='pr')corpo=_estAbaPrecosEntradas().precosH;
+  else if(eTab==='rel')corpo=_buildEstRelatorio();
+  return '<div class="fc"><div class="ptop"><div><div class="pl">Materiais</div><div class="pt">Estoque</div></div>'
+    +'<div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end"><button class="btnO bOb" onclick="mTransf()">&#8644; Reclassificar</button><button class="btn" onclick="mNovoProd()">+ Material</button></div></div>'
+    +kpi+tabsH+corpo+'</div>';
+}
+
+function _estAbaProdutos(nAtivos,nNeg,nPar,nArq){
+  var ordens=[['est_desc','Maior estoque'],['est_asc','Menor estoque'],['nome','Nome (A-Z)'],['valor','Maior valor'],['preco','Preço de venda'],['ult','Movimentado recentemente'],['parado','Mais tempo parado'],['id','Ordem de cadastro']];
+  var sel='<select class="inp est-ord" onchange="_swEstOrdemSel(this.value)" title="Ordenar">'+ordens.map(function(o){return '<option value="'+o[0]+'"'+(_estOrdem===o[0]?' selected':'')+'>&#8597; '+o[1]+'</option>';}).join('')+'</select>';
+  var vbtn=function(v,ic,t){var on=eVista===v;return '<button class="est-vbtn'+(on?' on':'')+'" onclick="swEVista(\''+v+'\')" title="'+t+'">'+ic+'</button>';};
+  var barra='<div class="est-busca">'
+    +'<div style="flex:1 1 220px;position:relative;min-width:0"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--mt)">&#128269;</span>'
+    +'<input class="inp" id="est-busca" type="text" placeholder="Buscar material..." value="'+_estEsc(_estBusca)+'" oninput="_onEstBusca(this.value)" style="padding-left:32px"></div>'
+    +'<div style="display:flex;gap:6px;flex:0 1 auto;min-width:0">'+sel
+    +'<button class="est-vbtn" onclick="mGerenciarFiltros()" title="Gerenciar categorias">&#127991;</button>'
+    +vbtn('lista','&#9776;','Lista')+vbtn('card','&#9783;','Cards')+'</div></div>';
+  var chip=function(k,txt,n,cls){var on=_estFiltro===k;return '<button class="est-chip'+(on?' on':'')+(cls?' '+cls:'')+'" onclick="_swEstFiltro(\''+String(k).replace(/'/g,"\\'")+'\')">'+txt+' <span class="n">'+n+'</span></button>';};
+  var chips='<div class="est-chips" style="margin-bottom:10px">'+chip('Todos','Todos',nAtivos);
+  if(nNeg||_estFiltro==='__neg')chips+=chip('__neg','&#9888; Negativos',nNeg,'rd');
+  if(nPar||_estFiltro==='__par')chips+=chip('__par','&#9208; Parados',nPar,'or');
+  (DB.filtrosMat||[]).forEach(function(f){if(f.nome==='Todos')return;var n=DB.produtos.filter(function(p){return !p.arquivado&&p.cat===f.nome;}).length;chips+=chip(f.nome,f.ic+' '+_estEsc(f.nome),n);});
+  if(nArq||_estFiltro==='__arq')chips+=chip('__arq','&#128452; Arquivados',nArq);
+  chips+='</div>';
+  return barra+chips+'<div id="est-produtos-ct">'+_buildEstProdutos()+'</div>';
+}
+
+function _estProdsFiltrados(){
+  var b=String(_estBusca||'').toLowerCase().trim();
+  var lst=DB.produtos.filter(function(p){
+    if(_estFiltro==='__arq'){if(!p.arquivado)return false;}else if(p.arquivado)return false;
+    if(_estFiltro==='__neg'&&!(p.est<-0.0005))return false;
+    if(_estFiltro==='__par'&&!_estParado(p))return false;
+    if(_estFiltro!=='Todos'&&String(_estFiltro).indexOf('__')!==0&&p.cat!==_estFiltro)return false;
+    if(b&&String(p.nome||'').toLowerCase().indexOf(b)<0&&String(p.barras||'').indexOf(b)<0)return false;
+    return true;
+  });
+  var ult=function(p){var u=_estUlt[_normId(p.id)];return u&&u.d?u.d.getTime():0;};
+  lst.sort(function(a,b){
+    switch(_estOrdem){
+      case 'est_asc':return a.est-b.est;
+      case 'nome':return String(a.nome).localeCompare(String(b.nome),'pt-BR');
+      case 'valor':return b.est*b.vV-a.est*a.vV;
+      case 'preco':return b.vV-a.vV;
+      case 'ult':return ult(b)-ult(a);
+      case 'parado':return ult(a)-ult(b);
+      case 'id':return String(a.id).localeCompare(String(b.id),undefined,{numeric:true});
+      default:return b.est-a.est;
+    }
+  });
+  return lst;
+}
+function _estUltTxt(p){
+  var u=_estUlt[_normId(p.id)];
+  if(_estParado(p))return '<span style="color:var(--or)">&#9208; '+(u?'parado há '+_estDias(u.d)+' dias':'sem movimento registrado')+'</span>';
+  return u?_estQuando(u.d):'<span style="color:var(--mt)">—</span>';
+}
+function _buildEstProdutos(){
+  var lst=_estProdsFiltrados();
+  if(!lst.length)return '<div class="card" style="text-align:center;padding:30px;color:var(--mt)">&#128269; Nenhum material encontrado.</div>';
+  if(eVista==='card'){
+    var c='<div class="est-cards">';
+    lst.forEach(function(p){
+      var cat=_estCat(p),neg=p.est<-0.0005,ec=neg?'var(--rd)':p.est>0.0005?'var(--gr)':'var(--mt)';
+      c+='<div class="card est-card'+(neg?' neg':'')+'" onclick="mEstAcoes('+_estIdArg(p.id)+')">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px"><span style="font-size:22px">'+p.ic+'</span>'
+        +'<span class="est-tag" style="color:'+cat.cor+';background:'+cat.cor+'22;border-color:'+cat.cor+'44">'+_estEsc(p.cat||'—')+'</span></div>'
+        +'<div class="est-nm" style="margin-top:6px">'+_estEsc(p.nome)+(p.arquivado?' <span class="est-tag">arquivado</span>':'')+'</div>'
+        +'<div class="est-kg" style="font-size:19px;color:'+ec+';margin:4px 0">'+fKg(p.est)+' kg</div>'
+        +'<div class="est-sb">Venda '+fR(p.vV)+' · Compra '+fR(p.vC)+'</div>'
+        +'<div class="est-sb" style="color:var(--or)">'+(neg?'—':fR(p.est*p.vV))+'</div>'
+        +'<div class="est-sb" style="margin-top:3px">'+(neg?'<span style="color:var(--rd)">&#9888; Negativo — confira o extrato</span>':'Última mov.: '+_estUltTxt(p))+'</div>'
+        +'<div style="display:flex;gap:6px;margin-top:9px">'
+        +'<button class="btnO bOb" style="flex:1;font-size:12px;padding:6px" onclick="event.stopPropagation();mExtrato('+_estIdArg(p.id)+')">&#128203; Extrato</button>'
+        +'<button class="btnO bOb" style="font-size:12px;padding:6px 12px" onclick="event.stopPropagation();mEstAcoes('+_estIdArg(p.id)+')" title="Mais ações">&#8943;</button>'
+        +'</div></div>';
+    });
+    return c+'</div>';
   }
+  // Celular: lista
+  var mob='<div class="card est-mob" style="padding:0;overflow:hidden">';
+  // PC: tabela
+  var seta=function(k){var o=_estOrdem;if(k==='est')return o==='est_desc'?' &#8595;':o==='est_asc'?' &#8593;':'';if(k==='nome')return o==='nome'?' &#8595;':'';if(k==='valor')return o==='valor'?' &#8595;':'';if(k==='ult')return o==='ult'?' &#8595;':o==='parado'?' &#8593;':'';return '';};
+  var pc='<div class="card est-pc" style="padding:0;overflow-x:auto"><table class="tbl est-tbl"><thead><tr>'
+    +'<th style="cursor:pointer" onclick="_swEstOrdemCol(\'nome\')">Material'+seta('nome')+'</th>'
+    +'<th style="text-align:right;cursor:pointer" onclick="_swEstOrdemCol(\'est\')">Estoque'+seta('est')+'</th>'
+    +'<th style="text-align:right">Venda/kg</th><th style="text-align:right">Compra/kg</th>'
+    +'<th style="text-align:right;cursor:pointer" onclick="_swEstOrdemCol(\'valor\')">Valor (venda)'+seta('valor')+'</th>'
+    +'<th style="text-align:right;cursor:pointer" onclick="_swEstOrdemCol(\'ult\')">Última mov.'+seta('ult')+'</th>'
+    +'<th></th></tr></thead><tbody>';
+  lst.forEach(function(p){
+    var cat=_estCat(p),neg=p.est<-0.0005,ec=neg?'var(--rd)':p.est>0.0005?'var(--gr)':'var(--mt)';
+    var idJ=_estIdArg(p.id);
+    mob+='<div class="est-row'+(neg?' neg':'')+'" onclick="mEstAcoes('+idJ+')">'
+      +'<span class="est-ic">'+p.ic+'</span>'
+      +'<div class="est-mid"><div class="est-nm">'+_estEsc(p.nome)+(p.arquivado?' <span class="est-tag">arquivado</span>':'')+'</div>'
+      +'<div class="est-sb">'+(neg?'<span style="color:var(--rd)">&#9888; Negativo — confira o extrato</span>':'<span style="color:'+cat.cor+'">'+_estEsc(p.cat||'—')+'</span> · '+fR(p.vV)+'/kg · '+_estUltTxt(p))+'</div></div>'
+      +'<div class="est-rt"><div class="est-kg" style="color:'+ec+'">'+fKg(p.est)+' kg</div><div class="est-vl">'+(neg?'—':fR(p.est*p.vV))+'</div></div>'
+      +'<span class="est-chev">&#8250;</span></div>';
+    pc+='<tr class="'+(neg?'neg':'')+'" onclick="mEstAcoes('+idJ+')">'
+      +'<td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">'+p.ic+'</span><div><div style="font-weight:700">'+_estEsc(p.nome)+(p.arquivado?' <span class="est-tag">arquivado</span>':'')+'</div>'
+      +'<span class="est-tag" style="color:'+cat.cor+';background:'+cat.cor+'22;border-color:'+cat.cor+'44">'+_estEsc(p.cat||'—')+'</span></div></div></td>'
+      +'<td class="mono" style="text-align:right;font-weight:800;color:'+ec+'">'+fKg(p.est)+' kg</td>'
+      +'<td class="mono" style="text-align:right;color:var(--gr)">'+fR(p.vV)+'</td>'
+      +'<td class="mono" style="text-align:right;color:var(--bl)">'+fR(p.vC)+'</td>'
+      +'<td class="mono" style="text-align:right;color:var(--or)">'+(neg?'—':fR(p.est*p.vV))+'</td>'
+      +'<td style="text-align:right;font-size:12px;white-space:nowrap">'+(neg?'<span style="color:var(--rd)">&#9888; negativo</span>':_estUltTxt(p))+'</td>'
+      +'<td style="text-align:right;white-space:nowrap"><div class="est-acts" onclick="event.stopPropagation()">'
+      +'<button class="bsm" onclick="mExtrato('+idJ+')" title="Extrato">&#128203; Extrato</button>'
+      +'<button class="bsm" onclick="mAjusteProd('+idJ+')" title="Ajuste de inventário">&#9878;</button>'
+      +'<button class="bsm" onclick="mTransf('+idJ+')" title="Reclassificar">&#8644;</button>'
+      +'<button class="bsm" onclick="mEditProd('+idJ+')" title="Editar">&#9998;</button>'
+      +'<button class="bsm" onclick="mEstAcoes('+idJ+')" title="Mais ações">&#8943;</button>'
+      +'</div></td></tr>';
+  });
+  return mob+'</div>'+pc+'</tbody></table></div>';
+}
+
+// ── Painel de ações do material ──────────────────────────────────────────
+function mEstAcoes(id){
+  var p=gP(id);if(!p)return;
+  _estCarregarArquivo();
+  if(!_estUlt||!Object.keys(_estUlt).length)_estUlt=_estUltMov(_estMovs());
+  var idJ=_estIdArg(p.id),cat=_estCat(p),neg=p.est<-0.0005;
+  var b=function(fn,txt){return '<button class="est-acao" onclick="'+fn+'">'+txt+'</button>';};
+  var h='<div class="mf">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">'
+    +'<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--mt)">'+_estEsc(p.cat||'—')+' · Venda '+fR(p.vV)+' · Compra '+fR(p.vC)+'</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-top:2px">Última movimentação: '+_estUltTxt(p)+'</div></div>'
+    +'<div style="text-align:right"><div class="mono" style="font-size:17px;font-weight:800;color:'+(neg?'var(--rd)':'var(--gr)')+'">'+fKg(p.est)+' kg</div>'
+    +'<div class="mono" style="font-size:11px;color:var(--or)">'+(neg?'':fR(p.est*p.vV))+'</div></div></div>'
+    +(p.arquivado?'<div class="al aly" style="font-size:12px">Material arquivado: não aparece na Pesagem, Produção e Revenda.</div>':'')
+    +'<div class="est-acoes">'
+    +b('mExtrato('+idJ+')','&#128203; Extrato')
+    +b('mAjusteProd('+idJ+')','&#9878; Ajuste de inventário')
+    +(p.arquivado?'':b('mTransf('+idJ+')','&#8644; Reclassificar'))
+    +b('mEditProd('+idJ+')','&#9998; Editar')
+    +'</div>'
+    +'<div style="display:flex;justify-content:center;gap:18px;margin-top:12px">'
+    +(p.arquivado?'<button class="est-link" onclick="desarquivarProd('+idJ+')">&#8634; Desarquivar</button>':'<button class="est-link" onclick="mArquivarProd('+idJ+')">&#128452; Arquivar material</button>')
+    +'<button class="est-link" style="color:var(--rd)" onclick="mDelProd('+idJ+')">&#128465; Excluir</button>'
+    +'</div></div>';
+  openM(p.ic+' '+_estEsc(p.nome),h,440);
+}
+
+// ── Arquivar / excluir ───────────────────────────────────────────────────
+function _estTemMov(id){var n=_normId(id);return _estMovs().some(function(m){return m.pId===n;});}
+function mArquivarProd(id){
+  var p=gP(id);if(!p)return;
+  if(Math.abs(p.est)>0.0005){
+    openM('&#128452; Arquivar material','<div class="mf"><div class="al aly" style="font-size:13px;line-height:1.6"><b>'+_estEsc(p.nome)+'</b> ainda tem <b>'+fKg(p.est)+' kg</b> em estoque. Para arquivar, o estoque precisa estar zerado: venda, reclassifique para outro material ou faça um ajuste de inventário.</div>'
+      +'<div class="brow"><button class="btnO bOgr" onclick="mEstAcoes('+_estIdArg(p.id)+')">Voltar</button></div></div>',420);
+    return;
+  }
+  openM('&#128452; Arquivar material','<div class="mf"><div style="font-size:13px;line-height:1.6;margin-bottom:6px">Arquivar <b>'+_estEsc(p.nome)+'</b>?</div>'
+    +'<div style="font-size:12px;color:var(--mt);line-height:1.6">Ele some das listas do Estoque, da Pesagem, da Produção e da Revenda. O histórico continua guardado e aparece no filtro <b>Arquivados</b>, de onde dá para desarquivar quando quiser.</div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="mEstAcoes('+_estIdArg(p.id)+')">Cancelar</button><button class="btn" onclick="confArquivarProd('+_estIdArg(p.id)+')">Arquivar</button></div></div>',420);
+}
+function confArquivarProd(id){
+  var p=gP(id);if(!p)return;
+  p.arquivado=true;p.arquivadoEm=hj();
+  try{_auditLog('Material arquivado',p.nome);}catch(e){}
+  saveDB();closeM();go('estoque');toast('Material arquivado','var(--bl)');
+}
+function desarquivarProd(id){
+  var p=gP(id);if(!p)return;
+  p.arquivado=false;
+  try{_auditLog('Material desarquivado',p.nome);}catch(e){}
+  saveDB();closeM();if(_estFiltro==='__arq')_estFiltro='Todos';go('estoque');toast('Material de volta à lista','var(--gr)');
+}
+function mDelProd(id){
+  var p=gP(id);if(!p)return;
+  var idJ=_estIdArg(p.id);
+  if(_estArqStatus==='carregando'){toast('Conferindo o histórico no Arquivo… tente de novo em instantes','var(--bl)');return;}
+  if(Math.abs(p.est)>0.0005||_estTemMov(p.id)){
+    openM('&#128465; Excluir material','<div class="mf"><div class="al aly" style="font-size:13px;line-height:1.6"><b>'+_estEsc(p.nome)+'</b> '+(Math.abs(p.est)>0.0005?'ainda tem '+fKg(p.est)+' kg em estoque':'tem movimentações no histórico')+'. Excluir apagaria o vínculo desse histórico.<br>Use <b>Arquivar</b>: o material some das listas e o histórico fica guardado.</div>'
+      +'<div class="brow"><button class="btnO bOgr" onclick="mEstAcoes('+idJ+')">Voltar</button>'+(Math.abs(p.est)>0.0005?'':'<button class="btn" onclick="mArquivarProd('+idJ+')">Arquivar</button>')+'</div></div>',420);
+    return;
+  }
+  openM('&#128465; Excluir material','<div class="mf"><div class="al alr">Excluir <strong>'+_estEsc(p.nome)+'</strong>? Ele não tem estoque nem histórico. Esta ação não pode ser desfeita.</div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="mEstAcoes('+idJ+')">Cancelar</button><button class="btn btn-rd" onclick="confDelProd('+idJ+')">Excluir</button></div></div>',420);
+}
+function confDelProd(id){
+  var p=gP(id);if(!p)return;
+  if(Math.abs(p.est)>0.0005||_estTemMov(p.id)){mDelProd(id);return;}
+  var n=_normId(id);
+  DB.produtos=DB.produtos.filter(function(x){return _normId(x.id)!==n;});
+  for(var i=0;i<DB.tabelas.length;i++){var t=DB.tabelas[i];for(var j=t.itens.length-1;j>=0;j--){if(_normId(t.itens[j].pId)===n)t.itens.splice(j,1);}}
+  try{_auditLog('Material excluído',p.nome);}catch(e){}
+  saveDB();closeM();go('estoque');
+}
+
+// ── Extrato do material ───────────────────────────────────────────────────
+var _extId=null,_extPer='tudo',_extOff=0,_extTipo='tudo',_extLim=50;
+var _EXT_GRUPOS=[{k:'tudo',l:'Tudo'},{k:'compras',l:'Entradas'},{k:'vendas',l:'Vendas'},{k:'producao',l:'Produção'},{k:'reclass',l:'Reclassificação'},{k:'revenda',l:'Revenda'},{k:'ajustes',l:'Ajustes'}];
+function mHistProd(id){mExtrato(id);}
+function mExtrato(id,per,off){
+  _extId=id;_extPer=per||'tudo';_extOff=off||0;_extTipo='tudo';_extLim=50;
+  _estCarregarArquivo(function(){if(document.getElementById('ext-root')&&_normId(_extId)===_normId(id))_renderExtrato();});
+  _renderExtrato();
+}
+function _extSetPer(p){_extPer=p;_extOff=0;_extLim=50;_renderExtrato();}
+function _extSetOff(o){_extOff=Math.min(0,o);_extLim=50;_renderExtrato();}
+function _extSetTipo(t){_extTipo=t;_extLim=50;_renderExtrato();}
+function _extMais(){_extLim+=100;_renderExtrato();}
+function _extDados(){
+  var p=gP(_extId);if(!p)return null;
+  var n=_normId(p.id);
+  var todos=_estMovs().filter(function(m){return m.pId===n&&!_EST_TIPOS[m.tipo].semEstoque;});
+  var r=_estPerRange(_extPer,_extOff);
+  var noPer=todos.filter(function(m){return _estNoPer(m,r);});
+  var lista=_extTipo==='tudo'?noPer:noPer.filter(function(m){return _EST_TIPOS[m.tipo].g===_extTipo;});
+  var ent=0,sai=0;noPer.forEach(function(m){if(m.kg>0)ent+=m.kg;else sai+=-m.kg;});
+  var soma=0;todos.forEach(function(m){soma+=m.kg;});
+  return {p:p,r:r,todos:todos,lista:lista,ent:_estN(ent),sai:_estN(sai),semReg:_estN(p.est-soma)};
+}
+function _renderExtrato(){
+  var D=_extDados();if(!D)return;
+  var p=D.p;
+  var h='<div id="ext-root">'
+    +'<div class="est-kpi est-kpi3" style="margin-bottom:10px">'
+    +'<div><div class="kl">Estoque</div><div class="kv" style="color:'+(p.est<-0.0005?'var(--rd)':'var(--gr)')+'">'+fKg(p.est)+'</div></div>'
+    +'<div><div class="kl">Entrou'+(D.r.tudo?'':' no período')+'</div><div class="kv" style="color:var(--gr)">+'+fKg(D.ent)+'</div></div>'
+    +'<div><div class="kl">Saiu'+(D.r.tudo?'':' no período')+'</div><div class="kv" style="color:var(--rd)">−'+fKg(D.sai)+'</div></div></div>'
+    +_estArqAviso()
+    +_estPerBarH(_extPer,_extOff,'_extSetPer','_extSetOff')
+    +'<div class="est-chips" style="margin-bottom:8px">'+_EXT_GRUPOS.map(function(g){return '<button class="est-chip'+(_extTipo===g.k?' on':'')+'" onclick="_extSetTipo(\''+g.k+'\')">'+g.l+'</button>';}).join('')+'</div>'
+    +'<div style="max-height:46vh;overflow-y:auto;border-top:1px solid var(--bd)">';
+  if(!D.lista.length)h+='<div style="text-align:center;padding:24px;color:var(--mt);font-size:12px">Nenhuma movimentação neste período.</div>';
+  D.lista.slice(0,_extLim).forEach(function(m){
+    var T=_EST_TIPOS[m.tipo];
+    h+='<div class="ext-ln"><div style="min-width:0"><div style="font-size:12px;font-weight:600">'+(m.data||'sem data')+(m.hora?' · '+m.hora:'')+'</div>'
+      +'<div style="font-size:11px;color:'+T.cor+'">'+T.ic+' '+T.l+(m.desc?' <span style="color:var(--mt)">· '+_estEsc(m.desc)+'</span>':'')+'</div></div>'
+      +'<div style="text-align:right;flex-shrink:0"><div class="mono" style="font-size:13px;font-weight:700;color:'+(m.kg>0?'var(--gr)':'var(--rd)')+'">'+_estKgS(m.kg)+' kg</div>'
+      +(m.val?'<div class="mono" style="font-size:10px;color:var(--mt)">'+fR(m.val)+'</div>':'')+'</div></div>';
+  });
+  if(D.lista.length>_extLim)h+='<div style="text-align:center;padding:10px"><button class="btnO bOb" onclick="_extMais()">Carregar mais ('+(D.lista.length-_extLim)+' restantes)</button></div>';
+  h+='</div>';
+  if(D.r.tudo&&_extTipo==='tudo'&&Math.abs(D.semReg)>0.0005){
+    h+='<div class="al aly" style="font-size:11.5px;line-height:1.5;margin-top:8px"><b>'+_estKgS(D.semReg)+' kg sem registro</b> — diferença entre o estoque atual e o que o histórico explica. Vem de estoque lançado antes do histórico, de correções antigas ou de algum movimento que não foi registrado. Se o estoque físico não bate, use o <b>Ajuste de inventário</b>.</div>';
+  }
+  h+='<div class="brow" style="margin-top:10px"><button class="btnO bOgr" onclick="_extExportar(\'csv\')">&#8659; CSV</button><button class="btnO bOgr" onclick="_extExportar(\'pdf\')">&#128424; PDF</button><button class="btn" onclick="closeM()">Fechar</button></div></div>';
+  openM(p.ic+' '+_estEsc(p.nome)+' — Extrato',h,580);
+}
+function _extExportar(fmt){
+  var D=_extDados();if(!D)return;
+  var hdr=['Data','Hora','Tipo','Descrição','Kg','Valor (R$)'];
+  var rows=D.lista.map(function(m){return [m.data||'',m.hora||'',_EST_TIPOS[m.tipo].l,m.desc||'',_estKgS(m.kg),m.val?fR(m.val):''];});
+  var nome=String(D.p.nome).replace(/[^\wÀ-ú]+/g,'-');
+  if(fmt==='csv'){_exportCSV('extrato-'+nome+'-'+hj().replace(/\//g,'-')+'.csv',[['Extrato: '+D.p.nome+' — '+D.r.lab],['Estoque atual',fKg(D.p.est)+' kg'],[]].concat([hdr]).concat(rows));}
+  else{
+    var th='<div style="margin-bottom:8px;font-size:12px"><b>'+_estEsc(D.p.nome)+'</b> — '+D.r.lab+' · Estoque atual: <b>'+fKg(D.p.est)+' kg</b> · Entrou: '+fKg(D.ent)+' kg · Saiu: '+fKg(D.sai)+' kg</div>'
+      +'<table><thead><tr>'+hdr.map(function(x){return '<th>'+x+'</th>';}).join('')+'</tr></thead><tbody>'
+      +rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+_estEsc(c)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table>';
+    _exportPDF('Extrato de estoque',th);
+  }
+}
+
+// ── Movimentação (kg) por período ────────────────────────────────────────
+var _estMovPer='mes',_estMovOff=0,_estMovInt=false;
+function _estMovSetPer(p){_estMovPer=p;_estMovOff=0;go('estoque');}
+function _estMovSetOff(o){_estMovOff=Math.min(0,o);go('estoque');}
+function _estMovSetInt(v){_estMovInt=!!v;go('estoque');}
+function _estAgg(movs,r,internos){
+  var a={ent:0,sai:0,nEnt:0,nSai:0,grp:{},mat:{}};
+  movs.forEach(function(m){
+    if(!_estNoPer(m,r))return;
+    var T=_EST_TIPOS[m.tipo];
+    if(internos){if(T.semEstoque)return;}else if(!T.ext)return;
+    var k=m.tipo+(m.kg>0?'+':'-');
+    var g=a.grp[k]||(a.grp[k]={tipo:m.tipo,kg:0,n:0});g.kg+=m.kg;g.n++;
+    var mt=a.mat[m.pId]||(a.mat[m.pId]={ent:0,sai:0});
+    if(m.kg>0){a.ent+=m.kg;a.nEnt++;mt.ent+=m.kg;}else{a.sai+=-m.kg;a.nSai++;mt.sai+=-m.kg;}
+  });
+  a.ent=_estN(a.ent);a.sai=_estN(a.sai);
+  return a;
+}
+function _estVar(at,ant){if(!(ant>0))return '';var v=Math.round((at-ant)/ant*100);return '<div style="font-size:9.5px;color:'+(v>=0?'var(--gr)':'var(--rd)')+'">'+(v>=0?'&#9650; ':'&#9660; ')+Math.abs(v)+'% vs anterior</div>';}
+function _buildEstMovimentacao(movs){
+  var per=_estMovPer,off=_estMovOff,intn=_estMovInt;
+  var r=_estPerRange(per,off),a=_estAgg(movs,r,intn);
+  var h=_estPerBarH(per,off,'_estMovSetPer','_estMovSetOff');
+  h+='<div class="est-sw"><button class="'+(intn?'':'on')+'" onclick="_estMovSetInt(false)">Empresa (entra/sai de fora)</button><button class="'+(intn?'on':'')+'" onclick="_estMovSetInt(true)">Inclui internos</button></div>'
+    +'<div style="font-size:10.5px;color:var(--mt);margin:-4px 0 10px;line-height:1.5">'+(intn
+      ?'Mostra tudo que mexeu no estoque, inclusive Produção (consumo e gerado) e Reclassificação. O saldo é a variação real do estoque no período.'
+      :'Só o que entrou na empresa (compras, doações, logística reversa) e o que saiu (vendas, revenda, perda da produção). Produção e reclassificação ficam de fora: o material só muda de nome dentro da empresa.')+'</div>'
+    +_estArqAviso();
+  var ant=r.tudo?null:_estAgg(movs,_estPerRange(per,off-1),intn);
+  var saldo=_estN(a.ent-a.sai);
+  h+='<div class="est-kpi est-kpi3" style="margin-bottom:10px">'
+    +'<div><div class="kl">Entrou</div><div class="kv" style="color:var(--gr)">+'+fKg(a.ent)+'</div><div style="font-size:9.5px;color:var(--mt)">kg · '+a.nEnt+' registro(s)</div>'+(ant?_estVar(a.ent,ant.ent):'')+'</div>'
+    +'<div><div class="kl">Saiu</div><div class="kv" style="color:var(--rd)">−'+fKg(a.sai)+'</div><div style="font-size:9.5px;color:var(--mt)">kg · '+a.nSai+' registro(s)</div>'+(ant?_estVar(a.sai,ant.sai):'')+'</div>'
+    +'<div><div class="kl">Saldo</div><div class="kv" style="color:'+(saldo>=0?'var(--gr)':'var(--rd)')+'">'+_estKgS(saldo)+'</div><div style="font-size:9.5px;color:var(--mt)">kg</div></div></div>';
+  // Gráfico: últimos 6 períodos (Tudo: por ano)
+  var cols=[];
+  if(r.tudo){
+    var anos={};movs.forEach(function(m){if(m.d)anos[m.d.getFullYear()]=1;});
+    var y0=_estHoje().getFullYear(),ys=Object.keys(anos).map(Number).filter(function(y){return y<=y0;}).sort();
+    if(!ys.length)ys=[y0];ys=ys.slice(-6);
+    ys.forEach(function(y){var rr=_estPerRange('ano',y-y0);cols.push({r:rr,a:_estAgg(movs,rr,intn),go:"_estMovPer='ano';_estMovSetOff("+(y-y0)+")",on:false});});
+  }else{
+    for(var i=5;i>=0;i--){var rr=_estPerRange(per,off-i);cols.push({r:rr,a:_estAgg(movs,rr,intn),go:'_estMovSetOff('+(off-i)+')',on:i===0});}
+  }
+  var mx=0.001;cols.forEach(function(c){mx=Math.max(mx,c.a.ent,c.a.sai);});
+  h+='<div class="card" style="padding:12px 14px;margin-bottom:10px"><div class="est-ttl">'+(r.tudo?'Por ano':'Últimos 6 períodos')+'</div><div class="est-bars">';
+  cols.forEach(function(c){
+    var he=Math.round(c.a.ent/mx*100),hs=Math.round(c.a.sai/mx*100);
+    h+='<div class="est-bg'+(c.on?' on':'')+'" onclick="'+c.go+'" title="'+c.r.lab+': entrou '+fKg(c.a.ent)+' kg, saiu '+fKg(c.a.sai)+' kg">'
+      +'<i style="height:'+he+'%;background:var(--gr)"></i><i style="height:'+hs+'%;background:var(--rd)"></i></div>';
+  });
+  h+='</div><div class="est-blb">'+cols.map(function(c){return '<span'+(c.on?' class="on"':'')+'>'+c.r.curto+'</span>';}).join('')+'</div>'
+    +'<div class="est-lg"><span><b style="background:var(--gr)"></b>Entrou</span><span><b style="background:var(--rd)"></b>Saiu</span><span>toque numa barra para abrir o período</span></div></div>';
+  // De onde veio / para onde foi
+  var ordem=['compra+','doacao+','lr+','prod_sai+','prod_sobra+','reclass+','ajuste+','venda-','revenda-','perda-','prod_ent-','prod_ent+','reclass-','ajuste-','compra-','lr-','doacao-','venda+'];
+  var gk=Object.keys(a.grp).sort(function(x,y){var ix=ordem.indexOf(x),iy=ordem.indexOf(y);return (ix<0?99:ix)-(iy<0?99:iy);});
+  h+='<div class="card" style="padding:12px 14px;margin-bottom:10px"><div class="est-ttl">De onde veio / para onde foi</div>';
+  if(!gk.length)h+='<div style="font-size:12px;color:var(--mt);padding:6px 0">Nada neste período.</div>';
+  gk.forEach(function(k){var g=a.grp[k],T=_EST_TIPOS[g.tipo];
+    var lb=T.l+(g.tipo==='venda'?' (inclui Em Aberto)':'')+((g.tipo==='ajuste'||g.tipo==='reclass')?(g.kg>0?' (entrada)':' (saída)'):'');
+    h+='<div class="est-lr"><span>'+T.ic+' '+lb+' <span style="color:var(--mt);font-size:10.5px">· '+g.n+'</span></span><span class="mono" style="font-weight:700;color:'+(g.kg>0?'var(--gr)':'var(--rd)')+'">'+_estKgS(g.kg)+' kg</span></div>';
+  });
+  h+='</div>';
+  // Por material
+  var mids=Object.keys(a.mat).sort(function(x,y){var A=a.mat[x],B=a.mat[y];return (B.ent+B.sai)-(A.ent+A.sai);});
+  h+='<div class="card" style="padding:12px 14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px"><div class="est-ttl" style="margin:0">Por material</div>'
+    +'<div style="display:flex;gap:6px"><button class="btnO bOgr" style="font-size:11px;padding:5px 10px" onclick="_estMovExportar(\'csv\')">&#8659; CSV</button><button class="btnO bOgr" style="font-size:11px;padding:5px 10px" onclick="_estMovExportar(\'pdf\')">&#128424; PDF</button></div></div>';
+  if(!mids.length)h+='<div style="font-size:12px;color:var(--mt);padding:6px 0">Nada neste período.</div>';
+  else{
+    h+='<div style="overflow-x:auto"><table class="tbl est-mt"><thead><tr><th>Material</th><th style="text-align:right">Entrou</th><th style="text-align:right">Saiu</th><th style="text-align:right">Saldo</th></tr></thead><tbody>';
+    mids.forEach(function(id){var x=a.mat[id],p=gP(id),s=_estN(x.ent-x.sai);
+      h+='<tr onclick="mExtrato('+_estIdArg(p?p.id:id)+',\''+per+'\','+off+')" style="cursor:pointer"><td>'+(p?p.ic+' '+_estEsc(p.nome):'(material excluído)')+'</td>'
+        +'<td class="mono" style="text-align:right;color:var(--gr)">'+fKg(x.ent)+'</td><td class="mono" style="text-align:right;color:var(--rd)">'+fKg(x.sai)+'</td>'
+        +'<td class="mono" style="text-align:right;font-weight:700;color:'+(s>=0?'var(--gr)':'var(--rd)')+'">'+_estKgS(s)+'</td></tr>';
+    });
+    h+='</tbody></table></div><div style="font-size:10.5px;color:var(--mt);margin-top:6px">Valores em kg. Toque no material para abrir o extrato dele neste período.</div>';
+  }
+  h+='</div>';
+  return h;
+}
+function _estMovExportar(fmt){
+  var movs=_estMovs(),r=_estPerRange(_estMovPer,_estMovOff),a=_estAgg(movs,r,_estMovInt);
+  var vis=_estMovInt?'Inclui internos':'Empresa';
+  var mids=Object.keys(a.mat).sort(function(x,y){var A=a.mat[x],B=a.mat[y];return (B.ent+B.sai)-(A.ent+A.sai);});
+  var rows=mids.map(function(id){var x=a.mat[id],p=gP(id);return [p?p.nome:'(excluído)',fKg(x.ent),fKg(x.sai),_estKgS(x.ent-x.sai)];});
+  var grp=Object.keys(a.grp).map(function(k){var g=a.grp[k];return [_EST_TIPOS[g.tipo].l+((g.tipo==='ajuste'||g.tipo==='reclass')?(g.kg>0?' (entrada)':' (saída)'):''),_estKgS(g.kg),g.n];});
+  if(fmt==='csv'){
+    _exportCSV('movimentacao-estoque-'+r.curto.replace(/\//g,'-')+'-'+hj().replace(/\//g,'-')+'.csv',
+      [['Movimentação de estoque (kg) — '+r.lab+' — '+vis],['Entrou',fKg(a.ent)],['Saiu',fKg(a.sai)],['Saldo',_estKgS(a.ent-a.sai)],[],['Origem/destino','Kg','Registros']].concat(grp).concat([[],['Material','Entrou (kg)','Saiu (kg)','Saldo (kg)']]).concat(rows));
+  }else{
+    var t='<div style="font-size:12px;margin-bottom:8px"><b>'+r.lab+'</b> · '+vis+' · Entrou <b>'+fKg(a.ent)+' kg</b> · Saiu <b>'+fKg(a.sai)+' kg</b> · Saldo <b>'+_estKgS(a.ent-a.sai)+' kg</b></div>'
+      +'<table><thead><tr><th>Origem / destino</th><th>Kg</th><th>Registros</th></tr></thead><tbody>'+grp.map(function(g){return '<tr><td>'+g[0]+'</td><td>'+g[1]+'</td><td>'+g[2]+'</td></tr>';}).join('')+'</tbody></table>'
+      +'<table style="margin-top:14px"><thead><tr><th>Material</th><th>Entrou (kg)</th><th>Saiu (kg)</th><th>Saldo (kg)</th></tr></thead><tbody>'+rows.map(function(x){return '<tr><td>'+_estEsc(x[0])+'</td><td>'+x[1]+'</td><td>'+x[2]+'</td><td>'+x[3]+'</td></tr>';}).join('')+'</tbody></table>';
+    _exportPDF('Movimentação de estoque',t);
+  }
+}
+
+// ── Aba Reclassificações ─────────────────────────────────────────────────
+function _estAbaReclass(){
+  var rows='';
+  (DB.transf||[]).forEach(function(t){
+    var kg=+t.pE||+t.pS||0,naVenda=/^Desmontagem para venda/.test(t.obs||'');
+    rows+='<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--bd)">'
+      +'<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">'
+      +'<span style="font-size:13px;font-weight:700;color:var(--rd)">'+_estEsc(t.de)+'</span><span style="color:var(--mt)">&#8594;</span><span style="font-size:13px;font-weight:700;color:var(--gr)">'+_estEsc(t.para)+'</span>'
+      +(naVenda?'<span class="est-tag" style="color:var(--or);border-color:rgba(245,158,11,.4)">na venda</span>':'')+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+(t.data||'')+(t.hora?' · '+t.hora:'')+(t.user?' · '+_estEsc(t.user):'')+(t.obs&&!naVenda?' · '+_estEsc(t.obs):'')+'</div></div>'
+      +'<div class="mono" style="font-size:13px;font-weight:700;color:var(--bl);flex-shrink:0">'+fKg(kg)+' kg</div></div>';
+  });
+  return '<div class="al alb" style="font-size:12px;line-height:1.5">Reclassificação troca o material de nome no estoque (ex.: entrou como “Placa mista”, na triagem viu que era “Placa Verde”). Desmontagem é feita na aba <b>Produção</b>.</div>'
+    +'<div class="card" style="padding:0;overflow:hidden">'+(rows||'<div style="padding:20px;text-align:center;color:var(--mt)">Nenhuma reclassificação registrada.</div>')+'</div>';
+}
+
+// ── Reclassificar (antiga Transferência) ─────────────────────────────────
+var transfDestinos=[],_transfSalvando=false;
+function _estOptsProd(selId,excluirId){
+  return DB.produtos.filter(function(p){return !p.arquivado&&(excluirId==null||_normId(p.id)!==_normId(excluirId));}).map(function(p){
+    return '<option value="'+p.id+'"'+(selId!=null&&_normId(p.id)===_normId(selId)?' selected':'')+'>'+p.ic+' '+_estEsc(p.nome)+' ('+fKg(p.est)+' kg)</option>';}).join('');
+}
+function mTransf(preId){
+  transfDestinos=[];
+  openM('&#8644; Reclassificar material','<div class="mf">'
+    +'<div class="al alb" style="font-size:12px;line-height:1.5">Use para corrigir o tipo de um material que já está no estoque (ex.: entrou como “Placa mista” e na triagem viu que era “Placa Verde”). <b>Desmontagem é feita na aba Produção</b>, que registra funcionário, tempo e perda.</div>'
+    +'<div class="fld"><label>De (material atual)</label><select class="inp" id="t-de" onchange="updTransfTotal()">'+_estOptsProd(preId)+'</select></div>'
+    +'<div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px"><span style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Para</span><button class="bsm bsmg" onclick="addTransfDest()" style="padding:4px 12px">+ Outro material</button></div>'
+    +'<div id="t-dests"></div>'
+    +'<div id="t-total-box" style="background:var(--s2);border-radius:var(--r);padding:8px 11px;margin-top:6px;font-size:12px"></div></div>'
+    +'<div class="fld"><label>Motivo</label><input class="inp" id="t-ob" placeholder="Ex: Triagem do lote 14/10"></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveTransf()">Reclassificar</button></div></div>',520);
+  addTransfDest();
+}
+function addTransfDest(){
+  var idx=transfDestinos.length;transfDestinos.push({});
+  var box=document.getElementById('t-dests');if(!box)return;
+  var row=document.createElement('div');row.id='td-row-'+idx;
+  row.style.cssText='display:grid;grid-template-columns:minmax(0,1fr) 110px 34px;gap:7px;align-items:end;margin-bottom:7px';
+  row.innerHTML='<div class="fld" style="margin:0"><select class="inp" id="td-pa-'+idx+'"><option value="">— escolha o material —</option>'+_estOptsProd(null)+'</select></div>'
+    +'<div class="fld" style="margin:0"><input class="inp" type="number" inputmode="decimal" step="0.001" id="td-pe-'+idx+'" placeholder="kg" oninput="updTransfTotal()"></div>'
+    +(idx>0?'<button class="btnO bOr" style="padding:6px;min-height:38px;font-size:15px" onclick="remTransfDest('+idx+')" title="Remover">&#215;</button>':'<span></span>');
+  box.appendChild(row);updTransfTotal();
+}
+function remTransfDest(idx){var row=document.getElementById('td-row-'+idx);if(row)row.remove();updTransfTotal();}
+function updTransfTotal(){
+  var box=document.getElementById('t-dests'),tb=document.getElementById('t-total-box');if(!box||!tb)return;
+  var total=0;box.querySelectorAll('input[type="number"]').forEach(function(i){total+=parseFloat(i.value)||0;});
+  var de=gP((document.getElementById('t-de')||{}).value),fica=de?_estN(de.est-total):0;
+  tb.innerHTML='<div style="display:flex;justify-content:space-between"><span style="color:var(--mt)">Total reclassificado</span><b class="mono" style="color:var(--bl)">'+fKg(total)+' kg</b></div>'
+    +(de?'<div style="display:flex;justify-content:space-between;margin-top:3px"><span style="color:var(--mt)">'+_estEsc(de.nome)+' fica com</span><b class="mono" style="color:'+(fica<-0.0005?'var(--rd)':'var(--gr)')+'">'+fKg(fica)+' kg'+(fica<-0.0005?' &#9888;':'')+'</b></div>':'');
+}
+function mTransfPre(id){mTransf(id);}
+function saveTransf(forcar){
+  var deEl=document.getElementById('t-de'),box=document.getElementById('t-dests');if(!deEl||!box)return;
+  var deId=deEl.value,ob=((document.getElementById('t-ob')||{}).value||'').trim();
+  var destinos=[],total=0,mesmo=false;
+  box.querySelectorAll('div[id^="td-row-"]').forEach(function(row){
+    var i=row.id.replace('td-row-',''),pa=document.getElementById('td-pa-'+i),pe=document.getElementById('td-pe-'+i);
+    if(!pa||!pe)return;var kg=_estN(parseFloat(pe.value)||0);
+    if(pa.value&&kg>0){if(_normId(pa.value)===_normId(deId))mesmo=true;destinos.push({paraId:pa.value,pE:kg});total+=kg;}
+  });
+  if(!deId||!destinos.length){alert('Escolha o material de destino e informe o peso!');return;}
+  if(mesmo){alert('O destino não pode ser o mesmo material da origem.');return;}
+  total=_estN(total);
+  var pDe=gP(deId);
+  if(!forcar&&pDe&&_estN(pDe.est-total)<-0.0005){
+    _prodAvisoInline('<b>'+_estEsc(pDe.nome)+'</b> tem só '+fKg(pDe.est)+' kg. Reclassificando '+fKg(total)+' kg ele fica <b>negativo</b> ('+fKg(pDe.est-total)+' kg). Confira o peso.','saveTransf',[],'Reclassificar mesmo assim');
+    return;
+  }
+  if(_transfSalvando)return;_transfSalvando=true;
+  _sincronizarAntes(function(){
+    _transfSalvando=false;
+    var pD=gP(deId);if(!pD){closeM();toast('Material de origem não encontrado','var(--rd)');return;}
+    var data=hj(),hora=_horaAgora(),quem=CU?CU.nome:'';
+    destinos.forEach(function(d,i){
+      var pP=gP(d.paraId);if(!pP)return;
+      pD.est=_estN(pD.est-d.pE);pP.est=_estN(pP.est+d.pE);
+      DB.transf.unshift({id:nid(),data:data,hora:hora,de:pD.nome,deId:pD.id,para:pP.nome,paraId:pP.id,pS:d.pE,pE:d.pE,obs:ob+(destinos.length>1?' ('+(i+1)+'/'+destinos.length+')':''),user:quem});
+    });
+    try{_auditLog('Reclassificação',pD.nome+' → '+destinos.length+' material(is), '+fKg(total)+' kg');}catch(e){}
+    autoSave();closeM();go('estoque');toast('Reclassificação registrada','var(--gr)');
+  },'Reclassificar');
+}
+
+// ── Ajuste de inventário ─────────────────────────────────────────────────
+var _ajSalvando=false;
+function saveAjusteProd(id){
+  var p=gP(id);if(!p)return;
+  var tipo=document.getElementById('aj-tipo').value;
+  var kg=_estN(parseFloat(document.getElementById('aj-kg').value)||0);
+  var obs=document.getElementById('aj-obs').value.trim();
+  if(kg<=0){alert('Informe a quantidade!');return;}
+  if(!obs){alert('Informe o motivo do ajuste!');return;}
+  if(_ajSalvando)return;_ajSalvando=true;
+  _sincronizarAntes(function(){
+    _ajSalvando=false;
+    var p2=gP(id);if(!p2){closeM();return;}
+    var delta=tipo==='add'?kg:-kg,antes=_estN(p2.est);
+    p2.est=_estN(p2.est+delta);
+    if(!p2.ajustes)p2.ajustes=[];
+    p2.ajustes.push({id:nid(),data:hj(),hora:_horaAgora(),tipo:tipo==='add'?'Entrada':'Saída',delta:delta,obs:obs,antes:antes,depois:p2.est,user:CU?CU.nome:''});
+    try{_auditLog('Ajuste de inventário',p2.nome+' '+_estKgS(delta)+' kg — '+obs);}catch(e){}
+    saveDB();closeM();go('estoque');toast('Ajuste registrado','var(--gr)');
+  },'Ajuste de inventário');
+}
+
+
+// ── Entradas e Saídas (por pesagem) ──────────────────────────────────────
+// Lê dos mesmos movimentos do Extrato: cada compra/venda aparece uma vez, com a
+// data do caixa, e o que está no Em Aberto aparece como "a pagar"/"a receber".
+var _esLado='e',_esPer='mes',_esOff=0,_esFiltro='todos',_esBusca='';
+var _ES_LADO={
+  e:{tipos:{compra:1,doacao:1,lr:1},filtros:[['todos','Todas'],['compra','Compras'],['doacao','Doações'],['lr','Logística reversa'],['aberto','&#9203; A pagar']],
+     quem:'Fornecedor',valor:'Valor das compras',aberto:'A pagar (Em Aberto)',tagAberto:'a pagar'},
+  s:{tipos:{venda:1,revenda:1,perda:1},filtros:[['todos','Todas'],['venda','Vendas'],['revenda','Revenda (peças)'],['perda','Perda da produção'],['aberto','&#9203; A receber']],
+     quem:'Cliente / destino',valor:'Valor das vendas',aberto:'A receber (Em Aberto)',tagAberto:'a receber'}
+};
+var _ES_TAG={compra:['Compra','var(--gr)'],doacao:['Doação','var(--bl)'],lr:['Logística reversa','#a855f7'],venda:['Venda','var(--rd)'],revenda:['Revenda','#ec4899'],perda:['Perda','var(--mt)']};
+function _esSetLado(l){_esLado=l;_esFiltro='todos';go('estoque');}
+function _esSetPer(p){_esPer=p;_esOff=0;go('estoque');}
+function _esSetOff(o){_esOff=Math.min(0,o);go('estoque');}
+function _esSetFiltro(f){_esFiltro=f;go('estoque');}
+function _esOnBusca(v){_esBusca=v;var ct=document.getElementById('es-lista');if(ct)ct.innerHTML=_esListaH(_esGrupos(_estMovs()).vis);}
+// Agrupa os movimentos por pesagem
+function _esGrupos(movs,lado,per,off,filtro,busca){
+  lado=lado||_esLado;per=per||_esPer;off=off==null?_esOff:off;filtro=filtro||_esFiltro;busca=busca==null?_esBusca:busca;
+  var L=_ES_LADO[lado],r=_estPerRange(per,off),g={},ordem=[];
+  movs.forEach(function(m){
+    if(!L.tipos[m.tipo]||!m.pes||!_estNoPer(m,r))return;
+    if(lado==='e'&&m.kg<=0)return;
+    if(lado==='s'&&m.kg>=0)return;
+    var k=m.pes.k,x=g[k];
+    if(!x){x=g[k]={k:k,tipo:m.tipo,nome:m.pes.nome||'—',num:m.pes.num,data:m.data,hora:m.pes.hora||m.hora||'',d:m.d,aberto:!!m.pes.aberto,liq:!!m.pes.liq,itens:[],kg:0,val:0};ordem.push(x);}
+    var kg=Math.abs(m.kg),val=+m.val||0;
+    x.itens.push({pId:m.pId,kg:kg,preco:m.preco||0,val:val});x.kg+=kg;x.val+=val;
+  });
+  var tot={kg:0,val:0,aberto:0,n:0,porTipo:{}},b=String(busca||'').toLowerCase().trim();
+  ordem.forEach(function(x){
+    tot.kg+=x.kg;tot.n++;tot.porTipo[x.tipo]=(tot.porTipo[x.tipo]||0)+1;
+    if(x.tipo==='compra'||x.tipo==='venda')tot.val+=x.val;
+    if(x.aberto)tot.aberto+=x.val;
+  });
+  var nAberto=ordem.filter(function(x){return x.aberto;}).length;
+  var vis=ordem.filter(function(x){
+    if(filtro==='aberto'){if(!x.aberto)return false;}
+    else if(filtro!=='todos'&&x.tipo!==filtro)return false;
+    if(b){
+      var txt=(x.nome+' '+(x.num||'')+' '+x.itens.map(function(i){var p=gP(i.pId);return p?p.nome:'';}).join(' ')).toLowerCase();
+      if(txt.indexOf(b)<0)return false;
+    }
+    return true;
+  });
+  return {r:r,todos:ordem,vis:vis,tot:tot,nAberto:nAberto};
+}
+function _esItemNome(i){var p=gP(i.pId);return p?{ic:p.ic,nome:p.nome}:{ic:'&#128230;',nome:'(material excluído)'};}
+function _esListaH(vis){
+  if(!vis.length)return '<div class="card" style="text-align:center;padding:26px;color:var(--mt)">Nada neste período.</div>';
+  var L=_ES_LADO[_esLado],cor=_esLado==='e'?'var(--gr)':'var(--rd)';
+  var tag=function(x){var t=_ES_TAG[x.tipo];return '<span class="est-tag" style="color:'+t[1]+';border-color:'+t[1]+'">'+t[0]+'</span>'+(x.aberto?' <span class="est-tag" style="color:var(--or);border-color:rgba(245,158,11,.55)">&#9203; '+L.tagAberto+'</span>':'');};
+  var quando=function(x){return (x.data?x.data.slice(0,5):'sem data')+(x.hora?' · '+x.hora:'')+(x.num?' · #'+x.num:'')+(x.aberto?' · Em Aberto':x.liq?' · liquidado depois':'');};
+  var mob='<div class="est-mob">',pc='<div class="card est-pc" style="padding:0;overflow-x:auto"><table class="tbl est-tbl"><thead><tr><th>Data</th><th>'+L.quem+'</th><th>Tipo</th><th>Materiais</th><th style="text-align:right">Peso</th><th style="text-align:right">Valor</th></tr></thead><tbody>';
+  vis.forEach(function(x){
+    var itensMob='',itensPc=[];
+    x.itens.forEach(function(i){var n=_esItemNome(i);
+      itensMob+='<div class="es-it"><span>'+n.ic+' '+_estEsc(n.nome)+'</span><b class="mono">'+fKg(i.kg)+' kg'+(i.preco?' · '+fR(i.preco):'')+'</b></div>';
+      itensPc.push(_estEsc(n.nome)+' <b class="mono">'+fKg(i.kg)+'</b>');
+    });
+    var valH=x.val?fR(x.val):'—';
+    mob+='<div class="card es-card'+(x.aberto?' ab':'')+'"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">'
+      +'<div style="min-width:0"><div class="est-nm" style="white-space:normal">'+_estEsc(x.nome)+' '+tag(x)+'</div><div class="est-sb" style="white-space:normal">'+quando(x)+'</div></div>'
+      +'<div class="est-rt"><div class="est-kg" style="color:'+cor+'">'+fKg(x.kg)+' kg</div><div class="est-vl">'+valH+'</div></div></div>'+itensMob+'</div>';
+    pc+='<tr class="'+(x.aberto?'es-ab':'')+'"><td style="white-space:nowrap">'+(x.data||'sem data')+(x.hora?' '+x.hora:'')+(x.num?'<div style="font-size:10.5px;color:var(--mt)">#'+x.num+'</div>':'')+'</td>'
+      +'<td style="font-weight:700">'+_estEsc(x.nome)+'</td><td style="white-space:nowrap">'+tag(x)+'</td>'
+      +'<td style="font-size:12px;color:var(--mt)">'+itensPc.join(' · ')+'</td>'
+      +'<td class="mono" style="text-align:right;font-weight:700;color:'+cor+';white-space:nowrap">'+fKg(x.kg)+' kg</td>'
+      +'<td class="mono" style="text-align:right;color:var(--or);white-space:nowrap">'+valH+'</td></tr>';
+  });
+  return mob+'</div>'+pc+'</tbody></table></div>';
+}
+function _buildEstEntradasSaidas(movs){
+  var G=_esGrupos(movs),L=_ES_LADO[_esLado];
+  var h='<div class="est-sw"><button class="'+(_esLado==='e'?'on':'')+'" onclick="_esSetLado(\'e\')">&#128229; Entradas</button><button class="'+(_esLado==='s'?'on':'')+'" onclick="_esSetLado(\'s\')">&#128228; Saídas</button></div>'
+    +_estArqAviso()+_estPerBarH(_esPer,_esOff,'_esSetPer','_esSetOff');
+  h+='<div class="est-chips" style="margin-bottom:8px">';
+  L.filtros.forEach(function(f){
+    var n=f[0]==='todos'?G.tot.n:f[0]==='aberto'?G.nAberto:(G.tot.porTipo[f[0]]||0);
+    if(f[0]!=='todos'&&!n&&_esFiltro!==f[0])return;
+    h+='<button class="est-chip'+(_esFiltro===f[0]?' on':'')+(f[0]==='aberto'?' or':'')+'" onclick="_esSetFiltro(\''+f[0]+'\')">'+f[1]+' <span class="n">'+n+'</span></button>';
+  });
+  h+='</div><div style="position:relative;margin-bottom:10px"><span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--mt)">&#128269;</span>'
+    +'<input class="inp" type="text" placeholder="Buscar '+(_esLado==='e'?'fornecedor':'cliente')+' ou material..." value="'+_estEsc(_esBusca)+'" oninput="_esOnBusca(this.value)" style="padding-left:32px"></div>';
+  h+='<div class="est-kpi es-kpi" style="margin-bottom:10px">'
+    +'<div><div class="kl">Peso que '+(_esLado==='e'?'entrou':'saiu')+'</div><div class="kv" style="color:'+(_esLado==='e'?'var(--gr)':'var(--rd)')+'">'+fKg(G.tot.kg)+' <small>kg</small></div></div>'
+    +'<div><div class="kl">'+L.valor+'</div><div class="kv" style="color:var(--or)">'+fR(G.tot.val)+'</div></div>'
+    +'<div><div class="kl">'+L.aberto+'</div><div class="kv" style="color:'+(G.tot.aberto?'var(--or)':'var(--mt)')+'">'+fR(G.tot.aberto)+'</div></div>'
+    +'<div><div class="kl">Pesagens</div><div class="kv" style="color:var(--bl)">'+G.tot.n+'</div></div></div>';
+  h+='<div id="es-lista">'+_esListaH(G.vis)+'</div>'
+    +'<div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px"><button class="btnO bOgr" style="font-size:11px;padding:5px 10px" onclick="_esExportar(\'csv\')">&#8659; CSV</button><button class="btnO bOgr" style="font-size:11px;padding:5px 10px" onclick="_esExportar(\'pdf\')">&#128424; PDF</button></div>';
+  return h;
+}
+function _esExportar(fmt){
+  var G=_esGrupos(_estMovs()),L=_ES_LADO[_esLado],tit=(_esLado==='e'?'Entradas':'Saídas')+' — '+G.r.lab;
+  var hdr=['Data','Hora','Nº','Tipo',L.quem,'Material','Kg','R$/kg','Valor','Situação'];
+  var rows=[];
+  G.vis.forEach(function(x){x.itens.forEach(function(i){var n=_esItemNome(i);
+    rows.push([x.data||'',x.hora||'',x.num||'',_ES_TAG[x.tipo][0],x.nome,n.nome,fKg(i.kg),i.preco?fR(i.preco):'',i.val?fR(i.val):'',x.aberto?L.tagAberto:'']);});});
+  if(fmt==='csv'){_exportCSV((_esLado==='e'?'entradas':'saidas')+'-'+hj().replace(/\//g,'-')+'.csv',[[tit],['Peso',fKg(G.tot.kg)+' kg'],[L.valor,fR(G.tot.val)],[L.aberto,fR(G.tot.aberto)],[]].concat([hdr]).concat(rows));}
+  else{
+    var t='<div style="font-size:12px;margin-bottom:8px"><b>'+tit+'</b> · Peso '+fKg(G.tot.kg)+' kg · '+L.valor+' '+fR(G.tot.val)+' · '+L.aberto+' '+fR(G.tot.aberto)+'</div>'
+      +'<table><thead><tr>'+hdr.map(function(x){return '<th>'+x+'</th>';}).join('')+'</tr></thead><tbody>'
+      +rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+_estEsc(c)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table>';
+    _exportPDF(_esLado==='e'?'Entradas de material':'Saídas de material',t);
+  }
+}
+// Lista de entradas no formato antigo (DB.entradas), montada dos movimentos — usada
+// pelo Dashboard. Mais nova primeiro; inclui compras do Em Aberto e não repete reaberturas.
+function _estEntradasCompat(){
+  var nome={compra:'Compra',doacao:'Doacao',lr:'Logistica Reversa'};
+  return _estMovs().filter(function(m){return nome[m.tipo]&&m.kg>0;}).map(function(m){
+    return {data:m.data||'',forn:m.pes?m.pes.nome:'',tipo:nome[m.tipo],pId:m.pId,peso:m.kg,vKg:m.preco||0,total:+m.val||0,aberto:!!(m.pes&&m.pes.aberto)};
+  });
 }
 
 // ── Gerenciamento de Filtros/Categorias de Material ──────────
@@ -7449,139 +8325,8 @@ function mDelFiltro(id){
   saveDB();mGerenciarFiltros();
 }
 
-function pgEstoque(){
-  var max=0.1;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].est>max)max=DB.produtos[i].est;}
-  // ── Filtrar produtos por busca e categoria ──
-  var prodsFiltrados=DB.produtos.filter(function(p){
-    var matchBusca=!_estBusca||p.nome.toLowerCase().indexOf(_estBusca.toLowerCase())>=0;
-    var matchFiltro=_estFiltro==='Todos'||p.cat===_estFiltro;
-    return matchBusca&&matchFiltro;
-  });
-  // ── Ordenação ──
-  prodsFiltrados=prodsFiltrados.slice().sort(function(a,b){
-    var v=0;
-    if(_estOrdem==='nome') v=a.nome.localeCompare(b.nome,'pt-BR');
-    else if(_estOrdem==='preco') v=a.vV-b.vV;
-    else if(_estOrdem==='cat') v=(a.cat||'').localeCompare(b.cat||'','pt-BR');
-    else if(_estOrdem==='est') v=a.est-b.est;
-    else v=a.id-b.id;
-    return v*_estOrdemDir;
-  });
-  // ── Alertas de estoque mínimo ──
-  var alertasMin='';var numAlertas=0;
-  for(var i=0;i<DB.produtos.length;i++){
-    var pa=DB.produtos[i];
-    if(pa.est<0){
-      numAlertas++;
-      alertasMin+='<div class="alerta-min"><span class="am-ic">&#9888;</span>'
-        +'<div><strong>'+pa.ic+' '+pa.nome+'</strong> '
-        +'<span style="color:var(--rd)">estoque negativo — <span style="font-family:monospace">'+fKg(pa.est)+' kg</span></span>'
-        +'</div></div>';
-    }
-  }
-  var alertasBanner=numAlertas>0
-    ?'<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--rd);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">&#9888; '+numAlertas+' Material(is) com Estoque Negativo</div>'+alertasMin+'</div>'
-    :'';
-
-  // ── Barra de busca + chips de filtro ──
-  var filtroCor=_estFiltro==='Todos'?'#22c55e':(DB.filtrosMat.find(function(f){return f.nome===_estFiltro;})||{cor:'#22c55e'}).cor;
-  var buscaBar='<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">'
-    +'<div style="flex:1;position:relative">'
-    +'<span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--mt)">&#128269;</span>'
-    +'<input class="inp" id="est-busca" type="text" placeholder="Buscar material..." value="'+(_estBusca||'')+'" oninput="_onEstBusca(this.value)" style="padding-left:32px">'
-    +'</div>'
-    +'<button onclick="mGerenciarFiltros()" style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:7px 11px;color:var(--mt);font-size:13px;cursor:pointer;white-space:nowrap" title="Gerenciar Filtros">&#127991; Filtros</button>'
-    +'</div>';
-  // ── Barra de ordenação ──
-  var ordens=[{k:'id',l:'ID'},{ k:'nome',l:'A-Z'},{k:'preco',l:'Preço'},{k:'cat',l:'Tipo'},{k:'est',l:'Qtd'}];
-  var sortBar='<div style="display:flex;gap:5px;align-items:center;margin-bottom:10px;flex-wrap:wrap">'
-    +'<span style="font-size:11px;color:var(--mt);white-space:nowrap">Ordenar:</span>';
-  for(var si=0;si<ordens.length;si++){
-    var oo=ordens[si];var isOn=_estOrdem===oo.k;
-    var seta=isOn?(_estOrdemDir===1?' ↑':' ↓'):'';
-    sortBar+='<button onclick="_swEstOrdem(\''+oo.k+'\')" style="border:1px solid '+(isOn?'var(--bl)':'var(--bd)')+';background:'+(isOn?'var(--blb)':'var(--s2)')+';color:'+(isOn?'var(--bl)':'var(--mt)')+';border-radius:20px;padding:4px 11px;font-size:12px;font-weight:'+(isOn?'700':'400')+';cursor:pointer;white-space:nowrap">'+oo.l+seta+'</button>';
-  }
-  sortBar+='</div>';
-  var chipsBar='<div class="aba-bar" style="margin-bottom:12px;flex-wrap:wrap;gap:5px">';
-  for(var i=0;i<DB.filtrosMat.length;i++){
-    var ff=DB.filtrosMat[i];
-    var isOn=_estFiltro===ff.nome;
-    var qtd=ff.nome==='Todos'?DB.produtos.length:DB.produtos.filter(function(p){return p.cat===ff.nome;}).length;
-    chipsBar+='<button onclick="_swEstFiltro(\''+ff.nome+'\')" style="display:inline-flex;align-items:center;gap:5px;border:1px solid '+(isOn?ff.cor:'var(--bd)')+';background:'+(isOn?ff.cor+'22':'var(--s2)')+';color:'+(isOn?ff.cor:'var(--mt)')+';border-radius:20px;padding:5px 12px;font-size:12px;font-weight:'+(isOn?'700':'400')+';cursor:pointer;white-space:nowrap">'
-      +'<span>'+ff.ic+'</span>'
-      +'<span>'+ff.nome+'</span>'
-      +'<span style="font-size:10px;opacity:.7">'+qtd+'</span>'
-      +'</button>';
-  }
-  chipsBar+='</div>';
-
-  var cards='';
-  var lista='<div class="card" style="padding:0;overflow:hidden"><table class="tbl" style="width:100%">'
-    +'<thead><tr>'
-    +'<th style="padding:9px 12px;cursor:pointer" onclick="_swEstOrdem(\'nome\')">Material'+(_estOrdem==='nome'?(_estOrdemDir===1?' ↑':' ↓'):'')+'</th>'
-    +'<th style="padding:9px 12px;text-align:right;cursor:pointer" onclick="_swEstOrdem(\'est\')">Estoque'+(_estOrdem==='est'?(_estOrdemDir===1?' ↑':' ↓'):'')+'</th>'
-    +'<th style="padding:9px 12px;text-align:right;cursor:pointer" onclick="_swEstOrdem(\'preco\')">Venda'+(_estOrdem==='preco'?(_estOrdemDir===1?' ↑':' ↓'):'')+'</th>'
-    +'<th style="padding:9px 12px;text-align:right">Compra</th>'
-    +'<th style="padding:9px 12px;text-align:right">Valor</th>'
-    +'<th style="padding:9px 12px;width:80px"></th>'
-    +'</tr></thead><tbody>';
-  for(var i=0;i<prodsFiltrados.length;i++){
-    var p=prodsFiltrados[i];var ec=p.est<0?'var(--rd)':'var(--gr)';
-    var fcor=(DB.filtrosMat.find(function(f){return f.nome===p.cat;})||{cor:'#64748b'}).cor;
-    cards+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px"><span style="font-size:23px">'+p.ic+'</span><span class="tag" style="color:'+fcor+';background:'+fcor+'22;border:1px solid '+fcor+'44">'+p.cat+'</span></div>'
-      +'<div style="font-size:14px;font-weight:700">'+p.nome+'</div>'
-      +'<div style="font-size:21px;font-weight:800;color:'+ec+';font-family:monospace;margin:5px 0">'+fKg(p.est)+' kg</div>'
-      +'<div style="font-size:11px;color:var(--mt)">Venda: '+fR(p.vV)+'/kg &middot; Compra: '+fR(p.vC)+'/kg</div>'
-      +'<div style="font-size:12px;color:var(--or);font-weight:600;margin-top:2px">Valor: '+fR(p.est*p.vV)+'</div>'
-      +'<div class="bw" style="margin:7px 0"><div class="bf" style="width:'+Math.round((p.est/max)*100)+'%;background:'+(p.est<0?'var(--rd)':'linear-gradient(90deg,var(--gr2),var(--gr))')+'"></div></div>'
-      +'<div style="display:flex;gap:6px;margin-top:4px">'
-      +'<button class="btn" style="flex:1;font-size:12px;padding:6px" onclick="mTransfPre('+p.id+')">Transferir</button>'
-      +'<button class="btnO bOb" style="font-size:12px;padding:6px 10px" onclick="mEditProd('+p.id+')" title="Editar">&#9998;</button>'
-      +'<button class="btnO bOb" style="font-size:12px;padding:6px 10px" onclick="mHistProd('+p.id+')" title="Histórico">&#128203;</button>'
-      +'<button class="btnO bOb" style="font-size:12px;padding:6px 10px" onclick="mAjusteProd('+p.id+')" title="Ajuste de Inventário">&#9878;</button>'
-      +'<button class="btnO bOr" style="font-size:12px;padding:6px 10px" onclick="mDelProd('+p.id+')" title="Excluir">&#128465;</button>'
-      +'</div></div>';
-    lista+='<tr style="border-bottom:1px solid var(--bd)">'
-      +'<td style="padding:9px 12px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">'+p.ic+'</span><div><div style="font-size:13px;font-weight:700">'+p.nome+'</div><span style="display:inline-block;margin-top:2px;padding:1px 6px;border-radius:10px;font-size:9px;font-weight:600;color:'+fcor+';background:'+fcor+'22;border:1px solid '+fcor+'44;letter-spacing:.3px">'+p.cat+'</span></div></div></td>'
-      +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-weight:700;color:'+ec+'">'+fKg(p.est)+' kg</td>'
-      +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-size:12px;color:var(--gr)">'+fR(p.vV)+'/kg</td>'
-      +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-size:12px;color:var(--bl)">'+fR(p.vC)+'/kg</td>'
-      +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-size:12px;color:var(--or)">'+fR(p.est*p.vV)+'</td>'
-      +'<td style="padding:9px 12px;text-align:right">'
-      +'<div style="display:flex;gap:4px;justify-content:flex-end">'
-      +'<button class="bsm" style="background:var(--s2);border:1px solid var(--bd);color:var(--mt);padding:3px 7px" onclick="mTransfPre('+p.id+')" title="Transferir">&#8646;</button>'
-      +'<button class="bsm" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);padding:3px 7px" onclick="mHistProd('+p.id+')" title="Histórico">&#128203;</button>'
-      +'<button class="bsm" style="background:var(--orb);border:1px solid rgba(245,158,11,.3);color:var(--or);padding:3px 7px" onclick="mAjusteProd('+p.id+')" title="Ajuste">&#9878;</button>'
-      +'<button class="bsm" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);padding:3px 7px" onclick="mEditProd('+p.id+')" title="Editar">&#9998;</button>'
-      +'<button class="bsm" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);padding:3px 7px" onclick="mDelProd('+p.id+')" title="Excluir">&#128465;</button>'
-      +'</div></td>'
-      +'</tr>';
-  }
-  if(!prodsFiltrados.length){
-    cards='<div class="card" style="text-align:center;padding:30px;color:var(--mt)">&#128269; Nenhum material encontrado.</div>';
-    lista+='<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--mt)">Nenhum material encontrado.</td></tr>';
-  }
-  lista+='</tbody></table></div>';
-  var rows='';
-  for(var i=0;i<DB.transf.length;i++){
-    var t=DB.transf[i];
-    rows+='<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--bd)">'
-      +'<div style="flex:1;min-width:0">'
-      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">'
-      +'<span style="font-size:13px;font-weight:700;color:var(--rd)">'+t.de+'</span>'
-      +'<span style="color:var(--mt);font-size:14px">&#8594;</span>'
-      +'<span style="font-size:13px;font-weight:700;color:var(--gr)">'+t.para+'</span>'
-      +'</div>'
-      +'<div style="display:flex;gap:8px;font-size:11px;color:var(--mt);flex-wrap:wrap">'
-      +'<span>'+t.data+'</span>'
-      +(t.obs?'<span>'+t.obs+'</span>':'')
-      +'</div></div>'
-      +'<div style="text-align:right;flex-shrink:0">'
-      +'<div style="font-size:12px;color:var(--rd);font-family:monospace">-'+fKg(t.pS)+' kg</div>'
-      +'<div style="font-size:12px;color:var(--gr);font-family:monospace">+'+fKg(t.pE)+' kg</div>'
-      +'</div></div>';
-  }
-
+// Abas Preços e Entradas (mesmo conteúdo da 5.11)
+function _estAbaPrecosEntradas(){
   // ── Aba Precos ─────────────────────────────────────────────
   var precosH='<div class="card" style="padding:0;overflow:hidden">'
     +'<div style="padding:13px 16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center">'
@@ -7598,7 +8343,7 @@ function pgEstoque(){
     +'<span style="font-size:10px;color:var(--bl);text-transform:uppercase;letter-spacing:1px;text-align:center">Compra R$/kg</span>'
     +'</div>';
   for(var i=0;i<DB.produtos.length;i++){
-    var p=DB.produtos[i];
+    var p=DB.produtos[i];if(p.arquivado)continue;
     precosH+='<div style="display:grid;grid-template-columns:1fr 130px 130px;gap:0;padding:8px 16px;border-bottom:1px solid var(--bd);align-items:center'+(i%2===1?';background:rgba(255,255,255,.02)':'')+'">'
       +'<div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">'+p.ic+'</span><span style="font-size:13px;font-weight:600">'+p.nome+'</span></div>'
       +'<div style="padding:0 8px"><input type="number" inputmode="decimal" step="0.01" class="inp" id="prc-vv-'+p.id+'" value="'+p.vV+'" style="text-align:center;font-family:monospace;font-weight:700;color:var(--gr);font-size:14px;padding:5px 8px;border-color:rgba(34,197,94,.3)" oninput="marcouMudanca('+p.id+')" onfocus="this.select()"></div>'
@@ -7658,45 +8403,7 @@ function pgEstoque(){
   var entradasH=resumoEntr+filtH
     +'<div class="card" style="padding:0;overflow:hidden">'+entrRows+'</div>';
 
-  // ── Totais gerais do estoque ──
-  var _totEstKg=0,_totEstVal=0,_totEstValC=0,_totProdutos=0,_totProdNeg=0;
-  for(var _i=0;_i<DB.produtos.length;_i++){var _pp=DB.produtos[_i];_totEstKg+=_pp.est;_totEstVal+=_pp.est*_pp.vV;_totEstValC+=_pp.est*_pp.vC;_totProdutos++;if(_pp.est<0)_totProdNeg++;}
-  var estTotalBanner='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:12px">'
-    +'<div class="card" style="padding:10px 14px;background:linear-gradient(135deg,var(--s1),rgba(34,197,94,0.07));border-color:rgba(34,197,94,0.25)">'
-    +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">&#9997; Total em Estoque</div>'
-    +'<div style="font-size:20px;font-weight:800;color:var(--gr);font-family:monospace;line-height:1">'+fKg(_totEstKg)+' <span style="font-size:12px">kg</span></div>'
-    +'</div>'
-    +'<div class="card" style="padding:10px 14px;background:linear-gradient(135deg,var(--s1),rgba(245,158,11,0.07));border-color:rgba(245,158,11,0.25)">'
-    +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">&#128176; Valor (Venda)</div>'
-    +'<div style="font-size:18px;font-weight:800;color:var(--or);font-family:monospace;line-height:1">'+fR(_totEstVal)+'</div>'
-    +'</div>'
-    +'<div class="card" style="padding:10px 14px;background:linear-gradient(135deg,var(--s1),rgba(59,130,246,0.07));border-color:rgba(59,130,246,0.25)">'
-    +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">&#128201; Valor (Compra)</div>'
-    +'<div style="font-size:18px;font-weight:800;color:var(--bl);font-family:monospace;line-height:1">'+fR(_totEstValC)+'</div>'
-    +'</div>'
-    +'<div class="card" style="padding:10px 14px">'
-    +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">&#128230; Materiais</div>'
-    +'<div style="font-size:20px;font-weight:800;color:var(--tx);font-family:monospace;line-height:1">'+_totProdutos+'</div>'
-    +(_totProdNeg>0?'<div style="font-size:10px;color:var(--rd);margin-top:2px">&#9888; '+_totProdNeg+' negativo(s)</div>':'<div style="font-size:10px;color:var(--gr);margin-top:2px">&#10003; Tudo positivo</div>')
-    +'</div>'
-    +'</div>';
-
-  return '<div class="fc"><div class="ptop"><div><div class="pl">Materiais</div><div class="pt">Estoque</div></div><div style="display:flex;gap:7px"><button class="btnO bOb" onclick="mTransf()">Transferencia</button><button class="btn" onclick="mNovoProd()">+ Material</button></div></div>'
-    +alertasBanner
-    +(eTab==='p'?estTotalBanner:'')
-    +'<div class="tabs"><button class="tabbtn'+(eTab==='p'?' on':'')+'" onclick="swET(\&apos;p\&apos;)">Produtos</button><button class="tabbtn'+(eTab==='e'?' on':'')+'" onclick="swET(\&apos;e\&apos;)">&#128229; Entradas</button><button class="tabbtn'+(eTab==='t'?' on':'')+'" onclick="swET(\&apos;t\&apos;)">Transferencias</button><button class="tabbtn'+(eTab==='pr'?' on':'')+'" onclick="swET(\&apos;pr\&apos;)">&#9998; Precos</button><button class="tabbtn'+(eTab==='rel'?' on':'')+'" onclick="swET(\&apos;rel\&apos;)">&#128202; Relatorio</button></div>'
-    +(eTab==='p'?buscaBar+sortBar+chipsBar
-      +'<div style="display:flex;justify-content:flex-end;gap:5px;margin-bottom:10px">'
-      +'<button onclick="swEVista(\'card\')" style="border:1px solid '+(eVista==='card'?'var(--gr)':'var(--bd)')+';background:'+(eVista==='card'?'var(--grb)':'transparent')+';color:'+(eVista==='card'?'var(--gr)':'var(--mt)')+';border-radius:7px;padding:5px 11px;font-size:15px;cursor:pointer" title="Cards">&#9783;</button>'
-      +'<button onclick="swEVista(\'lista\')" style="border:1px solid '+(eVista==='lista'?'var(--gr)':'var(--bd)')+';background:'+(eVista==='lista'?'var(--grb)':'transparent')+';color:'+(eVista==='lista'?'var(--gr)':'var(--mt)')+';border-radius:7px;padding:5px 11px;font-size:15px;cursor:pointer" title="Lista">&#9776;</button>'
-      +'</div>'
-      +'<div id="est-produtos-ct">'+(eVista==='lista'?lista:'<div class="g3">'+cards+'</div>')+'</div>'
-      :'')
-    +(eTab==='e'?entradasH
-      :eTab==='t'?'<div class="card" style="padding:0;overflow:hidden">'+(rows||'<div style="padding:20px;text-align:center;color:var(--mt)">Nenhuma transferencia registrada.</div>')+'</div>'
-      :eTab==='rel'?_buildEstRelatorio()
-      :eTab==='pr'?precosH:'')
-    +'</div>';
+  return {precosH:precosH,entradasH:entradasH};
 }
 var _precMudados={};
 function marcouMudanca(id){
@@ -7773,63 +8480,9 @@ function salvarTodosPrecos(){
 }
 function pgEstVis(){
   var max=0.1;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].est>max)max=DB.produtos[i].est;}
-  var cards='';for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];var ec=p.est===0?'var(--rd)':'var(--gr)';cards+='<div class="card"><div style="font-size:23px;margin-bottom:7px">'+p.ic+'</div><div style="font-size:14px;font-weight:700">'+p.nome+'</div><div style="font-size:22px;font-weight:800;color:'+ec+';font-family:monospace;margin:5px 0">'+fKg(p.est)+' kg</div><div class="bw"><div class="bf" style="width:'+Math.round((p.est/max)*100)+'%;background:'+(p.est===0?'var(--rd)':'linear-gradient(90deg,var(--gr2),var(--gr))')+'"></div></div></div>';}
+  var cards='';for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];if(p.arquivado)continue;var ec=p.est===0?'var(--rd)':'var(--gr)';cards+='<div class="card"><div style="font-size:23px;margin-bottom:7px">'+p.ic+'</div><div style="font-size:14px;font-weight:700">'+p.nome+'</div><div style="font-size:22px;font-weight:800;color:'+ec+';font-family:monospace;margin:5px 0">'+fKg(p.est)+' kg</div><div class="bw"><div class="bf" style="width:'+Math.round((p.est/max)*100)+'%;background:'+(p.est===0?'var(--rd)':'linear-gradient(90deg,var(--gr2),var(--gr))')+'"></div></div></div>';}
   return '<div class="fc"><div><div class="pl">Materiais</div><div class="pt">Consulta de Estoque</div></div><div class="g3">'+cards+'</div></div>';
 }
-function _buildEstProdutos(){
-  var max=0.1;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].est>max)max=DB.produtos[i].est;}
-  var prodsFiltrados=DB.produtos.filter(function(p){
-    var matchBusca=!_estBusca||p.nome.toLowerCase().indexOf(_estBusca.toLowerCase())>=0;
-    var matchFiltro=_estFiltro==='Todos'||p.cat===_estFiltro;
-    return matchBusca&&matchFiltro;
-  }).slice().sort(function(a,b){
-    var v=0;
-    if(_estOrdem==='nome') v=a.nome.localeCompare(b.nome,'pt-BR');
-    else if(_estOrdem==='preco') v=a.vV-b.vV;
-    else if(_estOrdem==='cat') v=(a.cat||'').localeCompare(b.cat||'','pt-BR');
-    else if(_estOrdem==='est') v=a.est-b.est;
-    else v=a.id-b.id;
-    return v*_estOrdemDir;
-  });
-  var cards='',lista='<div class="card" style="padding:0;overflow:hidden"><table class="tbl" style="width:100%"><thead><tr><th>Material</th><th style="text-align:right">Estoque</th><th style="text-align:right">Venda</th><th style="text-align:right">Compra</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody>';
-  for(var i=0;i<prodsFiltrados.length;i++){
-    var p=prodsFiltrados[i];
-    var ec=p.est<0?'var(--rd)':p.est===0?'var(--mt)':'var(--gr)';
-    var fcor=(DB.filtrosMat.find(function(f){return f.nome===p.cat;})||{cor:'#6b7280'}).cor;
-    var bw=Math.min(100,Math.round((p.est/max)*100));
-    cards+='<div class="card" style="position:relative;cursor:pointer" onclick="mEditProd('+p.id+')">'
-      +'<div style="font-size:23px;margin-bottom:7px">'+p.ic+'</div>'
-      +'<div style="font-size:14px;font-weight:700;margin-bottom:3px">'+p.nome+'</div>'
-      +'<span style="display:inline-block;margin-bottom:6px;padding:1px 7px;border-radius:10px;font-size:9px;font-weight:700;color:'+fcor+';background:'+fcor+'22;border:1px solid '+fcor+'44">'+p.cat+'</span>'
-      +'<div style="font-size:22px;font-weight:800;color:'+ec+';font-family:monospace;margin:3px 0">'+fKg(p.est)+'<span style="font-size:12px;font-weight:400"> kg</span></div>'
-      +'<div class="bw" style="margin-bottom:8px"><div class="bf" style="width:'+bw+'%;background:'+(p.est<=0?'var(--rd)':'linear-gradient(90deg,var(--gr2),var(--gr))')+';"></div></div>'
-      +'<div style="font-size:11px;color:var(--mt);margin-bottom:8px">Venda: <strong>'+fR(p.vV)+'/kg</strong> &nbsp; Compra: <strong>'+fR(p.vC)+'/kg</strong></div>'
-      +'<div style="display:flex;gap:6px;margin-top:4px">'
-      +'<button class="btn" style="flex:1;font-size:12px;padding:6px" onclick="event.stopPropagation();mTransfPre('+p.id+')">Transferir</button>'
-      +'<button class="btnO bOb" style="font-size:12px;padding:6px 10px" onclick="event.stopPropagation();mEditProd('+p.id+')" title="Editar">&#9998;</button>'
-      +'<button class="btnO bOr" style="font-size:12px;padding:6px 10px" onclick="event.stopPropagation();mDelProd('+p.id+')" title="Excluir">&#128465;</button>'
-      +'</div></div>';
-    lista+='<tr style="border-bottom:1px solid var(--bd)">'
-      +'<td style="padding:9px 12px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">'+p.ic+'</span><div><div style="font-size:13px;font-weight:700">'+p.nome+'</div><span style="display:inline-block;margin-top:2px;padding:1px 6px;border-radius:10px;font-size:9px;font-weight:600;color:'+fcor+';background:'+fcor+'22;border:1px solid '+fcor+'44;letter-spacing:.3px">'+p.cat+'</span></div></div></td>'
-      +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-weight:700;color:'+ec+'">'+fKg(p.est)+' kg</td>'
-      +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-size:12px;color:var(--gr)">'+fR(p.vV)+'/kg</td>'
-      +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-size:12px;color:var(--bl)">'+fR(p.vC)+'/kg</td>'
-      +'<td style="padding:9px 12px;text-align:right;font-family:monospace;font-size:12px;color:var(--or)">'+fR(p.est*p.vV)+'</td>'
-      +'<td style="padding:9px 12px;text-align:right">'
-      +'<div style="display:flex;gap:4px;justify-content:flex-end">'
-      +'<button class="bsm" style="background:var(--s2);border:1px solid var(--bd);color:var(--mt);padding:3px 7px" onclick="mTransfPre('+p.id+')" title="Transferir">&#8646;</button>'
-      +'<button class="bsm" style="background:var(--blb);border:1px solid rgba(59,130,246,.3);color:var(--bl);padding:3px 7px" onclick="mEditProd('+p.id+')" title="Editar">&#9998;</button>'
-      +'<button class="bsm" style="background:var(--rdb);border:1px solid rgba(239,68,68,.3);color:var(--rd);padding:3px 7px" onclick="mDelProd('+p.id+')" title="Excluir">&#128465;</button>'
-      +'</div></td></tr>';
-  }
-  if(!prodsFiltrados.length){
-    cards='<div class="card" style="text-align:center;padding:30px;color:var(--mt)">&#128269; Nenhum material encontrado.</div>';
-    lista+='<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--mt)">Nenhum material encontrado.</td></tr>';
-  }
-  lista+='</tbody></table></div>';
-  return eVista==='lista'?lista:'<div class="g3">'+cards+'</div>';
-}
-function swET(t){eTab=t;go('estoque');}
 
 // Períodos dos relatórios
 var _estRelPer='mes';
@@ -7919,35 +8572,36 @@ function _aplicarMesPer(varName,onchange){
   window[onchange+'Custom']();
 }
 
+// Compras e vendas por material no período — montado das pesagens (caixa aberto, caixas
+// fechados, Arquivo e Em Aberto), cada atendimento uma vez, com o peso líquido.
+function _estRelMaps(per,d1,d2){
+  var comp={},vend={};
+  _estMovs().forEach(function(m){
+    if(m.tipo!=='compra'&&m.tipo!=='venda')return;
+    if(!_perFiltro(m.data||'',per,d1,d2))return;
+    var mp=m.tipo==='compra'?comp:vend,k=m.pId;
+    if(!mp[k])mp[k]={kg:0,val:0,aberto:0};
+    mp[k].kg+=Math.abs(m.kg);mp[k].val+=+m.val||0;if(m.pes&&m.pes.aberto)mp[k].aberto+=+m.val||0;
+  });
+  return {comp:comp,vend:vend};
+}
 function _buildEstRelatorio(){
   var per=_estRelPer;
   var perBar=_buildPerBar(per,'estRel','','','swEstRelPer');
-
-  var compMap={};var vendMap={};
-  function _addItens(ah, data){
-    if(!_perFiltro(data,per,_estRelD1,_estRelD2))return;
-    var itens=ah.itens||ah.itensList||[];
-    for(var j=0;j<itens.length;j++){
-      var it=itens[j];var pId=it.pId||it.prodId;if(!pId)continue;
-      var val=_itVal(it);var kg=it.peso||0;
-      if(ah.tipo==='Compra'){if(!compMap[pId])compMap[pId]={kg:0,val:0};compMap[pId].kg+=kg;compMap[pId].val+=val;}
-      else if(ah.tipo==='Venda'){if(!vendMap[pId])vendMap[pId]={kg:0,val:0};vendMap[pId].kg+=kg;vendMap[pId].val+=val;}
-    }
-  }
-
-  for(var i=0;i<atendHist.length;i++) _addItens(atendHist[i], hj());
-  if(DB.caixasHist){
-    for(var i=0;i<DB.caixasHist.length;i++){
-      var cx=DB.caixasHist[i];var mvs=cx.movimentos||[];
-      for(var j=0;j<mvs.length;j++) _addItens({tipo:mvs[j].tipo,itens:mvs[j].itensList||[]},cx.data||'');
-    }
-  }
+  if(_estArqStatus==='')_estCarregarArquivo(function(){if(pgAtiva==='estoque'&&eTab==='rel')go('estoque');});
+  var _rm=_estRelMaps(per,_estRelD1,_estRelD2),compMap=_rm.comp,vendMap=_rm.vend;
+  perBar+=_estArqAviso();
 
   var totCompVal=0,totVendVal=0;
   for(var k in compMap)totCompVal+=compMap[k].val;
   for(var k in vendMap)totVendVal+=vendMap[k].val;
   var totLucro=totVendVal-totCompVal;
   var totMargem=totVendVal>0?Math.round((totLucro/totVendVal)*100):0;
+  // Lucro estimado: kg vendido × (preço médio de venda − preço médio de compra) — só
+  // para materiais com compra E venda no período (sem compra não há custo para comparar)
+  var totLucroEst=0;
+  for(var k in vendMap){var _c=compMap[k];if(_c&&_c.kg>0&&vendMap[k].kg>0)totLucroEst+=vendMap[k].kg*(vendMap[k].val/vendMap[k].kg-_c.val/_c.kg);}
+  var totMargemEst=totVendVal>0?Math.round((totLucroEst/totVendVal)*100):0;
 
   var resumo='<div class="g4" style="margin-bottom:14px">'
     +'<div class="card" style="background:linear-gradient(135deg,var(--s1),rgba(59,130,246,.08));border-color:rgba(59,130,246,.2)">'
@@ -7957,23 +8611,26 @@ function _buildEstRelatorio(){
     +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Total Vendido</div>'
     +'<div style="font-size:20px;font-weight:800;color:var(--gr);font-family:monospace">'+fR(totVendVal)+'</div></div>'
     +'<div class="card" style="background:linear-gradient(135deg,var(--s1),rgba(34,197,94,.08));border-color:rgba(34,197,94,.2)">'
-    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Lucro</div>'
-    +'<div style="font-size:20px;font-weight:800;color:'+(totLucro>=0?'var(--gr)':'var(--rd)')+';font-family:monospace">'+fR(totLucro)+'</div></div>'
+    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Vendas − Compras</div>'
+    +'<div style="font-size:20px;font-weight:800;color:'+(totLucro>=0?'var(--gr)':'var(--rd)')+';font-family:monospace">'+fR(totLucro)+'</div>'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Diferença de caixa, não é lucro</div></div>'
     +'<div class="card" style="background:linear-gradient(135deg,var(--s1),rgba(168,85,247,.08));border-color:rgba(168,85,247,.2)">'
-    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Margem</div>'
-    +'<div style="font-size:20px;font-weight:800;color:var(--pu);font-family:monospace">'+totMargem+'%</div></div>'
+    +'<div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Lucro estimado</div>'
+    +'<div style="font-size:20px;font-weight:800;color:'+(totLucroEst>=0?'var(--pu)':'var(--rd)')+';font-family:monospace">'+fR(totLucroEst)+'</div>'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Margem '+totMargemEst+'% · kg vendido × (PM venda − PM compra)</div></div>'
     +'</div>';
 
   var rows='';
   for(var i=0;i<DB.produtos.length;i++){
     var p=DB.produtos[i];
-    var comp=compMap[p.id]||{kg:0,val:0};
-    var vend=vendMap[p.id]||{kg:0,val:0};
+    var comp=compMap[_normId(p.id)]||{kg:0,val:0};
+    var vend=vendMap[_normId(p.id)]||{kg:0,val:0};
     if(comp.val===0&&vend.val===0)continue;
     var pmComp=comp.kg>0?comp.val/comp.kg:0;
     var pmVend=vend.kg>0?vend.val/vend.kg:0;
     var lucro=vend.val-comp.val;
-    var margem=vend.val>0?Math.round((lucro/vend.val)*100):0;
+    var lucroEst=(comp.kg>0&&vend.kg>0)?vend.kg*(pmVend-pmComp):null;
+    var margem=(lucroEst!=null&&vend.val>0)?Math.round((lucroEst/vend.val)*100):null;
     rows+='<tr>'
       +'<td style="padding:8px 10px;font-weight:600;font-size:12px">'+p.ic+' '+p.nome+'</td>'
       +'<td style="padding:8px 10px;text-align:right;font-family:monospace;font-size:11px;color:var(--bl)">'+fKg(comp.kg)+' kg</td>'
@@ -7982,8 +8639,9 @@ function _buildEstRelatorio(){
       +'<td style="padding:8px 10px;text-align:right;font-family:monospace;font-size:11px;color:var(--gr)">'+fKg(vend.kg)+' kg</td>'
       +'<td style="padding:8px 10px;text-align:right;font-family:monospace;font-size:11px;color:var(--gr)">'+fR(vend.val)+'</td>'
       +'<td style="padding:8px 10px;text-align:right;font-family:monospace;font-size:11px;color:var(--mt)">'+fR(pmVend)+'/kg</td>'
-      +'<td style="padding:8px 10px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:'+(lucro>=0?'var(--gr)':'var(--rd)')+'">'+fR(lucro)+'</td>'
-      +'<td style="padding:8px 10px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:'+(margem>=0?'var(--gr)':'var(--rd)')+'">'+margem+'%</td>'
+      +'<td style="padding:8px 10px;text-align:right;font-family:monospace;font-size:11px;color:'+(lucro>=0?'var(--gr)':'var(--rd)')+'">'+fR(lucro)+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:'+(lucroEst==null?'var(--mt)':lucroEst>=0?'var(--gr)':'var(--rd)')+'">'+(lucroEst==null?'—':fR(lucroEst))+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;font-family:monospace;font-size:12px;font-weight:700;color:'+(margem==null?'var(--mt)':margem>=0?'var(--gr)':'var(--rd)')+'">'+(margem==null?'—':margem+'%')+'</td>'
       +'</tr>';
   }
 
@@ -8000,11 +8658,13 @@ function _buildEstRelatorio(){
     +'<th style="padding:9px 10px;text-align:right;color:var(--gr)">Kg Vend.</th>'
     +'<th style="padding:9px 10px;text-align:right;color:var(--gr)">Val. Vend.</th>'
     +'<th style="padding:9px 10px;text-align:right">PM Vend.</th>'
-    +'<th style="padding:9px 10px;text-align:right">Lucro</th>'
-    +'<th style="padding:9px 10px;text-align:right">Margem</th>'
+    +'<th style="padding:9px 10px;text-align:right">Vendas − Compras</th>'
+    +'<th style="padding:9px 10px;text-align:right">Lucro est.</th>'
+    +'<th style="padding:9px 10px;text-align:right">Margem est.</th>'
     +'</tr></thead>'
     +'<tbody>'+rows+'</tbody>'
-    +'</table></div>';
+    +'</table></div>'
+    +'<div style="font-size:10.5px;color:var(--mt);margin-top:6px;line-height:1.5">“—” no lucro estimado: material sem compra no período, então não há custo para comparar. Inclui as pesagens do Em Aberto (pela data em que foram pesadas) e usa o peso líquido.</div>';
 }
 function swEstRelPer(p){_estRelPer=p;go('estoque');}
 function swEstRelPerCustom(){
@@ -8016,8 +8676,6 @@ function swEstRelPerCustom(){
     _estRelPer='custom';go('estoque');
   }
 }
-var eVista='card'; // 'card' ou 'lista'
-function swEVista(v){eVista=v;go('estoque');}
 var _ICONES_MAT={
   'Placas':['🟫','🟩','🟨','🟦','🟥','🟪','⬛','🔲','📟','💾','💿','📀','🖥️','💻','📠','📺','📡','🔌','🔋','🖨️'],
   'Eletrônicos':['📱','☎️','📞','⌨️','🖱️','📷','📸','📹','🎥','📻','🔭','🔬','💡','🔦','🕹️','🎮','⌚','📲','🖲️','🗜️'],
@@ -8064,43 +8722,6 @@ if(!window._icDropListenerSet){
   document.addEventListener('click',function(){document.querySelectorAll('[id$="-ic-drop"]').forEach(function(d){d.style.display='none';});});
 }
 
-function mHistProd(id){
-  var p=gP(id);if(!p)return;
-  // Busca todas as entradas e movimentações do produto
-  var hist=[];
-  for(var i=0;i<DB.entradas.length;i++){
-    var e=DB.entradas[i];
-    if(String(e.pId)===String(id))hist.push({data:e.data,tipo:e.tipo==='Compra'?'Entrada Compra':e.tipo==='Doacao'?'Entrada Doacao':'Entrada '+e.tipo,peso:e.peso,val:e.total,cor:'var(--gr)'});
-  }
-  // Movs de venda associados ao produto (por pesagem)
-  for(var i=0;i<DB.caixasHist.length;i++){
-    var cx=DB.caixasHist[i];var mvs=cx.movimentos||[];
-    for(var j=0;j<mvs.length;j++){
-      var mv=mvs[j];var itens=mv.itensList||mv.itens||[];
-      for(var k=0;k<itens.length;k++){
-        if(String(itens[k].pId||itens[k].prodId)===String(id)){
-          hist.push({data:cx.data||'',tipo:'Saída Venda',peso:itens[k].peso||0,val:(itens[k].peso||0)*(itens[k].preco||0),cor:'var(--rd)'});
-        }
-      }
-    }
-  }
-  // Ajustes de inventário
-  var ajustes=p.ajustes||[];
-  for(var i=0;i<ajustes.length;i++){
-    var aj=ajustes[i];
-    hist.push({data:aj.data,tipo:'Ajuste '+aj.tipo,peso:aj.delta,val:0,obs:aj.obs,cor:'var(--or)'});
-  }
-  hist.sort(function(a,b){try{return _parseDataBR(b.data)-_parseDataBR(a.data);}catch(e){return 0;}});
-  var rows='';
-  for(var i=0;i<Math.min(hist.length,30);i++){
-    var h=hist[i];
-    rows+='<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--bd)">'      +'<div><div style="font-size:12px;font-weight:600">'+h.data+'</div><div style="font-size:10px;color:'+h.cor+'">'+h.tipo+(h.obs?' — '+h.obs:'')+'</div></div>'      +'<div style="text-align:right"><div style="font-size:13px;font-weight:700;color:'+h.cor+';font-family:monospace">'+(h.peso>=0?'+':'')+fKg(h.peso)+'kg</div>'      +(h.val>0?'<div style="font-size:10px;color:var(--mt)">'+fR(h.val)+'</div>':'')+'</div></div>';
-  }
-  if(!rows)rows='<div style="text-align:center;padding:24px;color:var(--mt);font-size:12px">Nenhuma movimentação encontrada.</div>';
-  openM(p.ic+' '+p.nome+' — Histórico',
-    '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:2px solid var(--bd);margin-bottom:4px">'    +'<span style="font-size:11px;color:var(--mt)">Estoque atual</span>'    +'<span style="font-size:16px;font-weight:700;font-family:monospace;color:'+(p.est<0?'var(--rd)':'var(--gr)')+'">'+fKg(p.est)+'kg</span></div>'    +'<div style="max-height:55vh;overflow-y:auto">'+rows+'</div>',460);
-}
-
 function mAjusteProd(id){
   var p=gP(id);if(!p)return;
   openM(p.ic+' '+p.nome+' — Ajuste de Inventário',
@@ -8115,20 +8736,6 @@ function selAjTipo(t){
   if(t==='add'){bA.style.background='var(--grb)';bA.style.borderColor='var(--gr)';bA.style.color='var(--gr)';bR.style.background='var(--s2)';bR.style.borderColor='var(--bd)';bR.style.color='var(--mt)';}
   else{bR.style.background='var(--rdb)';bR.style.borderColor='var(--rd)';bR.style.color='var(--rd)';bA.style.background='var(--s2)';bA.style.borderColor='var(--bd)';bA.style.color='var(--mt)';}
 }
-function saveAjusteProd(id){
-  var p=gP(id);if(!p)return;
-  var tipo=document.getElementById('aj-tipo').value;
-  var kg=parseFloat(document.getElementById('aj-kg').value)||0;
-  var obs=document.getElementById('aj-obs').value.trim();
-  if(kg<=0){alert('Informe a quantidade!');return;}
-  if(!obs){alert('Informe o motivo do ajuste!');return;}
-  var delta=tipo==='add'?kg:-kg;
-  p.est=+(p.est+delta).toFixed(3);
-  if(!p.ajustes)p.ajustes=[];
-  p.ajustes.push({data:hj(),tipo:tipo==='add'?'Entrada':'Saída',delta:delta,obs:obs,antes:+(p.est-delta).toFixed(3),depois:p.est});
-  saveDB();closeM();go('estoque');
-}
-
 function mNovoProd(){
   var catO='';for(var i=0;i<DB.filtrosMat.length;i++){var f=DB.filtrosMat[i];if(f.nome==='Todos')continue;catO+='<option value="'+f.nome+'">'+f.ic+' '+f.nome+'</option>';}
   var defIc='📦';
@@ -8229,90 +8836,6 @@ function saveEditProd(id){
   }
   saveDB();closeM();go('estoque');
 }
-function mDelProd(id){
-  var p=gP(id);if(!p)return;
-  openM('Excluir Produto','<div class="mf"><div class="al alr">Tem certeza que deseja excluir <strong>'+p.nome+'</strong>? Esta acao nao pode ser desfeita.</div><div style="background:var(--s2);border-radius:var(--r);padding:11px;font-size:13px"><div style="display:flex;justify-content:space-between"><span style="color:var(--mt)">Estoque atual:</span><span style="font-family:monospace">'+fKg(p.est)+' kg</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--mt)">Valor em estoque:</span><span style="color:var(--or);font-family:monospace">'+fR(p.est*p.vV)+'</span></div></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn btn-rd" onclick="confDelProd('+id+')">Excluir</button></div></div>');
-}
-function confDelProd(id){
-  var idx=-1;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].id===id){idx=i;break;}}
-  if(idx<0)return;
-  DB.produtos.splice(idx,1);
-  // Remove das tabelas
-  for(var i=0;i<DB.tabelas.length;i++){var t=DB.tabelas[i];for(var j=t.itens.length-1;j>=0;j--){if(t.itens[j].pId===id)t.itens.splice(j,1);}}
-  saveDB();closeM();go('estoque');
-}
-var transfDestinos=[];
-function mTransf(preId){
-  var o1='';for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];o1+='<option value="'+p.nome+'">'+p.ic+' '+p.nome+' ('+fKg(p.est)+'kg)</option>';}
-  transfDestinos=[];
-  openM('Transferencia / Desmontagem','<div class="mf"><div class="al alb">Use para desmontagem. Ex: 10kg Eletronicos &rarr; 5kg Placas + 3kg Ferro</div>'
-    +'<div class="fld"><label>Material de origem</label><select class="inp" id="t-de">'+o1+'</select></div>'
-    +'<div style="margin-top:4px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px"><span style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Destinos</span><button class="bsm bsmg" onclick="addTransfDest()" style="padding:4px 12px">+ Destino</button></div>'
-    +'<div id="t-dests"></div>'
-    +'<div id="t-total-box" style="display:none;background:var(--s2);border-radius:var(--r);padding:8px 11px;margin-top:6px;font-size:12px;display:flex;justify-content:space-between"><span style="color:var(--mt)">Total retirado da origem:</span><span id="t-total-val" style="font-family:monospace;font-weight:700;color:var(--rd)">0.00 kg</span></div>'
-    +'</div>'
-    +'<div class="fld"><label>Observacao</label><input class="inp" id="t-ob" placeholder="Ex: Desmontagem lote 03"></div>'
-    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="saveTransf()">Registrar</button></div></div>',520);
-  addTransfDest();
-  if(preId){setTimeout(function(){var p=gP(preId);if(p){var s=document.getElementById('t-de');if(s)for(var i=0;i<s.options.length;i++){if(s.options[i].value===p.nome){s.value=p.nome;break;}}}},50);}
-}
-function addTransfDest(){
-  var o2='';for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];o2+='<option value="'+p.nome+'">'+p.ic+' '+p.nome+'</option>';}
-  var idx=transfDestinos.length;
-  transfDestinos.push({});
-  var box=document.getElementById('t-dests');if(!box)return;
-  var row=document.createElement('div');
-  row.id='td-row-'+idx;
-  row.style.cssText='display:grid;grid-template-columns:1fr 110px 28px;gap:7px;align-items:end;margin-bottom:7px';
-  row.innerHTML='<div class="fld"><label>Material destino</label><select class="inp" id="td-pa-'+idx+'">'+o2+'</select></div>'
-    +'<div class="fld"><label>Peso (kg)</label><input class="inp" type="number" inputmode="decimal" id="td-pe-'+idx+'" placeholder="0.00" oninput="updTransfTotal()"></div>'
-    +'<button class="btnO bOr" style="padding:6px;min-height:36px;font-size:15px;align-self:flex-end" onclick="remTransfDest('+idx+')" title="Remover">&#215;</button>';
-  box.appendChild(row);
-  updTransfTotal();
-}
-function remTransfDest(idx){
-  var row=document.getElementById('td-row-'+idx);if(row)row.remove();
-  updTransfTotal();
-}
-function updTransfTotal(){
-  var total=0;
-  var box=document.getElementById('t-dests');if(!box)return;
-  var inputs=box.querySelectorAll('input[type="number"]');
-  for(var i=0;i<inputs.length;i++)total+=parseFloat(inputs[i].value)||0;
-  var tv=document.getElementById('t-total-val');if(tv)tv.textContent=fKg(total)+' kg';
-  var tb=document.getElementById('t-total-box');if(tb)tb.style.display='flex';
-}
-function mTransfPre(id){mTransf(id);}
-function saveTransf(){
-  var de=document.getElementById('t-de').value;
-  var ob=document.getElementById('t-ob').value;
-  var box=document.getElementById('t-dests');if(!box){alert('Erro interno!');return;}
-  // Coleta todos os destinos visiveis
-  var rows=box.querySelectorAll('div[id^="td-row-"]');
-  var destinos=[];var totalPE=0;
-  for(var i=0;i<rows.length;i++){
-    var rowId=rows[i].id.replace('td-row-','');
-    var paSel=document.getElementById('td-pa-'+rowId);
-    var pePeso=document.getElementById('td-pe-'+rowId);
-    if(!paSel||!pePeso)continue;
-    var pa=paSel.value,pe=parseFloat(pePeso.value)||0;
-    if(pa&&pe>0){destinos.push({para:pa,pE:pe});totalPE+=pe;}
-  }
-  if(!de||destinos.length===0||totalPE===0){alert('Preencha ao menos um destino com peso!');return;}
-  // Desconta da origem o total de todos os destinos
-  var pDe=null;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].nome===de){pDe=DB.produtos[i];break;}}
-  if(pDe)pDe.est=+(pDe.est-totalPE).toFixed(2);
-  // Para cada destino, adiciona ao estoque e salva registro
-  for(var i=0;i<destinos.length;i++){
-    var d=destinos[i];
-    var pPa=null;for(var j=0;j<DB.produtos.length;j++){if(DB.produtos[j].nome===d.para){pPa=DB.produtos[j];break;}}
-    if(pPa)pPa.est=+(pPa.est+d.pE).toFixed(2);
-    DB.transf.unshift({id:nid(),data:hj(),de:de,para:d.para,pS:+(totalPE/destinos.length).toFixed(2),pE:d.pE,obs:ob+(destinos.length>1?' ('+i+1+'/'+destinos.length+')':'')});
-  }
-  autoSave();closeM();go('estoque');
-}
-
-
 var revCatFiltro='Todos';
 var revCondFiltro='Todas';
 var revAnuncioFiltro='Todos'; // 'Todos' | 'Sim' | 'Nao'
@@ -9284,7 +9807,7 @@ function confirmarAddUnidade(idRef){
     DB.revenda.push({
       id:nid(),prod:novoNome,desc:ref.desc,peso:peso,
       cond:ref.cond,preco:ref.preco,status:'Disponivel',
-      cat:ref.cat,estProdId:ref.estProdId,
+      cat:ref.cat,estProdId:ref.estProdId,dataCad:hj(),
       testesAprovados:(ref.testesAprovados||[]).slice()
     });
     // Abate do estoque
@@ -10426,6 +10949,7 @@ function mEditRev(id){
   for(var i=0;i<DB.produtos.length;i++){
     var p=DB.produtos[i];
     var sel=_normId(it.estProdId)===_normId(p.id);
+    if(p.arquivado&&!sel)continue;
     prodO+='<option value="'+p.id+'"'+(sel?' selected':'')+'>'+p.ic+' '+p.nome+' (Est: '+fKg(p.est)+'kg)</option>';
   }
 
@@ -10628,6 +11152,7 @@ function saveEditRev(id,forcarStatus){
     if(deltaQtd!==0&&it.estProdId&&it.peso>0){
       var epQ=null;for(var i=0;i<DB.produtos.length;i++){if(_normId(DB.produtos[i].id)===_normId(it.estProdId)){epQ=DB.produtos[i];break;}}
       if(epQ)epQ.est=+(epQ.est-deltaQtd*it.peso).toFixed(3);
+      it.qtdCad=(it.qtdCad||it.qtdEstoque||0)+deltaQtd; // Extrato: total de peças tiradas do material
     }
     it.qtdEstoque=qtdNovo;
     if(qtdNovo>0&&it.status==='Vendido')it.status='Disponivel';
@@ -10708,7 +11233,7 @@ function confDelRev(id){
     var it=DB.revenda[idx];
     // Devolve ao estoque se ainda estava Disponível (não vendido)
     if(it.status==='Disponivel'&&it.estProdId&&it.peso>0){
-      var ep=gP(it.estProdId);if(ep)ep.est=+(ep.est+it.peso).toFixed(2);
+      var ep=gP(it.estProdId);if(ep)ep.est=+(ep.est+it.peso).toFixed(3);
     }
     DB.revenda.splice(idx,1);
   }
@@ -10795,7 +11320,7 @@ function mNovoRev(){
   var condO='<option value="">-- Sem condicao --</option>';
   for(var i=0;i<DB.revendaStates.length;i++)condO+='<option>'+DB.revendaStates[i]+'</option>';
   var prodO='<option value="">-- Peso manual --</option>';
-  for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];prodO+='<option value="'+p.id+'">'+p.ic+' '+p.nome+' (Est: '+fKg(p.est)+'kg)</option>';}
+  for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];if(p.arquivado)continue;prodO+='<option value="'+p.id+'">'+p.ic+' '+p.nome+' (Est: '+fKg(p.est)+'kg)</option>';}
   var firstCat=DB.revendaCats.length>0?DB.revendaCats[0].nome:'';
   var clHtml=firstCat?renderChecklistHtml(firstCat,[],'nr'):'';
   openM('Novo Produto Revenda','<div class="mf">'
@@ -10900,7 +11425,7 @@ function saveRev(forcarStatus){
   if(tipoUnidade==='quantidade'){
     // Todas idênticas: 1 registro só, com quantidade em estoque e 1 código único
     var codCurto='BV-'+(DB.revProxCodigo++);
-    DB.revenda.push({id:nid(),codCurto:codCurto,prod:n,marca:marca,modelo:modelo,desc:desc,peso:pesoRev,cond:cond,preco:preco,status:status,manutencaoObs:manutObs,cat:cat,estProdId:pIdSel,testesAprovados:aprovados.slice(),specs:specsResult.specs,specsBoolKeys:specsResult.boolKeys,specsCamposOcultos:specsResult.camposOcultos,checklistExtra:clExtras.extras,checklistOcultos:clExtras.ocultos,tipoUnidade:'quantidade',qtdEstoque:qtd});
+    DB.revenda.push({id:nid(),dataCad:hj(),qtdCad:qtd,codCurto:codCurto,prod:n,marca:marca,modelo:modelo,desc:desc,peso:pesoRev,cond:cond,preco:preco,status:status,manutencaoObs:manutObs,cat:cat,estProdId:pIdSel,testesAprovados:aprovados.slice(),specs:specsResult.specs,specsBoolKeys:specsResult.boolKeys,specsCamposOcultos:specsResult.camposOcultos,checklistExtra:clExtras.extras,checklistOcultos:clExtras.ocultos,tipoUnidade:'quantidade',qtdEstoque:qtd});
     if(pIdSel&&pesoRev>0){
       var ep=null;
       for(var i=0;i<DB.produtos.length;i++){if(_normId(DB.produtos[i].id)===_normId(pIdSel)){ep=DB.produtos[i];break;}}
@@ -10911,7 +11436,7 @@ function saveRev(forcarStatus){
   }
   for(var u=0;u<qtd;u++){
     var codCurto='BV-'+(DB.revProxCodigo++);
-    DB.revenda.push({id:nid(),codCurto:codCurto,prod:n+(qtd>1?' #'+(u+1):''),marca:marca,modelo:modelo,desc:desc,peso:pesoRev,cond:cond,preco:preco,status:status,manutencaoObs:manutObs,cat:cat,estProdId:pIdSel,testesAprovados:aprovados.slice(),specs:specsResult.specs,specsBoolKeys:specsResult.boolKeys,specsCamposOcultos:specsResult.camposOcultos,checklistExtra:clExtras.extras,checklistOcultos:clExtras.ocultos});
+    DB.revenda.push({id:nid(),dataCad:hj(),codCurto:codCurto,prod:n+(qtd>1?' #'+(u+1):''),marca:marca,modelo:modelo,desc:desc,peso:pesoRev,cond:cond,preco:preco,status:status,manutencaoObs:manutObs,cat:cat,estProdId:pIdSel,testesAprovados:aprovados.slice(),specs:specsResult.specs,specsBoolKeys:specsResult.boolKeys,specsCamposOcultos:specsResult.camposOcultos,checklistExtra:clExtras.extras,checklistOcultos:clExtras.ocultos});
     if(pIdSel&&pesoRev>0){
       var ep=null;
       for(var i=0;i<DB.produtos.length;i++){if(_normId(DB.produtos[i].id)===_normId(pIdSel)){ep=DB.produtos[i];break;}}
@@ -11553,7 +12078,6 @@ function _finResumo(){
   // totais gerais — exclui movimentações internas (transferência, reforço, ajuste de caixa),
   // que não são receita nem despesa de verdade, pra bater com o número do DRE
   var _movs=_filtrarMovsPeriodo(DB.movs).filter(function(m){return !_isMovInterna(m);});
-  var _ents=_filtrarEntradasPeriodo(DB.entradas);
   var ent=0,sai=0;
   for(var i=0;i<_movs.length;i++){if(_movs[i].tipo==='entrada')ent+=_movs[i].valor;else sai+=_movs[i].valor;}
   var sal=0;for(var i=0;i<DB.contas.length;i++)sal+=DB.contas[i].saldo;
@@ -15721,7 +16245,7 @@ function _nomeTab(tabId){for(var i=0;i<DB.tabelas.length;i++)if(String(DB.tabela
 // listas de entrada/saída da Produção — são os que o usuário desmonta com mais frequência,
 // então economiza rolagem toda vez que abre uma produção nova.
 function _prodListaOrdenada(){
-  return DB.produtos.slice().sort(function(a,b){
+  return DB.produtos.filter(function(p){return !p.arquivado;}).sort(function(a,b){
     var da=a.prodDestaque?1:0,db=b.prodDestaque?1:0;
     if(da!==db)return db-da; // destaque primeiro
     return (a.nome||'').localeCompare(b.nome||'','pt-BR');
@@ -18256,62 +18780,17 @@ function mHistCli(idx){
   var tipo=c.tipo;
   var rows=[];var total=0;
 
-  function _processAh(ah, data){
-    var tipoAh=ah.tipo;
-    if(tipo==='fornecedor'&&tipoAh!=='Compra')return;
-    if(tipo==='cliente'&&tipoAh!=='Venda')return;
-    var match=String(ah.cliId)===String(c.id)||(ah.label&&ah.label===c.nome);
+  // 5.13: montado das pesagens (caixa aberto, caixas fechados, Arquivo e Em Aberto) —
+  // cada atendimento aparece uma vez, mesmo se foi reaberto e finalizado de novo.
+  var _tiposCli=tipo==='fornecedor'?{compra:'Compra',doacao:'Doacao',lr:'Logistica Reversa'}:{venda:'Venda'};
+  _estMovs().forEach(function(m){
+    if(!_tiposCli[m.tipo]||!m.pes)return;
+    var match=(m.pes.cliId!=null&&m.pes.cliId!==''&&String(m.pes.cliId)===String(c.id))||(m.pes.nome&&m.pes.nome===c.nome);
     if(!match)return;
-    var cor=tipoAh==='Compra'?'var(--rd)':'var(--gr)';
-    var itens=ah.itens||ah.itensList||[];
-    if(itens.length){
-      for(var j=0;j<itens.length;j++){
-        var it=itens[j];
-        var p=gP(it.pId||it.prodId);
-        var val=_itVal(it);
-        total+=val;
-        rows.push({data:data||ah.data||ah.hora||'—',num:'#'+(ah.num||''),desc:p?p.nome:it.nome||'—',kg:it.peso||0,val:val,tipo:tipoAh,cor:cor});
-      }
-    } else {
-      var val=ah.total||0;
-      total+=val;
-      rows.push({data:data||ah.data||ah.hora||'—',num:'#'+(ah.num||''),desc:'Pedido #'+(ah.num||''),kg:0,val:val,tipo:tipoAh,cor:cor});
-    }
-  }
-
-  // 1. atendHist atual
-  var _processados={};// evita duplicar mesmo pedido
-  for(var i=0;i<atendHist.length;i++){
-    var ah=atendHist[i];
-    var key=(ah.num||'')+'-'+(ah.hora||'');
-    if(_processados[key])continue;
-    _processados[key]=true;
-    _processAh(ah, null);
-  }
-
-  // 2. DB.caixasHist permanente
-  if(DB.caixasHist){
-    for(var i=0;i<DB.caixasHist.length;i++){
-      var cx=DB.caixasHist[i];
-      var movs=cx.movimentos||[];
-      for(var j=0;j<movs.length;j++){
-        var mv=movs[j];
-        var key2=(mv.num||'')+'-'+(cx.data||'');
-        if(_processados[key2])continue;
-        _processados[key2]=true;
-        var fakeAh={tipo:mv.tipo,cliId:mv.cliId,label:mv.label,num:mv.num,itens:mv.itensList||[],total:mv.total||0};
-        _processAh(fakeAh, cx.data||'—');
-      }
-    }
-  }
-
-  // 3. Legado — só DB.entradas (não usar DB.movs pois duplica com atendHist)
-  if(tipo==='fornecedor'){
-    for(var i=0;i<DB.entradas.length;i++){
-      var e=DB.entradas[i];
-      if(e.forn===c.nome){var p=gP(e.pId);var val=e.total||0;total+=val;rows.push({data:e.data,num:'',desc:p?p.ic+' '+p.nome:'—',kg:e.peso||0,val:val,tipo:e.tipo,cor:'var(--rd)'});}
-    }
-  }
+    var p=gP(m.pId),val=+m.val||0;total+=val;
+    rows.push({data:m.data||'—',num:(m.pes.num?'#'+m.pes.num:'')+(m.pes.aberto?' · ⏳ Em Aberto':''),desc:p?p.nome:'—',kg:Math.abs(m.kg),val:val,tipo:_tiposCli[m.tipo],cor:m.tipo==='venda'?'var(--gr)':'var(--rd)'});
+  });
+  if(_estArqStatus==='')_estCarregarArquivo(function(){var ov=document.getElementById('m-ov'),t=ov&&ov.querySelector('.mtl');if(ov&&ov.style.display!=='none'&&t&&t.textContent.indexOf('Historico — '+c.nome)>=0)mHistCli(idx);});
 
   var resumoH='<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">'
     +'<div class="card" style="flex:1;padding:10px 14px"><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:1px">Total movimentado</div>'
@@ -18354,13 +18833,13 @@ function pgClis(){
   lista.sort(function(a,b){return a.c.nome.localeCompare(b.c.nome,'pt-BR');});
 
   var cards='';
+  var _vendCli={id:{},nome:{}};
+  _estMovs().forEach(function(m){if(m.tipo!=='venda'||!m.pes)return;var v=+m.val||0;if(m.pes.cliId!=null&&m.pes.cliId!=='')_vendCli.id[String(m.pes.cliId)]=(_vendCli.id[String(m.pes.cliId)]||0)+v;else if(m.pes.nome)_vendCli.nome[m.pes.nome]=(_vendCli.nome[m.pes.nome]||0)+v;});
   for(var i=0;i<lista.length;i++){
     var c=lista[i].c;var dbIdx=lista[i].dbIdx;
     var t=null;for(var j=0;j<DB.tabelas.length;j++){if(DB.tabelas[j].id===c.tabId){t=DB.tabelas[j];break;}}
-    // Badge de nível por volume
-    var tot=0;
-    for(var _i=0;_i<atendHist.length;_i++){var _ah=atendHist[_i];if((String(_ah.cliId)===String(c.id)||(c.nome&&_ah.label&&_ah.label.indexOf(c.nome)>=0))&&_ah.tipo==='Venda')tot+=_ah.total||0;}
-    for(var _i=0;_i<DB.caixasHist.length;_i++){var _cx=DB.caixasHist[_i];var _mvs=_cx.movimentos||[];for(var _j=0;_j<_mvs.length;_j++){var _mv=_mvs[_j];if((String(_mv.cliId)===String(c.id)||(c.nome&&_mv.label&&_mv.label.indexOf(c.nome)>=0))&&_mv.tipo==='Venda')tot+=_mv.total||0;}}
+    // Badge de nível por volume (5.13: vendas montadas das pesagens, sem contar duas vezes)
+    var tot=(_vendCli.id[String(c.id)]||0)+(c.nome?(_vendCli.nome[c.nome]||0):0);
     var nivel=tot>=5000?'🥇 Ouro':tot>=1000?'🥈 Prata':tot>=200?'🥉 Bronze':'';
     cards+='<div class="card cli-card" data-busca="'+c.nome.toLowerCase()+(c.tel?' '+c.tel:'')+( c.cnpj?' '+c.cnpj.toLowerCase():'')+'" style="position:relative">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px">'
@@ -20470,15 +20949,12 @@ function _visualizarComoPDF(titulo,htmlContent){
   w.document.open();w.document.write(_buildPDFHtml(titulo,htmlContent,false));w.document.close();
 }
 function exportarRelatorioEstoque(fmt){
-  var compMap={},vendMap={};
-  function _ai(ah){var itens=ah.itens||ah.itensList||[];for(var j=0;j<itens.length;j++){var it=itens[j];var pId=it.pId||it.prodId;if(!pId)continue;var val=_itVal(it);var kg=it.peso||0;if(ah.tipo==='Compra'){if(!compMap[pId])compMap[pId]={kg:0,val:0};compMap[pId].kg+=kg;compMap[pId].val+=val;}else if(ah.tipo==='Venda'){if(!vendMap[pId])vendMap[pId]={kg:0,val:0};vendMap[pId].kg+=kg;vendMap[pId].val+=val;}}}
-  for(var i=0;i<atendHist.length;i++) _ai(atendHist[i]);
-  if(DB.caixasHist){for(var i=0;i<DB.caixasHist.length;i++){var cx=DB.caixasHist[i];var mvs=cx.movimentos||[];for(var j=0;j<mvs.length;j++) _ai({tipo:mvs[j].tipo,itens:mvs[j].itensList||[]});}}
-  var rows=[];var totC=0,totV=0,totL=0;
-  for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];var comp=compMap[p.id]||{kg:0,val:0};var vend=vendMap[p.id]||{kg:0,val:0};if(comp.val===0&&vend.val===0)continue;var lucro=vend.val-comp.val;var marg=vend.val>0?Math.round((lucro/vend.val)*100):0;totC+=comp.val;totV+=vend.val;totL+=lucro;rows.push([p.nome,fKg(comp.kg),fR(comp.val),fR(comp.kg>0?comp.val/comp.kg:0),fKg(vend.kg),fR(vend.val),fR(vend.kg>0?vend.val/vend.kg:0),fR(lucro),marg+'%']);}
-  var hdr=['Material','Kg Comp.','Val. Comp.','PM Comp.','Kg Vend.','Val. Vend.','PM Vend.','Lucro','Margem'];
-  if(fmt==='csv'){rows.push(['TOTAIS','',fR(totC),'','',fR(totV),'',fR(totL),'']);_exportCSV('relatorio-estoque-'+hj().replace(/\//g,'-')+'.csv',[hdr].concat(rows));}
-  else{var th='<table><thead><tr>'+hdr.map(function(h){return'<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return'<tr>'+r.map(function(c){return'<td>'+c+'</td>';}).join('')+'</tr>';}).join('')+'<tr style="font-weight:700"><td>TOTAL</td><td></td><td>'+fR(totC)+'</td><td></td><td></td><td>'+fR(totV)+'</td><td></td><td>'+fR(totL)+'</td><td></td></tr></tbody></table>';_exportPDF('Relatório de Estoque',th);}
+  var _rm=_estRelMaps(_estRelPer,_estRelD1,_estRelD2),compMap=_rm.comp,vendMap=_rm.vend;
+  var rows=[];var totC=0,totV=0,totL=0,totLE=0;
+  for(var i=0;i<DB.produtos.length;i++){var p=DB.produtos[i];var comp=compMap[_normId(p.id)]||{kg:0,val:0};var vend=vendMap[_normId(p.id)]||{kg:0,val:0};if(comp.val===0&&vend.val===0)continue;var lucro=vend.val-comp.val;var lEst=(comp.kg>0&&vend.kg>0)?vend.kg*(vend.val/vend.kg-comp.val/comp.kg):null;var marg=(lEst!=null&&vend.val>0)?Math.round((lEst/vend.val)*100)+'%':'—';totC+=comp.val;totV+=vend.val;totL+=lucro;if(lEst!=null)totLE+=lEst;rows.push([p.nome,fKg(comp.kg),fR(comp.val),fR(comp.kg>0?comp.val/comp.kg:0),fKg(vend.kg),fR(vend.val),fR(vend.kg>0?vend.val/vend.kg:0),fR(lucro),lEst==null?'—':fR(lEst),marg]);}
+  var hdr=['Material','Kg Comp.','Val. Comp.','PM Comp.','Kg Vend.','Val. Vend.','PM Vend.','Vendas − Compras','Lucro est.','Margem est.'];
+  if(fmt==='csv'){rows.push(['TOTAIS','',fR(totC),'','',fR(totV),'',fR(totL),fR(totLE),'']);_exportCSV('relatorio-estoque-'+hj().replace(/\//g,'-')+'.csv',[hdr].concat(rows));}
+  else{var th='<table><thead><tr>'+hdr.map(function(h){return'<th>'+h+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return'<tr>'+r.map(function(c){return'<td>'+c+'</td>';}).join('')+'</tr>';}).join('')+'<tr style="font-weight:700"><td>TOTAL</td><td></td><td>'+fR(totC)+'</td><td></td><td></td><td>'+fR(totV)+'</td><td></td><td>'+fR(totL)+'</td><td>'+fR(totLE)+'</td><td></td></tr></tbody></table>';_exportPDF('Relatório de Estoque',th);}
 }
 
 // ── Exportações PDF financeiro ─────────────────────────────────
