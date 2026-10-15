@@ -308,7 +308,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.6';
+var APP_VERSION='5.8';var DADOS_VERSAO=2;
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[
@@ -402,6 +402,7 @@ var DB={
   geminiKey:'',  // mantido para compatibilidade, usar CFG.sistema.geminiKey
   caixaDia:null,caixaOntem:null,atendNum:1,caixasHist:[],
   pesagensEmAberto:[],
+  pesCarts:{},
   motivosSangria:[
     {id:1,nome:'Deposito no banco',   cor:'#3b82f6'},
     {id:2,nome:'Pagamento fornecedor',cor:'#ef4444'},
@@ -592,17 +593,21 @@ function confirmar(msg,onSim){
 var CU=null,SU=null;
 function buildLoginList(){
   // Verifica se há pesagem pendente no localStorage
-  var pesPendente=false;
+  // Pesagens em andamento, por usuário (o carrinho é de cada login e está na nuvem)
+  var pesDonos={},pesResumo=[];
   try{
-    var rawP=localStorage.getItem('bv_pesAbas');
-    if(rawP){var arr=JSON.parse(rawP);pesPendente=arr&&arr.some(function(a){return a.itens&&a.itens.length>0;});}
+    var _pc=DB.pesCarts||{};
+    for(var _k in _pc){var _c=_pc[_k];if(!_c||!Array.isArray(_c.abas))continue;
+      var _n=_c.abas.filter(function(a){return a&&!a.assumida&&a.itens&&a.itens.length;}).length;
+      if(_n){pesDonos[_k]=_n;pesResumo.push(_pesNomeDono(_k,_c)+' ('+_n+')');}}
   }catch(e){}
+  var pesPendente=pesResumo.length>0;
   var h='';
   if(pesPendente){
     h+='<div style="display:flex;align-items:center;gap:8px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:10px 14px;margin-bottom:12px">'
       +'<span style="font-size:20px">⚠️</span>'
-      +'<div><div style="font-size:12px;font-weight:700;color:#d97706">Pesagem em andamento!</div>'
-      +'<div style="font-size:11px;color:var(--mt)">Faça login para continuar sem perder os dados.</div></div>'
+      +'<div><div style="font-size:12px;font-weight:700;color:#d97706">Pesagem em andamento: '+pesResumo.join(', ')+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">Entre com o mesmo login, em qualquer aparelho, para continuar.</div></div>'
       +'</div>';
   }
   for(var i=0;i<USERS.length;i++){
@@ -611,7 +616,7 @@ function buildLoginList(){
       +'<div class="lav" style="background:'+u.cor+'22;border:2px solid '+u.cor+';color:'+u.cor+'">'+u.av+'</div>'
       +'<div style="text-align:left;flex:1"><div style="font-size:13px;font-weight:600">'+u.nome+'</div>'
       +'<div style="font-size:11px;color:var(--mt)">'+(getRoleById(u.perfil)?getRoleName(u.perfil):'<span style="color:var(--or)">&#9888; sem função — recriar em Configurações</span>')+'</div></div>'
-      +(pesPendente?'<span style="font-size:16px" title="Pesagem pendente">⚠️</span>':'')
+      +(pesDonos[u.id]?'<span style="font-size:16px" title="Pesagem pendente">⚠️</span>':'')
       +'</button>';
   }
   document.getElementById('ul').innerHTML=h;
@@ -649,19 +654,21 @@ function doLogin(){
     var _rawDb=localStorage.getItem('bv_db');
     if(_rawDb){var _snapDb=JSON.parse(_rawDb);if(_snapDb&&Array.isArray(_snapDb.atendHistLS))atendHist=_snapDb.atendHistLS;}
   }catch(e){}
-  // Restaura pesagem pendente do localStorage
+  // Carrinho deste usuário (vem da nuvem: continua de onde parou em qualquer aparelho)
+  pesAbas=[];pesAtiva=0;
+  _pesAdotarLegadoLocal();
   var hadPes=loadPesState();
   var hasPendente=hadPes&&pesAbas&&pesAbas.some(function(a){return a.itens&&a.itens.length>0;});
   if(hasPendente){
     go('pesagem');
     setTimeout(function(){
-      var totalItens=0;pesAbas.forEach(function(a){totalItens+=a.itens.length;});
+      var totalItens=0,_nAb=0;pesAbas.forEach(function(a){if(a.itens&&a.itens.length){totalItens+=a.itens.length;_nAb++;}});
       openM('&#9878; Pesagem em Andamento',
         '<div style="text-align:center;padding:10px 0">'
         +'<div style="font-size:36px;margin-bottom:8px">⚠️</div>'
-        +'<div style="font-size:15px;font-weight:700;margin-bottom:6px">Há '+pesAbas.length+' pesagem(ns) em aberto</div>'
+        +'<div style="font-size:15px;font-weight:700;margin-bottom:6px">Você tem '+_nAb+' pesagem(ns) em aberto</div>'
         +'<div style="font-size:12px;color:var(--mt);margin-bottom:4px">'+totalItens+' item(ns) no carrinho aguardando finalização.</div>'
-        +'<div style="font-size:11px;color:var(--bl);background:rgba(59,130,246,.08);border-radius:8px;padding:7px 12px;margin-bottom:16px">&#9729; Pesagem restaurada da nuvem — continua de qualquer dispositivo.</div>'
+        +'<div style="font-size:11px;color:var(--bl);background:rgba(59,130,246,.08);border-radius:8px;padding:7px 12px;margin-bottom:16px">&#9729; Seu carrinho fica na nuvem — continua de qualquer aparelho com o seu login.</div>'
         +'<button class="btn" style="width:100%" onclick="closeM()">&#9878; Continuar Pesagem</button>'
         +'</div>', 380);
     }, 600);
@@ -891,15 +898,158 @@ function closeSb(){if(window.innerWidth<=768)document.getElementById('sb').class
 
 
 var pesAbas=[],pesAtiva=0,atendHist=[];
+// ── CARRINHO POR USUÁRIO ──────────────────────────────────────────────────
+// Cada login tem o seu carrinho: DB.pesCarts[id do usuário] = {abas, em, disp, nome}.
+// Ele vai para a nuvem junto com o resto, então a pesagem continua em QUALQUER aparelho
+// com o mesmo login (acabou a luz no PC do caixa -> entra no celular e está tudo lá).
+// O caixa, o financeiro e o Em Aberto continuam um só para a empresa.
+function _pesDisp(){return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent||'')?'celular':'computador';}
+// Cada item do carrinho ganha uma identificação: dois itens iguais pesados em aparelhos diferentes
+// não se confundem na junção (antes, dois itens idênticos viravam um só)
+function _pesIdItens(){(pesAbas||[]).forEach(function(a){(a&&a.itens||[]).forEach(function(it){if(it&&typeof it==='object'&&!it._k)it._k='k'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);});});}
+function _pesGravarNoDB(){
+  if(!CU)return;
+  _pesIdItens();
+  if(!DB.pesCarts||typeof DB.pesCarts!=='object')DB.pesCarts={};
+  var ant=DB.pesCarts[CU.id];var js=JSON.stringify(pesAbas||[]);
+  if(!ant||JSON.stringify(ant.abas||[])!==js){
+    DB.pesCarts[CU.id]={abas:JSON.parse(js),em:_agoraMs(),disp:_pesDisp(),nome:CU.nome};
+  }
+}
+function _pesCartsSnap(){_pesGravarNoDB();return DB.pesCarts||{};}
 function savePesState(){
-  try{localStorage.setItem('bv_pesAbas',JSON.stringify(pesAbas));localStorage.setItem('bv_pesAtiva',String(pesAtiva));}catch(e){}
+  if(!CU)return;
+  _pesGravarNoDB();
+  try{localStorage.setItem('bv_pesAbas_u'+CU.id,JSON.stringify(pesAbas));localStorage.setItem('bv_pesAtiva_u'+CU.id,String(pesAtiva));}catch(e){}
   // Toda ação do usuário no carrinho deve propagar para a nuvem.
-  // (Antes dependia de _localHasChanges, que era zerado por _applySnap e travava
-  //  o save após receber dados da nuvem — causava carrinho não sincronizar.)
   if(_sbReady){autoSave();}
 }
-function loadPesState(){try{var a=localStorage.getItem('bv_pesAbas');var i=localStorage.getItem('bv_pesAtiva');if(a){var arr=JSON.parse(a);if(arr&&arr.length){pesAbas=arr;pesAtiva=Math.min(parseInt(i)||0,arr.length-1);return true;}}return false;}catch(e){return false;}}
-function clearPesState(){try{localStorage.removeItem('bv_pesAbas');localStorage.removeItem('bv_pesAtiva');}catch(e){}}
+function loadPesState(){
+  if(!CU)return false;
+  var arr=null;
+  try{
+    var c=DB.pesCarts&&DB.pesCarts[CU.id];
+    if(c&&Array.isArray(c.abas))arr=JSON.parse(JSON.stringify(c.abas));
+    else{var a=localStorage.getItem('bv_pesAbas_u'+CU.id);if(a)arr=JSON.parse(a);}
+  }catch(e){arr=null;}
+  arr=(arr||[]).filter(function(a){return a&&!a.assumida;});
+  if(!arr.length)return false;
+  var i=0;try{i=parseInt(localStorage.getItem('bv_pesAtiva_u'+CU.id))||0;}catch(e){}
+  pesAbas=arr;pesAtiva=Math.max(0,Math.min(i,arr.length-1));
+  return true;
+}
+function clearPesState(){if(!CU)return;try{localStorage.removeItem('bv_pesAbas_u'+CU.id);localStorage.removeItem('bv_pesAtiva_u'+CU.id);}catch(e){}}
+function _pesIdsConhecidos(){
+  var ids={};var pc=DB.pesCarts||{};
+  for(var k in pc){var c=pc[k];if(c&&Array.isArray(c.abas))c.abas.forEach(function(a){if(a)ids[String(a.id)]=1;});}
+  (pesAbas||[]).forEach(function(a){if(a)ids[String(a.id)]=1;});
+  return ids;
+}
+// Versões anteriores tinham UM carrinho para todos. O que estava nele com itens vira
+// "pesagem sem dono": aparece para todo mundo e qualquer usuário pode assumir.
+function _pesAdotarAntigas(lista){
+  if(!Array.isArray(lista))return;
+  var ids=_pesIdsConhecidos();
+  var novas=lista.filter(function(a){return a&&a.itens&&a.itens.length&&!ids[String(a.id)];});
+  if(!novas.length)return;
+  if(!DB.pesCarts||typeof DB.pesCarts!=='object')DB.pesCarts={};
+  var c=DB.pesCarts._antigo||{abas:[],nome:'Sem dono (versão anterior)'};
+  c.abas=(c.abas||[]).concat(JSON.parse(JSON.stringify(novas)));
+  DB.pesCarts._antigo=c;
+}
+function _pesAdotarLegadoLocal(){
+  try{
+    var raw=localStorage.getItem('bv_pesAbas');
+    if(raw){_pesAdotarAntigas(JSON.parse(raw));localStorage.removeItem('bv_pesAbas');localStorage.removeItem('bv_pesAtiva');
+      if(DB.pesCarts&&DB.pesCarts._antigo&&_sbReady)autoSave();}
+  }catch(e){}
+}
+// Depois de receber dados da nuvem: o carrinho deste login passa a ser o que está na nuvem
+// (que já inclui o que este aparelho tinha pendente — a junção acontece antes)
+var _pesMudouFora=false;
+function _pesRecarregarDoDB(){
+  if(!CU)return;
+  var c=DB.pesCarts&&DB.pesCarts[CU.id];
+  if(!c||!Array.isArray(c.abas))return; // nada salvo ainda para este login: mantém o que está na tela
+  var assumidas=c.abas.filter(function(a){return a&&a.assumida;});
+  var novas=JSON.parse(JSON.stringify(c.abas.filter(function(a){return a&&!a.assumida;})));
+  if(assumidas.length){
+    assumidas.forEach(function(a){toast('&#9888; '+(a.label||'Pesagem')+' foi assumida por '+((a.assumida&&a.assumida.por)||'outro usuário'),'var(--or)');});
+    setTimeout(function(){if(CU)savePesState();},60); // tira o aviso de "assumida" do carrinho
+  }
+  if(JSON.stringify(novas)===JSON.stringify(pesAbas||[]))return;
+  var idAtivo=pesAbas&&pesAbas[pesAtiva]?pesAbas[pesAtiva].id:null;
+  pesAbas=novas;pesAtiva=0;
+  for(var i=0;i<pesAbas.length;i++){if(String(pesAbas[i].id)===String(idAtivo)){pesAtiva=i;break;}}
+  try{localStorage.setItem('bv_pesAbas_u'+CU.id,JSON.stringify(pesAbas));localStorage.setItem('bv_pesAtiva_u'+CU.id,String(pesAtiva));}catch(e){}
+  _pesMudouFora=true;
+}
+function _pesNomeDono(k,c){
+  if(k==='_antigo')return 'Sem dono (versão anterior)';
+  for(var i=0;i<USERS.length;i++){if(String(USERS[i].id)===String(k))return USERS[i].nome;}
+  return (c&&c.nome)||('Usuário '+k);
+}
+// Pesagens com itens nos carrinhos dos OUTROS usuários
+function _pesOutros(){
+  var out=[];var pc=DB.pesCarts||{};
+  for(var k in pc){
+    if(CU&&String(k)===String(CU.id))continue;
+    var c=pc[k];if(!c||!Array.isArray(c.abas))continue;
+    var abs=c.abas.filter(function(a){return a&&!a.assumida&&a.itens&&a.itens.length;});
+    if(abs.length)out.push({dono:k,nome:_pesNomeDono(k,c),em:c.em,disp:c.disp,abas:abs});
+  }
+  return out;
+}
+function _pesCliNome(a){if(a&&a.cliId){for(var i=0;i<DB.clientes.length;i++){if(DB.clientes[i].id==a.cliId)return DB.clientes[i].nome;}}return 'Avulso';}
+function _pesHtmlOutros(){
+  var outros=_pesOutros();if(!outros.length)return '';
+  var adm=CU&&CU.perfil==='adm';
+  var h='<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.45);border-radius:10px;padding:10px 12px">'
+    +'<div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:6px">&#9888; Pesagens abertas de outros usuários</div>';
+  outros.forEach(function(o){
+    var quando='';if(o.em){var d=new Date(o.em);quando=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+    o.abas.forEach(function(a){
+      var pode=adm||o.dono==='_antigo';
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid rgba(245,158,11,.25);font-size:12px">'
+        +'<div style="flex:1;min-width:0"><b>'+o.nome+'</b> · '+(a.label||'Atendimento')+' · '+_pesCliNome(a)+' · '+a.itens.length+' item(ns)'
+        +(o.disp||quando?'<div style="font-size:10px;color:var(--mt)">'+(o.disp?'no '+o.disp:'')+(quando?' · mexeu às '+quando:'')+'</div>':'')+'</div>'
+        +(pode?'<button class="btnO bOgr" style="font-size:11px;padding:5px 10px;white-space:nowrap" onclick="mPesAssumir(\''+o.dono+'\',\''+a.id+'\')">Assumir</button>':'')
+        +'</div>';
+    });
+  });
+  return h+'</div>';
+}
+function _pesAtualizarAviso(){var el=document.getElementById('pes-outros');if(el)el.innerHTML=_pesHtmlOutros();}
+function mPesAssumir(dono,abaId){
+  var c=DB.pesCarts&&DB.pesCarts[dono];var a=null;
+  if(c&&c.abas)for(var i=0;i<c.abas.length;i++){if(String(c.abas[i].id)===String(abaId)&&!c.abas[i].assumida){a=c.abas[i];break;}}
+  if(!a){toast('Essa pesagem já foi finalizada ou assumida','var(--or)');_pesAtualizarAviso();return;}
+  var nome=_pesNomeDono(dono,c);
+  openM('Assumir pesagem','<div class="mf"><div style="font-size:13px;line-height:1.6">A pesagem <b>'+(a.label||'Atendimento')+'</b> ('+_pesCliNome(a)+', '+a.itens.length+' item(ns)) sai do carrinho de <b>'+nome+'</b> e vem para o seu. Fica registrado na auditoria.</div>'
+    +(dono!=='_antigo'?'<div class="al aly" style="font-size:12px">Use quando '+nome+' não puder terminar (saiu, acabou a bateria). Se '+nome+' ainda estiver pesando, combine antes.</div>':'')
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="_pesAssumir(\''+dono+'\',\''+abaId+'\')">Assumir</button></div></div>',420);
+}
+function _pesAssumir(dono,abaId){
+  closeM();
+  _sincronizarAntes(function(ok){
+    if(!CU)return;
+    var c=DB.pesCarts&&DB.pesCarts[dono];var idx=-1;
+    if(c&&c.abas)for(var i=0;i<c.abas.length;i++){if(String(c.abas[i].id)===String(abaId)&&!c.abas[i].assumida){idx=i;break;}}
+    if(idx<0||!c.abas[idx].itens||!c.abas[idx].itens.length){toast('Essa pesagem já foi finalizada ou assumida','var(--or)');if(pgAtiva==='pesagem')renderPesagem();return;}
+    var ab=JSON.parse(JSON.stringify(c.abas[idx]));
+    var nome=_pesNomeDono(dono,c);
+    if(dono==='_antigo')c.abas.splice(idx,1);
+    // No carrinho do dono fica só um aviso: se o aparelho dele gravar atrasado, a pesagem não volta para lá
+    else c.abas[idx]={id:ab.id,label:ab.label,assumida:{por:CU.nome,porId:CU.id,em:_agoraMs()}};
+    c.em=_agoraMs();
+    pesAbas=(pesAbas||[]).filter(function(x){return x&&((x.itens&&x.itens.length)||x.cliId);}); // tira abas vazias
+    pesAbas.push(ab);pesAtiva=pesAbas.length-1;
+    _auditLog('Pesagem assumida',(ab.label||'Atendimento')+' de '+nome+' — '+ab.itens.length+' item(ns)');
+    savePesState();
+    if(pgAtiva==='pesagem')renderPesagem();else go('pesagem');
+    toast('&#10003; Pesagem assumida'+(ok?'':' (sem internet: sobe quando a conexão voltar)'),'var(--gr)');
+  });
+}
 
 // ── SUPABASE ──────────────────────────────────────────────────────────────
 var _SB_URL  = 'https://ovhwnrawjnshcvohbgco.supabase.co';
@@ -1223,6 +1373,108 @@ function _medirRelogio(){
     }).catch(function(){});
   }catch(e){}
 }
+
+// ── AVISO DE VERSÃO NOVA EM TODOS OS APARELHOS ─────────────────────────────
+// O primeiro aparelho que abrir a versão nova grava na nuvem (chave bv_versao) qual é a versão atual.
+// Os outros conferem essa chave a cada ~16 s (e na hora, pelo tempo real) e mostram uma faixa
+// "Nova versão — Atualizar agora". Se a versão nova mudou o formato dos dados (DADOS_VERSAO),
+// a antiga PARA DE GRAVAR na nuvem até atualizar (o que foi feito fica guardado no aparelho e
+// sobe depois de atualizar). Reforço: a cada 15 min confere também o arquivo publicado no GitHub.
+var _versaoLida=false,_versaoLendo=false,_versaoBloqueada=false,_versaoNova=null,_versaoT0=Date.now(),_versaoSiteEm=0;
+function _verCmp(a,b){
+  a=String(a||'0').split('.').map(function(x){return parseInt(x)||0;});b=String(b||'0').split('.').map(function(x){return parseInt(x)||0;});
+  for(var i=0;i<Math.max(a.length,b.length);i++){var d=(a[i]||0)-(b[i]||0);if(d)return d>0?1:-1;}
+  return 0;
+}
+function _versaoChecarNuvem(){
+  if(!_sbReady||!_sbClient||_versaoLendo)return;
+  _versaoLendo=true;
+  _sbReadRow('bv_versao',function(rd){
+    _versaoLendo=false;
+    if(!rd.ok)return;
+    _versaoLida=true;
+    var v=rd.obj||{};
+    if(!v.versao||_verCmp(v.versao,APP_VERSION)<0||(v.dados||0)<DADOS_VERSAO)_versaoPublicar(); // este aparelho tem a mais nova
+    if((v.dados||0)>DADOS_VERSAO)_versaoAvisar(v.versao||'?',true);
+    else if(v.versao&&_verCmp(v.versao,APP_VERSION)>0)_versaoAvisar(v.versao,false);
+  });
+}
+function _versaoPublicar(){
+  _sbCasWrite('bv_versao',function(c){
+    c=c||{};
+    if(c.versao&&_verCmp(c.versao,APP_VERSION)>=0&&(c.dados||0)>=DADOS_VERSAO)return {skip:true};
+    var o={versao:(c.versao&&_verCmp(c.versao,APP_VERSION)>0)?c.versao:APP_VERSION,dados:Math.max(c.dados||0,DADOS_VERSAO),em:new Date().toISOString(),por:CU?CU.nome:''};
+    return {json:JSON.stringify(o),obj:o};
+  },function(){});
+}
+// Reforço: lê só o começo do arquivo publicado (onde fica a versão) — não baixa o arquivo inteiro
+function _versaoChecarSite(forcar){
+  if(!/^https?:$/.test(location.protocol))return;
+  if(!forcar&&Date.now()-_versaoSiteEm<15*60000)return;
+  _versaoSiteEm=Date.now();
+  try{
+    fetch(location.pathname+'?vchk='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-200000'}})
+      .then(function(r){return (r.ok||r.status===206)?r.text():'';})
+      .then(function(t){
+        var m=t.match(/var APP_VERSION='([\d.]+)';var DADOS_VERSAO=(\d+);/)||t.match(/var APP_VERSION='([\d.]+)'/);
+        if(m&&_verCmp(m[1],APP_VERSION)>0)_versaoAvisar(m[1],m[2]&&parseInt(m[2])>DADOS_VERSAO);
+      }).catch(function(){});
+  }catch(e){}
+}
+function _versaoAvisar(v,bloquear){
+  if(bloquear&&!_versaoBloqueada){_versaoBloqueada=true;_syncBadge('error','Sistema desatualizado — atualize para gravar');}
+  if(!_versaoNova||_verCmp(v,_versaoNova)>0)_versaoNova=v;
+  _versaoBarra();
+}
+function _versaoBarra(msgExtra){
+  var el=document.getElementById('bv-upd-bar');
+  if(!el){
+    el=document.createElement('div');el.id='bv-upd-bar';
+    document.body.appendChild(el);
+  }
+  var bloq=_versaoBloqueada;
+  el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99998;display:flex;align-items:center;gap:10px;padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top,0px));font-size:12.5px;font-weight:600;line-height:1.35;box-shadow:0 2px 10px rgba(0,0,0,.35);'
+    +(bloq?'background:#991b1b;color:#fff;':'background:#1d4ed8;color:#fff;');
+  var txt=bloq
+    ?'&#9888; Este aparelho está com a versão antiga ('+APP_VERSION+'). Atualize para continuar gravando — o que você fez está guardado aqui.'
+    :'&#128640; Nova versão do sistema ('+_versaoNova+') disponível.';
+  if(msgExtra)txt=msgExtra;
+  el.innerHTML='<div style="flex:1;min-width:0">'+txt+'</div>'
+    +'<button id="bv-upd-btn" onclick="_atualizarSistema()" style="flex-shrink:0;background:#fff;color:'+(bloq?'#991b1b':'#1d4ed8')+';border:0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:800;cursor:pointer">Atualizar agora</button>';
+  document.body.style.paddingTop=el.offsetHeight+'px';
+}
+function _atualizarSistema(){
+  var alvo=_versaoNova||'';
+  try{sessionStorage.setItem('bv_upd_alvo',alvo);}catch(e){}
+  var b=document.getElementById('bv-upd-btn');if(b){b.textContent='Salvando…';b.disabled=true;}
+  try{if(pesAbas&&pesAbas.length&&CU)savePesState();}catch(e){}
+  _gravarJaSePendente();
+  var t0=Date.now();
+  (function esperar(){
+    // espera a nuvem confirmar o que estava pendente (se este aparelho ainda puder gravar)
+    if(!_versaoBloqueada&&(_pendingLocal||_saveInFlight)&&Date.now()-t0<8000){setTimeout(esperar,300);return;}
+    setTimeout(function(){ // dá tempo de a cópia segura (IndexedDB) terminar
+      location.replace(location.pathname+'?v='+encodeURIComponent(alvo)+'&t='+Date.now()+location.hash);
+    },600);
+  })();
+}
+// Depois de recarregar: limpa o endereço e confere se o GitHub já entregou a versão nova
+(function(){
+  try{
+    if(/[?&](v|t)=/.test(location.search)&&history.replaceState)history.replaceState(null,'',location.pathname+location.hash);
+    var alvo=sessionStorage.getItem('bv_upd_alvo');
+    if(alvo){
+      sessionStorage.removeItem('bv_upd_alvo');
+      if(_verCmp(alvo,APP_VERSION)>0){
+        _versaoNova=alvo;
+        var mostrar=function(){_versaoBarra('&#9203; O GitHub ainda está liberando a versão '+alvo+' (pode levar alguns minutos). Tente de novo em 1 minuto.');};
+        if(document.body)setTimeout(mostrar,500);else document.addEventListener('DOMContentLoaded',function(){setTimeout(mostrar,500);});
+      }
+    }
+  }catch(e){}
+})();
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){_versaoChecarNuvem();_versaoChecarSite(false);}});
+setInterval(function(){_versaoChecarSite(false);},5*60000);
 function _avisarRelogio(){
   try{
     var el=document.getElementById('bv-clock-warn');
@@ -1338,7 +1590,7 @@ function _m3objArr(x){
 }
 // Identidade de um item de lista: o id, ou o conteúdo quando não há id. Repetidos ganham #2, #3...
 function _m3key(r,vistos){
-  var k=(r.id!==undefined&&r.id!==null)?'i:'+r.id:'h:'+JSON.stringify(r);
+  var k=(r.id!==undefined&&r.id!==null)?'i:'+r.id:(r._k?'k:'+r._k:'h:'+JSON.stringify(r));
   var n=(vistos[k]=(vistos[k]||0)+1);
   return n>1?k+'#'+n:k;
 }
@@ -1462,7 +1714,14 @@ function _aplicarDaNuvem(snap,jsonStr){
       localStorage.setItem('bv_db_savedAt',String(snap.savedAt||Date.now()));
     }catch(e){}
     buildLoginList();
-    if(CU&&pgAtiva&&!_modalAberto())_rtRerenderAtual();
+    if(CU&&pgAtiva&&!_modalAberto()){
+      // Na Pesagem, se o carrinho deste login não mudou, só atualiza o aviso dos outros usuários
+      // (redesenhar a tela inteira apagaria o peso que a pessoa está digitando)
+      if(pgAtiva==='pesagem'&&!_pesMudouFora&&document.getElementById('pes-outros'))_pesAtualizarAviso();
+      else _rtRerenderAtual();
+    }
+    if(_pesMudouFora&&CU&&pgAtiva==='pesagem')toast('&#128260; Seu carrinho foi atualizado em outro aparelho','var(--bl)');
+    _pesMudouFora=false;
   }catch(e){console.warn('[BioVale] erro ao aplicar nuvem',e);}
   _rtApplying=false;
 }
@@ -1481,6 +1740,7 @@ function _sbStartRealtime(){
         if(_rtApplying)return;
         var chave = payload.new && payload.new.chave;
 
+        if(chave === 'bv_versao'){ _versaoChecarNuvem(); return; }
         if(chave === 'bv_db'){
           try{
             var snap = JSON.parse(payload.new.valor);
@@ -1545,6 +1805,7 @@ var _pollAcessosN=0;
 function _sbPoll(){
   if(!_sbReady||!_sbClient||!_cloudLoaded)return;
   if((++_pollAcessosN)%8===0)_recarregarAcessosNuvem();
+  if(_pollAcessosN%2===0)_versaoChecarNuvem();
   // Busca só o timestamp da última atualização (leve)
   _sbClient.from('biovale_dados')
     .select('atualizado_em')
@@ -1599,7 +1860,7 @@ function saveDB(){
       tabelas:DB.tabelas,contasFixas:DB.contasFixas,contasReceber:DB.contasReceber,centroCusto:DB.centroCusto,cotacoesHist:DB.cotacoesHist,mercado:DB.mercado,auditLogs:DB.auditLogs||[],metas:DB.metas,filtrosMat:DB.filtrosMat,
       concorrentes:DB.concorrentes,
       cfgSistema:CFG.sistema, // sincroniza configurações do sistema (inclui chave Anthropic, glossário PCB, critérios)
-      pesAbasCloud:pesAbas,pesAtivaCloud:pesAtiva,pesAbasTs:Date.now()
+      pesCarts:_pesCartsSnap()
     };
     // 1. Salva local como fallback imediato. Cada gravação local é independente: se o armazenamento
     //    do navegador encher, a gravação na nuvem continua acontecendo (antes ela era pulada em silêncio).
@@ -1717,6 +1978,20 @@ function _saveToCloudGuarded(snap){
     setTimeout(function(){ _saveToCloudGuarded(snap); }, 500);
     return;
   }
+  // Antes da primeira gravação, confere se este aparelho não está com uma versão que já foi superada
+  if(!_versaoLida&&Date.now()-_versaoT0<8000){
+    _versaoChecarNuvem();
+    setTimeout(function(){ if(_pendingLocal) autoSave(); }, 500);
+    return;
+  }
+  if(_versaoBloqueada){
+    // Versão antiga: NÃO grava na nuvem (poderia estragar dados no formato novo).
+    // Fica pendente neste aparelho e sobe sozinho depois de atualizar.
+    _pendingLocal=true;
+    _syncBadge('error','Sistema desatualizado — atualize para gravar');
+    _versaoBarra();
+    return;
+  }
   if(_saveInFlight){
     setTimeout(function(){ if(_pendingLocal) autoSave(); }, 800);
     return;
@@ -1765,7 +2040,7 @@ function _saveToCloudGuarded(snap){
     var js=res.out.json, enviar=res.out.obj;
     _podarOwnSavedAts();
     _lastCloudTs = new Date().toISOString();
-    var houveNova = (_lastSnapAt !== snap.savedAt); // o usuário fez outra ação enquanto gravava
+    var houveNova = (_lastSnapAt !== snap.savedAt) || !!_dbSaveTimer; // o usuário fez outra ação enquanto gravava (inclusive nos 0,4 s de espera)
     if(juntou){
       if(houveNova&&locCopia&&_ultimoSnap){
         // O usuário fez outra ação enquanto a junção era gravada. Reaplica essa ação nova por cima
@@ -1976,21 +2251,11 @@ function _applySnap(s){
   if(s.metas)DB.metas=Object.assign({kgMes:0,faturamento:0,compras:0,atendimentos:0},s.metas);
   if(s.filtrosMat!==undefined)DB.filtrosMat=s.filtrosMat;
   if(s.concorrentes)DB.concorrentes=s.concorrentes;
-  // Restaura pesagem em andamento da nuvem — sempre aplica se a nuvem for mais recente
-  var _pesCloudTs=s.pesAbasTs||0;
-  var _pesLocalTs=parseInt(localStorage.getItem('bv_pesAbas_ts')||'0');
-  if(s.hasOwnProperty('pesAbasCloud')){  // nuvem sempre prevalece nas pesagens
-    if(s.pesAbasCloud&&Array.isArray(s.pesAbasCloud)&&s.pesAbasCloud.length){
-      pesAbas=s.pesAbasCloud;
-      pesAtiva=Math.min(s.pesAtivaCloud||0,pesAbas.length-1);
-    } else {
-      // Nuvem vazia = atendimento fechado em outro dispositivo
-      pesAbas=[];pesAtiva=0;
-    }
-    // Salva localmente sem subir para nuvem (veio da nuvem)
-    try{localStorage.setItem('bv_pesAbas',JSON.stringify(pesAbas));localStorage.setItem('bv_pesAtiva',String(pesAtiva));}catch(e){}
-    localStorage.setItem('bv_pesAbas_ts',String(_pesCloudTs));
-  }
+  // Carrinhos de pesagem — um por usuário (a nuvem já traz a junção com o que estava pendente aqui)
+  if(s.pesCarts&&typeof s.pesCarts==='object'&&!Array.isArray(s.pesCarts))DB.pesCarts=JSON.parse(JSON.stringify(s.pesCarts));
+  else if(!DB.pesCarts||typeof DB.pesCarts!=='object')DB.pesCarts={};
+  if(Array.isArray(s.pesAbasCloud))_pesAdotarAntigas(s.pesAbasCloud); // carrinho único das versões anteriores
+  _pesRecarregarDoDB();
   // Garante que as Tabelas Padrão sempre existam (migração de versões antigas)
   var temPadVenda=false,temPadCompra=false;
   for(var i=0;i<DB.tabelas.length;i++){
@@ -2392,6 +2657,7 @@ function renderPesagem(){
      +'<div style="display:flex;gap:8px">'     +'<button onclick="mComprovantePes()" style="background:var(--blb);color:var(--bl);border:1px solid rgba(59,130,246,.4);border-radius:var(--r);padding:14px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">&#128196; Recibo</button>'     +'<button onclick="copiarProdutoPeso()" style="background:rgba(34,197,94,.12);color:var(--gr);border:1px solid rgba(34,197,94,.4);border-radius:var(--r);padding:14px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">&#128203; Copiar p/ WhatsApp</button>'     +'<button class="btn" style="flex:1;padding:14px;font-size:15px;font-weight:700;background:var(--gr2);box-shadow:0 2px 16px rgba(34,197,94,.4)" onclick="mFinPes()">&#10003; Finalizar Pesagem &mdash; '+fR(Math.abs(totLiq))+'</button>'     +'</div></div>'
     :'';
   cc.innerHTML='<div class="fc">'
+    +'<div id="pes-outros">'+_pesHtmlOutros()+'</div>'
     +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
     +'<div style="flex:1"><div class="pl">Operacoes</div><div class="pt">Pesagem</div></div>'
     +(DB.pesagensEmAberto&&DB.pesagensEmAberto.length>0?'<button class="btn" style="background:var(--or);color:#000;font-size:12px;font-weight:700" onclick="go(&quot;pendencias&quot;)">&#9203; Em Aberto ('+DB.pesagensEmAberto.length+')</button>':'')
@@ -3576,7 +3842,32 @@ function visualizarNota(){
   _viewHTML(html);
 }
 
+// Antes de gravar dinheiro e estoque, confere a nuvem: se a mesma pesagem já foi finalizada
+// em outro aparelho (mesmo login), ou mudou lá, não grava duas vezes.
+var _finConferindo=false;
 function confirmarFin(){
+  var ab=pesAbas[pesAtiva];if(!ab)return;
+  if(_finConferindo)return;
+  _pesIdItens();
+  var abId=ab.id,itensAntes=JSON.stringify(ab.itens||[]);
+  _finConferindo=true;
+  _sincronizarAntes(function(ok){
+    _finConferindo=false;
+    var idx=-1;for(var i=0;i<pesAbas.length;i++){if(String(pesAbas[i].id)===String(abId)){idx=i;break;}}
+    if(idx<0||!pesAbas[idx].itens||!pesAbas[idx].itens.length){
+      closeM();toast('Esta pesagem já foi finalizada em outro aparelho','var(--or)');if(pgAtiva==='pesagem')renderPesagem();return;
+    }
+    pesAtiva=idx;
+    if(JSON.stringify(pesAbas[idx].itens)!==itensAntes){
+      closeM();if(pgAtiva==='pesagem')renderPesagem();
+      openM('Carrinho alterado','<div class="mf"><div class="al aly" style="font-size:13px;line-height:1.6">Os itens desta pesagem foram alterados em outro aparelho enquanto você finalizava. Confira o carrinho e finalize de novo.</div><div class="brow"><button class="btn" onclick="closeM()">Conferir</button></div></div>',380);
+      return;
+    }
+    if(!ok)toast('Sem internet: a pesagem fica salva aqui e sobe quando a conexão voltar','var(--or)');
+    _confirmarFinCont();
+  },'Finalizar pesagem');
+}
+function _confirmarFinCont(){
   var ab=pesAbas[pesAtiva];
   var pg=getPgMethods();
   var recMethods=pg.recMethods;var pagMethods=pg.pagMethods;
@@ -3889,7 +4180,19 @@ function selLiqForma(btn,forma){
     }
   }
 }
+var _liqConferindo=false;
 function confirmarLiquidacao(pendId,valReceb,valPagei){
+  if(_liqConferindo)return;
+  _liqConferindo=true;
+  _sincronizarAntes(function(ok){
+    _liqConferindo=false;
+    var existe=(DB.pesagensEmAberto||[]).some(function(p){return String(p.id)===String(pendId);});
+    if(!existe){closeM();toast('Essa pendência já foi liquidada em outro aparelho','var(--or)');if(pgAtiva==='pendencias')go('pendencias');return;}
+    if(!ok)toast('Sem internet: a liquidação fica salva aqui e sobe quando a conexão voltar','var(--or)');
+    _confirmarLiquidacaoCont(pendId,valReceb,valPagei);
+  },'Liquidar');
+}
+function _confirmarLiquidacaoCont(pendId,valReceb,valPagei){
   if(!DB.pesagensEmAberto)DB.pesagensEmAberto=[];
   var pend=null,pendIdx=-1;
   for(var i=0;i<DB.pesagensEmAberto.length;i++){if(String(DB.pesagensEmAberto[i].id)===String(pendId)){pend=DB.pesagensEmAberto[i];pendIdx=i;break;}}
@@ -4991,11 +5294,15 @@ function _sincronizarAntes(cb,titulo){
   })();
 }
 function _pesagensAbertas(){
-  return (pesAbas||[]).filter(function(a){return a&&a.itens&&a.itens.length>0;});
+  var r=[];
+  (pesAbas||[]).forEach(function(a){if(a&&a.itens&&a.itens.length>0)r.push({a:a,dono:CU?CU.nome:'',meu:true});});
+  _pesOutros().forEach(function(o){o.abas.forEach(function(a){r.push({a:a,dono:o.nome,meu:false});});});
+  return r;
 }
 function _bloqueioPesagem(abertas){
-  var lista=abertas.map(function(a){return '<div style="padding:7px 10px;background:var(--s2);border-radius:8px;margin-bottom:5px;font-size:13px">'+(a.label||'Atendimento')+' · '+a.itens.length+' item(ns)</div>';}).join('');
-  openM('&#9888; Há pesagem aberta','<div class="mf"><div class="al alr" style="font-size:13px;line-height:1.6">O caixa só pode ser fechado sem nenhuma pesagem aberta. Finalize cada uma ou finalize como <b>Em Aberto</b>.</div>'+lista
+  var lista=abertas.map(function(x){var a=x.a;return '<div style="padding:7px 10px;background:var(--s2);border-radius:8px;margin-bottom:5px;font-size:13px"><b>'+(x.meu?'Você':x.dono)+'</b> · '+(a.label||'Atendimento')+' · '+_pesCliNome(a)+' · '+a.itens.length+' item(ns)</div>';}).join('');
+  var deOutros=abertas.some(function(x){return !x.meu;});
+  openM('&#9888; Há pesagem aberta','<div class="mf"><div class="al alr" style="font-size:13px;line-height:1.6">O caixa só pode ser fechado sem nenhuma pesagem aberta, de nenhum usuário. Finalize cada uma ou finalize como <b>Em Aberto</b>.'+(deOutros?' Se a pessoa não puder terminar, um administrador pode <b>assumir</b> a pesagem na tela de Pesagem.':'')+'</div>'+lista
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Voltar</button><button class="btn" onclick="closeM();go(\'pesagem\')">Ir para Pesagem</button></div></div>',420);
 }
 function mFecharCaixa(){
@@ -16031,9 +16338,16 @@ function confCancelarProdBV(prodId){
 }
 // Fechar produção: se sobrou peso não registrado como saída, pergunta o destino
 // (perda ou material ainda não desmontado) antes de distribuir tudo pro estoque real.
+var _prodConferindo=false;
 function fecharProdBV(prodId){
+  if(_prodConferindo)return;
+  _prodConferindo=true;
+  _sincronizarAntes(function(){_prodConferindo=false;_fecharProdBVCont(prodId);},'Fechar produção');
+}
+function _fecharProdBVCont(prodId){
   var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
   if(!p)return;
+  if(p.status==='fechada'){closeM();toast('Esta produção já foi fechada em outro aparelho','var(--or)');go('producao');return;}
   if(!p.saidas.length){toast('Registre pelo menos um material!','var(--rd)');return;}
   var somaSaidas=p.saidas.reduce(function(s,x){return s+x.peso;},0);
   var sobra=+(p.pesoEntrada-somaSaidas).toFixed(3);
@@ -16052,6 +16366,7 @@ function mResolverSobraProd(prodId,sobra){
 function _finalizarFechamentoProd(prodId,sobra,destinoSobra){
   var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
   if(!p)return;
+  if(p.status==='fechada'){closeM();toast('Esta produção já foi fechada em outro aparelho','var(--or)');go('producao');return;}
   // Credita cada material de saída no estoque real, agora que a produção fechou de vez
   p.saidas.forEach(function(s){
     var prod=gP(s.prodId);
@@ -21869,6 +22184,7 @@ function cfgZerarSistema(){
     DB.atendNum=1;
     DB.coletas=[];
     DB.pesagensEmAberto=[];
+    DB.pesCarts={};pesAbas=[];pesAtiva=0;
     // Estoque e produtos zerados
     DB.produtos=[];
     // Revenda vazia
@@ -21897,6 +22213,7 @@ function cfgZerarSistema(){
       localStorage.removeItem('bv_users');
       localStorage.removeItem('bv_pesAbas');
       localStorage.removeItem('bv_pesAtiva');
+      Object.keys(localStorage).forEach(function(k){if(k.indexOf('bv_pesAbas_u')===0||k.indexOf('bv_pesAtiva_u')===0)localStorage.removeItem(k);});
     }catch(e){}
     // Salva estado zerado na nuvem
     saveDB();
@@ -22043,6 +22360,7 @@ window.addEventListener('DOMContentLoaded', function(){
           // Inicia verificador de backup de meio período (12:30)
           setTimeout(_startBackupMeioPeriodo, 2000);
           setTimeout(_arquivarExcesso, 8000); // move para o Arquivo o que passou do limite (nada é apagado)
+          _versaoChecarNuvem();setTimeout(function(){_versaoChecarSite(true);},20000);
         } else {
           // sbGet devolve null tanto para "nuvem vazia" quanto para ERRO de leitura. Só sobe o que
           // há localmente se a nuvem estiver REALMENTE vazia — nunca por causa de uma falha de rede.
