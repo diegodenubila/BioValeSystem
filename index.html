@@ -208,6 +208,36 @@ select option{background:var(--s1)}.H{display:none!important}
 .aj{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid var(--mt);color:var(--mt);font-size:10px;font-weight:700;cursor:pointer;margin-left:6px;vertical-align:middle;flex-shrink:0;line-height:1;user-select:none}
 .aj:hover{border-color:var(--bl);color:var(--bl)}
 .aj-balao{position:fixed;z-index:100000;max-width:min(300px,calc(100vw - 24px));background:var(--s1);color:var(--tx);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.fld label .aj{margin-top:-4px;margin-bottom:-4px}
+.pesc-srch{display:flex;align-items:center;gap:8px;background:var(--bg);border:1.5px solid var(--bd);border-radius:10px;padding:2px 10px}
+.pesc-srch:focus-within,.pesc-srch.open{border-color:var(--gr)}
+.pesc-sec{font-size:9.5px;color:var(--mt);letter-spacing:1px;padding:7px 10px 2px}
+.pesc-srch input{flex:1;background:none;border:none;color:var(--tx);font-size:14px;padding:9px 0;outline:none;min-width:0}
+.pesc-x{color:var(--mt);cursor:pointer;padding:4px}
+.pesc-res{background:var(--s2);border-radius:10px;padding:5px;margin-top:6px;max-height:300px;overflow-y:auto}
+.pesc-row{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;font-size:13px;cursor:pointer}
+.pesc-row:hover{background:var(--s3)}
+.pesc-lbl{font-size:10px;color:var(--mt);letter-spacing:1px;margin:10px 0 6px}
+.pesc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.pesc-tile{background:var(--s2);border:1px solid transparent;border-radius:10px;padding:9px 4px;text-align:center;font-size:11px;font-weight:700;cursor:pointer;line-height:1.25;word-break:break-word}
+.pesc-tile div{font-size:22px;margin-bottom:2px}
+.pesc-tile:hover{border-color:var(--gr)}
+.pesc-misto{display:flex;gap:10px;align-items:center;background:var(--blb,rgba(59,130,246,.12));border:2px solid var(--bl);border-radius:12px;padding:11px;margin-top:8px;cursor:pointer}
+.pesc-sel{align-items:center;gap:10px;background:rgba(34,197,94,.1);border:2px solid var(--gr);border-radius:12px;padding:10px}
+.pquem-trig{display:flex;align-items:center;gap:10px;background:var(--bg);border:1.5px solid var(--bd);border-radius:12px;padding:9px 11px;cursor:pointer}
+.pquem-trig.open{border-color:var(--gr);border-bottom-left-radius:0;border-bottom-right-radius:0}
+.pquem-list{background:var(--s2);border:1.5px solid var(--gr);border-top:none;border-radius:0 0 12px 12px;padding:5px;max-height:320px;overflow-y:auto}
+.pquem-op{display:flex;align-items:center;gap:10px;padding:8px 9px;border-radius:9px;cursor:pointer}
+.pquem-op:hover{background:var(--s3)}
+.pquem-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0}
+.pv-n{background:var(--s2);border-radius:9px;padding:8px 4px;text-align:center}
+.pv-n b{display:block;font-size:16px}.pv-n span{font-size:9px;color:var(--mt);text-transform:uppercase}
+.pill-st{font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;white-space:nowrap}
+.pan-k{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:10px;min-width:0}
+.pan-k .l{font-size:9.5px;color:var(--mt);text-transform:uppercase;letter-spacing:.3px}.pan-k b{display:block;font-size:17px;margin:2px 0}
+.pan-al{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--bd);font-size:12px;line-height:1.4}
+details.pdet>summary{cursor:pointer;font-size:13px;font-weight:800;list-style:none;padding:2px 0}
+details.pdet>summary::-webkit-details-marker{display:none}
 </style><link rel="manifest" href="data:application/json,%7B%22name%22%3A%22BioVale%22%2C%22short_name%22%3A%22BioVale%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f172a%22%2C%22theme_color%22%3A%22%2316a34a%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage/svg%2Bxml%2C%3Csvg xmlns%3D'http%3A//www.w3.org/2000/svg' viewBox%3D'0 0 100 100'%3E%3Ccircle cx%3D'50' cy%3D'50' r%3D'50' fill%3D'%2316a34a'/%3E%3Ctext y%3D'.9em' font-size%3D'70' x%3D'15'%3E%E2%99%BB%3C/text%3E%3C/svg%3E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image/svg%2Bxml%22%7D%5D%7D">
 <meta name="theme-color" content="#16a34a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -308,6 +338,16 @@ select option{background:var(--s1)}.H{display:none!important}
 .es-it{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--mt);padding-top:4px}.es-it b{color:var(--tx);font-weight:600;white-space:nowrap}
 .est-tbl tr.es-ab td{background:rgba(245,158,11,.06)}
 @media(max-width:768px){.est-kpi.es-kpi{grid-template-columns:1fr 1fr}.est-kpi.es-kpi>div{display:block!important;border-right:1px solid var(--bd)}.est-kpi.es-kpi>div:nth-child(2n){border-right:none}.est-kpi.es-kpi>div:nth-child(-n+2){border-bottom:1px solid var(--bd)}}
+.ic-btn{position:relative;width:62px;height:42px;background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.ic-btn:hover{border-color:var(--gr)}.ic-btn small{position:absolute;right:4px;bottom:1px;font-size:9px;color:var(--mt)}
+.ic-pn{background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:10px;margin:2px 0 10px}
+.ic-gr{display:flex;flex-wrap:wrap;gap:5px;padding-bottom:8px;margin-bottom:6px;border-bottom:1px solid var(--bd)}
+.ic-gb{flex-shrink:0;background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:4px 10px;font-size:11px;color:var(--mt);cursor:pointer;white-space:nowrap}
+.ic-gb.on{border-color:var(--gr);color:var(--gr);background:var(--grb);font-weight:700}
+.ic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(38px,1fr));gap:3px;max-height:190px;overflow-y:auto}
+.ic-it{height:38px;background:transparent;border:2px solid transparent;border-radius:8px;font-size:21px;cursor:pointer}
+.ic-it:hover{background:var(--s1)}.ic-it.on{background:var(--grb);border-color:var(--gr)}
+.ic-out{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:11px;color:var(--mt)}.ic-out .inp{flex:1}
 </style>
 </head><body>
 <div id="bv-sync-badge" class="idle"><div id="bv-sync-dot"></div><span id="bv-sync-txt">Nuvem ativa</span></div>
@@ -394,7 +434,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.23';var DADOS_VERSAO=2;
+var APP_VERSION='5.29';var DADOS_VERSAO=2;
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[
@@ -470,6 +510,8 @@ var DB={
   prodMatEntrada:['Eletrônico p/ desmontar','Motor p/ desmontar','Alumínio p/ limpar','Informática','Telecomunicação','Linha Branca','Sucata Geral'],
   prodCustoEntrada:{}, // {nomeMatEntrada: precoKg} — custo manual por tipo de entrada
   prodJornada:null,    // expediente usado pra contar tempo trabalhado (null = padrão, ver _PROD_JORNADA_PADRAO)
+  prodServicos:null,   // tipos de serviço da desmontagem (null = padrão: Habilidade, Força e corte, Misto)
+  prodTabCat:{},       // {grupo do Estoque: id da tabela de venda} — preço dos materiais gerados
   clientes:[],
   tabelas:[
     {id:1,nome:'Padrao',tipo:'venda', itens:[]},
@@ -663,7 +705,7 @@ function openM(title,body,w){
 }
 function closeM(){var o=document.getElementById('m-ov');if(o)o.style.display='none';}
 // Modal de confirmação customizado (substitui confirm() nativo que é bloqueado em mobile)
-function confirmar(msg,onSim){
+function confirmar(msg,onSim,rotulo){
   var ov=document.getElementById('m-ov');
   if(!ov){ov=document.createElement('div');ov.id='m-ov';ov.className='mov';document.body.appendChild(ov);}
   window._confirmCb=onSim;
@@ -671,7 +713,7 @@ function confirmar(msg,onSim){
     +'<div style="font-size:14px;line-height:1.6;margin-bottom:18px;color:var(--tx)">'+msg+'</div>'
     +'<div class="brow" style="justify-content:flex-end">'
     +'<button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn btn-rd" onclick="closeM();window._confirmCb&&window._confirmCb();">Excluir</button>'
+    +'<button class="btn btn-rd" onclick="closeM();window._confirmCb&&window._confirmCb();">'+(rotulo||'Excluir')+'</button>'
     +'</div></div>';
   ov.style.display='flex';
 }
@@ -1941,7 +1983,7 @@ function saveDB(){
       atendNum:DB.atendNum,produtos:DB.produtos,movs:DB.movs,contas:DB.contas,
       revenda:DB.revenda,revendaCats:DB.revendaCats,revendaStates:DB.revendaStates,
       entradas:DB.entradas,atendHistLS:atendHist,pesagensEmAberto:DB.pesagensEmAberto,
-      transf:DB.transf,coletas:DB.coletas,preAgenda:DB.preAgenda,preAgendaLimite:DB.preAgendaLimite,eventos:DB.eventos,producoes:DB.producoes,prodVinculos:DB.prodVinculos,prodCustoTab:DB.prodCustoTab,prodMatEntrada:DB.prodMatEntrada,prodCustoEntrada:DB.prodCustoEntrada,prodJornada:DB.prodJornada,gestoraHistorico:DB.gestoraHistorico,gestoraPeriodoSalvo:DB.gestoraPeriodoSalvo,revProxCodigo:DB.revProxCodigo,funcs:DB.funcs,clientes:DB.clientes,
+      transf:DB.transf,coletas:DB.coletas,preAgenda:DB.preAgenda,preAgendaLimite:DB.preAgendaLimite,eventos:DB.eventos,producoes:DB.producoes,prodVinculos:DB.prodVinculos,prodCustoTab:DB.prodCustoTab,prodMatEntrada:DB.prodMatEntrada,prodCustoEntrada:DB.prodCustoEntrada,prodJornada:DB.prodJornada,prodServicos:DB.prodServicos,prodTabCat:DB.prodTabCat,gestoraHistorico:DB.gestoraHistorico,gestoraPeriodoSalvo:DB.gestoraPeriodoSalvo,revProxCodigo:DB.revProxCodigo,funcs:DB.funcs,clientes:DB.clientes,
       gerarTabsCustom:DB.gerarTabsCustom,
       pclCatsCustom:DB.pclCatsCustom||{},
       pclCatOrder:DB.pclCatOrder||[],
@@ -2321,6 +2363,8 @@ function _applySnap(s){
     DB.producoes=s.producoes.filter(function(p){return !((p.id===9101||p.id===9102)&&/^Exemplo/.test(p.lote||''));});
   }
   if(s.prodJornada)DB.prodJornada=s.prodJornada;
+  if(s.prodServicos)DB.prodServicos=s.prodServicos;
+  if(s.prodTabCat)DB.prodTabCat=s.prodTabCat;
   if(s.gestoraHistorico)DB.gestoraHistorico=s.gestoraHistorico;
   if(s.revProxCodigo)DB.revProxCodigo=s.revProxCodigo;
   if(s.gestoraPeriodoSalvo)DB.gestoraPeriodoSalvo=s.gestoraPeriodoSalvo;
@@ -3025,6 +3069,9 @@ function toast(msg,cor){
 // ── (?) DE AJUDA — padrão do sistema ─────────────────────
 // Uso: título + _aj('chave')  → os textos ficam todos em AJUDA, agrupados por aba.
 var AJUDA={
+  // aba Estoque — filtros e ícones
+  'est.filtros':'Filtros: grupos que aparecem como botões no Estoque para achar materiais mais rápido. Cada material fica em um filtro, escolhido ao cadastrar ou editar o material. Só dá para apagar um filtro sem materiais.',
+  'est.icone':'Ícone: figura que aparece no botão do filtro e ao lado dos materiais. Escolha na lista ou cole qualquer emoji em “Outro” — no PC, a tecla Windows + . abre todos os emojis.',
   // aba Tabelas
   'tab.pagina':'Tabelas de preço da BioVale. <b>Compra</b>: o que pagamos a quem traz material. <b>Venda</b>: o que as empresas nos pagam. Cada cliente/fornecedor tem a sua tabela no cadastro, e a pesagem já entra com ela.',
   'tab.todas':'Todas as tabelas, de compra e de venda.',
@@ -3048,8 +3095,9 @@ var AJUDA={
   'tab.excluir':'Apaga a tabela de vez. Se algum cliente usa esta tabela, o sistema pede para escolher outra para ele antes de apagar.',
   'tab.sincPadrao':'Coloca na tabela Padrão todos os materiais do Estoque, com o preço do cadastro de cada um. Materiais arquivados ficam de fora.',
   'tab.porta':'Tabela de compra para quem chega sem cadastro (preço de porta). Ela é a tabela Padrão de compra e anda junto com o preço de compra do Estoque.',
-  'tab.gBase':'Tabela de venda usada para calcular as de compra. Os grupos e a ordem dela também são copiados para as tabelas geradas.',
-  'tab.gNiveis':'Cada nível da escada (menos a Porta). Marque os que quer gerar e defina o lucro: em % do preço de venda ou em R$ por kg. Fica gravado.',
+  'tab.gBase':'A tabela de venda (o que a empresa te paga) usada para calcular os preços de compra. Escolha GreenTech para as placas ou GreenTech (Materiais Finos) para o fino. Só os materiais dessa tabela entram nas tabelas geradas.',
+  'tab.gNovaRef':'Cria uma tabela de compra ligada a esta referência, fora da escada de níveis. Use para um preço especial, como o fino para fornecedores maiores.',
+  'tab.gNiveis':'As suas tabelas de compra calculadas a partir da referência escolhida, cada uma com o seu lucro. As tabelas ligadas a outra referência não aparecem aqui e não mudam.',
   'tab.subtitulo':'Texto que aparece embaixo de "Tabela de Preços" na folha impressa e na imagem. Ex.: Placas e Eletrônicos. Não use o nome do nível.',
   'tab.imprimir':'Folha com a logo, os grupos e a cor da tabela. O nome da tabela não sai: o fornecedor vê só a cor. Sai com a data dos preços.',
   'tab.cmp':'Coloca até 5 tabelas lado a lado. Toque num preço para mudar: grava na hora e entra no histórico. Embaixo do preço de compra aparece o lucro sobre a tabela de venda escolhida.',
@@ -3075,7 +3123,54 @@ var AJUDA={
   'tab.cmpRef':'A tabela de venda usada para calcular a %, o lucro ou a diferença em R$ de cada preço de compra.',
   'tab.cmpModo':'“% da venda”: quanto a tabela paga do que a empresa paga. “Lucro %”: o que sobra para a BioVale. “R$ de lucro”: a diferença em reais por kg.',
   'tab.cmpMedia':'Média de cada tabela no grupo e no total. Serve para ver se um nível está fora do padrão.',
-  'tab.gGerar':'Atualiza os preços dos níveis marcados, item por item. Grupos, histórico e clientes ficam como estão. Materiais que não estão na base não são apagados.'
+  'tab.gGerar':'Atualiza os preços dos níveis marcados, item por item. Grupos, histórico e clientes ficam como estão. Materiais que não estão na base não são apagados.',
+  // aba Produção
+  'prod.pagina':'Controle da desmontagem: quanto entra, o que vira, quanto tempo leva e quanto rende para a empresa.',
+  'prod.registro':'Produções em andamento e as que fecharam hoje. É aqui que o funcionário abre, pesa o que gerou e fecha.',
+  'prod.nova':'Abre uma desmontagem: quem vai fazer, o que vai desmontar e o peso. O peso sai do estoque do material na hora.',
+  'prod.oque':'<b>Misto</b> = pegou de tudo um pouco da caixa geral. <b>Lote</b> = um tipo só (só HD, só celular). Lotes mostram se vale a pena desmontar aquele material.',
+  'prod.tara':'Peso da caixa ou do recipiente. O sistema desconta do peso bruto.',
+  'prod.taraSai':'Peso da caixa usada nesta pesagem. Fica em branco porque nem sempre é a mesma caixa; o número cinza é só a tara da entrada, de referência.',
+  'prod.pesar':'Escolha o material (pelos principais ou pela busca), pese e lance. Cada caixa fica guardada separada, com hora, e dá pra apagar só a errada.',
+  'prod.fechar':'Termina a desmontagem e manda os materiais gerados para o estoque. Se sobrar peso, pergunta se foi perda ou se volta para o estoque.',
+  'prod.analise':'Números da produção para o Administrador: lucro, materiais e funcionários.',
+  'prod.painel':'Resumo do período: quanto foi desmontado, quanto rendeu, quanto custou de mão de obra e o lucro, comparado com o mesmo trecho do período anterior.',
+  'prod.lucroSemana':'Lucro real de cada semana (ou de cada mês, nos períodos longos). Barra mais alta = semana melhor.',
+  'prod.atencao':'Coisas fora do normal pra conferir: produção esquecida aberta, material sem preço, lote que rendeu bem abaixo da média, horário suspeito.',
+  'prod.mistoVira':'De tudo que saiu da caixa geral (misto) no período, quanto foi de cada grupo, em peso e em valor.',
+  'prod.lotes':'Um cartão por material desmontado: quanto rende por kg, quanto custa de mão de obra e se vale mais desmontar ou vender inteiro. Usa os preços de hoje.',
+  'prod.valeDesmontar':'Compara o preço de vender o material inteiro com o que ele rende desmontado, já descontando a mão de obra.',
+  'prod.ateQuanto':'O máximo por kg em que o material ainda não dá prejuízo (rende − mão de obra). Não é sugestão de preço: é o seu limite na negociação.',
+  'prod.simulador':'Estimativa para um lote grande: escolha um material parecido do histórico, o peso e o lucro que quer, e veja até quanto dá pra pagar.',
+  'prod.equipe':'Quanto cada funcionário desmonta, quanto gera, quanto custa e se paga a mão de obra.',
+  'prod.habilidade':'Compara o funcionário com a média da equipe no mesmo tipo de serviço (habilidade, força e corte, misto), pelo valor que o trabalho acrescenta por hora.',
+  'prod.porTipo':'Como ele vai em cada material e a posição dele entre quem também desmontou aquele material.',
+  'prod.evolucao':'Kg por hora de cada semana. Subindo = pegando prática. A linha tracejada é a média da equipe.',
+  'prod.config':'Configurações da Produção: expediente, tabela de venda de cada grupo, tipo de serviço dos materiais, principais e rejeito.',
+  'prod.expediente':'Só o tempo dentro do expediente conta como trabalhado: almoço, cafés, noite e fim de semana saem da conta sozinhos.',
+  'prod.tabGrupo':'De qual tabela vem o preço dos materiais gerados, por grupo do Estoque. Um material pode ter tabela própria (exceção), como a Sucata de Ferro.',
+  'prod.servico':'Diz que tipo de trabalho o material exige. É o que permite ver em que cada funcionário rende mais.',
+  'prod.principais':'Materiais que aparecem em card na hora de escolher, sem precisar buscar. Entrada e saída têm listas próprias (até 9).',
+  'prod.rejeito':'Material que sai da desmontagem mas não é vendido (ex.: Pós-garimpo): conta no peso e vale sempre R$ 0.',
+  'prod.m.horas':'Tempo em produção dentro do expediente (sem almoço, cafés e pausas).',
+  'prod.m.kgDesm':'Quanto material foi desmontado. O que voltou pro estoque sem desmontar não conta.',
+  'prod.m.kgh':'Velocidade: quantos kg são desmontados em uma hora.',
+  'prod.m.aprov':'Quanto do que entrou virou material pesado. O resto é perda ou poeira.',
+  'prod.m.gerou':'Quanto valem, pela tabela de venda, os materiais que ele separou.',
+  'prod.m.gerouDia':'O que ele gerou dividido pelos dias em que fechou alguma produção.',
+  'prod.m.gerouHora':'O que ele gerou dividido pelas horas trabalhadas.',
+  'prod.m.saldo':'O que sobra pra empresa depois de pagar o material comprado e o custo dele.',
+  'prod.m.saldoDia':'O saldo dividido pelos dias em que ele fechou alguma produção.',
+  'prod.m.saldoHora':'O saldo dividido pelas horas trabalhadas.',
+  'prod.m.pctLucro':'Quanto do que ele gerou vira saldo. Ex.: 35% = de cada R$ 100 gerados, sobram R$ 35.',
+  'prod.m.paga':'O valor que o trabalho dele acrescenta (gerou − compra do material) cobre o que ele custa. “2,0×” = cobre duas vezes.',
+  'prod.m.diaCheio':'A mesma conta, mas com o custo do dia todo (7h30), não só das horas em produção.',
+  'prod.m.rende':'Valor dos materiais gerados pela tabela de venda — no total ou por kg desmontado.',
+  'prod.m.mo':'Mão de obra: horas trabalhadas × valor/hora do cadastro de cada funcionário.',
+  'prod.m.lucro':'Lucro real = o que rendeu − compra do material − mão de obra.',
+  'prod.m.conf':'Quanto histórico existe. Boa = 5 vezes ou mais e 50 kg; média = 2 vezes ou mais; fraca = 1 vez só.',
+  'prod.m.perda':'Quanto do que ele desmontou virou perda ou descarte (poeira, resto sem valor). Comparado com a média da equipe; muito acima pode ser material jogado fora junto.',
+  'prod.m.ndt':'Vezes em que sobrou material sem desmontar e ele voltou pro estoque. Não conta contra o funcionário; serve pra ver se as levas estão grandes demais.'
 };
 function _aj(chave){
   if(CFG.sistema&&CFG.sistema.ocultarAjuda)return '';
@@ -8362,16 +8457,16 @@ function mGerenciarFiltros(){
   html+='</div>';
   html+='<button class="btn btn-bl" style="width:100%" onclick="mNovoFiltro()">+ Novo Filtro</button>';
   html+='</div>';
-  openM('&#127991; Filtros de Material',html,460);
+  openM('&#127991; Filtros de Material'+_aj('est.filtros'),html,460);
 }
 function mNovoFiltro(){
   closeM();
   setTimeout(function(){
     openM('Novo Filtro','<div class="mf">'
-      +'<div style="display:grid;grid-template-columns:65px 1fr;gap:9px">'
-      +'<div class="fld"><label>Icone</label><input class="inp" id="nf-ic" value="&#128230;" style="font-size:17px;text-align:center"></div>'
+      +'<div style="display:grid;grid-template-columns:70px 1fr;gap:9px;align-items:end">'
+      +'<div class="fld"><label>Ícone'+_aj('est.icone')+'</label>'+_icBtnH('nf','📦')+'</div>'
       +'<div class="fld"><label>Nome</label><input class="inp" id="nf-n" placeholder="Ex: Processadores"></div>'
-      +'</div>'
+      +'</div>'+_icPainelH('nf','📦')
       +'<div class="fld"><label>Cor</label><input type="color" class="inp" id="nf-cor" value="#3b82f6" style="height:40px;padding:4px"></div>'
       +'<div class="brow"><button class="btnO bOgr" onclick="mGerenciarFiltros()">Cancelar</button><button class="btn" onclick="saveNovoFiltro()">Criar Filtro</button></div></div>',400);
   },80);
@@ -8380,7 +8475,7 @@ function saveNovoFiltro(){
   var n=document.getElementById('nf-n').value.trim();
   if(!n){alert('Informe um nome!');return;}
   if(DB.filtrosMat.find(function(f){return f.nome===n;})){alert('Ja existe um filtro com esse nome!');return;}
-  DB.filtrosMat.push({id:nid(),nome:n,ic:document.getElementById('nf-ic').value||'&#127991;',cor:document.getElementById('nf-cor').value||'#3b82f6'});
+  DB.filtrosMat.push({id:nid(),nome:n,ic:document.getElementById('nf-ic-val').value||'📦',cor:document.getElementById('nf-cor').value||'#3b82f6'});
   saveDB();mGerenciarFiltros();
 }
 function mEditFiltro(id){
@@ -8388,10 +8483,10 @@ function mEditFiltro(id){
   closeM();
   setTimeout(function(){
     openM('Editar Filtro','<div class="mf">'
-      +'<div style="display:grid;grid-template-columns:65px 1fr;gap:9px">'
-      +'<div class="fld"><label>Icone</label><input class="inp" id="ef-ic" value="'+f.ic+'" style="font-size:17px;text-align:center"></div>'
+      +'<div style="display:grid;grid-template-columns:70px 1fr;gap:9px;align-items:end">'
+      +'<div class="fld"><label>Ícone'+_aj('est.icone')+'</label>'+_icBtnH('ef',f.ic)+'</div>'
       +'<div class="fld"><label>Nome</label><input class="inp" id="ef-n" value="'+f.nome+'"></div>'
-      +'</div>'
+      +'</div>'+_icPainelH('ef',f.ic)
       +'<div class="fld"><label>Cor</label><input type="color" class="inp" id="ef-cor" value="'+f.cor+'" style="height:40px;padding:4px"></div>'
       +'<div class="brow"><button class="btnO bOgr" onclick="mGerenciarFiltros()">Cancelar</button><button class="btn" onclick="saveEditFiltro('+id+')">Salvar</button></div></div>',400);
   },80);
@@ -8402,7 +8497,7 @@ function saveEditFiltro(id){
   if(!novoNome){alert('Informe um nome!');return;}
   var antigoNome=f.nome;
   f.nome=novoNome;
-  f.ic=document.getElementById('ef-ic').value||f.ic;
+  f.ic=document.getElementById('ef-ic-val').value||f.ic;
   f.cor=document.getElementById('ef-cor').value||f.cor;
   // Atualiza cat nos produtos que usavam o nome antigo
   for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].cat===antigoNome)DB.produtos[i].cat=novoNome;}
@@ -8767,50 +8862,63 @@ function swEstRelPerCustom(){
     _estRelPer='custom';go('estoque');
   }
 }
+// ── Escolha de ícone (filtros e materiais) — 5.28 ─────────────────────────
+// A lista abre DENTRO do formulário (não é dropdown solto), com grupos ligados aos
+// filtros da BioVale e um campo "Outro" para colar qualquer emoji.
 var _ICONES_MAT={
-  'Placas':['🟫','🟩','🟨','🟦','🟥','🟪','⬛','🔲','📟','💾','💿','📀','🖥️','💻','📠','📺','📡','🔌','🔋','🖨️'],
-  'Eletrônicos':['📱','☎️','📞','⌨️','🖱️','📷','📸','📹','🎥','📻','🔭','🔬','💡','🔦','🕹️','🎮','⌚','📲','🖲️','🗜️'],
-  'Metais':['⚙️','🔩','🔧','🔨','⛏️','🪛','🪚','🧲','🪝','🔗','⛓️','🪜','🔑','🗝️','🛢️','🪣','⚖️','🏗️','🪤','🔰'],
-  'Fios':['🔌','🪫','🔋','💡','⚡','📡','🛜','〰️','➰','🔁','🌀','🧵','🧶','🪢','🌡️','🔆','〽️','↩️','🔄','⚡'],
-  'Plásticos':['🧴','🪣','🛒','🛍️','📦','🗑️','♻️','🫙','🧃','🪟','🪑','🛋️','🚿','🧺','🧻','🪥','🫧','🧹','🪠','🧼'],
-  'Outros':['📦','🎁','🗃️','🗄️','🏷️','🪙','💰','♻️','🏭','🚛','🏗️','🪨','🪵','🌿','🌱','🌾','🗑️','🧾','🔖','🪬']
+  'Placas eletrônicas':['🟩','🟫','🟨','🟦','🟥','🟪','🟧','⬛','⬜','🟢','🟤','🟡','🔵','🔴','🟣','🟠','⚫','⚪','🔲','🔳','💾','💿','📀','📟','🎛️','🎚️','🧮','🖲️','📶','🗂️'],
+  'Materiais finos':['🥇','🥈','🥉','🏅','🪙','💰','💎','💍','👑','✨','⭐','🌟','🔶','🔷','🔸','🔹','♦️','🔆','🏆','⚜️','🎖️','💠','🧿','🔮'],
+  'Eletrônicos p/ desmontar':['🖥️','💻','⌨️','🖱️','🖨️','📱','📲','☎️','📞','📠','📺','📻','📷','📸','📹','🎥','📽️','🎮','🕹️','⌚','⏰','🔊','📢','🎧','🎤','🎙️','📡','🔦','🔬','🔭','🧭','⏱️'],
+  'Linha branca e casa':['🧊','❄️','🌀','🔥','🍳','🫖','☕','🧺','🚿','🛁','🧹','🪭','🌡️','🛋️','🪑','🚪','🍽️','🥘','🧯','💈','🪞','🛏️'],
+  'Baterias e energia':['🔋','🪫','⚡','🔌','💡','☀️','🌞','🔆','⛽','🛢️','🕯️','🪔','♨️','☢️','⚠️'],
+  'Fios e cabos':['🧵','🧶','🪢','➰','➿','〰️','🔗','⛓️','🔁','🔄','🎗️','📎','🖇️','🪝','🧷','🎀'],
+  'Sucata de ferro e metais':['🔩','⚙️','🔧','🔨','🪛','🪚','⛏️','🧲','🗜️','🛠️','⚒️','🔑','🗝️','🪣','🪤','🧱','⚓','🔰','🚲','🛴','🛒','🏗️','🗑️','🥫','🪜','⚖️'],
+  'Plásticos e vidro':['♻️','🧴','🧃','🥤','🫙','🍶','🍾','🥛','🪟','🛍️','🧸','🪀','🪥','🧼','🫧','💧','🧪','🥽'],
+  'Máquinas e motores':['🚜','🛞','🏭','🚗','🚙','🛵','🏍️','🚚','🚛','🚐','🚂','✈️','🚁','⛴️','🛻','🦾','🤖','🌪️'],
+  'Outros':['📦','🎁','🗃️','🗄️','🏷️','🧾','🔖','📌','📍','🪨','🪵','🌿','🌱','🌾','🏠','🏢','❓','❗','✅','🚫','⛔','🔒','💲','📊','📋','🧰']
 };
-function _buildIconDrop(sel,prefix){
-  var h='<div id="'+prefix+'-ic-drop" onclick="event.stopPropagation()" style="display:none;position:absolute;z-index:500;background:var(--s1);border:1px solid var(--bd);border-radius:var(--r2);box-shadow:0 8px 32px rgba(0,0,0,.55);padding:11px;width:280px;max-height:320px;overflow-y:auto;top:calc(100% + 5px);left:0">';
-  var grupos=Object.keys(_ICONES_MAT);
-  for(var g=0;g<grupos.length;g++){
-    var grp=grupos[g];var ics=_ICONES_MAT[grp];
-    h+='<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin:8px 0 5px">'+grp+'</div>';
-    h+='<div style="display:flex;flex-wrap:wrap;gap:3px">';
-    for(var i=0;i<ics.length;i++){
-      var ic=ics[i];var isSel=(ic===sel);
-      h+='<button type="button" onclick="_selMatIc(this,\''+prefix+'\')" data-ic="'+ic+'" style="width:34px;height:34px;background:'+(isSel?'var(--grb)':'transparent')+';border:2px solid '+(isSel?'var(--gr)':'transparent')+';border-radius:7px;font-size:20px;cursor:pointer">'+ic+'</button>';
-    }
-    h+='</div>';
-  }
-  h+='</div>';
+// Tira repetidos (o primeiro grupo em que o ícone aparece fica com ele)
+(function(){var visto={};Object.keys(_ICONES_MAT).forEach(function(g){_ICONES_MAT[g]=_ICONES_MAT[g].filter(function(ic){if(visto[ic])return false;visto[ic]=1;return true;});});})();
+// Ícones antigos podem estar gravados como código HTML (ex.: &#128230;); compara pelo emoji
+function _icNorm(s){if(!s)return '';var t=document.createElement('textarea');t.innerHTML=String(s);return t.value.trim();}
+function _icGrupoDe(sel){var n=_icNorm(sel),gs=Object.keys(_ICONES_MAT);for(var i=0;i<gs.length;i++){if(_ICONES_MAT[gs[i]].indexOf(n)>=0)return i;}return 0;}
+// Botão que mostra o ícone atual (vai no lugar do campo) + valor escondido
+function _icBtnH(prefix,sel){
+  var n=_icNorm(sel)||'📦';
+  return '<button type="button" id="'+prefix+'-ic-btn" class="ic-btn" onclick="_icToggle(\''+prefix+'\')" title="Escolher ícone">'+n+'<small>&#9662;</small></button>'
+    +'<input type="hidden" id="'+prefix+'-ic-val" value="'+n+'">';
+}
+// Painel com os grupos (vai logo abaixo da linha do ícone/nome, na largura toda)
+function _icPainelH(prefix,sel){
+  var gs=Object.keys(_ICONES_MAT),gi=_icGrupoDe(sel);
+  var h='<div id="'+prefix+'-ic-pn" class="ic-pn" style="display:none"><div class="ic-gr">';
+  gs.forEach(function(g,i){h+='<button type="button" class="ic-gb'+(i===gi?' on':'')+'" onclick="_icGrupo(\''+prefix+'\','+i+')">'+g+'</button>';});
+  h+='</div><div class="ic-grid" id="'+prefix+'-ic-grid">'+_icGridH(prefix,gi,sel)+'</div>'
+    +'<div class="ic-out"><span>Outro:</span><input class="inp" id="'+prefix+'-ic-outro" placeholder="cole qualquer emoji aqui" oninput="_icOutro(\''+prefix+'\',this.value)" style="padding:6px 10px;font-size:13px"></div></div>';
   return h;
 }
-function _selMatIc(btn,prefix){
-  var ic=btn.getAttribute('data-ic');
-  var drop=document.getElementById(prefix+'-ic-drop');
-  if(drop){drop.querySelectorAll('button[data-ic]').forEach(function(b){b.style.background='transparent';b.style.borderColor='transparent';});btn.style.background='var(--grb)';btn.style.borderColor='var(--gr)';drop.style.display='none';}
-  var trigger=document.getElementById(prefix+'-ic-btn');if(trigger)trigger.textContent=ic;
-  var hidden=document.getElementById(prefix+'-ic-val');if(hidden)hidden.value=ic;
+function _icGridH(prefix,gi,sel){
+  var n=_icNorm(sel),ics=_ICONES_MAT[Object.keys(_ICONES_MAT)[gi]]||[];
+  return ics.map(function(ic){return '<button type="button" class="ic-it'+(ic===n?' on':'')+'" data-ic="'+ic+'" onclick="_icSel(\''+prefix+'\',this.getAttribute(\'data-ic\'))">'+ic+'</button>';}).join('');
 }
-function _toggleIconDrop(prefix,e){
-  if(e)e.stopPropagation();
-  var drop=document.getElementById(prefix+'-ic-drop');
-  if(!drop)return;
-  var isOpen=drop.style.display!=='none';
-  // Fecha todos os outros drops abertos
-  document.querySelectorAll('[id$="-ic-drop"]').forEach(function(d){d.style.display='none';});
-  if(!isOpen)drop.style.display='block';
+function _icToggle(prefix){var pn=document.getElementById(prefix+'-ic-pn');if(pn)pn.style.display=pn.style.display==='none'?'block':'none';}
+function _icGrupo(prefix,gi){
+  var pn=document.getElementById(prefix+'-ic-pn'),grid=document.getElementById(prefix+'-ic-grid'),v=document.getElementById(prefix+'-ic-val');
+  if(!pn||!grid)return;
+  pn.querySelectorAll('.ic-gb').forEach(function(b,i){b.classList.toggle('on',i===gi);});
+  grid.innerHTML=_icGridH(prefix,gi,v?v.value:'');
 }
-// Fecha drop ao clicar fora (registra uma vez)
-if(!window._icDropListenerSet){
-  window._icDropListenerSet=true;
-  document.addEventListener('click',function(){document.querySelectorAll('[id$="-ic-drop"]').forEach(function(d){d.style.display='none';});});
+function _icSel(prefix,ic){
+  var v=document.getElementById(prefix+'-ic-val'),b=document.getElementById(prefix+'-ic-btn');
+  if(v)v.value=ic;
+  if(b)b.innerHTML=ic+'<small>&#9662;</small>';
+  var grid=document.getElementById(prefix+'-ic-grid');
+  if(grid)grid.querySelectorAll('.ic-it').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-ic')===ic);});
+}
+// "Outro": aceita só o emoji (no máximo alguns caracteres, sem símbolos de HTML)
+function _icOutro(prefix,val){
+  var s=Array.from(String(val||'').replace(/[\x00-\x7F]/g,'')).slice(0,4).join(''); // só emoji: tira letras, números e símbolos de HTML
+  if(s)_icSel(prefix,s);
 }
 
 function mAjusteProd(id){
@@ -8831,15 +8939,10 @@ function mNovoProd(){
   var catO='';for(var i=0;i<DB.filtrosMat.length;i++){var f=DB.filtrosMat[i];if(f.nome==='Todos')continue;catO+='<option value="'+f.nome+'">'+f.ic+' '+f.nome+'</option>';}
   var defIc='📦';
   openM('Novo Material','<div class="mf">'
-    +'<div style="display:grid;grid-template-columns:56px 1fr;gap:9px;align-items:end">'
-    +'<div class="fld"><label>Ícone</label>'
-    +'<div style="position:relative">'
-    +'<button type="button" id="np-ic-btn" onclick="_toggleIconDrop(\'np\',event)" title="Escolher ícone" style="width:52px;height:40px;background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--gr)\'" onmouseout="this.style.borderColor=\'var(--bd)\'">'+defIc+'</button>'
-    +'<input type="hidden" id="np-ic-val" value="'+defIc+'">'
-    +_buildIconDrop(defIc,'np')
-    +'</div></div>'
+    +'<div style="display:grid;grid-template-columns:70px 1fr;gap:9px;align-items:end">'
+    +'<div class="fld"><label>Ícone'+_aj('est.icone')+'</label>'+_icBtnH('np',defIc)+'</div>'
     +'<div class="fld"><label>Nome</label><input class="inp" id="np-n" placeholder="Ex: Placa Marrom"></div>'
-    +'</div>'
+    +'</div>'+_icPainelH('np',defIc)
     +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">'
     +'<div class="fld"><label>Venda R$/kg</label><input class="inp" type="number" inputmode="decimal" id="np-vv"></div>'
     +'<div class="fld"><label>Compra R$/kg</label><input class="inp" type="number" inputmode="decimal" id="np-vc"></div>'
@@ -8881,15 +8984,10 @@ function mEditProd(id){
   }
   openM('&#9998; Editar Material',
     '<div class="mf">'
-    +'<div style="display:grid;grid-template-columns:56px 1fr;gap:9px;align-items:end">'
-    +'<div class="fld"><label>Ícone</label>'
-    +'<div style="position:relative">'
-    +'<button type="button" id="ep-ic-btn" onclick="_toggleIconDrop(\'ep\',event)" title="Escolher ícone" style="width:52px;height:40px;background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--gr)\'" onmouseout="this.style.borderColor=\'var(--bd)\'">'+p.ic+'</button>'
-    +'<input type="hidden" id="ep-ic-val" value="'+p.ic+'">'
-    +_buildIconDrop(p.ic,'ep')
-    +'</div></div>'
+    +'<div style="display:grid;grid-template-columns:70px 1fr;gap:9px;align-items:end">'
+    +'<div class="fld"><label>Ícone'+_aj('est.icone')+'</label>'+_icBtnH('ep',p.ic)+'</div>'
     +'<div class="fld"><label>Nome</label><input class="inp" id="ep-n" value="'+p.nome+'" placeholder="Ex: Placa Marrom"></div>'
-    +'</div>'
+    +'</div>'+_icPainelH('ep',p.ic)
     +'<div class="fld"><label>Filtro / Categoria</label><select class="inp" id="ep-c">'+catO+'</select></div>'
     +'<div class="al alb" style="margin-bottom:0;font-size:12px">Alterar o preco de venda atualiza a tabela <strong>Padrao</strong> automaticamente.</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
@@ -16178,9 +16276,17 @@ function mMateriaisRejeito(){
   html+='</div><div class="brow"><button class="btn" onclick="closeM();go(\'producao\')">Pronto</button></div></div>';
   openM('&#9851; Rejeito (valor zero)',html,480);
 }
+// Tabela de venda de um material: a exceção escolhida só pra ele (prodVinculos)
+// ou, se não tiver, a tabela do grupo dele no Estoque (prodTabCat).
+function _prodTabVendaDe(prodId){
+  var v=(DB.prodVinculos||{})[prodId];if(v)return v;
+  var p=gP(parseFloat(prodId));
+  if(p&&p.cat&&DB.prodTabCat&&DB.prodTabCat[p.cat])return DB.prodTabCat[p.cat];
+  return null;
+}
 function _prodPrecoVenda(prodId){
   if(_prodEhRejeito(prodId))return 0;
-  var tabId=DB.prodVinculos[prodId];if(!tabId)return 0;
+  var tabId=_prodTabVendaDe(prodId);if(!tabId)return 0;
   for(var i=0;i<DB.tabelas.length;i++){
     if(String(DB.tabelas[i].id)===String(tabId)){
       for(var j=0;j<DB.tabelas[i].itens.length;j++){if(String(DB.tabelas[i].itens[j].pId)===String(prodId))return DB.tabelas[i].itens[j].preco;}
@@ -16336,6 +16442,45 @@ function _nomeTab(tabId){for(var i=0;i<DB.tabelas.length;i++)if(String(DB.tabela
 // Materiais marcados como "em destaque" (p.prodDestaque=true) aparecem primeiro nas
 // listas de entrada/saída da Produção — são os que o usuário desmonta com mais frequência,
 // então economiza rolagem toda vez que abre uma produção nova.
+// ── TIPOS DE SERVIÇO (o que a desmontagem exige) ─────
+var _PROD_SERVICOS_PADRAO=[
+  {id:'hab',nome:'Habilidade',ic:'🔬',ex:'HD, celular, notebook, drive'},
+  {id:'forca',nome:'Força e corte',ic:'🔨',ex:'TV, motor, prensa, morsa, corte'},
+  {id:'misto',nome:'Misto',ic:'📦',ex:'caixa geral, de tudo um pouco'}
+];
+function _prodServicos(){return (DB.prodServicos&&DB.prodServicos.length)?DB.prodServicos:_PROD_SERVICOS_PADRAO;}
+function _prodServicoObj(id){var l=_prodServicos();for(var i=0;i<l.length;i++)if(l[i].id===id)return l[i];return null;}
+// Tipo de serviço de um material de entrada. Sem escolha feita, tenta adivinhar
+// pelo nome (só sugestão — dá pra trocar em ⚙️ Tabelas).
+function _prodServicoDe(prodId){
+  var p=gP(parseFloat(prodId));if(!p)return null;
+  if(p.prodServico)return p.prodServico==='nenhum'?null:p.prodServico;
+  var n=(p.nome||'').toLowerCase();
+  if(/sucata eletr|caixa geral|misto \(caixa/.test(n))return 'misto';
+  if(/\bhds?\b|celular|notebook|\bdrives?\b|tablet|mem[oó]ria|processador|smartphone/.test(n))return 'hab';
+  if(/\btv\b|televis|monitor|motor|compressor|nobreak|impressora|micro.?ondas|\bfios?\b|cabo/.test(n))return 'forca';
+  return null;
+}
+function _prodServicoAuto(prodId){var p=gP(parseFloat(prodId));return !!p&&!p.prodServico&&!!_prodServicoDe(prodId);}
+// Principais (cards) da escolha de material. Entrada e saída têm listas próprias.
+// Se nenhum foi marcado, usa os mais usados na produção.
+function _prodPrincipais(modo){
+  var campo=modo==='ent'?'prodDestaqueEnt':'prodDestaque';
+  var uso={};
+  (DB.producoes||[]).forEach(function(p){
+    if(modo==='ent'){if(p.matEntradaId!=null)uso[p.matEntradaId]=(uso[p.matEntradaId]||0)+1;}
+    else (p.saidas||[]).forEach(function(sd){uso[sd.prodId]=(uso[sd.prodId]||0)+1;});
+  });
+  var ativos=DB.produtos.filter(function(p){return !p.arquivado;});
+  var marcados=ativos.filter(function(p){return p[campo];});
+  var base=marcados.length?marcados:ativos.filter(function(p){return uso[p.id];});
+  if(modo==='ent')base=base.filter(function(p){return _prodServicoDe(p.id)!=='misto';});
+  return base.sort(function(a,b){return (uso[b.id]||0)-(uso[a.id]||0)||(a.nome||'').localeCompare(b.nome||'','pt-BR');}).slice(0,9);
+}
+function _prodMistos(){
+  return DB.produtos.filter(function(p){return !p.arquivado&&_prodServicoDe(p.id)==='misto';}).slice(0,2);
+}
+function _prodNorm(t){return (t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
 function _prodListaOrdenada(){
   return DB.produtos.filter(function(p){return !p.arquivado;}).sort(function(a,b){
     var da=a.prodDestaque?1:0,db=b.prodDestaque?1:0;
@@ -16343,9 +16488,9 @@ function _prodListaOrdenada(){
     return (a.nome||'').localeCompare(b.nome||'','pt-BR');
   });
 }
-function _toggleProdDestaque(prodId,marcado){
+function _toggleProdDestaque(prodId,marcado,modo){
   var p=gP(prodId);if(!p)return;
-  p.prodDestaque=marcado;
+  if(modo==='ent')p.prodDestaqueEnt=marcado;else p.prodDestaque=marcado;
   saveDB();
 }
 
@@ -16373,22 +16518,23 @@ function pgProducao(){
 
   // Sub-abas: Operador vê só Registro; Admin vê tudo
   var subTabs='<div style="display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--bd)">'
-    +'<button onclick="prodVw=\'registro\';go(\'producao\')" style="background:none;border:none;border-bottom:2px solid '+(prodVw==='registro'?'var(--gr)':'transparent')+';color:'+(prodVw==='registro'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer">👷 Registro</button>';
+    +'<button onclick="prodVw=\'registro\';go(\'producao\')" style="background:none;border:none;border-bottom:2px solid '+(prodVw==='registro'?'var(--gr)':'transparent')+';color:'+(prodVw==='registro'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer">👷 Registro'+_aj('prod.registro')+'</button>';
   if(adm){
-    subTabs+='<button onclick="prodVw=\'analise\';go(\'producao\')" style="background:none;border:none;border-bottom:2px solid '+(prodVw==='analise'?'var(--gr)':'transparent')+';color:'+(prodVw==='analise'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer">📊 Análise</button>'
-      +'<button onclick="prodVw=\'config\';go(\'producao\')" style="background:none;border:none;border-bottom:2px solid '+(prodVw==='config'?'var(--gr)':'transparent')+';color:'+(prodVw==='config'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer">⚙️ Tabelas</button>';
+    subTabs+='<button onclick="prodVw=\'analise\';go(\'producao\')" style="background:none;border:none;border-bottom:2px solid '+(prodVw==='analise'?'var(--gr)':'transparent')+';color:'+(prodVw==='analise'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer">📊 Análise'+_aj('prod.analise')+'</button>'
+      +'<button onclick="prodVw=\'config\';go(\'producao\')" style="background:none;border:none;border-bottom:2px solid '+(prodVw==='config'?'var(--gr)':'transparent')+';color:'+(prodVw==='config'?'var(--tx)':'var(--mt)')+';font-weight:700;font-size:13px;padding:9px 10px;cursor:pointer">⚙️ Tabelas'+_aj('prod.config')+'</button>';
   }
   subTabs+='</div>';
   // Se não é admin e tenta ver análise/lotes/config, volta pra registro
   if(!adm&&prodVw!=='registro')prodVw='registro';
   if(prodVw==='lotes'){prodVw='analise';prodAnVw='lotes';} // atalho antigo
+  if(prodAnVw==='resumo')prodAnVw='painel';if(prodAnVw==='materiais')prodAnVw='lotes';if(prodAnVw==='funcs')prodAnVw='equipe';
 
   var corpo=prodVw==='registro'?_prodRegistro(abertas,hjFech)
     :prodVw==='analise'?_prodAnalise(fechadas)
     :_prodConfig();
 
   return '<div class="fc"><div class="ptop">'
-    +'<div><div class="pl">Operações</div><div class="pt">Controle de Produção</div></div>'
+    +'<div><div class="pl">Operações</div><div class="pt">Controle de Produção'+_aj('prod.pagina')+'</div></div>'
     +'<div style="display:flex;gap:6px">'
     +(prodVw==='registro'?'<button class="btn" onclick="mNovaProdBV()">+ Nova Produção</button>':'')
     +'</div></div>'
@@ -16409,7 +16555,7 @@ function _prodRegistro(abertas,hjFech){
         +'<div style="font-size:11px;color:var(--mt)">'+p.saidas.length+' material(is) · '+fKg(ts)+'kg gerados</div>'
         +'<div style="font-size:11px;color:var(--mt)">&#9200; desde '+(p.data!==_fmtDataBR(_today())?p.data+' ':'')+p.hora+' · '+_fmtDuracao(_prodDuracaoMin(p,true))+' trabalhadas</div></div>'
         +((p.pausas&&p.pausas.length&&!p.pausas[p.pausas.length-1].fim)
-          ?'<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:var(--s3);color:var(--or);border:1px solid var(--or)">&#9208; Pausada</span>'
+          ?'<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:var(--s3);color:var(--or);border:1px solid var(--or)">&#9208; Pausada desde '+p.pausas[p.pausas.length-1].inicio+'</span>'
           :'<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;background:var(--orb);color:var(--or)">Aberta</span>')
         +'</div></div>';
     });
@@ -16430,36 +16576,201 @@ function _prodRegistro(abertas,hjFech){
   return html;
 }
 
-// ── NOVA PRODUÇÃO (usa lista manual de materiais de entrada) ──
+// ── ESCOLHA DE MATERIAL: busca sempre aberta + principais em card ──
+// pfx = prefixo dos campos ('np-mat' entrada, 'rs-mat' saída); modo = 'ent'|'sai'
+var _prodEscAberto={};
+function _prodEscolhaHTML(pfx,modo){
+  _prodEscAberto[pfx]=false;
+  var tiles='';
+  if(modo==='ent'){
+    _prodMistos().forEach(function(p){
+      tiles+='<div class="pesc-misto" onclick="_prodEscPick(\''+pfx+'\',\''+modo+'\','+p.id+')">'
+        +'<div style="font-size:28px">'+p.ic+'</div><div><div style="font-weight:800">'+p.nome+'</div><div style="font-size:11px;color:var(--mt)">Misto (caixa geral) — pegou de tudo um pouco</div></div></div>';
+    });
+  }
+  var pr=_prodPrincipais(modo);
+  if(pr.length){
+    tiles+='<div class="pesc-lbl">'+(modo==='ent'?'OU UM LOTE DE UM TIPO SÓ':'⭐ PRINCIPAIS')+'</div><div class="pesc-grid">';
+    pr.forEach(function(p){tiles+='<div class="pesc-tile" onclick="_prodEscPick(\''+pfx+'\',\''+modo+'\','+p.id+')"><div>'+p.ic+'</div>'+p.nome+'</div>';});
+    tiles+='</div>';
+  }
+  return '<input type="hidden" id="'+pfx+'-id">'
+    +'<div id="'+pfx+'-sel" class="pesc-sel" style="display:none"></div>'
+    +'<div id="'+pfx+'-box">'
+    +'<div class="pesc-srch" id="'+pfx+'-cb"><span>&#128269;</span><input id="'+pfx+'-q" placeholder="Toque para escolher ou escreva…" autocomplete="off" onfocus="_prodEscAbrir(\''+pfx+'\',\''+modo+'\',true)" oninput="_prodEscAbrir(\''+pfx+'\',\''+modo+'\',true)">'
+    +'<span class="pesc-x" id="'+pfx+'-arr" onclick="_prodEscFechar(\''+pfx+'\',\''+modo+'\')">&#9660;</span></div>'
+    +'<div id="'+pfx+'-res"></div>'
+    +'<div id="'+pfx+'-tiles">'+tiles+'</div></div>';
+}
+function _prodEscFechar(pfx,modo){
+  if(!_prodEscAberto[pfx]){var q=document.getElementById(pfx+'-q');if(q)q.focus();return;}
+  _prodEscAberto[pfx]=false;
+  var q=document.getElementById(pfx+'-q');if(q){q.value='';q.blur();}
+  _prodEscBusca(pfx,modo);
+}
+function _prodEscAbrir(pfx,modo,abrir){_prodEscAberto[pfx]=!!abrir;_prodEscBusca(pfx,modo);}
+function _prodEscLinha(pfx,modo,p){
+  return '<div class="pesc-row" onclick="_prodEscPick(\''+pfx+'\',\''+modo+'\','+p.id+')"><span>'+p.ic+'</span><span style="flex:1">'+p.nome+'</span>'
+    +(modo==='ent'?'<span style="font-size:10px;color:var(--mt)">'+fKg(p.est||0)+'kg</span>':'')+'</div>';
+}
+function _prodEscBusca(pfx,modo){
+  var qEl=document.getElementById(pfx+'-q');
+  var q=_prodNorm((qEl||{}).value||'').trim();
+  var res=document.getElementById(pfx+'-res'),tl=document.getElementById(pfx+'-tiles'),cb=document.getElementById(pfx+'-cb'),arr=document.getElementById(pfx+'-arr');
+  if(!res||!tl)return;
+  var aberto=_prodEscAberto[pfx]||!!q;
+  if(arr)arr.innerHTML=aberto?'&#9650;':'&#9660;';
+  if(cb)cb.classList.toggle('open',aberto);
+  if(!aberto){res.innerHTML='';tl.style.display='';return;}
+  tl.style.display='none';
+  var h='<div class="pesc-res">';
+  if(!q){
+    var pr=(modo==='ent'?_prodMistos():[]).concat(_prodPrincipais(modo));
+    if(pr.length){h+='<div class="pesc-sec">⭐ PRINCIPAIS</div>';pr.forEach(function(p){h+=_prodEscLinha(pfx,modo,p);});}
+    h+='<div class="pesc-sec">TODOS (A–Z)</div>';
+    _prodListaOrdenada().slice().sort(function(a,b){return (a.nome||'').localeCompare(b.nome||'','pt-BR');}).forEach(function(p){h+=_prodEscLinha(pfx,modo,p);});
+  } else {
+    var lista=_prodListaOrdenada().filter(function(p){return _prodNorm(p.nome).indexOf(q)>=0;}).slice(0,40);
+    if(!lista.length)h+='<div style="padding:12px;text-align:center;color:var(--mt);font-size:12px">Nenhum material com esse nome</div>';
+    lista.forEach(function(p){h+=_prodEscLinha(pfx,modo,p);});
+    if(_isAdm()){
+      var txt=((qEl||{}).value||'').trim().replace(/"/g,'&quot;').replace(/</g,'&lt;');
+      h+='<div class="pesc-row" style="color:var(--bl);font-weight:700;border-top:1px solid var(--bd)" onclick="_prodNovoMatForm(\''+pfx+'\',\''+modo+'\')">&#65291; Cadastrar “'+txt+'” como material novo</div>';
+    }
+  }
+  res.innerHTML=h+'</div>';
+}
+// Cadastro rápido de material novo (só Admin), DENTRO do formulário aberto
+function _prodNovoMatForm(pfx,modo){
+  var res=document.getElementById(pfx+'-res');if(!res)return;
+  var nome=(document.getElementById(pfx+'-q').value||'').trim().replace(/"/g,'&quot;');
+  var cats=(DB.filtrosMat||[]).filter(function(f){return f.nome!=='Todos';});
+  var catO=cats.map(function(f){return '<option value="'+f.nome+'">'+f.nome+'</option>';}).join('');
+  var svO='<option value="">— não é desmontado —</option>'+_prodServicos().map(function(t){return '<option value="'+t.id+'"'+(modo==='ent'&&t.id==='hab'?' selected':'')+'>'+t.ic+' '+t.nome+'</option>';}).join('');
+  res.innerHTML='<div class="pesc-res" style="padding:10px">'
+    +'<div style="font-size:12px;font-weight:800;margin-bottom:8px">&#65291; Material novo</div>'
+    +'<div class="fld"><label>Nome</label><input class="inp" id="'+pfx+'-nn" value="'+nome+'"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +'<div class="fld"><label>Grupo no Estoque</label><select class="inp" id="'+pfx+'-nc">'+catO+'</select></div>'
+    +'<div class="fld"><label>Tipo de serviço '+_aj('prod.servico')+'</label><select class="inp" id="'+pfx+'-ns">'+svO+'</select></div></div>'
+    +'<div style="font-size:10px;color:var(--mt);margin:4px 0 8px">Entra no Estoque com estoque zero, igual ao + Novo de lá. O preço você coloca depois nas Tabelas.</div>'
+    +'<div style="display:flex;gap:8px"><button type="button" class="btnO bOgr" style="flex:1" onclick="_prodEscAbrir(\''+pfx+'\',\''+modo+'\',true)">Voltar</button>'
+    +'<button type="button" class="btn" style="flex:2" onclick="_prodNovoMatSalvar(\''+pfx+'\',\''+modo+'\')">Cadastrar e escolher</button></div></div>';
+}
+function _prodNovoMatSalvar(pfx,modo){
+  if(!_isAdm())return;
+  var n=(document.getElementById(pfx+'-nn').value||'').trim();
+  if(!n){toast('Informe o nome!','var(--rd)');return;}
+  var ja=DB.produtos.filter(function(p){return _prodNorm(p.nome)===_prodNorm(n);})[0];
+  if(ja){toast('Já existe um material com esse nome — escolhido','var(--or)');_prodEscPick(pfx,modo,ja.id);return;}
+  var cat=document.getElementById(pfx+'-nc').value||'';
+  var sv=document.getElementById(pfx+'-ns').value||'';
+  var np={id:nid(),nome:n,ic:'📦',vV:0,vC:0,est:0,cat:cat,barras:''};
+  if(sv)np.prodServico=sv;
+  DB.produtos.push(np);
+  // Igual ao + Novo do Estoque: entra nas tabelas Padrão (compra e venda) com preço zero
+  for(var j=0;j<DB.tabelas.length;j++){
+    var tab=DB.tabelas[j];
+    if((tab.nome||'').toLowerCase()!=='padrao')continue;
+    if(!tab.itens.some(function(it){return String(it.pId)===String(np.id);}))tab.itens.push({pId:np.id,preco:0});
+  }
+  try{_auditLog('Material novo pela Produção',n+(cat?' · '+cat:''));}catch(e){}
+  saveDB();
+  toast('Material “'+n+'” cadastrado','var(--gr)');
+  _prodEscPick(pfx,modo,np.id);
+}
+function _prodEscPick(pfx,modo,id){
+  var p=gP(id);if(!p)return;
+  document.getElementById(pfx+'-id').value=id;
+  var sel=document.getElementById(pfx+'-sel'),box=document.getElementById(pfx+'-box');
+  var sv=modo==='ent'?_prodServicoObj(_prodServicoDe(id)):null;
+  sel.innerHTML='<div style="font-size:24px">'+p.ic+'</div><div style="flex:1;min-width:0"><div style="font-weight:800">'+p.nome+'</div>'
+    +'<div style="font-size:11px;color:var(--mt)">'+(modo==='ent'?(sv?sv.ic+' '+sv.nome+' · ':'')+'estoque '+fKg(p.est||0)+'kg':'material escolhido')+'</div></div>'
+    +'<button type="button" class="btnO bOgr" style="font-size:11px;padding:5px 10px" onclick="_prodEscTrocar(\''+pfx+'\',\''+modo+'\')">trocar</button>';
+  sel.style.display='flex';box.style.display='none';_prodEscAberto[pfx]=false;
+  if(pfx==='np-mat'){_autoFillCustoProdById(id);try{_prodLiqNp();}catch(e){}}
+  if(pfx==='rs-mat'){var w=document.getElementById('rs-peso');if(w)setTimeout(function(){w.focus();},60);}
+}
+function _prodEscTrocar(pfx,modo){
+  document.getElementById(pfx+'-id').value='';
+  document.getElementById(pfx+'-sel').style.display='none';
+  document.getElementById(pfx+'-box').style.display='';
+  var q=document.getElementById(pfx+'-q');if(q){q.value='';_prodEscAberto[pfx]=false;_prodEscBusca(pfx,modo);}
+}
+// ── QUEM VAI DESMONTAR (lista com iniciais e cor) ──
+var _PROD_CORES_PESSOA=['#22c55e','#3b82f6','#f59e0b','#a855f7','#ef4444','#14b8a6','#ec4899','#84cc16'];
+function _prodIniciais(n){var w=(n||'').trim().split(/\s+/);return ((w[0]||'').charAt(0)+(w[1]||w[0]||'').charAt(w[1]?0:1)).toUpperCase();}
+function _prodQuemOps(q){
+  var abertasPor={};
+  (DB.producoes||[]).forEach(function(p){if(p.status==='aberta'){var k=_prodChaveFunc(p.func);abertasPor[k]=(abertasPor[k]||0)+1;}});
+  var ops='';q=_prodNorm(q||'').trim();
+  (DB.funcs||[]).forEach(function(f,i){
+    if(q&&_prodNorm(f.nome).indexOf(q)<0)return;
+    var c=_PROD_CORES_PESSOA[i%_PROD_CORES_PESSOA.length];var ab=abertasPor[_prodChaveFunc(f.nome)]||0;
+    ops+='<div class="pquem-op" onclick="_prodQuemPick('+i+')"><div class="pquem-av" style="background:'+c+'2e;color:'+c+';border:2px solid '+c+'">'+_prodIniciais(f.nome)+'</div>'
+      +'<div style="flex:1"><b>'+f.nome+'</b><div style="font-size:11px;color:'+(ab?'var(--or)':'var(--mt)')+'">'+(ab?'&#9203; '+ab+' produção aberta':'livre')+'</div></div></div>';
+  });
+  ops+='<div class="pquem-op" style="border-top:1px solid var(--bd)" onclick="_prodQuemPick(-1)"><div class="pquem-av" style="background:var(--s3);color:var(--mt)">&#9997;</div><div style="flex:1"><b>Outra pessoa</b><div style="font-size:11px;color:var(--mt)">sócio, ajuda pontual…</div></div></div>';
+  return ops;
+}
+function _prodQuemHTML(){
+  return '<input type="hidden" id="np-func">'
+    +'<div id="np-fn-trig" class="pquem-trig"><div class="pquem-av" style="background:var(--s3);color:var(--mt)">&#128119;</div>'
+    +'<input id="np-fn-q" placeholder="Toque para escolher ou escreva…" autocomplete="off" style="flex:1;background:none;border:none;color:var(--tx);font-size:14px;outline:none;min-width:0;padding:4px 0" onfocus="_prodQuemAbrir(true)" oninput="document.getElementById(\'np-func\').value=\'\';_prodQuemAbrir(true)">'
+    +'<div id="np-fn-arr" style="color:var(--mt);cursor:pointer;padding:4px" onclick="_prodQuemAbrir()">&#9660;</div></div>'
+    +'<div id="np-fn-list" class="pquem-list" style="display:none"></div>'
+    +'<input class="inp" id="np-func-outro" placeholder="Nome de quem vai fazer a produção" style="display:none;margin-top:7px">';
+}
+function _prodQuemAbrir(forcar){
+  var l=document.getElementById('np-fn-list'),t=document.getElementById('np-fn-trig'),q=document.getElementById('np-fn-q');if(!l)return;
+  var abrir=forcar===true?true:(forcar===false?false:l.style.display==='none');
+  if(abrir){
+    // escolhido e sem digitar de novo: lista toda; digitando: filtra
+    var txt=document.getElementById('np-func').value?'':(q?q.value:'');
+    l.innerHTML=_prodQuemOps(txt);
+  }
+  l.style.display=abrir?'block':'none';t.classList.toggle('open',abrir);
+  document.getElementById('np-fn-arr').innerHTML=abrir?'&#9650;':'&#9660;';
+}
+function _prodQuemPick(i){
+  var q=document.getElementById('np-fn-q'),av=document.querySelector('#np-fn-trig .pquem-av'),outro=document.getElementById('np-func-outro');
+  if(i<0){
+    document.getElementById('np-func').value='__outro__';
+    q.value='Outra pessoa';av.innerHTML='&#9997;';av.style.cssText='background:var(--s3);color:var(--mt)';
+    outro.style.display='block';setTimeout(function(){outro.focus();},60);
+  } else {
+    var f=DB.funcs[i];if(!f)return;var c=_PROD_CORES_PESSOA[i%_PROD_CORES_PESSOA.length];
+    document.getElementById('np-func').value=f.nome;
+    q.value=f.nome;
+    av.textContent=_prodIniciais(f.nome);av.style.cssText='background:'+c+'2e;color:'+c+';border:2px solid '+c;
+    outro.style.display='none';
+  }
+  q.blur();
+  _prodQuemAbrir(false);
+}
+
+// ── NOVA PRODUÇÃO ──
 function mNovaProdBV(){
-  var funcOpts='<option value="">-- Selecione --</option>';
-  funcOpts+=DB.funcs.map(function(f){return '<option value="'+f.nome+'">'+f.nome+'</option>';}).join('');
-  funcOpts+='<option value="__outro__">&#9997; Outra pessoa (sócio, ajuda pontual...)</option>';
-  openM('⚙️ Nova Produção',
+  openM('⚙️ Nova Produção '+_aj('prod.nova'),
     '<div class="mf">'
-    +'<div class="fld"><label>Quem está fazendo? *</label><select class="inp" id="np-func" onchange="_toggleNpOutro()">'+funcOpts+'</select>'
-    +'<input class="inp" id="np-func-outro" placeholder="Nome de quem vai fazer a produção" style="display:none;margin-top:7px"></div>'
-    +'<div class="fld"><label>Material de entrada (o que vai desmontar) *</label>'
-    +'<div class="pdd" id="pdd-np-mat">'
-    +'<button class="pdd-trigger" onclick="_toggleProdPicker(\'np-mat\')" type="button">'
-    +'<span class="pdd-ic" id="np-mat-ic">📦</span><span class="pdd-lbl" id="np-mat-lbl" style="color:var(--mt)">-- Selecione --</span><span class="pdd-arr">&#9660;</span>'
-    +'</button>'
-    +'<div class="pdd-panel" id="np-mat-panel">'
-    +'<div class="pdd-search"><input type="text" id="np-mat-search" placeholder="&#128269; Buscar material..." oninput="_filtrarProdPicker(\'np-mat\')" autocomplete="off"></div>'
-    +'<div class="pdd-list" id="np-mat-list"></div>'
-    +'</div></div>'
-    +'<input type="hidden" id="np-mat-id"></div>'
-    +(_isAdm()?'<div class="fld"><label>Custo de compra deste lote (R$/kg)</label><input class="inp" type="number" inputmode="decimal" step="0.01" id="np-custo">'
-    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Já vem preenchido com o preço cadastrado do produto. Mude aqui só se esse lote específico custou diferente do de costume.</div></div>':'')
-    +'<div class="fld"><label>Apelido do lote</label><input class="inp" id="np-lote" list="np-lote-dl" autocomplete="off" placeholder="Ex: Lote de PC Misto (normal + Slim)"><datalist id="np-lote-dl">'+_prodApelidosUsados().map(function(a){return '<option value="'+a.replace(/"/g,'&quot;')+'">';}).join('')+'</datalist>'
-    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Use sempre o MESMO apelido pra lotes do mesmo tipo (os já usados aparecem como sugestão) — é ele que junta o histórico na análise de Lotes e no simulador de leilão. Não afeta o estoque.</div></div>'
+    +'<div class="fld"><label>Quem vai desmontar? *</label>'+_prodQuemHTML()+'</div>'
+    +'<div class="fld"><label>O que vai desmontar? * '+_aj('prod.oque')+'</label>'+_prodEscolhaHTML('np-mat','ent')+'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">'
-    +'<div class="fld"><label>Peso bruto (kg) *</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="np-peso"></div>'
-    +'<div class="fld"><label>Tara (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="np-tara"></div>'
+    +'<div class="fld"><label>Peso bruto (kg) *</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="np-peso" oninput="_prodLiqNp()"></div>'
+    +'<div class="fld"><label>Tara (kg) '+_aj('prod.tara')+'</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="np-tara" oninput="_prodLiqNp()"></div>'
     +'</div>'
-    +'<div style="font-size:10px;color:var(--mt);margin-bottom:12px">Tara = peso do recipiente. Peso líquido = bruto − tara. O peso líquido já sai do estoque do material de entrada agora, na abertura.</div>'
-    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="salvarNovaProdBV()">Iniciar Produção</button></div>'
+    +'<div id="np-liq" style="font-size:11px;color:var(--mt);margin:-2px 0 10px">O peso líquido sai do estoque do material agora, na abertura.</div>'
+    +(_isAdm()?'<div class="fld"><label>Custo de compra deste lote (R$/kg)</label><input class="inp" type="number" inputmode="decimal" step="0.01" id="np-custo">'
+    +'<div style="font-size:10px;color:var(--mt);margin-top:3px">Já vem com o preço cadastrado do material. Mude só se esse lote custou diferente do de costume.</div></div>':'')
+    +'<div class="fld"><label>Observação (opcional)</label><input class="inp" id="np-obs" placeholder="Ex: veio da coleta da empresa X"></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="salvarNovaProdBV()">&#9654; Iniciar Produção</button></div>'
     +'</div>',520);
+}
+function _prodLiqNp(){
+  var b=parseFloat((document.getElementById('np-peso')||{}).value)||0,t=parseFloat((document.getElementById('np-tara')||{}).value)||0;
+  var el=document.getElementById('np-liq');if(!el)return;
+  var nm='';var id=(document.getElementById('np-mat-id')||{}).value;var p=id?gP(parseFloat(id)):null;if(p)nm=' de '+p.nome;
+  el.innerHTML=b>0?'Peso líquido: <b style="color:var(--tx)">'+fKg(Math.max(0,b-t))+' kg</b> — sai do estoque'+nm+' agora.':'O peso líquido sai do estoque do material agora, na abertura.';
 }
 function _toggleNpOutro(){
   var sel=document.getElementById('np-func');
@@ -16529,7 +16840,7 @@ function _prodApelidosUsados(){
   });
   return out.sort(function(a,b){return a.localeCompare(b,'pt-BR');});
 }
-function salvarNovaProdBV(semApelidoOk,forcar){
+function salvarNovaProdBV(forcar){
   var selVal=document.getElementById('np-func').value;
   var func=selVal==='__outro__'?document.getElementById('np-func-outro').value.trim():selVal;
   var matIdEl=document.getElementById('np-mat-id');
@@ -16537,26 +16848,19 @@ function salvarNovaProdBV(semApelidoOk,forcar){
   var prodEnt=matId?gP(matId):null;
   var custoEl=document.getElementById('np-custo');
   var custoLote=custoEl?(parseFloat(custoEl.value)||0):0; // campo só existe pra Admin
-  var lote=document.getElementById('np-lote').value.trim();
+  var obsEl=document.getElementById('np-obs');var obs=obsEl?obsEl.value.trim():'';
   var peso=parseFloat(document.getElementById('np-peso').value)||0;
   var tara=parseFloat(document.getElementById('np-tara').value)||0;
-  if(!func){toast('Selecione ou digite quem está fazendo!','var(--rd)');return;}
-  if(!prodEnt){toast('Selecione o material de entrada!','var(--rd)');return;}
+  if(!func){toast('Escolha quem vai desmontar!','var(--rd)');return;}
+  if(!prodEnt){toast('Escolha o que vai desmontar!','var(--rd)');return;}
   if(peso<=0){toast('Informe o peso!','var(--rd)');return;}
   if(tara<0||peso-tara<=0){toast('A tara precisa ser menor que o peso bruto!','var(--rd)');return;}
   // Avisa (não bloqueia) se essa pessoa já tem outra produção aberta — isso faz o
   // tempo trabalhado contar errado se as duas ficarem rodando "ao mesmo tempo".
-  // Pede o apelido do lote (não bloqueia): sem ele a produção entra na análise
-  // agrupada só pelo material de entrada.
-  if(!lote&&!semApelidoOk){
-    _prodAvisoInline('&#128230; Esta produção está <b>sem apelido de lote</b>. Sem ele, ela é agrupada só pelo material de entrada na análise. Dê um apelido (ex: "HD leilão", "Fontes ATX") ou continue assim mesmo.','salvarNovaProdBV',[],'Continuar sem apelido');
-    var lEl=document.getElementById('np-lote');if(lEl)lEl.focus();
-    return;
-  }
   if(!forcar){
     var jaTemAberta=DB.producoes.some(function(p){return p.status==='aberta'&&(p.func||'').trim().toLowerCase()===func.trim().toLowerCase();});
     if(jaTemAberta){
-      _prodAvisoInline('&#9888; <b>'+func+'</b> já tem uma produção em aberto. Se abrir outra, o tempo trabalhado de uma pode contar junto com o da outra sem querer.','salvarNovaProdBV',[true],'Abrir mesmo assim');
+      _prodAvisoInline('&#9888; <b>'+func+'</b> já tem uma produção em aberto. Se abrir outra, o tempo trabalhado de uma pode contar junto com o da outra sem querer.','salvarNovaProdBV',[],'Abrir mesmo assim');
       return;
     }
   }
@@ -16565,7 +16869,8 @@ function salvarNovaProdBV(semApelidoOk,forcar){
   // separado pra desmontar, mesmo antes de terminar o processo.
   prodEnt.est=+((prodEnt.est||0)-pesoEntrada).toFixed(3);
   var h=_agoraMG();var hora=('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
-  DB.producoes.push({id:nid(),func:func,matEntradaId:prodEnt.id,matEntrada:prodEnt.nome,custoEntradaLote:custoLote,lote:lote,pesoEntrada:pesoEntrada,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,pausas:[],saidas:[],entradas:[{bruto:peso,tara:tara,peso:pesoEntrada,data:_fmtDataBR(_today()),hora:hora}],status:'aberta'});
+  var nova={id:nid(),func:func,matEntradaId:prodEnt.id,matEntrada:prodEnt.nome,custoEntradaLote:custoLote,lote:'',obs:obs,pesoEntrada:pesoEntrada,tara:tara,pesoBruto:peso,data:_fmtDataBR(_today()),hora:hora,pausas:[],saidas:[],entradas:[{id:nid(),bruto:peso,tara:tara,peso:pesoEntrada,data:_fmtDataBR(_today()),hora:hora}],status:'aberta'};
+  DB.producoes.push(nova);
   saveDB();closeM();go('producao');toast('Produção iniciada!','var(--gr)');
 }
 // Mostra um aviso DENTRO do formulário que já está aberto (não troca de modal —
@@ -16615,7 +16920,27 @@ function _prodTgForm(qual){
   });
 }
 
+// Pausas da produção: "10:02 → 10:20 (18min) · 15:30 → agora"
+function _prodPausasLinha(p){
+  if(!p.pausas||!p.pausas.length)return '';
+  var it=p.pausas.map(function(pa){
+    var a=_hm2min(pa.inicio),b=pa.fim?_hm2min(pa.fim):null;
+    var d=(a!==null&&b!==null)?((b-a+1440)%1440):null;
+    return (pa.dIni&&pa.dIni!==p.data?pa.dIni.slice(0,5)+' ':'')+pa.inicio+' &rarr; '+(pa.fim?pa.fim+(d!==null?' ('+_fmtDuracao(d)+')':''):'<b style="color:var(--or)">agora</b>');
+  });
+  return '<div style="font-size:11px;color:var(--mt);margin-top:3px">&#9208; Pausas: '+it.join(' · ')+'</div>';
+}
 // ── DETALHE DA PRODUÇÃO ──────────────────────────────
+var _prodExpSd={};      // materiais com as pesagens abertas na lista (por produção)
+var _prodVerEnt={};     // levas de entrada abertas (por produção)
+var _prodUltMat={};     // último material pesado em cada produção (já vem escolhido)
+function _prodTgSd(pid,matId){var k=pid+'|'+matId;_prodExpSd[k]=!_prodExpSd[k];closeM();mVerProdBV(pid);}
+function _prodTgEnt(pid){_prodVerEnt[pid]=!_prodVerEnt[pid];closeM();mVerProdBV(pid);}
+function _prodLiqRs(){
+  var b=parseFloat((document.getElementById('rs-peso')||{}).value)||0,t=parseFloat((document.getElementById('rs-tara')||{}).value)||0;
+  var el=document.getElementById('rs-liq');if(!el)return;
+  el.innerHTML=b>0?'Líquido: <b style="color:var(--gr);font-size:14px">'+fKg(Math.max(0,b-t))+' kg</b>':'Deixe a tara em branco se pesou sem caixa.';
+}
 function mVerProdBV(id){
   var p=_prodAchar(id);
   if(!p)return;
@@ -16625,127 +16950,116 @@ function mVerProdBV(id){
   var falta=+(p.pesoEntrada-ts).toFixed(3);
   var pausaAtiva=p.pausas&&p.pausas.length&&!p.pausas[p.pausas.length-1].fim;
   var btnX='background:var(--rdb);color:var(--rd);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer';
-  var linhaPes='display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;border-top:1px solid var(--bd)';
-  var tituloBloco='font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px';
+  var linhaPes='display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;border-top:1px solid var(--bd)';
+  var prodEnt=gP(p.matEntradaId);
+  var sv=_prodServicoObj(_prodServicoDe(p.matEntradaId));
 
-  // ── Entrada: levas ──
-  var levas=_prodEntradas(p);
-  var levasHTML='';
-  levas.forEach(function(lv,idx){
-    var conta=lv.ajuste?'ajuste do Admin':(lv.tara>0?fKg(lv.bruto)+' &minus; '+fKg(lv.tara)+' tara':'sem tara');
-    levasHTML+='<div style="'+linhaPes+'">'
-      +'<span style="color:var(--mt);min-width:78px">'+_prodPesLbl(lv)+'</span>'
-      +'<span style="flex:1;color:var(--mt);font-size:11px">'+conta+'</span>'
-      +'<span style="font-weight:700">'+(lv.ajuste&&lv.peso>0?'+':'')+fKg(lv.peso)+'kg</span>'
-      +(aberta&&levas.length>1&&p.entradas?'<button onclick="remEntradaProdBV('+p.id+','+idx+')" style="'+btnX+'">&#10005;</button>':'')
-      +'</div>';
-  });
-
-  // ── Saídas: um bloco por material, com as pesagens dentro ──
-  var saidasHTML='';
-  p.saidas.forEach(function(sd,sIdx){
-    var prod=gP(sd.prodId);var nome=prod?prod.ic+' '+prod.nome:(sd.mat||'?');
-    var pes=_prodPesagens(sd);
-    var mostrarPes=aberta||pes.length>1;
-    saidasHTML+='<div style="background:var(--s2);border-radius:8px;padding:9px 10px;margin-bottom:6px">'
-      +'<div style="display:flex;align-items:center;gap:8px">'
-      +'<div style="flex:1"><div style="font-size:13px;font-weight:700">'+nome+'</div>'
-      +'<div style="font-size:10px;color:var(--mt)">'+pes.length+' pesagem'+(pes.length>1?'s':'')+(p.pesoEntrada>0?' &middot; '+(sd.peso/p.pesoEntrada*100).toFixed(1)+'% da entrada':'')+'</div></div>'
-      +'<div style="font-size:15px;color:var(--gr);font-weight:800">'+fKg(sd.peso)+'kg</div></div>';
-    if(mostrarPes){
-      saidasHTML+='<div style="margin-top:6px">';
-      pes.forEach(function(pg,pIdx){
-        saidasHTML+='<div style="'+linhaPes+'">'
-          +'<span style="color:var(--mt);min-width:78px">'+_prodPesLbl(pg)+'</span>'
-          +'<span style="flex:1;color:var(--mt);font-size:11px">'+(pg.tara>0?fKg(pg.bruto)+' &minus; '+fKg(pg.tara)+' tara':'')+'</span>'
-          +'<span style="font-weight:700">'+fKg(pg.peso)+'kg</span>'
-          +(aberta?'<button onclick="remPesagemProdBV('+p.id+','+sIdx+','+pIdx+')" style="'+btnX+'">&#10005;</button>':'')
-          +'</div>';
-      });
-      saidasHTML+='</div>';
-    }
-    saidasHTML+='</div>';
-  });
-  if(!saidasHTML)saidasHTML='<div style="text-align:center;padding:14px;color:var(--mt);font-size:12px">Nenhum material pesado ainda</div>';
-
+  // ── cabeçalho ──
   var corFalta=falta<-0.001?'var(--rd)':(falta>0.001?'var(--or)':'var(--gr)');
   var html='<div class="mf">'
-    +'<div style="font-size:12px;color:var(--mt)">👷 '+p.func+' · '+p.data+' '+p.hora+(p.horaFim?' &rarr; '+_prodFimLbl(p)+' ('+_fmtDuracao(_prodDuracaoMin(p))+')':'')+(_isAdm()?' <a href="#" onclick="event.preventDefault();mEditarHoraProd('+p.id+')" style="color:var(--bl)">&#9998;</a>':'')+(pausaAtiva?' · <span style="color:var(--or);font-weight:700">&#9208; PAUSADA</span>':'')+'</div>'
-    +'<div style="font-size:16px;font-weight:800;margin:4px 0 2px">'+p.matEntrada+'</div>'
-    +(p.lote?'<div style="font-size:12px;color:var(--pu);margin-bottom:4px">📦 '+p.lote+'</div>':'')
-    +(_isAdm()&&p.custoEntradaLote>0?'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">💰 Custo considerado: '+fR(p.custoEntradaLote)+'/kg</div>':'<div style="margin-bottom:10px"></div>')
-    // Resumo
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">'
-    +'<div style="background:var(--s2);border-radius:8px;padding:9px 4px;text-align:center"><div style="font-size:16px;font-weight:800">'+fKg(p.pesoEntrada)+'</div><div style="font-size:9px;color:var(--mt)">KG ENTROU</div></div>'
-    +'<div style="background:var(--s2);border-radius:8px;padding:9px 4px;text-align:center"><div style="font-size:16px;font-weight:800;color:var(--gr)">'+fKg(ts)+'</div><div style="font-size:9px;color:var(--mt)">KG JÁ PESADO</div></div>'
-    +'<div style="background:var(--s2);border-radius:8px;padding:9px 4px;text-align:center"><div style="font-size:16px;font-weight:800;color:'+corFalta+'">'+fKg(Math.abs(falta))+'</div><div style="font-size:9px;color:var(--mt)">'+(falta<-0.001?'KG A MAIS':(aberta?'KG FALTA PESAR':'KG SOBRA'))+'</div></div>'
+    +'<div class="card" style="border-color:'+(aberta?'var(--or)':'var(--gr)')+';margin-bottom:10px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div style="min-width:0">'
+    +'<div style="font-size:12px;color:var(--mt)">👷 '+p.func+' · '+p.data.slice(0,5)+' '+p.hora+(p.horaFim?' &rarr; '+_prodFimLbl(p):'')
+    +' · <b style="color:var(--tx)">'+_fmtDuracao(_prodDuracaoMin(p,aberta))+'</b>'+(_isAdm()?' <a href="#" onclick="event.preventDefault();mEditarHoraProd('+p.id+')" style="color:var(--bl)">&#9998;</a>':'')+'</div>'
+    +'<div style="font-size:17px;font-weight:800;margin-top:2px">'+(prodEnt?prodEnt.ic+' ':'')+p.matEntrada+'</div>'
+    +(sv?'<div style="font-size:11px;color:var(--mt)">'+sv.ic+' '+sv.nome+'</div>':'')
+    +(p.lote?'<div style="font-size:11px;color:var(--pu)">📦 '+p.lote+'</div>':'')
+    +(p.obs?'<div style="font-size:11px;color:var(--mt)">📝 '+p.obs+'</div>':'')
+    +_prodPausasLinha(p)
+    +(_isAdm()&&p.custoEntradaLote>0?'<div style="font-size:11px;color:var(--mt)">💰 Custo considerado: '+fR(p.custoEntradaLote)+'/kg</div>':'')
     +'</div>'
-    +'<div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden;margin-top:8px"><div style="height:100%;border-radius:3px;width:'+pct+'%;background:'+(aberta?'var(--bl)':(pct>80?'var(--gr)':pct>50?'var(--or)':'var(--rd)'))+'"></div></div>'
-    +'<div style="font-size:10px;color:var(--mt);text-align:right;margin-top:3px">'+pct.toFixed(1)+(aberta?'% já pesado':'% aproveitado')+'</div>';
+    +(aberta?(pausaAtiva?'<span class="pill-st" style="background:var(--s3);color:var(--or);border:1px solid var(--or)">&#9208; Pausada</span>':'<span class="pill-st" style="background:var(--orb);color:var(--or)">&#9203; Aberta</span>')
+      :'<span class="pill-st" style="background:var(--grb);color:var(--gr)">&#10003; Fechada</span>')
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px">'
+    +'<div class="pv-n"><b>'+fKg(p.pesoEntrada)+'</b><span>kg entrou</span></div>'
+    +'<div class="pv-n"><b style="color:var(--gr)">'+fKg(ts)+'</b><span>já pesado</span></div>'
+    +'<div class="pv-n"><b style="color:'+corFalta+'">'+fKg(Math.abs(falta))+'</b><span>'+(falta<-0.001?'kg a mais':(aberta?'falta pesar':'sobra'))+'</span></div>'
+    +'</div>'
+    +'<div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden;margin-top:8px"><div style="height:100%;width:'+pct+'%;background:'+(aberta?'var(--bl)':(pct>80?'var(--gr)':pct>50?'var(--or)':'var(--rd)'))+'"></div></div>'
+    +'</div>';
 
-  // ── Bloco ENTRADA ──
-  html+='<div style="border-top:1px solid var(--bd);margin-top:10px;padding-top:10px">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
-    +'<div style="'+tituloBloco+';color:var(--bl)">📥 Entrada · '+levas.length+' leva'+(levas.length>1?'s':'')+'</div>'
-    +(aberta?'<button class="btnO bOb" style="font-size:12px;padding:6px 11px" onclick="_prodTgForm(\'pv-form-ent\')">+ Pegar mais material</button>':'')
-    +'</div>'
-    +levasHTML;
+  // ── pesar material (só aberta) ──
+  if(aberta){
+    var levas0=_prodEntradas(p);
+    var taraRef=(levas0[0]&&levas0[0].tara>0)?levas0[0].tara:(p.tara||0);
+    html+='<div class="card" style="border-color:rgba(34,197,94,.5);margin-bottom:10px">'
+      +'<div style="font-size:14px;font-weight:800;margin-bottom:8px">&#9878; Pesar material '+_aj('prod.pesar')+'</div>'
+      +_prodEscolhaHTML('rs-mat','sai')
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">'
+      +'<div class="fld"><label>Bruto (kg)</label><input class="inp" style="font-size:20px;font-weight:800;padding:11px" type="number" inputmode="decimal" step="0.001" id="rs-peso" oninput="_prodLiqRs()"></div>'
+      +'<div class="fld"><label>Tara da caixa (kg) '+_aj('prod.taraSai')+'</label><input class="inp" style="font-size:16px;padding:12px" type="number" inputmode="decimal" step="0.001" id="rs-tara" oninput="_prodLiqRs()" placeholder="'+(taraRef>0?'entrada: '+fKg(taraRef):'0')+'"></div></div>'
+      +'<div id="rs-liq" style="font-size:11px;color:var(--mt);margin:2px 0 10px">Deixe a tara em branco se pesou sem caixa.</div>'
+      +'<button class="btn" style="width:100%;padding:12px;font-size:15px" onclick="addSaidaProdBV('+p.id+')">&#65291; Lançar pesagem</button></div>';
+  }
+
+  // ── já pesado ──
+  html+='<div class="card" style="margin-bottom:10px"><div style="font-size:14px;font-weight:800;margin-bottom:8px">📤 Já pesado <span style="font-size:11px;color:var(--mt);font-weight:600">· '+p.saidas.length+' material(is)</span></div>';
+  if(!p.saidas.length)html+='<div style="text-align:center;padding:12px;color:var(--mt);font-size:12px">Nenhum material pesado ainda</div>';
+  p.saidas.forEach(function(sd,sIdx){
+    var prod=gP(sd.prodId);var nome=prod?prod.ic+' '+prod.nome:(sd.mat||'?');
+    var pes=_prodPesagens(sd);var exp=!!_prodExpSd[p.id+'|'+sd.prodId];
+    html+='<div style="background:var(--s2);border-radius:10px;padding:9px 10px;margin-bottom:6px">'
+      +'<div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="_prodTgSd('+p.id+','+sd.prodId+')">'
+      +'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">'+nome+(_prodEhRejeito(sd.prodId)?' <span style="font-size:10px;color:var(--mt)">(rejeito)</span>':'')+'</div>'
+      +'<div style="font-size:10px;color:var(--mt)">'+pes.length+' pesagem'+(pes.length>1?'s':'')+(p.pesoEntrada>0?' · '+(sd.peso/p.pesoEntrada*100).toFixed(0)+'% do que entrou':'')+' · '+(exp?'esconder &#9650;':'ver &#9660;')+'</div></div>'
+      +'<div style="font-size:15px;color:var(--gr);font-weight:800;white-space:nowrap">'+fKg(sd.peso)+' kg</div></div>';
+    if(exp){
+      pes.forEach(function(pg,pIdx){
+        html+='<div style="'+linhaPes+'"><span style="color:var(--mt);min-width:74px">'+_prodPesLbl(pg)+'</span>'
+          +'<span style="flex:1;color:var(--mt);font-size:11px">'+(pg.tara>0?fKg(pg.bruto)+' &minus; '+fKg(pg.tara):'')+'</span>'
+          +'<span style="font-weight:700">'+fKg(pg.peso)+'</span>'
+          +(aberta?'<button onclick="remPesagemProdBV('+p.id+','+sIdx+','+pIdx+')" style="'+btnX+'">&#10005;</button>':'')+'</div>';
+      });
+    }
+    html+='</div>';
+  });
+  if(p.saidas.length)html+='<div style="font-size:10px;color:var(--mt)">Toque num material pra ver'+(aberta?' ou apagar':'')+' as pesagens dele.</div>';
+  html+='</div>';
+
+  // ── entrada (levas) ──
+  var levas=_prodEntradas(p);var verEnt=!!_prodVerEnt[p.id];
+  html+='<div class="card" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="_prodTgEnt('+p.id+')">'
+    +'<div style="font-size:13px;font-weight:800">📥 Entrada · '+levas.length+' leva'+(levas.length>1?'s':'')+' · '+fKg(p.pesoEntrada)+' kg</div>'
+    +'<div style="font-size:11px;color:var(--bl)">'+(verEnt?'esconder &#9650;':'ver &#9660;')+'</div></div>';
+  if(verEnt){
+    levas.forEach(function(lv,idx){
+      var conta=lv.ajuste?'ajuste do Admin':(lv.tara>0?fKg(lv.bruto)+' &minus; '+fKg(lv.tara)+' tara':'sem tara');
+      html+='<div style="'+linhaPes+'"><span style="color:var(--mt);min-width:74px">'+_prodPesLbl(lv)+'</span><span style="flex:1;color:var(--mt);font-size:11px">'+conta+'</span>'
+        +'<span style="font-weight:700">'+(lv.ajuste&&lv.peso>0?'+':'')+fKg(lv.peso)+'</span>'
+        +(aberta&&levas.length>1&&p.entradas?'<button onclick="remEntradaProdBV('+p.id+','+idx+')" style="'+btnX+'">&#10005;</button>':'')+'</div>';
+    });
+  }
   if(aberta){
     html+='<div id="pv-form-ent" style="display:none;background:var(--s2);border:1px solid rgba(59,130,246,.35);border-radius:8px;padding:10px;margin-top:8px">'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
       +'<div class="fld"><label>Peso bruto (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="ae-peso"></div>'
       +'<div class="fld"><label>Tara (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="ae-tara"></div></div>'
-      +'<div style="font-size:10px;color:var(--mt);margin:6px 0 8px">Só pra material da mesma leva/origem. Se for de outra compra, feche esta produção e abra uma nova.</div>'
+      +'<div style="font-size:10px;color:var(--mt);margin:6px 0 8px">Só pra material da mesma leva. Se for outro material, feche esta produção e abra uma nova.</div>'
       +'<button class="btn" style="width:100%;background:var(--bl)" onclick="addEntradaProdBV('+p.id+')">Somar à entrada</button></div>';
   }
   html+='</div>';
 
-  // ── Bloco MATERIAIS GERADOS ──
-  html+='<div style="border-top:1px solid var(--bd);margin-top:12px;padding-top:10px">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
-    +'<div style="'+tituloBloco+';color:var(--gr)">📤 Materiais gerados</div>'
-    +(aberta?'<button class="btn" style="font-size:12px;padding:6px 11px" onclick="_prodTgForm(\'pv-form-sai\')">+ Pesar material</button>':'')
-    +'</div>';
+  // ── ações ──
   if(aberta){
-    var taraRef=(levas[0]&&levas[0].tara>0)?levas[0].tara:(p.tara||0);
-    html+='<div id="pv-form-sai" style="display:none;background:var(--s2);border:1px solid rgba(34,197,94,.35);border-radius:8px;padding:10px;margin-bottom:8px">'
-      +'<div class="fld"><label>Material</label>'
-      +'<div class="pdd" id="pdd-rs-mat">'
-      +'<button class="pdd-trigger" onclick="_toggleProdPicker(\'rs-mat\')" type="button">'
-      +'<span class="pdd-ic" id="rs-mat-ic">📦</span><span class="pdd-lbl" id="rs-mat-lbl" style="color:var(--mt)">-- Selecione --</span><span class="pdd-arr">&#9660;</span>'
-      +'</button>'
-      +'<div class="pdd-panel" id="rs-mat-panel">'
-      +'<div class="pdd-search"><input type="text" id="rs-mat-search" placeholder="&#128269; Buscar material..." oninput="_filtrarProdPicker(\'rs-mat\')" autocomplete="off"></div>'
-      +'<div class="pdd-list" id="rs-mat-list"></div>'
-      +'</div></div>'
-      +'<input type="hidden" id="rs-mat-id"></div>'
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+      +(p.reabertaDe?'<div></div>':(pausaAtiva
+        ?'<button class="btnO" style="border-color:var(--gr);color:var(--gr);padding:12px;font-size:14px" onclick="retomarProdBV('+p.id+')">&#9654; Retomar</button>'
+        :'<button class="btnO" style="border-color:var(--or);color:var(--or);padding:12px;font-size:14px" onclick="pausarProdBV('+p.id+')">&#9208; Pausar</button>'))
+      +'<button class="btn" style="background:var(--bl);color:#fff;padding:12px;font-size:14px" onclick="fecharProdBV('+p.id+')">🏁 Fechar '+_aj('prod.fechar')+'</button></div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'
-      +'<div class="fld"><label>Peso bruto (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="rs-peso"></div>'
-      +'<div class="fld"><label>Tara da caixa (kg)</label><input class="inp" type="number" inputmode="decimal" step="0.001" id="rs-tara" placeholder="'+(taraRef>0?'entrada: '+fKg(taraRef):'0')+'"></div></div>'
-      +'<div style="font-size:10px;color:var(--mt);margin:6px 0 8px">'+(taraRef>0?'A caixa da entrada pesava '+fKg(taraRef)+'kg — é só referência, digite a tara da caixa que você usou agora. ':'')+'Sem caixa? Deixe a tara em branco.</div>'
-      +'<button class="btn" style="width:100%" onclick="addSaidaProdBV('+p.id+')">Lançar pesagem</button></div>';
-  }
-  html+=saidasHTML+'</div>';
-
-  // ── Ações ──
-  if(aberta){
-    html+='<div style="border-top:1px solid var(--bd);margin-top:8px;padding-top:10px;display:flex;gap:8px">'
-      +(p.reabertaDe?'':(pausaAtiva
-        ?'<button class="btnO" style="flex:1;border-color:var(--gr);color:var(--gr)" onclick="retomarProdBV('+p.id+')">&#9654; Retomar</button>'
-        :'<button class="btnO" style="flex:1;border-color:var(--or);color:var(--or)" onclick="pausarProdBV('+p.id+')">&#9208; Pausar</button>'))
-      +'<button class="btn" style="flex:2;background:var(--bl);color:#fff" onclick="fecharProdBV('+p.id+')">🏁 Fechar Produção</button></div>'
-      +'<button class="btnO" style="width:100%;margin-top:8px;font-size:11px;padding:6px;border-color:rgba(239,68,68,.3);color:var(--rd)" onclick="mCancelarProdBV('+p.id+')">&#10005; Cancelar produção (aberta por engano)</button>';
+      +'<button class="btnO" style="font-size:12px;padding:9px;border-color:rgba(59,130,246,.4);color:var(--bl)" onclick="_prodTgForm(\'pv-form-ent\');var c=document.getElementById(\'pv-form-ent\');if(c&&c.style.display!==\'none\'){_prodVerEnt['+p.id+']=true;}">&#65291; Pegar mais material</button>'
+      +'<button class="btnO" style="font-size:12px;padding:9px;border-color:rgba(239,68,68,.35);color:var(--rd)" onclick="mCancelarProdBV('+p.id+')">&#10005; Cancelar (engano)</button></div>';
     if(p.reabertaDe){
       html+='<div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.3);border-radius:8px;padding:9px 11px;margin-top:10px;font-size:11px;color:var(--bl)">&#9998; Reaberta pra correção. Ajuste os materiais e feche de novo — o horário de fechamento original ('+p.reabertaDe.dataFim+' '+p.reabertaDe.horaFim+') é mantido.</div>';
     }
   } else {
-    html+='<div style="margin-top:8px">';
     if(p.sobra>0.001)html+='<div style="font-size:11px;color:var(--mt);margin-bottom:8px">Sobra: <b>'+fKg(p.sobra)+'kg</b> — '+(p.destinoSobra==='pendente'?'voltou pro estoque (não desmontado)':'perda / descarte')+'</div>';
     if(_isAdm())html+='<button class="btnO" style="width:100%;margin-bottom:8px;font-size:12px;padding:7px;border-color:var(--bl);color:var(--bl)" onclick="mReabrirProdBV('+p.id+')">&#9998; Reabrir pra corrigir (peso ou material errado)</button>';
-    html+='</div>';
   }
-  html+='<div class="brow"><button class="btnO bOgr" onclick="closeM();go(\'producao\')">Fechar</button></div></div>';
+  html+='<div class="brow"><button class="btnO bOgr" onclick="closeM();go(\'producao\')">Fechar janela</button></div></div>';
   openM((aberta?'⏳':'✅')+' Produção',html,560);
+  // já deixa escolhido o último material pesado nesta produção (caixas seguidas do mesmo material)
 }
 // Pega mais material da MESMA leva/lote: registra como uma nova leva de entrada e
 // desconta do estoque do mesmo material, sem mexer no horário de início.
@@ -16761,7 +17075,7 @@ function addEntradaProdBV(prodId){
   var matProd=gP(p.matEntradaId);
   if(matProd)matProd.est=+((matProd.est||0)-pesoNovo).toFixed(3);
   p.entradas=_prodEntradas(p).slice();
-  p.entradas.push({bruto:brutoNovo,tara:taraNova,peso:pesoNovo,data:_fmtDataBR(_today()),hora:_horaAgora()});
+  p.entradas.push({id:nid(),bruto:brutoNovo,tara:taraNova,peso:pesoNovo,data:_fmtDataBR(_today()),hora:_horaAgora()});
   p.pesoEntrada=+(p.pesoEntrada+pesoNovo).toFixed(3);
   p.pesoBruto=+((p.pesoBruto||0)+brutoNovo).toFixed(3);
   p.tara=+((p.tara||0)+taraNova).toFixed(3);
@@ -16891,7 +17205,8 @@ function addSaidaProdBV(prodId,forcar){
   var bruto=parseFloat(document.getElementById('rs-peso').value)||0;
   var taraEl=document.getElementById('rs-tara');
   var tara=taraEl?(parseFloat(taraEl.value)||0):0;
-  if(!matId||bruto<=0){toast('Selecione material e peso!','var(--rd)');return;}
+  if(!matId){toast('Escolha o material!','var(--rd)');return;}
+  if(bruto<=0){toast('Informe o peso!','var(--rd)');return;}
   if(tara<0||bruto-tara<=0){toast('A tara precisa ser menor que o peso bruto!','var(--rd)');return;}
   var peso=+(bruto-tara).toFixed(3); // líquido
   var prod=gP(matId);
@@ -16902,11 +17217,12 @@ function addSaidaProdBV(prodId,forcar){
   if(!forcar){
     var somaNova=+(p.saidas.reduce(function(t,x){return t+x.peso;},0)+peso).toFixed(3);
     if(somaNova>p.pesoEntrada+0.001){
-      _prodAvisoInline('&#9888; Com essa pesagem as saídas somam <b>'+fKg(somaNova)+'kg</b>, mais do que entrou (<b>'+fKg(p.pesoEntrada)+'kg</b>). Confira o peso e a tara, ou lance antes o material que faltou em "+ Pegar mais material".','addSaidaProdBV',[prodId],'Lançar mesmo assim');
+      _prodAvisoInline('&#9888; Com essa pesagem as saídas somam <b>'+fKg(somaNova)+'kg</b>, mais do que entrou (<b>'+fKg(p.pesoEntrada)+'kg</b>). Confira o peso e a tara, ou lance antes o material que faltou em "Pegar mais material".','addSaidaProdBV',[prodId],'Lançar mesmo assim');
       return;
     }
   }
-  var pesagem={peso:peso,bruto:bruto,tara:tara,data:_fmtDataBR(_today()),hora:_horaAgora()};
+  // pv = preço de venda do dia: o histórico não muda quando a tabela muda depois
+  var pesagem={id:nid(),peso:peso,bruto:bruto,tara:tara,data:_fmtDataBR(_today()),hora:_horaAgora(),pv:_prodPrecoVenda(matId)};
   var sd=null;
   for(var j=0;j<p.saidas.length;j++){if(p.saidas[j].prodId===matId){sd=p.saidas[j];break;}}
   if(sd){
@@ -16914,9 +17230,10 @@ function addSaidaProdBV(prodId,forcar){
     sd.pesagens.push(pesagem);
     sd.peso=+sd.pesagens.reduce(function(t,x){return t+x.peso;},0).toFixed(3);
   } else {
-    p.saidas.push({prodId:matId,mat:prod?prod.nome:'?',peso:peso,pesagens:[pesagem]});
+    p.saidas.push({id:'sd'+matId,prodId:matId,mat:prod?prod.nome:'?',peso:peso,pesagens:[pesagem]});
   }
-  saveDB();closeM();mVerProdBV(prodId);toast(fKg(peso)+'kg lançado!','var(--gr)');
+  _prodUltMat[prodId]=matId;
+  saveDB();closeM();mVerProdBV(prodId);toast(fKg(peso)+'kg de '+(prod?prod.nome:'material')+' lançado!','var(--gr)');
 }
 // Apaga UMA pesagem (a que foi lançada errada). Se era a única daquele material,
 // o material sai da lista.
@@ -17018,7 +17335,7 @@ function _finalizarFechamentoProd(prodId,sobra,destinoSobra){
 // ══════════════════════════════════════════════════════
 // ANÁLISE DE PRODUÇÃO (só Admin) — Resumo · Materiais · Funcionários · Lotes
 // ══════════════════════════════════════════════════════
-var prodAnVw='resumo';      // 'resumo'|'materiais'|'funcs'|'lotes'
+var prodAnVw='painel';      // 'painel'|'lotes'|'equipe'
 var prodFuncSel='';         // chave do funcionário aberto na visão Funcionários ('' = Todos)
 var prodFuncAgrup='dia';    // 'dia'|'semana'|'mes' — agrupamento da tabela do funcionário
 var _prodFuncKeys=[];       // chaves na ordem dos botões (evita aspas no onclick)
@@ -17037,47 +17354,66 @@ function _prodVHora(nome){
   return 0;
 }
 // Números de UMA produção fechada. Lucro = receita − material − mão de obra.
-function _prodCalc(p){
+// Valor de um material gerado. Usa o preço gravado em cada pesagem (preço do dia);
+// pesagens antigas, sem preço gravado, usam o preço de hoje. hoje=true: tudo a
+// preço de hoje (pra decidir compra/desmontagem com o mercado atual).
+function _prodValorSaida(sd,hoje){
+  if(_prodEhRejeito(sd.prodId))return 0;
+  var atual=_prodPrecoVenda(sd.prodId);
+  if(hoje||!sd.pesagens||!sd.pesagens.length)return atual*sd.peso;
+  var v=0,kgCom=0;
+  sd.pesagens.forEach(function(pg){if(pg.pv>0){v+=pg.pv*pg.peso;kgCom+=pg.peso;}});
+  return v+atual*Math.max(0,sd.peso-kgCom);
+}
+function _prodCalc(p,hoje){
   var pe=_prodPesoProc(p);
   var custoMat=_prodCustoEntradaP(p)*pe;
   var receita=0,saida=0;
-  p.saidas.forEach(function(sd){saida+=sd.peso;receita+=_prodPrecoVenda(sd.prodId)*sd.peso;});
+  p.saidas.forEach(function(sd){saida+=sd.peso;receita+=_prodValorSaida(sd,hoje);});
   var min=_prodDuracaoMin(p);
   var vh=_prodVHora(p.func);
   var mo=min/60*vh;
   return {pe:pe,custoMat:custoMat,receita:receita,saida:saida,min:min,vh:vh,mo:mo,lucro:receita-custoMat-mo};
 }
-function _prodAcum(nome){return {nome:nome||'',n:0,pe:0,saida:0,receita:0,custoMat:0,mo:0,min:0,minSemCusto:0,lucro:0,mats:{},dias:{},recKgLista:[],prods:[]};}
+function _prodAcum(nome){return {nome:nome||'',n:0,pe:0,saida:0,receita:0,custoMat:0,mo:0,min:0,minSemCusto:0,lucro:0,perda:0,ndt:0,ndtKg:0,mats:{},dias:{},recKgLista:[],prods:[]};}
 function _prodSoma(a,p,c){
   a.n++;a.pe+=c.pe;a.saida+=c.saida;a.receita+=c.receita;a.custoMat+=c.custoMat;a.mo+=c.mo;a.min+=c.min;a.lucro+=c.lucro;
   if(c.vh<=0)a.minSemCusto+=c.min;
+  // Perda = o que foi desmontado e não virou material pesado (poeira, descarte).
+  // "Não deu tempo" (sobra que voltou pro estoque) não conta como perda.
+  var perdaP=Math.max(0,c.pe-c.saida);a.perda=(a.perda||0)+perdaP;
+  if(p.destinoSobra==='pendente'&&p.sobra>0.001){a.ndt=(a.ndt||0)+1;a.ndtKg=(a.ndtKg||0)+p.sobra;}
   p.saidas.forEach(function(sd){a.mats[sd.prodId]=(a.mats[sd.prodId]||0)+sd.peso;});
   var d=_prodDataRef(p);
   if(!a.dias[d])a.dias[d]={n:0,pe:0,receita:0,min:0,lucro:0};
-  a.dias[d].n++;a.dias[d].pe+=c.pe;a.dias[d].receita+=c.receita;a.dias[d].min+=c.min;a.dias[d].lucro+=c.lucro;a.dias[d].mo=(a.dias[d].mo||0)+c.mo;a.dias[d].custoMat=(a.dias[d].custoMat||0)+c.custoMat;
+  a.dias[d].n++;a.dias[d].pe+=c.pe;a.dias[d].receita+=c.receita;a.dias[d].min+=c.min;a.dias[d].lucro+=c.lucro;a.dias[d].mo=(a.dias[d].mo||0)+c.mo;a.dias[d].custoMat=(a.dias[d].custoMat||0)+c.custoMat;a.dias[d].perda=(a.dias[d].perda||0)+perdaP;
   if(c.pe>0)a.recKgLista.push(c.receita/c.pe);
   a.prods.push(p);
 }
-function _prodAgrupar(fechadas,fnChave,fnNome){
+function _prodAgrupar(fechadas,fnChave,fnNome,hoje){
   var g={};
   fechadas.forEach(function(p){
     var k=fnChave(p);
     if(!g[k])g[k]=_prodAcum(fnNome(p));
-    _prodSoma(g[k],p,_prodCalc(p));
+    _prodSoma(g[k],p,_prodCalc(p,hoje));
   });
   return g;
 }
-function _prodChaveLote(p){
-  var a=(p.lote||'').trim().replace(/\s+/g,' ').toLowerCase();
-  return a?'L:'+a:'M:'+(p.matEntradaId||p.matEntrada);
-}
+// Lote = o material que entrou (Misto, HD, Celular…)
+function _prodChaveLote(p){return 'M:'+(p.matEntradaId||p.matEntrada);}
 function _div(a,b){return b>0?a/b:0;}
 function _corSinal(v){return v>=0?'var(--gr)':'var(--rd)';}
 // quadradinho de número
+// Cada número da Análise ganha o (?) pelo nome dele
+var _PROD_AJ_NUM={'horas':'prod.m.horas','kg desmontado':'prod.m.kgDesm','kg por hora':'prod.m.kgh','aproveitamento':'prod.m.aprov',
+  'gerou':'prod.m.gerou','gerou por dia':'prod.m.gerouDia','gerou por hora':'prod.m.gerouHora','saldo por dia':'prod.m.saldoDia','saldo por hora':'prod.m.saldoHora',
+  '% de lucro':'prod.m.pctLucro','rende/kg':'prod.m.rende','mão de obra/kg':'prod.m.mo','desmontado':'prod.m.kgDesm','rendeu (valor gerado)':'prod.m.rende',
+  'mão de obra':'prod.m.mo','lucro real':'prod.m.lucro','deve render':'prod.m.rende','tempo de 1 pessoa':'prod.m.horas'};
+function _prodAjNum(lbl){var k=_PROD_AJ_NUM[(lbl||'').toLowerCase()];return k?_aj(k):'';}
 function _pmt(lbl,val,cor){
   return '<div style="background:var(--s2);border-radius:8px;padding:8px 4px;text-align:center;min-width:0">'
     +'<div style="font-size:13px;font-weight:800;color:'+(cor||'var(--tx)')+';line-height:1.25">'+val+'</div>'
-    +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:.3px">'+lbl+'</div></div>';
+    +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase;letter-spacing:.3px">'+lbl+_prodAjNum(lbl)+'</div></div>';
 }
 function _pgrid(cols,itens){return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax('+(cols>=4?150:96)+'px,1fr));gap:6px;margin-top:8px">'+itens.join('')+'</div>';}
 // composição: o que cada material representa do peso desmontado (+ perda)
@@ -17107,7 +17443,7 @@ function _prodAvisoSemPreco(fechadas){
   if(!ids.length)return '';
   var linhas=ids.sort(function(a,b){return sem[b]-sem[a];}).map(function(pid){
     var prod=gP(parseFloat(pid));
-    var motivo=DB.prodVinculos[pid]?'tabela vinculada sem preço':'sem tabela vinculada';
+    var motivo=_prodTabVendaDe(pid)?'tabela sem preço pra ele':'grupo sem tabela de venda';
     return '<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0"><span>'+(prod?prod.ic+' '+prod.nome:'Material removido do cadastro')+' <span style="color:var(--mt)">· '+motivo+'</span></span><span style="font-weight:700">'+fKg(sem[pid])+'kg</span></div>';
   }).join('');
   return '<div class="card" style="border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.06)">'
@@ -17127,119 +17463,355 @@ function _prodAnalise(todasFechadas){
   perBar+='</div>'
     +'<button onclick="exportarRelatorioProducao()" class="btnO bOgr" style="font-size:12px;padding:6px 12px;white-space:nowrap">&#128196; Exportar PDF</button>'
     +'</div>';
-  var visoes=[{k:'resumo',l:'📊 Resumo'},{k:'materiais',l:'🧱 Materiais'},{k:'funcs',l:'👷 Funcionários'},{k:'lotes',l:'📦 Lotes e Leilão'}];
-  var vwBar='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px;background:var(--s2);border-radius:10px;padding:4px;margin-bottom:14px">';
+  var visoes=[{k:'painel',l:'📊 Painel'},{k:'lotes',l:'📦 Lotes'},{k:'equipe',l:'👷 Equipe'}];
+  var vwBar='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--s2);border-radius:10px;padding:4px;margin-bottom:12px">';
   visoes.forEach(function(v){
     var on=prodAnVw===v.k;
-    vwBar+='<button onclick="prodAnVw=\''+v.k+'\';go(\'producao\')" style="border:none;border-radius:7px;padding:8px 4px;font-size:12px;font-weight:700;cursor:pointer;background:'+(on?'var(--gr)':'transparent')+';color:'+(on?'#fff':'var(--mt)')+'">'+v.l+'</button>';
+    vwBar+='<button onclick="prodAnVw=\''+v.k+'\';go(\'producao\')" style="border:none;border-radius:7px;padding:9px 4px;font-size:12.5px;font-weight:700;cursor:pointer;background:'+(on?'var(--gr)':'transparent')+';color:'+(on?'#fff':'var(--mt)')+'">'+v.l+'</button>';
   });
   vwBar+='</div>';
-
   var fechadas=_prodFiltrar(todasFechadas);
-  if(!fechadas.length)return perBar+vwBar+'<div class="card" style="text-align:center;padding:40px;color:var(--mt)"><div style="font-size:32px;margin-bottom:10px">📊</div><div style="font-weight:700">Nenhuma produção fechada neste período</div><div style="font-size:12px;margin-top:4px">Troque o período acima pra ver o histórico</div></div>';
-
-  var corpo=prodAnVw==='materiais'?_prodAnMateriais(fechadas)
-    :prodAnVw==='funcs'?_prodAnFuncs(fechadas)
-    :prodAnVw==='lotes'?_prodAnLotes(fechadas)
-    :_prodAnResumo(fechadas);
-  return perBar+vwBar+corpo;
+  var tit=prodAnVw==='lotes'?'📦 Lotes'+_aj('prod.lotes'):prodAnVw==='equipe'?'👷 Equipe'+_aj('prod.equipe'):'📊 Painel'+_aj('prod.painel');
+  var head=vwBar+perBar+'<div style="font-size:18px;font-weight:800;margin:2px 0 10px">'+tit+'</div>';
+  if(prodAnVw==='painel')return head+_prodAnPainel(fechadas,todasFechadas);
+  if(!fechadas.length)return head+'<div class="card" style="text-align:center;padding:40px;color:var(--mt)"><div style="font-size:32px;margin-bottom:10px">📊</div><div style="font-weight:700">Nenhuma produção fechada neste período</div><div style="font-size:12px;margin-top:4px">Troque o período acima pra ver o histórico</div></div>';
+  return head+(prodAnVw==='lotes'?_prodAnLotesV(fechadas):_prodAnFuncs(fechadas));
 }
 
-// ── Resumo ───────────────────────────────────────────
-function _prodAnResumo(fechadas){
-  var t=_prodAcum('Total');
-  fechadas.forEach(function(p){_prodSoma(t,p,_prodCalc(p));});
-  var horas=t.min/60;
-  var html='<div class="g4">'
-    +sc('📥','Desmontado',fKg(t.pe)+'kg',t.n+' produção(ões)','var(--bl)')
-    +sc('📤','Saída',fKg(t.saida)+'kg',(_div(t.saida,t.pe)*100).toFixed(1)+'% aproveitado','var(--gr)')
-    +sc('&#9201;','Tempo trabalhado',_fmtDuracao(t.min),horas>0?fKg(_div(t.pe,horas))+'kg por hora':'','var(--pu)')
-    +sc('💰','Lucro real',fR(t.lucro),horas>0?fR(t.lucro/horas)+' por hora':'',_corSinal(t.lucro))
-    +'</div>';
-  // de onde vem o lucro
-  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:8px">💵 Como o lucro se forma</div>'
-    +'<div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0"><span>Valor dos materiais gerados</span><b style="color:var(--gr)">'+fR(t.receita)+'</b></div>'
-    +'<div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0"><span>&minus; Compra do material desmontado</span><b>'+fR(t.custoMat)+'</b></div>'
-    +'<div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0"><span>&minus; Mão de obra ('+_fmtDuracao(t.min)+')</span><b>'+fR(t.mo)+'</b></div>'
-    +'<div style="display:flex;justify-content:space-between;font-size:15px;padding:8px 0 2px;border-top:1px solid var(--bd);margin-top:4px"><b>= Lucro real</b><b style="color:'+_corSinal(t.lucro)+'">'+fR(t.lucro)+'</b></div>'
-    +'<div style="font-size:10px;color:var(--mt);margin-top:6px">Mão de obra = horas trabalhadas × valor/hora do cadastro de Funcionários.'
-    +(t.minSemCusto>0?' <span style="color:var(--or)">'+_fmtDuracao(t.minSemCusto)+' foram de pessoas sem valor/hora (sócio, ajuda ou cadastro sem valor) e contam a custo zero.</span>':'')
-    +' Tempo contado: '+_prodJornadaResumo()+'</div></div>';
-  html+=_prodAvisoSemPreco(fechadas);
+// Período atual (desloc=0) ou o anterior (desloc=1) cortado no mesmo ponto, pra
+// comparar "esta semana até hoje" com "a semana passada até o mesmo dia".
+function _prodRange(desloc){
+  if(prodPeriodo==='tudo')return null;
+  var hj=_today();var d0=new Date(hj.getFullYear(),hj.getMonth(),hj.getDate());
+  var y=d0.getFullYear(),m=d0.getMonth(),ini,fim;
+  if(prodPeriodo==='hoje'){ini=new Date(y,m,d0.getDate()-desloc);fim=new Date(y,m,d0.getDate()-desloc+1);}
+  else if(prodPeriodo==='semana'){var dw=d0.getDay();ini=new Date(y,m,d0.getDate()-dw-7*desloc);fim=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate()+7);}
+  else if(prodPeriodo==='mes'){ini=new Date(y,m-desloc,1);fim=new Date(y,m-desloc+1,1);}
+  else if(prodPeriodo==='trim'){ini=new Date(y,m-2-3*desloc,1);fim=new Date(y,m+1-3*desloc,1);}
+  else {ini=new Date(y-desloc,0,1);fim=new Date(y-desloc+1,0,1);}
+  if(desloc>0){
+    var ini0=_prodRange(0).ini;var dias=Math.round((d0-ini0)/864e5)+1;
+    var corte=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate()+dias);
+    if(corte<fim)fim=corte;
+  }
+  return {ini:ini,fim:fim};
+}
+function _prodNoRange(p,r){var d=_parseDataBR(_prodDataRef(p));return d>=r.ini&&d<r.fim;}
+function _prodVar(cur,ant,inverso){
+  if(ant===null)return '';
+  if(!ant){return cur?'<span style="font-size:11px;color:var(--mt)">sem base anterior</span>':'';}
+  var v=(cur-ant)/Math.abs(ant)*100;var bom=inverso?v<=0:v>=0;
+  return '<span style="font-size:11px;font-weight:700;color:'+(bom?'var(--gr)':'var(--rd)')+'">'+(v>=0?'&#9650; ':'&#9660; ')+Math.abs(v).toFixed(0)+'%</span>';
+}
+function _prodTotais(lista){
+  var t=_prodAcum('');lista.forEach(function(p){_prodSoma(t,p,_prodCalc(p));});return t;
+}
+// ── Painel ───────────────────────────────────────────
+function _prodAnPainel(fechadas,todas){
+  var nomePer={hoje:'ontem',semana:'semana passada',mes:'mês passado',trim:'trimestre anterior',ano:'ano passado'}[prodPeriodo]||'';
+  var t=_prodTotais(fechadas);
+  var rAnt=_prodRange(1);
+  var a=rAnt?_prodTotais(todas.filter(function(p){return _prodNoRange(p,rAnt);})):null;
+  var mg=t.receita>0?t.lucro/t.receita*100:null;
+  var k=function(l,val,cor,vr){return '<div class="pan-k"><div class="l">'+l+_prodAjNum(l)+'</div><b style="color:'+(cor||'var(--tx)')+'">'+val+'</b>'+(vr||'')+'</div>';};
+  var html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +k('Desmontado',fKg(t.pe)+' kg',null,_prodVar(t.pe,a?a.pe:null))
+    +k('Rendeu (valor gerado)',fR(t.receita),'var(--bl)',_prodVar(t.receita,a?a.receita:null))
+    +k('Mão de obra',fR(t.mo),null,_prodVar(t.mo,a?a.mo:null,true))
+    +k('Lucro real',fR(t.lucro),_corSinal(t.lucro),_prodVar(t.lucro,a?a.lucro:null)+(mg!==null?' <span style="font-size:11px;color:var(--mt)">· '+mg.toFixed(0)+'% de lucro</span>':''))
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--mt);margin:6px 0 10px">'+t.n+' produção(ões) · '+_fmtDuracao(t.min)+' trabalhadas'+(nomePer?' · comparado com '+nomePer+' até o mesmo dia':'')+'</div>';
 
-  // Projeção por tabela (comprador)
-  var porTabela={};
-  fechadas.forEach(function(p){p.saidas.forEach(function(sd){
-    var tabId=DB.prodVinculos[sd.prodId];if(!tabId||_prodEhRejeito(sd.prodId))return;
-    if(!porTabela[tabId])porTabela[tabId]={nome:_nomeTab(tabId),peso:0,valor:0};
-    porTabela[tabId].peso+=sd.peso;porTabela[tabId].valor+=_prodPrecoVenda(sd.prodId)*sd.peso;
-  });});
-  var tabIds=Object.keys(porTabela).sort(function(a,b){return porTabela[b].valor-porTabela[a].valor;});
-  if(tabIds.length){
-    html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:10px">📋 Pra quem vai o material (por tabela)</div>';
-    tabIds.forEach(function(tid){
-      var d=porTabela[tid];
-      html+='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border-radius:8px;margin-bottom:5px">'
-        +'<div style="flex:1"><div style="font-size:13px;font-weight:700">'+d.nome+'</div><div style="font-size:10px;color:var(--mt)">'+fKg(d.peso)+'kg</div></div>'
-        +'<div style="font-size:13px;font-weight:700;color:var(--gr)">'+fR(d.valor)+'</div></div>';
+  // lucro por semana (ou por mês)
+  var porMes=prodPeriodo==='ano'||prodPeriodo==='tudo';
+  var hj=_today();var d0=new Date(hj.getFullYear(),hj.getMonth(),hj.getDate());
+  var cols=[];
+  if(porMes){for(var i=11;i>=0;i--){var ini=new Date(d0.getFullYear(),d0.getMonth()-i,1);cols.push({ini:ini,fim:new Date(ini.getFullYear(),ini.getMonth()+1,1),lbl:['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][ini.getMonth()]});}}
+  else {var seg=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()-((d0.getDay()+6)%7));for(var w=7;w>=0;w--){var i0=new Date(seg.getFullYear(),seg.getMonth(),seg.getDate()-7*w);cols.push({ini:i0,fim:new Date(i0.getFullYear(),i0.getMonth(),i0.getDate()+7),lbl:_fmtDataBR(i0).slice(0,5)});}}
+  cols.forEach(function(c){c.v=0;todas.forEach(function(p){if(_prodNoRange(p,c))c.v+=_prodCalc(p).lucro;});});
+  var mx=0;cols.forEach(function(c){mx=Math.max(mx,Math.abs(c.v));});
+  if(mx>0){
+    var W=340,Hh=90,bw=W/cols.length;var svg='';
+    cols.forEach(function(c,ix){
+      var h=Math.max(2,Math.abs(c.v)/mx*(Hh-14));var x=ix*bw+bw*0.15;var ult=ix===cols.length-1;
+      svg+='<rect x="'+x.toFixed(1)+'" y="'+(Hh-h).toFixed(1)+'" width="'+(bw*0.7).toFixed(1)+'" height="'+h.toFixed(1)+'" rx="3" fill="'+(c.v<0?'#ef4444':'#22c55e')+'" opacity="'+(ult?1:0.55)+'"><title>'+c.lbl+': '+fR(c.v)+'</title></rect>'
+        +'<text x="'+(x+bw*0.35).toFixed(1)+'" y="'+(Hh+11)+'" fill="#8b9ab3" font-size="9" text-anchor="middle">'+c.lbl+'</text>';
     });
-    html+='</div>';
+    html+='<div class="card"><div style="font-size:14px;font-weight:800;margin-bottom:6px">📈 Lucro por '+(porMes?'mês':'semana')+_aj('prod.lucroSemana')+'</div>'
+      +'<svg width="100%" viewBox="0 0 '+W+' '+(Hh+14)+'" style="display:block">'+svg+'</svg>'
+      +'<div style="font-size:10px;color:var(--mt);margin-top:4px">'+(porMes?'Últimos 12 meses':'Últimas 8 semanas (segunda a domingo)')+'. Toque na barra pra ver o valor.</div></div>';
   }
 
-  // Últimas produções
-  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:10px">📋 Últimas produções</div>';
-  fechadas.slice().sort(function(a,b){return b.id-a.id;}).slice(0,15).forEach(function(p){
-    var c=_prodCalc(p);
-    html+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd);cursor:pointer" onclick="mVerProdBV('+p.id+')">'
-      +'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">'+p.func+' · '+(p.lote||p.matEntrada)+'</div>'
-      +'<div style="font-size:11px;color:var(--mt)">'+_prodDataRef(p)+' · '+fKg(c.pe)+'kg → '+fKg(c.saida)+'kg · '+_fmtDuracao(c.min)+'</div></div>'
-      +'<div style="text-align:right"><div style="font-size:13px;font-weight:700;color:'+_corSinal(c.lucro)+'">'+fR(c.lucro)+'</div><div style="font-size:9px;color:var(--mt)">lucro</div></div></div>';
+  // precisa de atenção
+  var al=[];
+  (DB.producoes||[]).forEach(function(p){
+    if(p.status!=='aberta')return;
+    var ontem=p.data!==_fmtDataBR(_today());var longa=_prodDuracaoMin(p,true)>540;
+    if(ontem||longa)al.push('<span>&#9203;</span><span>Produção de <b>'+p.func+'</b> ('+p.matEntrada+') aberta desde '+(ontem?p.data.slice(0,5)+' ':'')+p.hora+' — esqueceram de fechar?</span>');
   });
-  html+='</div>';
+  var semP={};fechadas.forEach(function(p){p.saidas.forEach(function(sd){if(!_prodEhRejeito(sd.prodId)&&!(_prodPrecoVenda(sd.prodId)>0))semP[sd.prodId]=1;});});
+  var nSem=Object.keys(semP).length;
+  if(nSem)al.push('<span>&#128178;</span><span><b>'+nSem+' material(is)</b> gerado(s) sem preço de venda: o lucro está incompleto. <a href="#" style="color:var(--bl)" onclick="event.preventDefault();prodVw=\'config\';go(\'producao\')">Corrigir</a></span>');
+  // rendimento bem abaixo da média do mesmo material (a preço de hoje, pra comparar igual)
+  var hist={};todas.forEach(function(p){var c=_prodCalc(p,true);if(c.pe<=0)return;var kk=p.matEntradaId;if(!hist[kk])hist[kk]={pe:0,rec:0,n:0};hist[kk].pe+=c.pe;hist[kk].rec+=c.receita;hist[kk].n++;});
+  var nb=0;
+  fechadas.slice().sort(function(x,y){return y.id-x.id;}).forEach(function(p){
+    if(nb>=3)return;var hh=hist[p.matEntradaId];var c=_prodCalc(p,true);
+    if(!hh||hh.n<3||c.pe<1)return;
+    if(_prodServicoDe(p.matEntradaId)==='misto')return; // a caixa geral varia muito de uma leva pra outra: não compara
+    var medOut=(hh.rec-c.receita)/(hh.pe-c.pe);var rk=c.receita/c.pe;
+    if(medOut>0&&rk<medOut*0.65){nb++;al.push('<span>&#128201;</span><span>'+p.matEntrada+' do <b>'+p.func+'</b> ('+_prodDataRef(p).slice(0,5)+') rendeu '+fR(rk)+'/kg; a média é '+fR(medOut)+'/kg. Conferir separação.</span>');}
+  });
+  fechadas.forEach(function(p){
+    var ts=p.saidas.reduce(function(x,y){return x+y.peso;},0);
+    if(ts>p.pesoEntrada+0.01)al.push('<span>&#9878;</span><span>'+p.matEntrada+' do <b>'+p.func+'</b> ('+_prodDataRef(p).slice(0,5)+'): saiu '+fKg(ts)+'kg de '+fKg(p.pesoEntrada)+'kg que entraram.</span>');
+    else if(_prodDuracaoSuspeita(p))al.push('<span>&#9201;</span><span>'+p.matEntrada+' do <b>'+p.func+'</b> ('+_prodDataRef(p).slice(0,5)+') durou '+_fmtDuracao(_prodDuracaoMin(p))+'. Conferir horário.</span>');
+  });
+  // perda bem acima da média da equipe (mínimo 3 produções no período)
+  (function(){
+    var med=_prodPerdaEquipe(fechadas);if(med===null)return;
+    var gp=_prodAgrupar(fechadas,function(p){return _prodChaveFunc(p.func);},function(p){return (p.func||'').trim().split(' ')[0];});
+    Object.keys(gp).forEach(function(k){
+      var a=gp[k];var pp=_prodPerdaPct(a);
+      if(a.n>=3&&pp!==null&&pp>=med+5)al.push('<span>&#128465;&#65039;</span><span>Perda do <b>'+a.nome+'</b>: '+pp.toFixed(1).replace('.',',')+'%; média da equipe: '+med.toFixed(1).replace('.',',')+'%.</span>');
+    });
+  })();
+  html+='<div class="card"><div style="font-size:14px;font-weight:800;margin-bottom:4px">&#9888;&#65039; Precisa de atenção'+_aj('prod.atencao')+'</div>'
+    +(al.length?al.slice(0,7).map(function(x){return '<div class="pan-al">'+x+'</div>';}).join(''):'<div class="pan-al"><span>&#10003;</span><span style="color:var(--gr)">Nada fora do normal no período.</span></div>')
+    +'</div>';
+
+  if(fechadas.length){
+    // mais lucro por kg + equipe
+    var gl=_prodAgrupar(fechadas,_prodChaveLote,function(p){return p.matEntrada;});
+    var lk=Object.keys(gl).filter(function(x){return gl[x].pe>0;}).sort(function(x,y){return _div(gl[y].lucro,gl[y].pe)-_div(gl[x].lucro,gl[x].pe);}).slice(0,4);
+    var gf=_prodAgrupar(fechadas,function(p){return _prodChaveFunc(p.func);},function(p){return (p.func||'').trim().split(' ')[0];});
+    var fk=Object.keys(gf).sort(function(x,y){return gf[y].lucro-gf[x].lucro;}).slice(0,4);
+    var lin=function(nm,v,cor){return '<div style="display:flex;justify-content:space-between;gap:6px;font-size:12px;padding:4px 0"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+nm+'</span><b style="color:'+(cor||'var(--tx)')+';white-space:nowrap">'+v+'</b></div>';};
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:10px">'
+      +'<div class="card" style="margin:0"><div style="font-size:13px;font-weight:800;margin-bottom:4px">🏆 Mais lucro por kg</div>'
+      +lk.map(function(x){var pr=gP(parseFloat(x.slice(2)));return lin((pr?pr.ic+' ':'')+gl[x].nome,fR(_div(gl[x].lucro,gl[x].pe)),_corSinal(gl[x].lucro));}).join('')+'</div>'
+      +'<div class="card" style="margin:0"><div style="font-size:13px;font-weight:800;margin-bottom:4px">👷 Equipe no período</div>'
+      +fk.map(function(x){return lin(gf[x].nome,fR(gf[x].lucro),_corSinal(gf[x].lucro));}).join('')+'<div style="font-size:10px;color:var(--mt)">saldo pra empresa</div></div>'
+      +'</div>';
+
+    // o que a caixa geral (misto) vira
+    var cats={},peM=0,saiM=0;
+    fechadas.forEach(function(p){
+      if(_prodServicoDe(p.matEntradaId)!=='misto')return;
+      peM+=_prodPesoProc(p);
+      p.saidas.forEach(function(sd){
+        var pr=gP(sd.prodId);var ct=_prodEhRejeito(sd.prodId)?'Rejeito':((pr&&pr.cat)||'Outros');
+        if(!cats[ct])cats[ct]={kg:0,v:0};cats[ct].kg+=sd.peso;cats[ct].v+=_prodValorSaida(sd);saiM+=sd.peso;
+      });
+    });
+    if(peM>0){
+      var corCat={};(DB.filtrosMat||[]).forEach(function(f){corCat[f.nome]=f.cor;});
+      var pal=['#22c55e','#64748b','#a855f7','#f59e0b','#3b82f6','#ec4899','#14b8a6'];
+      var vt=0;Object.keys(cats).forEach(function(c){vt+=cats[c].v;});
+      var ck=Object.keys(cats).sort(function(x,y){return cats[y].kg-cats[x].kg;});
+      var barra='',leg='',ix=0,maisV=null;
+      ck.forEach(function(c){
+        var cor=c==='Rejeito'?'#475569':(corCat[c]||pal[ix++%pal.length]);var pk=cats[c].kg/peM*100;
+        barra+='<i style="display:block;width:'+pk.toFixed(1)+'%;background:'+cor+'" title="'+c+'"></i>';
+        leg+='<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0"><span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+cor+';margin-right:5px"></span>'+c+'</span><span><b>'+pk.toFixed(0)+'%</b> do peso'+(vt>0?' · <b>'+(cats[c].v/vt*100).toFixed(0)+'%</b> do valor':'')+'</span></div>';
+        if(vt>0&&(!maisV||(cats[c].v/vt-cats[c].kg/peM)>(cats[maisV].v/vt-cats[maisV].kg/peM)))maisV=c; // o que mais vale em relação ao peso
+      });
+      var perda=Math.max(0,peM-saiM);
+      if(perda>0.001){barra+='<i style="display:block;width:'+(perda/peM*100).toFixed(1)+'%;background:#1e293b"></i>';leg+='<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;color:var(--mt)"><span>Perda / descarte</span><span><b>'+(perda/peM*100).toFixed(0)+'%</b> do peso</span></div>';}
+      html+='<div class="card"><div style="font-size:14px;font-weight:800">🧩 O que a caixa geral (misto) vira'+_aj('prod.mistoVira')+'</div>'
+        +'<div style="font-size:11px;color:var(--mt);margin:2px 0 8px">'+fKg(peM)+' kg de misto desmontados no período</div>'
+        +'<div style="display:flex;height:16px;border-radius:6px;overflow:hidden">'+barra+'</div><div style="margin-top:8px">'+leg+'</div>'
+        +(maisV&&vt>0?'<div style="font-size:11px;color:var(--mt);margin-top:6px">'+maisV+' é '+(cats[maisV].kg/peM*100).toFixed(0)+'% do peso mas <b style="color:var(--tx)">'+(cats[maisV].v/vt*100).toFixed(0)+'% do valor</b>.</div>':'')
+        +'</div>';
+    }
+  } else {
+    html+='<div class="card" style="text-align:center;padding:28px;color:var(--mt)"><div style="font-weight:700">Nenhuma produção fechada neste período</div><div style="font-size:12px;margin-top:4px">Troque o período acima pra ver o histórico</div></div>';
+  }
   return html;
 }
 
-// ── Materiais: um cartão por material de ENTRADA ─────
-function _prodAnMateriais(fechadas){
-  var g=_prodAgrupar(fechadas,function(p){return String(p.matEntradaId||p.matEntrada);},function(p){return p.matEntrada;});
-  var keys=Object.keys(g).sort(function(a,b){return g[b].pe-g[a].pe;});
-  var html='<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Cada cartão é um material que entrou pra desmontar: o que ele vira, quanto rende por kg e quanto tempo toma.</div>'
+// ── Lotes (um cartão por material desmontado) ─────────
+function _prodConfianca(a){
+  if(a.n>=5&&a.pe>=50)return {t:'boa',c:'var(--gr)'};
+  if(a.n>=2)return {t:'média',c:'var(--or)'};
+  return {t:'fraca (1 vez só)',c:'var(--rd)'};
+}
+function _prodAnLotesV(fechadas){
+  var g=_prodAgrupar(fechadas,_prodChaveLote,function(p){return p.matEntrada;},true);
+  var keys=Object.keys(g).sort(function(x,y){return g[y].pe-g[x].pe;});
+  var html='<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Valores a preço de hoje das tabelas de venda, pra decidir com o mercado atual.</div>'
     +_prodAvisoSemPreco(fechadas);
+  _prodLoteStats={};
   keys.forEach(function(k){
-    var a=g[k];var prod=gP(parseFloat(k));var horas=a.min/60;
-    html+='<div class="card" style="margin-bottom:10px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div><div style="font-size:14px;font-weight:800">'+(prod?prod.ic+' ':'')+a.nome+'</div>'
-      +'<div style="font-size:11px;color:var(--mt)">'+a.n+' produção(ões) · '+fKg(a.pe)+'kg desmontados · '+_fmtDuracao(a.min)+'</div></div>'
-      +'<div style="text-align:right;white-space:nowrap"><div style="font-size:16px;font-weight:800;color:'+_corSinal(a.lucro)+'">'+fR(a.lucro)+'</div><div style="font-size:10px;color:var(--mt)">lucro real</div></div></div>'
-      +_pgrid(4,[
-        _pmt('rende/kg',fR(_div(a.receita,a.pe)),'var(--bl)'),
-        _pmt('compra/kg',fR(_div(a.custoMat,a.pe))),
-        _pmt('mão de obra/kg',fR(_div(a.mo,a.pe))),
-        _pmt('lucro/kg',fR(_div(a.lucro,a.pe)),_corSinal(a.lucro))])
-      +_pgrid(3,[
-        _pmt('aproveitamento',(_div(a.saida,a.pe)*100).toFixed(1)+'%'),
-        _pmt('kg por hora',horas>0?fKg(a.pe/horas):'&mdash;'),
-        _pmt('lucro por hora',horas>0?fR(a.lucro/horas):'&mdash;',_corSinal(a.lucro))])
-      +'<div style="margin-top:10px;border-top:1px solid var(--bd);padding-top:8px"><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">No que ele vira</div>'
-      +_prodComposicao(a)+'</div></div>';
+    var a=g[k];var entId=parseFloat(k.slice(2));var pr=gP(entId);
+    var horas=a.min/60;var recKg=_div(a.receita,a.pe),moKg=_div(a.mo,a.pe),cmKg=_div(a.custoMat,a.pe);
+    var desm=recKg-moKg;var sv=_prodServicoObj(_prodServicoDe(entId));var misto=sv&&sv.id==='misto';
+    var inteiro=(!misto&&pr)?_prodPrecoVenda(entId):0;
+    var conf=_prodConfianca(a);
+    _prodLoteStats[k]={nome:a.nome,n:a.n,pe:a.pe,recKg:recKg,moKg:moKg,minKg:_div(a.min,a.pe),recMin:a.recKgLista.length?Math.min.apply(null,a.recKgLista):0};
+    var borda=inteiro>0?(desm>=inteiro?'rgba(34,197,94,.5)':'rgba(239,68,68,.5)'):'var(--bd)';
+    html+='<div class="card" style="border-color:'+borda+';margin-bottom:10px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div style="min-width:0"><div style="font-size:15px;font-weight:800">'+(pr?pr.ic+' ':'')+a.nome+'</div>'
+      +'<div style="font-size:11px;color:var(--mt)">'+(sv?sv.ic+' '+sv.nome+' · ':'')+a.n+' vez(es) · '+fKg(a.pe)+' kg · '+_fmtDuracao(a.min)+'</div>'
+      +'<div style="font-size:11px">confiança: <b style="color:'+conf.c+'">'+conf.t+'</b>'+_aj('prod.m.conf')+'</div></div>'
+      +'<div style="text-align:right;white-space:nowrap"><div style="font-size:16px;font-weight:800;color:'+_corSinal(a.lucro)+'">'+fR(_div(a.lucro,a.pe))+'/kg</div><div style="font-size:10px;color:var(--mt)">lucro · '+fR(a.lucro)+' no total</div></div></div>'
+      +_pgrid(3,[_pmt('rende/kg',fR(recKg),'var(--bl)'),_pmt('mão de obra/kg',fR(moKg)),_pmt('kg por hora',horas>0?fKg(a.pe/horas):'&mdash;')]);
+    if(inteiro>0){
+      var dif=desm-inteiro;
+      html+='<div style="margin-top:10px;background:var(--s2);border-radius:10px;padding:10px">'
+        +'<div style="font-size:13px;font-weight:800">&#9878;&#65039; Vale desmontar?'+_aj('prod.valeDesmontar')+'</div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0 2px"><span>Vendendo inteiro (tabela)</span><b>'+fR(inteiro)+'/kg</b></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span>Desmontando (rende − mão de obra)</span><b>'+fR(desm)+'/kg</b></div>'
+        +'<div style="text-align:center;margin-top:6px"><span class="pill-st" style="background:'+(dif>=0?'var(--grb)':'var(--rdb)')+';color:'+(dif>=0?'var(--gr)':'var(--rd)')+'">'+(dif>=0?'&#10003; Vale desmontar · ganha '+fR(dif)+'/kg':'&#10007; Melhor vender inteiro · perde '+fR(-dif)+'/kg')+'</span></div></div>';
+    }
+    html+='<div style="margin-top:8px;background:var(--s2);border-radius:10px;padding:10px">'
+      +'<div style="font-size:13px;font-weight:800">&#129518; Até quanto dá pra pagar'+_aj('prod.ateQuanto')+'</div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0 2px"><span>Sem prejuízo (rende − mão de obra)</span><b style="color:var(--or)">'+fR(Math.max(0,desm))+'/kg</b></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span>Pagando hoje (média de compra)</span><b>'+fR(cmKg)+'/kg</b></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span>Folga pra negociar</span><b style="color:'+_corSinal(desm-cmKg)+'">'+fR(desm-cmKg)+'/kg</b></div></div>'
+      +(a.n>1?'<div style="font-size:11px;color:var(--mt);margin-top:8px">Variou entre as '+a.n+' vezes: rendeu de <b>'+fR(Math.min.apply(null,a.recKgLista))+'</b> a <b>'+fR(Math.max.apply(null,a.recKgLista))+'</b> por kg</div>':'')
+      +'<details class="pdet" style="margin-top:8px;border-top:1px solid var(--bd);padding-top:8px"><summary style="font-size:12px;color:var(--bl)">No que ele vira &#9660;</summary>'+_prodComposicao(a)+'</details>'
+      +'</div>';
   });
 
-  // Tudo que foi gerado no período (somando todas as entradas)
-  var t=_prodAcum('');
-  fechadas.forEach(function(p){_prodSoma(t,p,_prodCalc(p));});
-  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:4px">📦 Tudo que foi gerado no período</div>'
-    +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Soma de todas as produções — é o que foi pro estoque.</div>';
-  Object.keys(t.mats).sort(function(a,b){return _prodPrecoVenda(parseFloat(b))*t.mats[b]-_prodPrecoVenda(parseFloat(a))*t.mats[a];}).forEach(function(mid){
-    var prod=gP(parseFloat(mid));var nome=prod?prod.ic+' '+prod.nome:'?';
-    var pv=_prodPrecoVenda(parseFloat(mid));
-    var tabId=DB.prodVinculos[parseFloat(mid)];var tabNome=tabId?_nomeTab(tabId):'sem tabela';
-    html+='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border-radius:8px;margin-bottom:5px">'
-      +'<div style="flex:1"><div style="font-size:13px;font-weight:700">'+nome+'</div>'
-      +'<div style="font-size:10px;color:var(--mt)">'+fKg(t.mats[mid])+'kg · '+fR(pv)+'/kg · → '+tabNome+'</div></div>'
-      +'<div style="font-size:13px;font-weight:700;color:'+(pv>0?'var(--gr)':(_prodEhRejeito(mid)?'var(--mt)':'var(--or)'))+'">'+(pv>0?fR(pv*t.mats[mid]):(_prodEhRejeito(mid)?'rejeito':'sem preço'))+'</div></div>';
+  // tudo que foi gerado no período
+  var t=_prodAcum('');fechadas.forEach(function(p){_prodSoma(t,p,_prodCalc(p,true));});
+  var mats='';
+  Object.keys(t.mats).sort(function(x,y){return t.mats[y]-t.mats[x];}).forEach(function(mid){
+    var pr=gP(parseFloat(mid));var pv=_prodPrecoVenda(parseFloat(mid));var tb=_prodTabVendaDe(mid);
+    mats+='<div style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:var(--s2);border-radius:8px;margin-top:5px">'
+      +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700">'+(pr?pr.ic+' '+pr.nome:'?')+'</div>'
+      +'<div style="font-size:10px;color:var(--mt)">'+fKg(t.mats[mid])+'kg · '+(_div(t.mats[mid],t.pe)*100).toFixed(1)+'% · '+(_prodEhRejeito(mid)?'rejeito':fR(pv)+'/kg · '+(tb?_nomeTab(tb):'sem tabela'))+'</div></div>'
+      +'<b style="font-size:12px;color:'+(pv>0?'var(--gr)':'var(--mt)')+'">'+(pv>0?fR(pv*t.mats[mid]):'&mdash;')+'</b></div>';
   });
-  html+='</div>';
+  html+='<div class="card"><details class="pdet"><summary>📤 Tudo que foi gerado no período &#9660;</summary><div style="font-size:11px;color:var(--mt);margin-top:4px">Soma de todas as produções — é o que foi pro estoque.</div>'+mats+'</details></div>';
+
+  // simulador
+  var opts=keys.map(function(k){return '<option value="'+k+'">'+g[k].nome+' — '+g[k].n+'× · '+fKg(g[k].pe)+'kg</option>';}).join('');
+  html+='<div class="card"><details class="pdet"><summary>🔨 Simulador de compra de lote'+_aj('prod.simulador')+' &#9660;</summary>'
+    +'<div style="font-size:11px;color:var(--mt);margin:6px 0 10px">Pra um lote grande (ex.: leilão): escolha o material parecido do histórico. Usa o que ele rendeu e o tempo que tomou no período selecionado.</div>'
+    +'<div class="fld"><label>Material parecido</label><select class="inp" id="sim-lote" onchange="_prodSimCalc()">'+opts+'</select></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">'
+    +'<div class="fld"><label>Peso (kg)</label><input class="inp" type="number" inputmode="decimal" id="sim-kg" oninput="_prodSimCalc()" placeholder="ex: 500"></div>'
+    +'<div class="fld"><label>Lucro que quero (%)</label><input class="inp" type="number" inputmode="decimal" id="sim-mg" oninput="_prodSimCalc()" value="30"></div>'
+    +'<div class="fld"><label>Frete, taxas (R$)</label><input class="inp" type="number" inputmode="decimal" id="sim-ex" oninput="_prodSimCalc()" placeholder="0"></div></div>'
+    +'<div id="sim-out" style="margin-top:10px"></div></details></div>';
+  setTimeout(_prodSimCalc,30);
   return html;
+}
+
+// ── Perda por funcionário ────────────────────────────
+function _prodPerdaPct(a){return a&&a.pe>0?(a.perda||0)/a.pe*100:null;}
+function _prodPerdaEquipe(fechadas){var t=_prodAcum('');fechadas.forEach(function(p){_prodSoma(t,p,_prodCalc(p));});return _prodPerdaPct(t);}
+// Cartão "Perda" + "Não deu tempo" (esboço aprovado)
+function _prodPerdaHTML(a,media){
+  var pp=_prodPerdaPct(a);
+  var alta=pp!==null&&media!==null&&pp>=media+5;var baixa=pp!==null&&media!==null&&pp<=media-2;
+  var cor=alta?'var(--rd)':baixa?'var(--gr)':'var(--tx)';
+  var seta=(pp===null||media===null)?'':(pp>media+0.5?' &#9650;':pp<media-0.5?' &#9660;':'');
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">'
+    +'<div style="background:var(--s2);border-radius:8px;padding:8px 4px;text-align:center'+(alta?';outline:1px solid rgba(239,68,68,.5)':'')+'">'
+    +'<div style="font-size:15px;font-weight:800;color:'+cor+'">'+(pp===null?'&mdash;':pp.toFixed(1).replace('.',',')+'%')+seta+'</div>'
+    +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase">perda'+_aj('prod.m.perda')+'</div>'
+    +'<div style="font-size:10px;color:var(--mt)">média da equipe '+(media===null?'&mdash;':media.toFixed(1).replace('.',',')+'%')+'</div></div>'
+    +'<div style="background:var(--s2);border-radius:8px;padding:8px 4px;text-align:center">'
+    +'<div style="font-size:15px;font-weight:800">'+(a.ndt||0)+'× · '+fKg(a.ndtKg||0)+'kg</div>'
+    +'<div style="font-size:9px;color:var(--mt);text-transform:uppercase">não deu tempo'+_aj('prod.m.ndt')+'</div>'
+    +'<div style="font-size:10px;color:var(--mt)">voltou pro estoque</div></div></div>';
+}
+// ── Equipe: em que cada um rende mais ────────────────
+// Valor que o trabalho acrescenta (gerou − compra do material) por hora, por tipo
+// de serviço — comparando a pessoa com a equipe toda no MESMO tipo de serviço.
+function _prodSvAgg(fechadas){
+  var o={};
+  fechadas.forEach(function(p){
+    var c=_prodCalc(p);var sv=_prodServicoDe(p.matEntradaId)||'sem';var k=_prodChaveFunc(p.func);
+    var ag=c.receita-c.custoMat;
+    if(!o[sv])o[sv]={team:{min:0,pe:0,ag:0},pes:{}};
+    var T=o[sv].team;T.min+=c.min;T.pe+=c.pe;T.ag+=ag;
+    if(!o[sv].pes[k])o[sv].pes[k]={min:0,pe:0,ag:0};
+    var Q=o[sv].pes[k];Q.min+=c.min;Q.pe+=c.pe;Q.ag+=ag;
+  });
+  return o;
+}
+function _prodSvLista(){return _prodServicos().concat([{id:'sem',nome:'Sem tipo',ic:'❔',ex:'material sem tipo de serviço'}]);}
+function _prodMelhorTag(fechadas,chave){
+  var o=_prodSvAgg(fechadas);var best=null;
+  _prodSvLista().forEach(function(s){
+    var x=o[s.id];if(!x||!x.pes[chave])return;var q=x.pes[chave];if(q.min<60||x.team.min<=q.min)return;
+    var pr=q.ag/(q.min/60),tr=x.team.ag/(x.team.min/60);if(!(tr>0))return;
+    var d=(pr/tr-1)*100;if(d>=10&&(!best||d>best.d))best={s:s,d:d};
+  });
+  return best?'<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;background:var(--blb,rgba(59,130,246,.12));color:var(--bl)">Melhor em: '+best.s.ic+' '+best.s.nome+'</span>':'';
+}
+function _prodHabilidadeHTML(fechadas,chave){
+  var o=_prodSvAgg(fechadas);var linhas='',melhor=null,pior=null;
+  _prodSvLista().forEach(function(s){
+    var x=o[s.id];if(!x||!x.pes[chave])return;var q=x.pes[chave];if(q.min<15)return;
+    var pr=q.ag/(q.min/60),tr=x.team.min>0?x.team.ag/(x.team.min/60):0;
+    var so=x.team.min<=q.min+0.01;var d=(!so&&tr>0)?(pr/tr-1)*100:null;
+    var mx=Math.max(pr,tr,0.01);var cor=d===null?'var(--bl)':d>=5?'var(--gr)':d<=-5?'var(--rd)':'var(--bl)';
+    linhas+='<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:12px"><span>'+s.ic+' <b>'+s.nome+'</b> <span style="color:var(--mt);font-size:10px">'+(s.ex||'')+'</span></span>'
+      +'<b style="color:'+cor+'">'+(d===null?'só ele':(d>=0?'+':'')+d.toFixed(0)+'%')+'</b></div>'
+      +'<div style="height:6px;background:var(--s3);border-radius:3px;overflow:hidden;margin-top:4px"><div style="height:100%;width:'+Math.max(3,Math.min(100,pr/mx*100))+'%;background:'+cor+'"></div></div>'
+      +'<div style="font-size:10px;color:var(--mt);margin-top:2px">'+fR(pr)+'/h · '+fKg(q.min>0?q.pe/(q.min/60):0)+' kg/h · '+_fmtDuracao(q.min)+(d===null?'':' · média da equipe '+fR(tr)+'/h')+'</div></div>';
+    if(d!==null&&q.min>=60){if(d>=10&&(!melhor||d>melhor.d))melhor={s:s,d:d};if(d<=-10&&(!pior||d<pior.d))pior={s:s,d:d};}
+  });
+  var nome='';(DB.producoes||[]).some(function(p){if(_prodChaveFunc(p.func)===chave){nome=(p.func||'').trim().split(' ')[0];return true;}return false;});
+  var h='<div class="card"><div style="font-size:14px;font-weight:800">🎯 Em que ele rende mais'+_aj('prod.habilidade')+'</div>'
+    +'<div style="font-size:11px;color:var(--mt)">Valor que o trabalho dele acrescenta por hora, comparado com a equipe no mesmo tipo de serviço</div>'
+    +(linhas||'<div style="font-size:12px;color:var(--mt);margin-top:8px">Pouco tempo registrado no período pra comparar.</div>');
+  if(melhor||pior)h+='<div style="margin-top:10px;background:var(--blb,rgba(59,130,246,.12));border-radius:9px;padding:9px;font-size:12px">💡 '
+    +(melhor?nome+' rende mais em <b>'+melhor.s.nome.toLowerCase()+'</b>'+(pior?' e menos em <b>'+pior.s.nome.toLowerCase()+'</b>':'')+'.':nome+' rende menos em <b>'+pior.s.nome.toLowerCase()+'</b>.')+'</div>';
+  h+='</div>';
+
+  // por material
+  var porM={};
+  fechadas.forEach(function(p){
+    var c=_prodCalc(p);var m=p.matEntradaId;var k=_prodChaveFunc(p.func);
+    if(!porM[m])porM[m]={nome:p.matEntrada,pes:{}};
+    if(!porM[m].pes[k])porM[m].pes[k]={min:0,pe:0,ag:0,sai:0};
+    var Q=porM[m].pes[k];Q.min+=c.min;Q.pe+=c.pe;Q.ag+=c.receita-c.custoMat;Q.sai+=c.saida;
+  });
+  var rows='';
+  Object.keys(porM).forEach(function(m){
+    var me=porM[m].pes[chave];if(!me||me.min<15)return;
+    var rank=Object.keys(porM[m].pes).filter(function(k){return porM[m].pes[k].min>=15;}).map(function(k){var q=porM[m].pes[k];return {k:k,v:q.ag/(q.min/60)};}).sort(function(x,y){return y.v-x.v;});
+    var pos=0;rank.forEach(function(r,ix){if(r.k===chave)pos=ix+1;});
+    var pr=gP(parseFloat(m));
+    rows+='<div style="display:grid;grid-template-columns:1.6fr .7fr .9fr .7fr .7fr;gap:4px;font-size:12px;padding:6px 0;border-top:1px solid var(--bd);align-items:center">'
+      +'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(pr?pr.ic+' ':'')+porM[m].nome+'</span>'
+      +'<span style="text-align:right">'+fKg(me.pe/(me.min/60))+'</span>'
+      +'<span style="text-align:right">'+fR(me.ag/(me.min/60))+'</span>'
+      +'<span style="text-align:right">'+(_div(me.sai,me.pe)*100).toFixed(0)+'%</span>'
+      +'<b style="text-align:right;color:'+(rank.length<2?'var(--mt)':pos===1?'var(--gr)':pos===rank.length?'var(--rd)':'var(--tx)')+'">'+(rank.length<2?'só ele':pos+'º/'+rank.length)+'</b></div>';
+  });
+  if(rows)h+='<div class="card"><div style="font-size:14px;font-weight:800;margin-bottom:6px">📋 Por tipo de material'+_aj('prod.porTipo')+'</div>'
+    +'<div style="display:grid;grid-template-columns:1.6fr .7fr .9fr .7fr .7fr;gap:4px;font-size:9px;color:var(--mt);text-transform:uppercase"><span>Material</span><span style="text-align:right">kg/h</span><span style="text-align:right">R$/h</span><span style="text-align:right">aprov.</span><span style="text-align:right">posição</span></div>'
+    +rows+'</div>';
+
+  // evolução: kg/h das últimas 8 semanas (todo o histórico, não só o período)
+  var todas=(DB.producoes||[]).filter(function(p){return p.status==='fechada';});
+  var hj=_today();var d0=new Date(hj.getFullYear(),hj.getMonth(),hj.getDate());var seg=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()-((d0.getDay()+6)%7));
+  var sem=[];for(var w=7;w>=0;w--){var i0=new Date(seg.getFullYear(),seg.getMonth(),seg.getDate()-7*w);sem.push({ini:i0,fim:new Date(i0.getFullYear(),i0.getMonth(),i0.getDate()+7),lbl:_fmtDataBR(i0).slice(0,5),me:{pe:0,min:0},tm:{pe:0,min:0}});}
+  todas.forEach(function(p){
+    var c=null;
+    sem.forEach(function(s){if(!_prodNoRange(p,s))return;c=c||_prodCalc(p);s.tm.pe+=c.pe;s.tm.min+=c.min;if(_prodChaveFunc(p.func)===chave){s.me.pe+=c.pe;s.me.min+=c.min;}});
+  });
+  var pts=sem.map(function(s){return {me:s.me.min>=15?s.me.pe/(s.me.min/60):null,tm:s.tm.min>=15?s.tm.pe/(s.tm.min/60):null,lbl:s.lbl};});
+  var nMe=pts.filter(function(x){return x.me!==null;}).length;
+  if(nMe>=2){
+    var mx=0;pts.forEach(function(x){mx=Math.max(mx,x.me||0,x.tm||0);});
+    var W=340,Hh=80,X=function(i){return 12+i*(W-24)/7;},Y=function(v){return Hh-6-(v/mx)*(Hh-16);};
+    var lm='',lt='',dots='';
+    pts.forEach(function(x,i){if(x.me!==null){lm+=(lm?' ':'')+X(i).toFixed(1)+','+Y(x.me).toFixed(1);dots+='<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(x.me).toFixed(1)+'" r="3" fill="#3b82f6"><title>'+x.lbl+': '+fKg(x.me)+' kg/h</title></circle>';}
+      if(x.tm!==null)lt+=(lt?' ':'')+X(i).toFixed(1)+','+Y(x.tm).toFixed(1);});
+    var lbls='';pts.forEach(function(x,i){lbls+='<text x="'+X(i).toFixed(1)+'" y="'+(Hh+10)+'" fill="#8b9ab3" font-size="8.5" text-anchor="middle">'+x.lbl+'</text>';});
+    h+='<div class="card"><div style="font-size:14px;font-weight:800;margin-bottom:6px">📈 Evolução (kg por hora, por semana)'+_aj('prod.evolucao')+'</div>'
+      +'<svg width="100%" viewBox="0 0 '+W+' '+(Hh+14)+'" style="display:block"><polyline fill="none" stroke="#8b9ab3" stroke-dasharray="4 4" stroke-width="1.5" points="'+lt+'"/><polyline fill="none" stroke="#3b82f6" stroke-width="3" points="'+lm+'"/>'+dots+lbls+'</svg>'
+      +'<div style="font-size:10px;color:var(--mt)">Azul = ele · tracejada = equipe toda. Últimas 8 semanas (não depende do período escolhido).</div></div>';
+  }
+  return h;
 }
 
 // ── Funcionários: Todos (comparação) ou um por vez ───
@@ -17263,13 +17835,14 @@ function _prodSeloPaga(ind,vh){
   if(!(vh>0))return '<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;background:var(--s3);color:var(--mt)">sem valor/hora no cadastro</span>';
   var ok=ind.cobre!==null&&ind.cobre>=1;
   return '<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;background:'+(ok?'var(--grb)':'var(--rdb)')+';color:'+(ok?'var(--gr)':'var(--rd)')+'">'
-    +(ok?'&#10003; Paga a mão de obra':'&#10007; Não paga a mão de obra')+(ind.cobre!==null?' · '+ind.cobre.toFixed(1).replace('.',',')+'×':'')+'</span>';
+    +(ok?'&#10003; Paga a mão de obra':'&#10007; Não paga a mão de obra')+(ind.cobre!==null?' · '+ind.cobre.toFixed(1).replace('.',',')+'×':'')+'</span>'+_aj('prod.m.paga');
 }
 function _fmtPct(v){return v===null||!isFinite(v)?'&mdash;':v.toFixed(0)+'%';}
 function _prodAnFuncs(fechadas){
   var g=_prodAgrupar(fechadas,function(p){return _prodChaveFunc(p.func);},function(p){return (p.func||'').trim();});
   var keys=Object.keys(g).sort(function(a,b){return g[b].lucro-g[a].lucro;});
   _prodFuncKeys=keys;
+  var _mediaPerda=_prodPerdaEquipe(fechadas);
   if(prodFuncSel&&!g[prodFuncSel])prodFuncSel='';
   var chip=function(on){return 'border:1px solid '+(on?'var(--gr)':'var(--bd)')+';background:'+(on?'var(--grb)':'var(--s1)')+';color:'+(on?'var(--gr)':'var(--tx)')+';border-radius:20px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap';};
   var html='<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px">'
@@ -17292,13 +17865,15 @@ function _prodAnFuncs(fechadas){
       html+='<div class="card" style="margin-bottom:10px;cursor:pointer" onclick="prodFuncSel=_prodFuncKeys['+i+'];go(\'producao\')">'
         +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div><div style="font-size:14px;font-weight:800">'+(i===0&&keys.length>1?'🥇 ':'')+a.nome+'</div>'
         +'<div style="font-size:11px;color:var(--mt)">'+nd+' dia(s) · '+_fmtDuracao(a.min)+' · '+fKg(a.pe)+'kg · '+(vh>0?fR(vh)+'/h':'sem valor/hora')+'</div></div>'
-        +'<div style="text-align:right;white-space:nowrap"><div style="font-size:16px;font-weight:800;color:'+_corSinal(a.lucro)+'">'+fR(a.lucro)+'</div><div style="font-size:10px;color:var(--mt)">saldo · '+_fmtPct(ind.margem)+' de lucro</div></div></div>'
-        +'<div style="margin-top:8px">'+_prodSeloPaga(ind,vh)+'</div>'
+        +'<div style="text-align:right;white-space:nowrap"><div style="font-size:16px;font-weight:800;color:'+_corSinal(a.lucro)+'">'+fR(a.lucro)+'</div><div style="font-size:10px;color:var(--mt)">saldo'+_aj('prod.m.saldo')+' · '+_fmtPct(ind.margem)+' de lucro'+_aj('prod.m.pctLucro')+'</div></div></div>'
+        +'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+_prodSeloPaga(ind,vh)+_prodMelhorTag(fechadas,k)+'</div>'
         +_pgrid(4,[
           _pmt('gerou por dia',nd>0?fR(a.receita/nd):'&mdash;','var(--bl)'),
           _pmt('saldo por dia',nd>0?fR(a.lucro/nd):'&mdash;',_corSinal(a.lucro)),
           _pmt('kg por hora',horas>0?fKg(a.pe/horas):'&mdash;'),
           _pmt('% de lucro',_fmtPct(ind.margem),_corSinal(a.lucro))])
+        +(function(){var pp=_prodPerdaPct(a);if(pp===null)return '';var alta=_mediaPerda!==null&&pp>=_mediaPerda+5;
+          return '<div style="font-size:11px;margin-top:8px;color:'+(alta?'var(--rd)':'var(--mt)')+'">Perda <b>'+pp.toFixed(1).replace('.',',')+'%</b>'+(_mediaPerda!==null?' · média da equipe '+_mediaPerda.toFixed(1).replace('.',',')+'%':'')+(alta?' &#9888;':'')+((a.ndt||0)?' · não deu tempo '+a.ndt+'×':'')+'</div>';})()
         +'<div style="font-size:10px;color:var(--bl);margin-top:8px;text-align:right">ver dia, semana e mês &#8250;</div></div>';
     });
     return html+glossario;
@@ -17309,13 +17884,14 @@ function _prodAnFuncs(fechadas){
   var nd=Object.keys(a.dias).length;
   html+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div><div style="font-size:16px;font-weight:800">👷 '+a.nome+'</div>'
     +'<div style="font-size:11px;color:var(--mt)">'+a.n+' produção(ões) em '+nd+' dia(s) · '+(vh>0?fR(vh)+'/hora no cadastro':'<span style="color:var(--or)">sem valor/hora (custo zero)</span>')+'</div></div>'
-    +'<div style="text-align:right;white-space:nowrap"><div style="font-size:18px;font-weight:800;color:'+_corSinal(a.lucro)+'">'+fR(a.lucro)+'</div><div style="font-size:10px;color:var(--mt)">saldo · '+_fmtPct(ind.margem)+' de lucro</div></div></div>'
+    +'<div style="text-align:right;white-space:nowrap"><div style="font-size:18px;font-weight:800;color:'+_corSinal(a.lucro)+'">'+fR(a.lucro)+'</div><div style="font-size:10px;color:var(--mt)">saldo'+_aj('prod.m.saldo')+' · '+_fmtPct(ind.margem)+' de lucro'+_aj('prod.m.pctLucro')+'</div></div></div>'
     +'<div style="margin-top:8px">'+_prodSeloPaga(ind,vh)+'</div>'
     +_pgrid(4,[
       _pmt('horas',_fmtDuracao(a.min),'var(--pu)'),
       _pmt('kg desmontado',fKg(a.pe)),
       _pmt('kg por hora',horas>0?fKg(a.pe/horas):'&mdash;'),
       _pmt('aproveitamento',(_div(a.saida,a.pe)*100).toFixed(1)+'%')])
+    +_prodPerdaHTML(a,_mediaPerda)
     +_pgrid(4,[
       _pmt('gerou por dia',nd>0?fR(a.receita/nd):'&mdash;','var(--bl)'),
       _pmt('saldo por dia',nd>0?fR(a.lucro/nd):'&mdash;',_corSinal(a.lucro)),
@@ -17332,7 +17908,7 @@ function _prodAnFuncs(fechadas){
     var custoDiaCheio=vh*minDia/60*nd;var saldoDiaCheio=ind.agregado-custoDiaCheio;
     var minPago=minDia*nd;
     html+='<div style="margin-top:10px;background:var(--s2);border-radius:8px;padding:9px 11px;font-size:11px;color:var(--mt)">'
-      +'<b style="color:var(--tx)">Contando o dia inteiro pago</b> ('+_fmtDuracao(minDia)+' × '+nd+' dia(s) = '+_fmtDuracao(minPago)+', das quais '+_fmtDuracao(a.min)+' em produção):<br>'
+      +'<b style="color:var(--tx)">Contando o dia inteiro pago</b>'+_aj('prod.m.diaCheio')+' ('+_fmtDuracao(minDia)+' × '+nd+' dia(s) = '+_fmtDuracao(minPago)+', das quais '+_fmtDuracao(a.min)+' em produção):<br>'
       +'custo dele '+fR(custoDiaCheio)+' &rarr; saldo <b style="color:'+_corSinal(saldoDiaCheio)+'">'+fR(saldoDiaCheio)+'</b>'
       +' · '+(ind.agregado>=custoDiaCheio?'<span style="color:var(--gr)">ainda paga a mão de obra ('+(ind.agregado/custoDiaCheio).toFixed(1).replace('.',',')+'×)</span>':'<span style="color:var(--rd)">não paga a mão de obra ('+(custoDiaCheio>0?(ind.agregado/custoDiaCheio).toFixed(1).replace('.',','):'0')+'×)</span>')
       +'<br><span style="font-size:10px">Só conta os dias em que ele fechou alguma produção. Se ele faz outras tarefas além da produção, esse número fica pior do que a realidade.</span></div>';
@@ -17354,18 +17930,18 @@ function _prodAnFuncs(fechadas){
     } else {
       k=d;lbl='<b>'+d.slice(0,5)+'</b> <span style="color:var(--mt);font-size:10px">'+nomesDia[dt.getDay()]+'</span>';ord=dt.getTime();
     }
-    if(!grupos[k])grupos[k]={lbl:lbl,ord:ord,n:0,dias:0,pe:0,receita:0,custoMat:0,mo:0,min:0,lucro:0};
+    if(!grupos[k])grupos[k]={lbl:lbl,ord:ord,n:0,dias:0,pe:0,receita:0,custoMat:0,mo:0,min:0,lucro:0,perda:0};
     var G=grupos[k];
-    G.n+=x.n;G.dias++;G.pe+=x.pe;G.receita+=x.receita;G.custoMat+=(x.custoMat||0);G.mo+=(x.mo||0);G.min+=x.min;G.lucro+=x.lucro;
+    G.n+=x.n;G.dias++;G.pe+=x.pe;G.receita+=x.receita;G.custoMat+=(x.custoMat||0);G.mo+=(x.mo||0);G.min+=x.min;G.lucro+=x.lucro;G.perda+=(x.perda||0);
   });
   var gk=Object.keys(grupos).sort(function(x,y){return grupos[y].ord-grupos[x].ord;});
   var maxRec=0;gk.forEach(function(k){if(grupos[k].receita>maxRec)maxRec=grupos[k].receita;});
   var ag=function(v,l){var on=prodFuncAgrup===v;return '<button onclick="prodFuncAgrup=\''+v+'\';go(\'producao\')" style="border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;background:'+(on?'var(--bl)':'transparent')+';color:'+(on?'#fff':'var(--mt)')+'">'+l+'</button>';};
-  var cols='grid-template-columns:1.5fr 0.9fr 1.1fr 1.1fr 0.8fr';
+  var cols='grid-template-columns:1.4fr 0.85fr 1.05fr 1.05fr 0.7fr 0.7fr';
   html+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">'
     +'<div style="font-size:13px;font-weight:800">📅 Quanto ele fez</div>'
     +'<div style="display:flex;gap:2px;background:var(--s2);border-radius:8px;padding:3px">'+ag('dia','Dia')+ag('semana','Semana')+ag('mes','Mês')+'</div></div>'
-    +'<div style="display:grid;'+cols+';gap:4px;font-size:9px;color:var(--mt);text-transform:uppercase;padding-bottom:4px;border-bottom:1px solid var(--bd)"><span>'+(prodFuncAgrup==='dia'?'Dia':prodFuncAgrup==='semana'?'Semana':'Mês')+'</span><span style="text-align:right">Horas</span><span style="text-align:right">Gerou</span><span style="text-align:right">Saldo</span><span style="text-align:right">Lucro</span></div>';
+    +'<div style="display:grid;'+cols+';gap:4px;font-size:9px;color:var(--mt);text-transform:uppercase;padding-bottom:4px;border-bottom:1px solid var(--bd)"><span>'+(prodFuncAgrup==='dia'?'Dia':prodFuncAgrup==='semana'?'Semana':'Mês')+'</span><span style="text-align:right">Horas</span><span style="text-align:right">Gerou</span><span style="text-align:right">Saldo</span><span style="text-align:right">Lucro</span><span style="text-align:right">Perda</span></div>';
   gk.forEach(function(k){
     var G=grupos[k];var gi=_prodInd(G);var paga=vh>0?(gi.cobre!==null&&gi.cobre>=1):null;
     html+='<div style="padding:6px 0;border-bottom:1px solid var(--bd)"><div style="display:grid;'+cols+';gap:4px;font-size:12px;align-items:center">'
@@ -17373,10 +17949,13 @@ function _prodAnFuncs(fechadas){
       +'<span style="text-align:right">'+_fmtDuracao(G.min)+'</span>'
       +'<span style="text-align:right;color:var(--bl);font-weight:700">'+fR(G.receita)+'</span>'
       +'<span style="text-align:right;font-weight:700;color:'+_corSinal(G.lucro)+'">'+fR(G.lucro)+'</span>'
-      +'<span style="text-align:right;font-weight:700;color:'+_corSinal(G.lucro)+'">'+_fmtPct(gi.margem)+'</span></div>'
+      +'<span style="text-align:right;font-weight:700;color:'+_corSinal(G.lucro)+'">'+_fmtPct(gi.margem)+'</span>'
+      +(function(){var pp=G.pe>0?G.perda/G.pe*100:null;var alta=pp!==null&&_mediaPerda!==null&&pp>=_mediaPerda+5;return '<span style="text-align:right;font-weight:700;color:'+(alta?'var(--rd)':'var(--mt)')+'">'+(pp===null?'&mdash;':pp.toFixed(0)+'%')+'</span>';})()+'</div>'
       +'<div style="height:3px;background:var(--s3);border-radius:2px;overflow:hidden;margin-top:4px"><div style="height:100%;width:'+(maxRec>0?Math.min(100,G.receita/maxRec*100):0)+'%;background:var(--bl)"></div></div></div>';
   });
   html+='<div style="font-size:10px;color:var(--mt);margin-top:6px">Use o período lá em cima (Mês, Trimestre, Ano…) pra ver mais semanas ou meses.</div></div>';
+
+  html+=_prodHabilidadeHTML(fechadas,prodFuncSel);
 
   // o que ele desmonta
   var gm={};
@@ -17408,55 +17987,6 @@ function _prodAnFuncs(fechadas){
   return html;
 }
 
-// ── Lotes e Leilão ───────────────────────────────────
-function _prodAnLotes(fechadas){
-  var g=_prodAgrupar(fechadas,_prodChaveLote,function(p){return (p.lote||'').trim()||p.matEntrada;});
-  var keys=Object.keys(g).sort(function(a,b){return _div(g[b].lucro,g[b].pe)-_div(g[a].lucro,g[a].pe);});
-  _prodLoteStats={};
-  keys.forEach(function(k){
-    var a=g[k];
-    _prodLoteStats[k]={nome:a.nome,n:a.n,pe:a.pe,recKg:_div(a.receita,a.pe),moKg:_div(a.mo,a.pe),minKg:_div(a.min,a.pe),
-      recMin:a.recKgLista.length?Math.min.apply(null,a.recKgLista):0};
-  });
-  var opts=keys.map(function(k){return '<option value="'+k.replace(/"/g,'&quot;')+'">'+g[k].nome+(k.charAt(0)==='M'?' (sem apelido)':'')+' — '+g[k].n+'× · '+fKg(g[k].pe)+'kg</option>';}).join('');
-
-  var html='<div class="card" style="border-color:rgba(168,85,247,.35);background:linear-gradient(135deg,var(--s1),rgba(168,85,247,.07))">'
-    +'<div style="font-size:14px;font-weight:800;margin-bottom:2px">🔨 Simulador de leilão</div>'
-    +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Escolha no seu histórico o lote mais parecido com o do leilão. O cálculo usa o que ele rendeu e o tempo que tomou no período selecionado acima.</div>'
-    +'<div class="fld"><label>Lote parecido</label><select class="inp" id="sim-lote" onchange="_prodSimCalc()">'+opts+'</select></div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">'
-    +'<div class="fld"><label>Peso do leilão (kg)</label><input class="inp" type="number" inputmode="decimal" id="sim-kg" oninput="_prodSimCalc()" placeholder="ex: 500"></div>'
-    +'<div class="fld"><label>Lucro que quero (%)</label><input class="inp" type="number" inputmode="decimal" id="sim-mg" oninput="_prodSimCalc()" value="30"></div>'
-    +'<div class="fld"><label>Frete, taxas (R$)</label><input class="inp" type="number" inputmode="decimal" id="sim-ex" oninput="_prodSimCalc()" placeholder="0"></div></div>'
-    +'<div id="sim-out" style="margin-top:10px"></div></div>';
-
-  html+=_prodAvisoSemPreco(fechadas);
-  keys.forEach(function(k){
-    var a=g[k];var semAp=k.charAt(0)==='M';
-    var recKg=_div(a.receita,a.pe),moKg=_div(a.mo,a.pe);
-    var mn=a.recKgLista.length?Math.min.apply(null,a.recKgLista):0,mx=a.recKgLista.length?Math.max.apply(null,a.recKgLista):0;
-    html+='<div class="card" style="margin-bottom:10px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div><div style="font-size:14px;font-weight:800">'+a.nome+'</div>'
-      +'<div style="font-size:11px;color:var(--mt)">'+(semAp?'<span style="color:var(--or)">sem apelido — agrupado pelo material</span> · ':'')+a.n+' vez(es) · '+fKg(a.pe)+'kg · '+_fmtDuracao(a.min)+'</div></div>'
-      +'<div style="text-align:right;white-space:nowrap"><div style="font-size:16px;font-weight:800;color:'+_corSinal(a.lucro)+'">'+fR(a.lucro)+'</div><div style="font-size:10px;color:var(--mt)">lucro real</div></div></div>'
-      +_pgrid(4,[
-        _pmt('rende/kg',fR(recKg),'var(--bl)'),
-        _pmt('paguei/kg',fR(_div(a.custoMat,a.pe))),
-        _pmt('mão de obra/kg',fR(moKg)),
-        _pmt('lucro/kg',fR(_div(a.lucro,a.pe)),_corSinal(a.lucro))])
-      +_pgrid(3,[
-        _pmt('horas p/ 100kg',a.pe>0?_fmtDuracao(Math.round(_div(a.min,a.pe)*100)):'&mdash;','var(--pu)'),
-        _pmt('aproveitamento',(_div(a.saida,a.pe)*100).toFixed(1)+'%'),
-        _pmt('empata pagando',fR(Math.max(0,recKg-moKg))+'/kg','var(--or)')])
-      +(a.n>1?'<div style="font-size:11px;color:var(--mt);margin-top:8px">Variou entre as '+a.n+' vezes: rendeu de <b>'+fR(mn)+'</b> a <b>'+fR(mx)+'</b> por kg'+(mn>0&&mx/mn>1.5?' <span style="color:var(--or)">— variação grande, a média engana</span>':'')+'</div>'
-            :'<div style="font-size:11px;color:var(--or);margin-top:8px">Só 1 vez no período — pouco histórico pra confiar num lance.</div>')
-      +'<div style="margin-top:10px;border-top:1px solid var(--bd);padding-top:8px"><div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Composição (a cada 100kg)</div>'
-      +_prodComposicao(a)+'</div></div>';
-  });
-  html+='<div style="font-size:10px;color:var(--mt)"><b>Empata pagando</b> = o máximo por kg em que o lote ainda não dá prejuízo (rende/kg &minus; mão de obra/kg), sem frete nem taxas.</div>';
-  setTimeout(_prodSimCalc,30);
-  return html;
-}
 function _prodSimCalc(){
   var out=document.getElementById('sim-out');var sel=document.getElementById('sim-lote');
   if(!out||!sel)return;
@@ -17506,11 +18036,11 @@ function exportarRelatorioProducao(){
   });
   html+='</tbody></table>';
 
-  var gl=_prodAgrupar(fechadas,_prodChaveLote,function(p){return (p.lote||'').trim()||p.matEntrada;});
+  var gl=_prodAgrupar(fechadas,_prodChaveLote,function(p){return p.matEntrada;});
   html+='<h3 style="font-size:13px;margin:14px 0 6px">Lotes</h3><table><thead><tr><th>Lote</th><th>Vezes</th><th>Kg</th><th>Aprov.</th><th>Rende/kg</th><th>Paguei/kg</th><th>M.O./kg</th><th>Lucro/kg</th><th>Horas p/ 100kg</th><th>Lucro</th></tr></thead><tbody>';
   Object.keys(gl).sort(function(a,b){return gl[b].lucro-gl[a].lucro;}).forEach(function(k){
     var a=gl[k];
-    html+='<tr><td>'+a.nome+(k.charAt(0)==='M'?' (sem apelido)':'')+'</td><td>'+a.n+'</td><td>'+fKg(a.pe)+'</td><td>'+(_div(a.saida,a.pe)*100).toFixed(1)+'%</td><td>'+fR(_div(a.receita,a.pe))+'</td><td>'+fR(_div(a.custoMat,a.pe))+'</td><td>'+fR(_div(a.mo,a.pe))+'</td><td>'+fR(_div(a.lucro,a.pe))+'</td><td>'+_fmtDuracao(Math.round(_div(a.min,a.pe)*100))+'</td><td>'+fR(a.lucro)+'</td></tr>';
+    html+='<tr><td>'+a.nome+'</td><td>'+a.n+'</td><td>'+fKg(a.pe)+'</td><td>'+(_div(a.saida,a.pe)*100).toFixed(1)+'%</td><td>'+fR(_div(a.receita,a.pe))+'</td><td>'+fR(_div(a.custoMat,a.pe))+'</td><td>'+fR(_div(a.mo,a.pe))+'</td><td>'+fR(_div(a.lucro,a.pe))+'</td><td>'+_fmtDuracao(Math.round(_div(a.min,a.pe)*100))+'</td><td>'+fR(a.lucro)+'</td></tr>';
   });
   html+='</tbody></table>';
 
@@ -17537,75 +18067,124 @@ function exportarRelatorioProducao(){
 // ── CONFIGURAÇÃO: tabelas + materiais de entrada ─────
 // Materiais em destaque — os mais usados, pra não ficar rolando a lista toda vez.
 // Virou modal separado (era estranho ficar misturado com Vincular Tabela de Venda).
-function mMateriaisDestaque(){
+function mMateriaisDestaque(modo){
+  modo=modo==='ent'?'ent':'sai';
+  var campo=modo==='ent'?'prodDestaqueEnt':'prodDestaque';
   var html='<div class="mf">'
-    +'<div style="font-size:12px;color:var(--mt);margin-bottom:14px">Marque os materiais que você desmonta com mais frequência — eles aparecem primeiro nas listas de entrada e saída da Produção, sem precisar rolar até achar.</div>';
-  if(!DB.produtos.length){
-    html+='<div style="text-align:center;padding:14px;color:var(--mt);font-size:12px">Nenhum produto cadastrado ainda.</div>';
-  } else {
-    html+='<div style="max-height:420px;overflow-y:auto">';
-    DB.produtos.forEach(function(p){
-      html+='<label style="display:flex;align-items:center;gap:8px;padding:7px 0;cursor:pointer;border-bottom:1px solid var(--bd)">'
-        +'<input type="checkbox" '+(p.prodDestaque?'checked':'')+' onchange="_toggleProdDestaque('+p.id+',this.checked)" style="width:16px;height:16px">'
-        +'<span style="font-size:13px">'+p.ic+' '+p.nome+'</span></label>';
+    +'<div style="font-size:12px;color:var(--mt);margin-bottom:14px">'+(modo==='ent'
+      ?'Marque o que vocês mais <b>desmontam</b> (HD, celular, notebook…). Aparecem em card na Nova Produção. O Misto (caixa geral) já aparece sempre em destaque.'
+      :'Marque os materiais que mais <b>saem</b> da desmontagem (placas, ferro, plástico…). Aparecem em card na hora de pesar.')
+    +' Até 9; sem nenhum marcado, aparecem os mais usados.</div>'
+    +'<div class="pesc-srch" style="margin-bottom:8px"><span>&#128269;</span><input id="pdest-q" placeholder="Buscar…" oninput="var q=_prodNorm(this.value);document.querySelectorAll(\'.pdest-row\').forEach(function(r){r.style.display=_prodNorm(r.getAttribute(\'data-n\')).indexOf(q)>=0?\'\':\'none\';})"></div>'
+    +'<div style="max-height:400px;overflow-y:auto">';
+  DB.produtos.filter(function(p){return !p.arquivado;}).slice().sort(function(a,b){return (b[campo]?1:0)-(a[campo]?1:0)||(a.nome||'').localeCompare(b.nome||'','pt-BR');}).forEach(function(p){
+    html+='<label class="pdest-row" data-n="'+(p.nome||'').replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;border-bottom:1px solid var(--bd)">'
+      +'<input type="checkbox" '+(p[campo]?'checked':'')+' onchange="_toggleProdDestaque('+p.id+',this.checked,\''+modo+'\')" style="width:16px;height:16px">'
+      +'<span style="font-size:13px">'+p.ic+' '+p.nome+'</span></label>';
+  });
+  html+='</div><div class="brow"><button class="btn" onclick="closeM();go(\'producao\')">Pronto</button></div></div>';
+  openM('&#11088; Principais — '+(modo==='ent'?'o que desmonta':'o que sai')+_aj('prod.principais'),html,480);
+}
+var _prodCfgVerMat=false,_prodCfgSvTodos=false;
+function _setProdTabCat(cat,val){
+  if(!DB.prodTabCat)DB.prodTabCat={};
+  if(val)DB.prodTabCat[cat]=parseFloat(val);else delete DB.prodTabCat[cat];
+  saveDB();go('producao');
+}
+function _setProdServico(id,val){
+  var p=gP(id);if(!p)return;
+  if(val)p.prodServico=val;else delete p.prodServico;
+  saveDB();go('producao');
+}
+// Tira as exceções que apontam pra mesma tabela do grupo (não mudam nada no preço)
+function _prodLimparExcecoes(){
+  var n=0;
+  Object.keys(DB.prodVinculos||{}).forEach(function(pid){
+    var p=gP(parseFloat(pid));
+    if(p&&p.cat&&DB.prodTabCat&&String(DB.prodTabCat[p.cat])===String(DB.prodVinculos[pid])){delete DB.prodVinculos[pid];n++;}
+  });
+  saveDB();go('producao');toast(n?n+' exceção(ões) iguais ao grupo foram tiradas':'Nenhuma exceção igual ao grupo','var(--bl)');
+}
+function _prodConfig(){
+  var tabVenda=DB.tabelas.filter(function(t){return t.tipo==='venda';});
+  var html='<div style="display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
+    +'<button class="btnO bOgr" onclick="mMateriaisDestaque(\'ent\')" style="font-size:12px;padding:6px 12px">&#11088; Principais: o que desmonta</button>'
+    +'<button class="btnO bOgr" onclick="mMateriaisDestaque(\'sai\')" style="font-size:12px;padding:6px 12px">&#11088; Principais: o que sai</button>'
+    +'<button class="btnO bOgr" onclick="mMateriaisRejeito()" style="font-size:12px;padding:6px 12px">&#9851; Rejeito'+_aj('prod.rejeito')+'</button>'
+    +'</div>';
+
+  // Expediente
+  html+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'
+    +'<div><div style="font-size:13px;font-weight:800;margin-bottom:4px">&#128343; Expediente (tempo trabalhado)'+_aj('prod.expediente')+'</div>'
+    +'<div style="font-size:11px;color:var(--mt)">'+_prodJornadaResumo()+'</div></div>'
+    +'<button class="btnO bOgr" onclick="mProdJornada()" style="font-size:12px;padding:6px 12px;white-space:nowrap">&#9998; Editar</button></div></div>';
+
+  // Tabela de venda por grupo
+  var cats=[];(DB.filtrosMat||[]).forEach(function(f){if(f.nome!=='Todos'&&cats.indexOf(f.nome)<0)cats.push(f.nome);});
+  DB.produtos.forEach(function(p){if(p.cat&&cats.indexOf(p.cat)<0)cats.push(p.cat);});
+  var optT=function(sel){return '<option value="">— sem tabela —</option>'+tabVenda.map(function(t){return '<option value="'+t.id+'"'+(sel!=null&&String(sel)===String(t.id)?' selected':'')+'>'+t.nome+'</option>';}).join('');};
+  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:4px">💲 Tabela de venda por grupo'+_aj('prod.tabGrupo')+'</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">De onde vem o preço dos materiais gerados na desmontagem.</div>';
+  cats.forEach(function(c,ix){
+    var n=DB.produtos.filter(function(p){return p.cat===c&&!p.arquivado;}).length;
+    html+='<div style="display:grid;grid-template-columns:1fr 1.2fr;gap:8px;align-items:center;margin-bottom:6px">'
+      +'<div style="font-size:12px;font-weight:700">'+c+'<div style="font-size:10px;color:var(--mt);font-weight:400">'+n+' material(is)</div></div>'
+      +'<select class="inp" style="padding:8px;font-size:12px" data-cat="'+c.replace(/"/g,'&quot;')+'" onchange="_setProdTabCat(this.getAttribute(\'data-cat\'),this.value)">'+optT((DB.prodTabCat||{})[c])+'</select></div>';
+  });
+  var exc=Object.keys(DB.prodVinculos||{}).filter(function(pid){return gP(parseFloat(pid));});
+  var iguais=exc.filter(function(pid){var p=gP(parseFloat(pid));return p&&p.cat&&DB.prodTabCat&&String(DB.prodTabCat[p.cat])===String(DB.prodVinculos[pid]);}).length;
+  html+='<div style="font-size:11px;color:var(--mt);margin-top:8px">'+exc.length+' material(is) com tabela própria (exceção).'+(iguais?' '+iguais+' delas são iguais à do grupo.':'')+'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
+    +'<button class="btnO bOgr" style="font-size:12px;padding:6px 12px" onclick="_prodCfgVerMat=!_prodCfgVerMat;go(\'producao\')">'+(_prodCfgVerMat?'Esconder':'Ver')+' material por material</button>'
+    +(iguais?'<button class="btnO bOgr" style="font-size:12px;padding:6px 12px" onclick="_prodLimparExcecoes()">Tirar exceções iguais ao grupo</button>':'')+'</div>';
+  if(_prodCfgVerMat){
+    html+='<div style="margin-top:10px;border-top:1px solid var(--bd);padding-top:8px">';
+    var porCat={};
+    DB.produtos.filter(function(p){return !p.arquivado;}).forEach(function(p){var c=p.cat||'Sem grupo';(porCat[c]=porCat[c]||[]).push(p);});
+    Object.keys(porCat).sort(function(a,b){return a.localeCompare(b,'pt-BR');}).forEach(function(cat){
+      var lista=porCat[cat].sort(function(a,b){return (a.nome||'').localeCompare(b.nome||'','pt-BR');});
+      var semP=lista.filter(function(p){return !_prodEhRejeito(p.id)&&!(_prodPrecoVenda(p.id)>0);}).length;
+      var gT0=(DB.prodTabCat||{})[cat];var gT0n=gT0?_nomeTab(gT0):'sem tabela';
+      html+='<details class="pdet" style="background:var(--s2);border-radius:10px;padding:9px 10px;margin-bottom:6px"><summary>'+cat
+        +' <span style="font-size:11px;color:var(--mt);font-weight:600">· '+lista.length+' material(is) · grupo: '+gT0n+'</span>'
+        +(semP?' <span style="font-size:11px;color:var(--rd);font-weight:700">· '+semP+' sem preço</span>':'')+' &#9660;</summary><div style="margin-top:8px">';
+      lista.forEach(function(p){
+        var grupoT=(DB.prodTabCat||{})[p.cat];var vinc=(DB.prodVinculos||{})[p.id];
+        var tabsCom=tabVenda.filter(function(t){return t.itens.some(function(it){return String(it.pId)===String(p.id);});});
+        var precoEm=function(t){for(var j=0;j<t.itens.length;j++){if(String(t.itens[j].pId)===String(p.id))return t.itens[j].preco;}return 0;};
+        var gT=grupoT?tabVenda.filter(function(t){return String(t.id)===String(grupoT);})[0]:null;
+        var opts='<option value="">Segue o grupo'+(gT?' ('+gT.nome+(tabsCom.indexOf(gT)>=0?' · '+fR(precoEm(gT)):' · não tem')+')':' (sem tabela)')+'</option>'
+          +tabsCom.map(function(t){return '<option value="'+t.id+'"'+(vinc&&String(vinc)===String(t.id)?' selected':'')+'>'+t.nome+' ('+fR(precoEm(t))+'/kg)</option>';}).join('');
+        html+='<div style="display:grid;grid-template-columns:1fr 1.3fr;gap:8px;align-items:center;margin-bottom:6px">'
+          +'<div style="font-size:12px;font-weight:600">'+p.ic+' '+p.nome+'<div style="font-size:9px;color:'+(_prodPrecoVenda(p.id)>0||_prodEhRejeito(p.id)?'var(--mt)':'var(--rd)')+'">'+(_prodEhRejeito(p.id)?'rejeito':(_prodPrecoVenda(p.id)>0?fR(_prodPrecoVenda(p.id))+'/kg':'sem preço'))+'</div></div>'
+          +(tabsCom.length?'<select class="inp" style="padding:7px;font-size:11px" onchange="_setProdVinc('+p.id+',this.value)">'+opts+'</select>'
+            :'<button onclick="mAddPrecoTabelaProd('+p.id+')" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:8px;font-size:11px;cursor:pointer">+ Pôr preço numa tabela</button>')
+          +'</div>';
+      });
+      html+='</div></details>';
     });
     html+='</div>';
   }
   html+='</div>';
-  openM('&#11088; Materiais em Destaque',html,480);
-}
-function _prodConfig(){
-  var tabVenda=DB.tabelas.filter(function(t){return t.tipo==='venda';});
 
-  var html='<div style="display:flex;justify-content:flex-end;margin-bottom:10px">'
-    +'<button class="btnO bOgr" onclick="mMateriaisRejeito()" style="font-size:12px;padding:6px 12px;margin-right:6px">&#9851; Rejeito</button>'
-    +'<button class="btnO bOgr" onclick="mMateriaisDestaque()" style="font-size:12px;padding:6px 12px">&#11088; Materiais em Destaque</button>'
-    +'</div>';
-
-  // Expediente — base do tempo trabalhado e do lucro por hora
-  html+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'
-    +'<div><div style="font-size:13px;font-weight:800;margin-bottom:4px">&#128343; Expediente (tempo trabalhado)</div>'
-    +'<div style="font-size:11px;color:var(--mt)">'+_prodJornadaResumo()+'</div></div>'
-    +'<button class="btnO bOgr" onclick="mProdJornada()" style="font-size:12px;padding:6px 12px;white-space:nowrap">&#9998; Editar</button></div></div>';
-
-  // Vínculos material de saída → tabela de venda
-  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:6px">📋 Vincular Material → Tabela de Venda</div>'
-    +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">Escolha qual tabela usar pra projetar o valor de cada material gerado. O preço vem automaticamente da tabela.</div>';
-
-  if(!DB.produtos.length){
-    html+='<div style="text-align:center;padding:20px;color:var(--mt);font-size:12px">Nenhum produto cadastrado no sistema. Cadastre produtos na aba <b>Pesagem</b> ou <b>Estoque</b> primeiro.</div>';
-  } else if(!tabVenda.length){
-    html+='<div style="text-align:center;padding:20px;color:var(--mt);font-size:12px">Nenhuma tabela de venda encontrada. Crie tabelas de venda na aba <b>Tabelas</b> primeiro.</div>';
-  } else {
-    var temAlgum=false;
-    DB.produtos.forEach(function(p){
-      var vinculado=DB.prodVinculos[p.id];
-      var tabsComProd=tabVenda.filter(function(t){return t.itens.some(function(it){return String(it.pId)===String(p.id);});});
-      if(!tabsComProd.length){
-        // Produto não está em nenhuma tabela de venda — em vez de só avisar,
-        // deixa adicionar o preço numa tabela existente sem sair da tela
-        html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;margin-bottom:6px">'
-          +'<div style="font-size:12px;font-weight:600">'+p.ic+' '+p.nome+'<div style="font-size:9px;color:var(--rd)">⚠ Sem preço em nenhuma tabela</div></div>'
-          +'<button onclick="mAddPrecoTabelaProd('+p.id+')" style="background:var(--orb);color:var(--or);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:8px;font-size:11px;cursor:pointer">+ Adicionar preço numa tabela</button></div>';
-      } else {
-        temAlgum=true;
-        var opts='<option value="">— Sem tabela —</option>'+tabsComProd.map(function(t){
-          var preco=0;for(var j=0;j<t.itens.length;j++){if(String(t.itens[j].pId)===String(p.id)){preco=t.itens[j].preco;break;}}
-          return '<option value="'+t.id+'"'+(vinculado&&String(vinculado)===String(t.id)?' selected':'')+'>'+t.nome+' ('+fR(preco)+'/kg)</option>';
-        }).join('');
-        html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;margin-bottom:6px">'
-          +'<div style="font-size:12px;font-weight:600">'+p.ic+' '+p.nome+'</div>'
-          +'<select class="inp" style="padding:8px;font-size:12px" onchange="_setProdVinc('+p.id+',this.value)">'+opts+'</select></div>';
-      }
-    });
-    if(!temAlgum){
-      html+='<div style="padding:12px;background:var(--orb);border-radius:8px;font-size:11px;color:var(--or);margin-top:8px">⚠ Nenhum produto do catálogo está cadastrado nas suas tabelas de venda. Vá em <b>Tabelas</b> e adicione os produtos (cobre, ferro, alumínio, etc.) nas tabelas dos seus compradores (Green, Diasfer, Metalis...).</div>';
-    }
-  }
-  html+='</div>';
+  // Tipo de serviço
+  var usados={};(DB.producoes||[]).forEach(function(p){if(p.matEntradaId!=null)usados[p.matEntradaId]=1;});
+  var lista=DB.produtos.filter(function(p){return !p.arquivado&&(_prodCfgSvTodos||usados[p.id]||p.prodServico||p.prodDestaqueEnt||_prodServicoDe(p.id));})
+    .sort(function(a,b){return (a.nome||'').localeCompare(b.nome||'','pt-BR');});
+  html+='<div class="card"><div style="font-size:13px;font-weight:800;margin-bottom:4px">🧰 Tipo de serviço de cada material'+_aj('prod.servico')+'</div>'
+    +'<div style="font-size:11px;color:var(--mt);margin-bottom:10px">'+_prodServicos().map(function(t){return t.ic+' <b>'+t.nome+'</b>: '+t.ex;}).join(' · ')+'. “automático” = o sistema adivinhou pelo nome.</div>';
+  lista.forEach(function(p){
+    var auto=_prodServicoAuto(p.id);var atual=p.prodServico||'';var adiv=auto?_prodServicoObj(_prodServicoDe(p.id)):null;
+    var opts='<option value=""'+(atual===''?' selected':'')+'>'+(adiv?'automático: '+adiv.ic+' '+adiv.nome:'— sem tipo —')+'</option>'
+      +_prodServicos().map(function(t){return '<option value="'+t.id+'"'+(atual===t.id?' selected':'')+'>'+t.ic+' '+t.nome+'</option>';}).join('')
+      +'<option value="nenhum"'+(atual==='nenhum'?' selected':'')+'>não é desmontado</option>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1.2fr;gap:8px;align-items:center;margin-bottom:6px">'
+      +'<div style="font-size:12px;font-weight:600">'+p.ic+' '+p.nome+(usados[p.id]?'':'<div style="font-size:9px;color:var(--mt)">ainda não desmontado</div>')+'</div>'
+      +'<select class="inp" style="padding:7px;font-size:11px" onchange="_setProdServico('+p.id+',this.value)">'+opts+'</select></div>';
+  });
+  html+='<button class="btnO bOgr" style="font-size:12px;padding:6px 12px;margin-top:6px" onclick="_prodCfgSvTodos=!_prodCfgSvTodos;go(\'producao\')">'+(_prodCfgSvTodos?'Mostrar só os da produção':'Mostrar todos os materiais')+'</button></div>';
   return html;
 }
-
 function mProdJornada(){
   var j=_prodJornada();
   var nomes=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
@@ -19466,11 +20045,39 @@ function _gCfgDe(t){
   return t.gerar;
 }
 // Monta a lista do gerador a partir dos níveis gravados (a Porta fica de fora: ela anda junto com o Estoque)
+// Referência dos níveis da escada: a mais usada em geradaDe; se nunca geraram, a tabela de venda
+// (fora a Padrão) que tem mais materiais em comum com os níveis.
+function _gBaseNiveis(){
+  var nv=_tabNiveis().filter(function(t){return !_tabEhPorta(t);});
+  var cont={},best=null,bc=0;
+  nv.forEach(function(t){var g=t.geradaDe!==undefined&&t.geradaDe!==null?_tabT(t.geradaDe):null;if(g&&g.tipo==='venda'){var k=String(g.id);cont[k]=(cont[k]||0)+1;if(cont[k]>bc){bc=cont[k];best=g.id;}}});
+  if(best!==null)return best;
+  var ids={};nv.forEach(function(t){t.itens.forEach(function(it){ids[String(it.pId)]=1;});});
+  var melhor=null,mc=-1,melhorPad=false;
+  DB.tabelas.forEach(function(v){if(v.tipo!=='venda')return;var c=0;v.itens.forEach(function(it){if(ids[String(it.pId)])c++;});var pad=_tabEhPadrao(v);
+    if(c>mc||(c===mc&&melhorPad&&!pad)){mc=c;melhor=v.id;melhorPad=pad;}});
+  return mc>0?melhor:null;
+}
+// Tabelas que recebem os preços da referência bt: níveis da escada ligados a ela + tabelas fora da escada ligadas a ela
+function _gTabsDaBase(bt){
+  if(!bt)return [];
+  var pr=_gBaseNiveis();var r=[];
+  _tabNiveis().forEach(function(t){
+    if(_tabEhPorta(t))return;
+    var g=t.geradaDe!==undefined&&t.geradaDe!==null?_tabT(t.geradaDe):null;
+    if(g&&g.tipo==='venda'?String(g.id)===String(bt.id):String(pr)===String(bt.id))r.push(t);
+  });
+  DB.tabelas.forEach(function(t){
+    if(t.tipo!=='compra'||_tabEhPadrao(t)||t.nivel>0)return;
+    if(t.geradaDe!==undefined&&t.geradaDe!==null&&String(t.geradaDe)===String(bt.id))r.push(t);
+  });
+  return r;
+}
 function _gSyncCustom(){
-  _gTabs=_tabNiveis().filter(function(t){return !_tabEhPorta(t);}).map(function(t0){
+  _gTabs=_gTabsDaBase(_gBaseTab()).map(function(t0){
     var tid=t0.id;
     function T(){return _tabT(tid)||t0;}
-    var cfg={key:'t'+String(tid).replace(/[^\w-]/g,''),tabId:tid,nome:t0.nome,emoji:'',cor:getTabCor(t0).hex,custom:false,nivel:t0.nivel};
+    var cfg={key:'t'+String(tid).replace(/[^\w-]/g,''),tabId:tid,nome:t0.nome,emoji:'',cor:getTabCor(t0).hex,custom:false,nivel:t0.nivel,fora:!(t0.nivel>0)};
     ['ativo','modo','tipoVal','valGeral','porProd'].forEach(function(k){
       Object.defineProperty(cfg,k,{enumerable:true,get:function(){return _gCfgDe(T())[k];},set:function(v){_gCfgDe(T())[k]=v;}});
     });
@@ -19488,12 +20095,44 @@ function _gRemoveCustom(key){
     t.nivel=0;_tabRenumerar();autoSave();go('tabelas');
   });
 }
+// Tabela fora da escada: desliga da referência (a tabela continua, com os mesmos preços e clientes)
+function _gDesligar(key){
+  var cfg=_gAchar(key);if(!cfg)return;
+  confirmar('Desligar <b>'+_tabEsc(cfg.nome)+'</b> desta referência?<br><span style="font-size:12px;color:var(--mt)">A tabela continua existindo, com os mesmos preços e clientes. Ela só deixa de ser gerada aqui.</span>',function(){
+    var t=_tabT(cfg.tabId);if(!t)return;t.geradaDe=null;if(t.gerar)t.gerar.ativo=false;autoSave();go('tabelas');
+  },'Desligar');
+}
+// ＋ Nova tabela com esta referência (fora da escada de níveis)
+function _gNovaTabRef(){
+  var bt=_gBaseTab();if(!bt){toast('Escolha a tabela de referência.','var(--rd)');return;}
+  openM('＋ Nova tabela com esta referência'+_aj('tab.gNovaRef'),
+    '<div class="mf">'
+    +'<div class="al alb" style="font-size:12px;margin-bottom:10px">Referência: <b>'+_tabEsc(_tabNomeExib(bt))+'</b> · '+_gGetBasePrecos().length+' material(is). A tabela nova é de compra e fica fora da escada de níveis.</div>'
+    +'<div class="fld"><label>Nome</label><input class="inp" id="gnr-n" maxlength="40" placeholder="Ex: BioVale Materiais Finos"></div>'
+    +_tabCorPicker('menta','gnr-cor')
+    +'<div class="fld"><label>Lucro (% do preço de venda)</label><input class="inp" id="gnr-l" type="number" inputmode="decimal" placeholder="Ex: 12"></div>'
+    +'<div style="font-size:11px;color:var(--mt)">Os preços só são calculados quando você tocar em ⚡ Gerar.</div>'
+    +'<div id="gnr-err" style="display:none;font-size:12px;color:var(--rd);margin-top:6px"></div>'
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="_gNovaTabRefOk()">Criar</button></div>'
+    +'</div>',480);
+  setTimeout(function(){var e=document.getElementById('gnr-n');if(e)e.focus();},60);
+}
+function _gNovaTabRefOk(){
+  var bt=_gBaseTab();if(!bt)return;
+  var n=(document.getElementById('gnr-n').value||'').trim();var err=document.getElementById('gnr-err');
+  if(!n){err.textContent='Informe o nome da tabela.';err.style.display='block';return;}
+  if(n.toLowerCase()==='padrao'){err.textContent='Esse nome é reservado para a tabela Padrão.';err.style.display='block';return;}
+  var cor=document.getElementById('gnr-cor').value||'padrao';
+  var hx=document.getElementById('gnr-cor-hex-inp');if(hx&&hx.value.trim()){var hv=hx.value.trim().toUpperCase();if(hv.charAt(0)!=='#')hv='#'+hv;if(/^#[0-9A-F]{6}$/.test(hv))cor=hv;}
+  var l=parseFloat(String(document.getElementById('gnr-l').value).replace(',','.'))||0;if(l<0)l=0;if(l>100)l=100;
+  var t={id:nid(),nome:n,tipo:'compra',cor:cor,itens:[],nivel:0,geradaDe:bt.id,atualizadaEm:hj(),gerar:{ativo:true,modo:'geral',tipoVal:'pct',valGeral:l,porProd:{}}};
+  DB.tabelas.push(t);
+  _gBase=_tabEhPadrao(bt)?'padrao':bt.id;
+  saveDB();closeM();toast('Tabela criada · confira o lucro e toque em ⚡ Gerar');go('tabelas');
+}
 function _gBaseTab(){
   if(_gBase!==undefined&&_gBase!=='padrao'){var tb=_tabT(_gBase);if(tb&&tb.tipo==='venda')return tb;}
-  if(_gBase===undefined){
-    var nv=_tabNiveis();
-    for(var i=0;i<nv.length;i++){if(nv[i].geradaDe!==undefined&&nv[i].geradaDe!==null){var g=_tabT(nv[i].geradaDe);if(g&&g.tipo==='venda')return g;}}
-  }
+  if(_gBase===undefined){var bn=_gBaseNiveis();var g=bn!==null?_tabT(bn):null;if(g&&g.tipo==='venda')return g;}
   for(var j=0;j<DB.tabelas.length;j++){if(_tabEhPadrao(DB.tabelas[j])&&DB.tabelas[j].tipo==='venda')return DB.tabelas[j];}
   return null;
 }
@@ -19646,11 +20285,12 @@ function buildGerarTabelas(){
     if(t.tipo==='venda')optsVenda+='<option value="'+(_tabEhPadrao(t)?'':t.id)+'"'+(_bt&&String(_bt.id)===String(t.id)?' selected':'')+'>'+_tabNomeExib(t)+'</option>';
   }
 
+  var ehBaseNiveis=!!(_bt&&_gBaseNiveis()!==null&&String(_gBaseNiveis())===String(_bt.id))||(_bt&&_gBaseNiveis()===null);
   // ── Seção 1: Base ──
   var secBase='<div class="card" style="padding:14px;margin-bottom:10px">'
-    +'<div class="stl" style="margin-bottom:10px"><div class="stb" style="background:var(--or)"></div><div class="stx" style="color:var(--or)">1. Tabela Base de Venda'+_aj('tab.gBase')+'</div></div>'
-    +'<div class="al aly" style="margin-bottom:10px;font-size:12px">Escolha a tabela de venda usada para calcular os preços de compra. Se ela tiver grupos, os grupos e a ordem dela também vão para as tabelas geradas.</div>'
-    +'<div class="fld"><label>Tabela de Venda (Base)</label>'
+    +'<div class="stl" style="margin-bottom:10px"><div class="stb" style="background:var(--or)"></div><div class="stx" style="color:var(--or)">1. Tabela de referência'+_aj('tab.gBase')+'</div></div>'
+    +'<div class="al aly" style="margin-bottom:10px;font-size:12px">Escolha a tabela de venda (o que a empresa te paga) usada para calcular os preços de compra. Só os materiais dela entram nas tabelas geradas. Se ela tiver grupos, os grupos e a ordem dela também vão.</div>'
+    +'<div class="fld"><label>Tabela de referência (venda)</label>'
     +'<select class="inp" onchange="_gSetBase(this.value)">'+optsVenda+'</select></div>'
     +(base.length?'<div style="margin-top:8px;font-size:11px;color:var(--mt)">'+base.length+' produto(s) na base</div>':'<div style="margin-top:8px;font-size:11px;color:var(--rd)">Nenhum produto encontrado na base.</div>')
     +'</div>';
@@ -19754,11 +20394,12 @@ function buildGerarTabelas(){
       +'<div style="width:22px;height:22px;border-radius:6px;border:2px solid '+(isAtivo?cfg.cor:'var(--bd)')+';background:'+(isAtivo?cfg.cor:'transparent')+';display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0">'
       +(isAtivo?'<span style="color:#fff;font-size:13px;font-weight:700;line-height:1">✓</span>':'')
       +'</div>'
-      +'<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;background:var(--s3);color:var(--mt)">Nível '+cfg.nivel+'</span>'
+      +'<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;background:var(--s3);color:var(--mt)">'+(cfg.fora?'fora da escada':'Nível '+cfg.nivel)+'</span>'
       +'<span style="font-size:14px;font-weight:700;color:'+(isAtivo?cfg.cor:'var(--mt)')+'">'+cfg.nome+'</span>'
       +'</label>'
       +(jaExiste&&tabExistObj.atualizadaEm?'<span style="font-size:10px;color:var(--mt)">atualizada em '+tabExistObj.atualizadaEm+'</span>':'')
-      +'<button onclick="_gRemoveCustom(\&apos;'+cfg.key+'\&apos;)" title="Tirar esta tabela da escada de níveis" style="background:none;border:1px solid var(--bd);color:var(--mt);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;flex-shrink:0">Tirar da escada</button>'
+      +(cfg.fora?'<button onclick="_gDesligar(\&apos;'+cfg.key+'\&apos;)" title="Desligar esta tabela da referência" style="background:none;border:1px solid var(--bd);color:var(--mt);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;flex-shrink:0">Desligar</button>'
+        :'<button onclick="_gRemoveCustom(\&apos;'+cfg.key+'\&apos;)" title="Tirar esta tabela da escada de níveis" style="background:none;border:1px solid var(--bd);color:var(--mt);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;flex-shrink:0">Tirar da escada</button>')
       +(isAtivo?
         '<div style="display:flex;gap:5px;margin-left:auto">'
         +'<button onclick="_gSetModo(\&apos;'+cfg.key+'\&apos;,\&apos;geral\&apos;)" style="background:'+(isModoGeral?cfg.cor:'var(--bg)')+';border:1px solid '+(isModoGeral?cfg.cor:'var(--bd)')+';border-radius:6px;padding:3px 9px;color:'+(isModoGeral?'#fff':'var(--mt)')+';font-size:11px;cursor:pointer">Geral</button>'
@@ -19783,10 +20424,12 @@ function buildGerarTabelas(){
   }
 
   var secTabs='<div class="card" style="padding:14px;margin-bottom:10px">'
-    +'<div class="stl" style="margin-bottom:10px"><div class="stb" style="background:var(--or)"></div><div class="stx" style="color:var(--or)">2. Níveis'+_aj('tab.gNiveis')+'</div></div>'
-    +'<div class="al aly" style="margin-bottom:10px;font-size:12px">Marque os níveis que quer gerar e defina o lucro: em % do preço de venda ou em R$/kg. O lucro fica gravado. A Porta não aparece aqui: ela anda junto com o preço de compra do Estoque.</div>'
-    +'<div style="display:flex;flex-direction:column;gap:8px">'+(tabCards||'<div style="text-align:center;padding:14px;color:var(--mt);font-size:13px">Nenhum nível na escada. Use “Organizar níveis” para colocar tabelas de compra na escada.</div>')+'</div>'
-    +'<div style="display:flex;gap:8px;margin-top:10px"><button class="btnO bOgr" style="flex:1;border-style:dashed" onclick="_gAddCustomModal()">&#10133; Novo nível</button><button class="btnO bOgr" style="flex:1" onclick="mNiveis()">&#9881; Organizar níveis</button></div>'
+    +'<div class="stl" style="margin-bottom:10px"><div class="stb" style="background:var(--or)"></div><div class="stx" style="color:var(--or)">2. Tabelas geradas desta referência'+_aj('tab.gNiveis')+'</div></div>'
+    +'<div class="al aly" style="margin-bottom:10px;font-size:12px">Marque as tabelas que quer gerar e defina o lucro: em % do preço de venda ou em R$/kg. O lucro fica gravado. Tabelas ligadas a outra referência não aparecem aqui e não mudam. A Porta também não aparece: ela anda junto com o preço de compra do Estoque.</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'+(tabCards||'<div style="text-align:center;padding:14px;color:var(--mt);font-size:13px">Nenhuma tabela de compra ligada a esta referência ainda. Toque em “＋ Nova tabela com esta referência”.</div>')+'</div>'
+    +(ehBaseNiveis?'<div style="display:flex;gap:8px;margin-top:10px"><button class="btnO bOgr" style="flex:1;border-style:dashed" onclick="_gAddCustomModal()">&#10133; Novo nível</button><button class="btnO bOgr" style="flex:1" onclick="mNiveis()">&#9881; Organizar níveis</button></div>':'')
+    +(_bt?'<div style="display:flex;align-items:center;gap:4px;margin-top:8px"><button class="btnO" style="flex:1;border:1px dashed var(--gr);color:var(--gr)" onclick="_gNovaTabRef()">＋ Nova tabela com esta referência</button>'+_aj('tab.gNovaRef')+'</div>':'')
+    +(!ehBaseNiveis&&_tabNiveis().length?'<div style="font-size:11px;color:var(--mt);margin-top:8px">Os níveis da escada (Amarela, Azul…) não aparecem aqui: eles são gerados'+(_gBaseNiveis()!==null&&_tabT(_gBaseNiveis())?' da '+_tabEsc(_tabNomeExib(_tabT(_gBaseNiveis()))):' de outra referência')+'.</div>':'')
     +'</div>';
 
   var secPreview='';
