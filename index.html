@@ -298,6 +298,7 @@ details.pdet>summary::-webkit-details-marker{display:none}
 .pz-row.aberta{background:var(--grb)}
 .pz-nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pz-sub{display:none}
+.pz-trf{display:block;font-size:10.5px;color:var(--or);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pz-v{font-family:monospace;font-variant-numeric:tabular-nums}
 .pz-tot{font-weight:700}
 .pz-ed{color:var(--mt);text-align:center}
@@ -553,7 +554,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.31';var DADOS_VERSAO=2;
+var APP_VERSION='5.32';var DADOS_VERSAO=2;
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[
@@ -2820,6 +2821,7 @@ function renderPesagem(){
         +(mix?' <span class="pz-tag" style="color:'+tipoCol(it.tipo)+'">'+_pesNomeTipo(it.tipo)+'</span>':'')
         +(it.uni?' <span class="pz-tag" style="color:var(--or)">Unidade</span>':'')
         +(it.obs?' <span title="'+String(it.obs).replace(/"/g,'&quot;')+'">&#128172;</span>':'')
+        +(_pesTransfPend(it)?'<span class="pz-trf">&#8644; vem de '+it.transf.map(function(t){return t.de+' '+fKg(+t.peso)+' kg';}).join(' + ')+'</span>':'')
         +'<span class="pz-sub">'+(it.uni?(it.qtdVendida?it.qtdVendida+' un':'1 un'):fKg(_pesLiqIt(it))+' kg × '+fR(it.preco).replace('R$ ',''))+'</span></span>'
         +'<span class="pz-v pz-c-br">'+(it.uni?'—':fKg(it.peso))+'</span>'
         +'<span class="pz-v pz-c-ta" style="color:var(--mt)">'+(it.uni?'—':fKg(taraTot))+'</span>'
@@ -2890,6 +2892,7 @@ function _pesEditHtml(it,i){
   }
   var dt=it.descontoTipo==='%'?'%':'kg';
   return '<div class="pz-edit" onclick="event.stopPropagation()">'
+    +(_pesTransfPend(it)?'<div class="al aly" style="grid-column:1 / -1;font-size:11.5px">&#8644; Ao finalizar, '+it.transf.map(function(t){return fKg(+t.peso)+' kg saem de <b>'+t.de+'</b>';}).join(' e ')+' para <b>'+it.nome+'</b>. Se apagar o item, nada muda no estoque.</div>':'')
     +'<div><div class="pz-lbl">Bruto kg</div><input type="number" inputmode="decimal" class="inp" value="'+(+it.peso||0).toFixed(3)+'" min="0" step="0.001" onchange="updIP('+i+',this.value)"></div>'
     +'<div><div class="pz-lbl">Tara kg</div><input type="number" inputmode="decimal" class="inp" value="'+(+it.tara||0).toFixed(3)+'" min="0" step="0.001" onchange="updITara('+i+',this.value)"></div>'
     +'<div><div class="pz-lbl">Desconto '+_aj('pes.desconto')+'</div><div style="display:flex;gap:4px"><input type="number" inputmode="decimal" class="inp" value="'+(+it.desconto||0)+'" min="0" step="0.001" onchange="updIDesc('+i+',this.value,null)" style="min-width:0">'
@@ -3263,6 +3266,7 @@ function toast(msg,cor){
 // ── (?) DE AJUDA — padrão do sistema ─────────────────────
 // Uso: título + _aj('chave')  → os textos ficam todos em AJUDA, agrupados por aba.
 var AJUDA={
+  'est.desfazerVenda':'Antes da versão 5.32, a transferência da venda (“Estoque insuficiente”) acontecia na hora, mesmo se a venda fosse cancelada depois. O Desfazer devolve o peso para o material de origem. Desde a 5.32 ela só acontece ao finalizar.',
   // aba Pesagem
   'pes.pagina':'<b>Pesagem</b>: onde se pesa o material de quem chega (compra) ou de quem leva (venda). Cada atendimento fica numa aba. Ao finalizar, o estoque e o caixa do dia são atualizados.',
   'pes.abas':'Cada aba é um atendimento aberto, com o nome do cliente, o tipo e o total. Dá para atender várias pessoas ao mesmo tempo.',
@@ -3411,6 +3415,44 @@ window.addEventListener('scroll',_ajFechar,true);
 // Peso líquido de um item do carrinho (itens antigos ou da transferência podem não ter pesoLiquido)
 function _pesLiqIt(it){if(!it||it.uni)return 0;var v=it.pesoLiquido!=null?it.pesoLiquido:it.peso;return +v||0;}
 function _pesAviso(msg){toast(msg,'var(--rd)');}
+// ── Transferência na venda (5.32) ─────────────────────────────
+function _pesTransfPend(it){return !!(it&&!it.uni&&Array.isArray(it.transf)&&it.transf.length&&!it.transfAplicada);}
+function _pesAcharProd(id,nome){var p=id!=null?gP(id):null;if(!p&&nome){for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].nome===nome){p=DB.produtos[i];break;}}}return p;}
+// Faz as transferências anotadas nos itens (chamado ao Finalizar e ao Deixar Em Aberto)
+function _pesAplicarTransf(ab,num){
+  var data=hj(),hora=_horaAgora(),quem=CU?CU.nome:'';
+  (ab.itens||[]).forEach(function(it){
+    if(!_pesTransfPend(it))return;
+    var pDest=gP(it.prodId);if(!pDest)return;
+    var ids=[];
+    it.transf.forEach(function(t){
+      var kg=+t.peso||0;if(!(kg>0))return;
+      var pOri=_pesAcharProd(t.deId,t.de);
+      if(pOri)pOri.est=+((pOri.est||0)-kg).toFixed(3);
+      pDest.est=+((pDest.est||0)+kg).toFixed(3);
+      var id=nid();ids.push(id);
+      DB.transf.unshift({id:id,data:data,hora:hora,de:pOri?pOri.nome:t.de,deId:pOri?pOri.id:null,para:pDest.nome,paraId:pDest.id,pS:kg,pE:kg,obs:'Desmontagem para venda de '+pDest.nome,atendNum:num,user:quem});
+    });
+    it.transfAplicada=true;it.transfIds=ids;
+  });
+}
+// Desfaz as transferências de uma venda reaberta: o peso volta direto para o material de onde veio
+function _pesDesfazerTransfItens(itens,num){
+  var data=hj(),hora=_horaAgora(),quem=CU?CU.nome:'';
+  (itens||[]).forEach(function(it){
+    if(!it||!it.transfAplicada||!Array.isArray(it.transf))return;
+    var pDest=gP(it.prodId);
+    it.transf.forEach(function(t){
+      var kg=+t.peso||0;if(!(kg>0))return;
+      var pOri=_pesAcharProd(t.deId,t.de);
+      if(pDest)pDest.est=+((pDest.est||0)-kg).toFixed(3);
+      if(pOri)pOri.est=+((pOri.est||0)+kg).toFixed(3);
+      DB.transf.unshift({id:nid(),data:data,hora:hora,de:pDest?pDest.nome:it.nome,deId:pDest?pDest.id:it.prodId,para:pOri?pOri.nome:t.de,paraId:pOri?pOri.id:t.deId,pS:kg,pE:kg,obs:'Desfeito: venda #'+(num||'')+' reaberta',desfazAtend:num||'',user:quem});
+    });
+    (it.transfIds||[]).forEach(function(id){for(var i=0;i<DB.transf.length;i++){if(String(DB.transf[i].id)===String(id)){DB.transf[i].desfeito={data:data,hora:hora,user:quem};break;}}});
+    delete it.transfAplicada;delete it.transfIds;
+  });
+}
 function _pesTemDuplicatas(){
   var ab=pesAbas[pesAtiva];
   var vistos={};
@@ -3469,6 +3511,7 @@ function _pesJuntarConfirmar(){
     grupos[key].total+=it.peso||0;
     grupos[key].totalLiq+=_pesLiqIt(it);
     grupos[key].count++;
+    if(_pesTransfPend(it))grupos[key].trf=(grupos[key].trf||[]).concat(it.transf);
   }
   var revendas=ab.itens.filter(function(it){return it.uni;});
   var novosItens=[];
@@ -3480,6 +3523,7 @@ function _pesJuntarConfirmar(){
     // tara + desconto juntados viram uma tara só: bruto − tara = líquido (editar o peso depois não perde a tara)
     merged.tara=Math.max(0,Math.round((g.total-g.totalLiq)*1000)/1000);merged.desconto=0;merged.descontoTipo='kg';
     merged.obs=(g.count>1?'('+g.count+'x juntados) ':'')+(g.base.obs||'');
+    if(g.trf&&g.trf.length)merged.transf=g.trf;else delete merged.transf;
     novosItens.push(merged);
   }
   ab.itens=novosItens.concat(revendas);
@@ -3820,7 +3864,7 @@ function mMostrarEstoqueInsuf(prodId,pesoLiquido,preco,falta){
     +'<div id="transf-restante" style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--gr)">&#9989; Cobre o total da falta</div>'
     +'<button type="button" class="btnO bOgr" style="width:100%;margin-bottom:10px" onclick="_addLinhaTransf()">+ Adicionar outro material de origem</button>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button>'
-    +'<button class="btn btn-or" onclick="confTransfPMulti()">Transferir e adicionar</button></div></div>',460);
+    +'<button class="btn btn-or" onclick="confTransfPMulti()">Adicionar</button></div><div style="font-size:11px;color:var(--mt);margin-top:6px">A transferência só acontece quando a venda for finalizada. Se desistir, nada muda no estoque.</div></div>',460);
 }
 function _linhaTransfHtml(idx,opts,pesoDefault){
   return '<div class="transf-linha" style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-end">'
@@ -3868,15 +3912,12 @@ function confTransfPMulti(){
     if(oriNome&&oriPeso>0)transfs.push({nome:oriNome,peso:oriPeso});
   }
   if(!transfs.length){_pesAviso('Preencha ao menos um material de origem com peso!');return;}
-  transfs.forEach(function(t){
-    var pOri=null;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].nome===t.nome){pOri=DB.produtos[i];break;}}
-    if(pOri)pOri.est=+(pOri.est-t.peso).toFixed(3);
-    pDest.est=+(pDest.est+t.peso).toFixed(3);
-    DB.transf.unshift({id:nid(),data:hj(),hora:_horaAgora(),de:t.nome,deId:pOri?pOri.id:null,para:pDest.nome,paraId:pDest.id,pS:t.peso,pE:t.peso,obs:'Desmontagem para venda de '+pDest.nome,user:CU?CU.nome:''});
-  });
+  // 5.32: a transferência só acontece ao Finalizar (ou Deixar Em Aberto). Até lá fica anotada no item:
+  // desistir, apagar o item ou fechar o atendimento não mexe no estoque.
+  var trf=transfs.map(function(t){var pOri=null;for(var i=0;i<DB.produtos.length;i++){if(DB.produtos[i].nome===t.nome){pOri=DB.produtos[i];break;}}return {deId:pOri?pOri.id:null,de:t.nome,peso:+(+t.peso).toFixed(3)};});
   var ab=pesAbas[pesAtiva];var tabN='Padrao';
   if(ab.tabId){for(var i=0;i<DB.tabelas.length;i++){if(DB.tabelas[i].id==ab.tabId){tabN=DB.tabelas[i].nome;break;}}}
-  ab.itens.push({prodId:prodId,ic:pDest.ic,nome:pDest.nome,peso:pesoLiquido,tara:0,desconto:0,descontoTipo:'kg',pesoLiquido:pesoLiquido,preco:preco,tipo:ab.tipo,uni:false,tabN:tabN});
+  ab.itens.push({prodId:prodId,ic:pDest.ic,nome:pDest.nome,peso:pesoLiquido,tara:0,desconto:0,descontoTipo:'kg',pesoLiquido:pesoLiquido,preco:preco,tipo:ab.tipo,uni:false,tabN:tabN,transf:trf});
   closeM();savePesState();renderPesagem();
   setTimeout(_reabrirBuscaProd,150);
 }
@@ -4304,12 +4345,17 @@ function _pesConferirAntes(titulo,cont){
   },titulo);
 }
 function _pesConferirEstoque(cont){
-  var ab=pesAbas[pesAtiva];var precisa={};
-  (ab.itens||[]).forEach(function(it){if(it.uni||it.tipo!=='Venda')return;var k=_normId(it.prodId);precisa[k]=(precisa[k]||0)+_pesLiqIt(it);});
+  var ab=pesAbas[pesAtiva];var delta={},usa={};
+  function add(id,v){var k=_normId(id);delta[k]=(delta[k]||0)+v;usa[k]=true;}
+  (ab.itens||[]).forEach(function(it){
+    if(it.uni)return;
+    if(it.tipo==='Venda')add(it.prodId,-_pesLiqIt(it));
+    if(_pesTransfPend(it))it.transf.forEach(function(t){var po=_pesAcharProd(t.deId,t.de);if(po)add(po.id,-(+t.peso||0));add(it.prodId,+t.peso||0);});
+  });
   var falta=[];
-  Object.keys(precisa).forEach(function(k){var p=gP(k);if(!p)return;var est=+p.est||0;if(est+0.0005<precisa[k])falta.push({p:p,est:est,kg:precisa[k]});});
+  Object.keys(usa).forEach(function(k){var p=gP(k);if(!p)return;var est=+p.est||0;if(est+delta[k]<-0.0005)falta.push({p:p,est:est,kg:-delta[k]});});
   if(!falta.length){cont();return;}
-  var lista=falta.map(function(f){return '<div>'+f.p.ic+' <b>'+f.p.nome+'</b>: estoque agora '+fKg(f.est)+' kg · nesta venda '+fKg(f.kg)+' kg</div>';}).join('');
+  var lista=falta.map(function(f){return '<div>'+f.p.ic+' <b>'+f.p.nome+'</b>: estoque agora '+fKg(f.est)+' kg · esta pesagem usa '+fKg(f.kg)+' kg</div>';}).join('');
   var box=document.getElementById('fin-aviso');
   window._pesEstCont=function(){var b=document.getElementById('fin-aviso');if(b)b.innerHTML='';cont();};
   var html='<div class="al aly" style="font-size:12.5px;line-height:1.6;margin-bottom:8px">&#9888; O estoque mudou (outro aparelho vendeu ou desmontou):'+lista+'Se continuar, o estoque fica negativo.</div>'
@@ -4351,6 +4397,7 @@ function _finalizarPesagem(snap){
   if(ab.cliId){for(var _ci=0;_ci<DB.clientes.length;_ci++){if(DB.clientes[_ci].id==ab.cliId){_cliNomeSnap=DB.clientes[_ci].nome;break;}}}
   var num=ab.numAtend||gerarNum();ab.numAtend=num;ab.obs=obs;
   var dataOp=_finDataOperacao||hj();
+  _pesAplicarTransf(ab,num);
   var totLiq2=+(valReceb-valPagei).toFixed(2);
   var vendaTotal=valReceb;var compraTotal=valPagei;
   // Apply stock changes
@@ -4481,6 +4528,7 @@ function _suspenderCont(obs){
   var ab=pesAbas[pesAtiva];
   var num=ab.numAtend||gerarNum();
   ab.numAtend=num;ab.obs=obs;
+  _pesAplicarTransf(ab,num);
   var valReceb=0,valPagei=0;
   for(var i=0;i<ab.itens.length;i++){
     var it=ab.itens[i];
@@ -4582,6 +4630,7 @@ function reabrirPendencia(pendId){
     for(var i=0;i<pend.itens.length;i++){var it=pend.itens[i];if(it.uni){for(var j=0;j<DB.revenda.length;j++){if(DB.revenda[j].id===it.uid){DB.revenda[j].status='Reservado';break;}}}else if(it.tipo==='Venda'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est-pesoEf).toFixed(3);}else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'||(it.tipo==='Doacao'&&pend.estDoacao)){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(3);}}
     DB.pesagensEmAberto.splice(pendIdx,0,pend);autoSave();return;
   }
+  _pesDesfazerTransfItens(pend.itens,pend.num);
   pesAbas.push({id:nid(),label:'Pen.#'+pend.num,tipo:pend.tipo,cliId:pend.cliId,tabId:pend.tabId,itens:pend.itens.slice(),obs:pend.obs||'',showUnit:false,numAtend:pend.num,nfNum:pend.nfNum||''});
   pesAtiva=pesAbas.length-1;savePesState();autoSave();go('pesagem');
 }
@@ -4760,6 +4809,8 @@ function _execReabrirDoCaixaCont(numAtend){
       }
     }
   }
+  // Transferências feitas nesta venda voltam para o material de origem
+  _pesDesfazerTransfItens(snap.itensList,snap.num);
   // Remove from caixa movimentos
   DB.caixaDia.movimentos.splice(snapIdx,1);
   // Remove from atendHist if present
@@ -8425,15 +8476,46 @@ function _estAbaReclass(){
   var rows='';
   (DB.transf||[]).forEach(function(t){
     var kg=+t.pE||+t.pS||0,naVenda=/^Desmontagem para venda/.test(t.obs||'');
-    rows+='<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--bd)">'
+    var podeDesf=naVenda&&!t.desfeito&&!t.atendNum&&t.id!=null&&CU&&CU.perfil==='adm';
+    rows+='<div style="display:flex;align-items:center;gap:10px;padding:10px 13px;border-bottom:1px solid var(--bd)'+(t.desfeito?';opacity:.55':'')+'">'
       +'<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">'
       +'<span style="font-size:13px;font-weight:700;color:var(--rd)">'+_estEsc(t.de)+'</span><span style="color:var(--mt)">&#8594;</span><span style="font-size:13px;font-weight:700;color:var(--gr)">'+_estEsc(t.para)+'</span>'
-      +(naVenda?'<span class="est-tag" style="color:var(--or);border-color:rgba(245,158,11,.4)">na venda</span>':'')+'</div>'
+      +(naVenda?'<span class="est-tag" style="color:var(--or);border-color:rgba(245,158,11,.4)">na venda</span>':'')
+      +(t.atendNum?'<span class="est-tag">venda #'+_estEsc(t.atendNum)+'</span>':'')
+      +(t.desfeito?'<span class="est-tag" style="color:var(--mt)">desfeito '+_estEsc(t.desfeito.data||'')+'</span>':'')
+      +(/^Desfeito/.test(t.obs||'')||t.desfazDe?'<span class="est-tag" style="color:var(--bl);border-color:rgba(59,130,246,.4)">&#8630; estorno</span>':'')+'</div>'
       +'<div style="font-size:11px;color:var(--mt)">'+(t.data||'')+(t.hora?' · '+t.hora:'')+(t.user?' · '+_estEsc(t.user):'')+(t.obs&&!naVenda?' · '+_estEsc(t.obs):'')+'</div></div>'
-      +'<div class="mono" style="font-size:13px;font-weight:700;color:var(--bl);flex-shrink:0">'+fKg(kg)+' kg</div></div>';
+      +'<div class="mono" style="font-size:13px;font-weight:700;color:var(--bl);flex-shrink:0">'+fKg(kg)+' kg</div>'
+      +(podeDesf?'<button class="btnO bOgr" style="font-size:11px;padding:5px 9px;white-space:nowrap;flex-shrink:0" onclick="_estDesfazerTransf(\''+t.id+'\')">&#8630; Desfazer</button>':'')
+      +'</div>';
   });
-  return '<div class="al alb" style="font-size:12px;line-height:1.5">Reclassificação troca o material de nome no estoque (ex.: entrou como “Placa mista”, na triagem viu que era “Placa Verde”). Desmontagem é feita na aba <b>Produção</b>.</div>'
+  return '<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mt)">Transferências “na venda” antigas podem ser desfeitas pelo Administrador '+_aj('est.desfazerVenda')+'</div>'
+    +'<div class="al alb" style="font-size:12px;line-height:1.5">Reclassificação troca o material de nome no estoque (ex.: entrou como “Placa mista”, na triagem viu que era “Placa Verde”). Desmontagem é feita na aba <b>Produção</b>.</div>'
     +'<div class="card" style="padding:0;overflow:hidden">'+(rows||'<div style="padding:20px;text-align:center;color:var(--mt)">Nenhuma reclassificação registrada.</div>')+'</div>';
+}
+
+// Desfaz uma transferência "na venda" antiga (feita antes da 5.32, quando a venda não foi finalizada):
+// o peso volta do destino para o material de origem e fica um registro "desfazer" no extrato.
+function _estDesfazerTransf(id){
+  var t=null;for(var i=0;i<(DB.transf||[]).length;i++){if(String(DB.transf[i].id)===String(id)){t=DB.transf[i];break;}}
+  if(!t||t.desfeito)return;
+  var kg=+t.pE||+t.pS||0;
+  confirmar('Desfazer a transferência de <b>'+fKg(kg)+' kg</b>?<br><b>'+_estEsc(t.para)+'</b> volta para <b>'+_estEsc(t.de)+'</b>.<br><span style="font-size:12px;color:var(--mt)">Só desfaça se a venda desse material NÃO foi finalizada.</span>',function(){
+    _sincronizarAntes(function(ok){
+      if(!ok){toast('Sem internet: tente de novo quando a conexão voltar','var(--or)');return;}
+      var tt=null;for(var i=0;i<DB.transf.length;i++){if(String(DB.transf[i].id)===String(id)){tt=DB.transf[i];break;}}
+      if(!tt||tt.desfeito){toast('Essa transferência já foi desfeita','var(--or)');go('estoque');return;}
+      var k=+tt.pE||+tt.pS||0;
+      var pPara=_pesAcharProd(tt.paraId,tt.para),pDe=_pesAcharProd(tt.deId,tt.de);
+      if(!pPara||!pDe){toast('Material não encontrado no estoque','var(--rd)');return;}
+      var data=hj(),hora=_horaAgora(),quem=CU?CU.nome:'';
+      pPara.est=_estN(pPara.est-k);pDe.est=_estN(pDe.est+k);
+      tt.desfeito={data:data,hora:hora,user:quem};
+      DB.transf.unshift({id:nid(),data:data,hora:hora,de:pPara.nome,deId:pPara.id,para:pDe.nome,paraId:pDe.id,pS:k,pE:k,obs:'Desfeito: transferência na venda de '+(tt.data||'')+' '+(tt.hora||''),desfazDe:tt.id,user:quem});
+      try{_auditLog('Transferência na venda desfeita',pPara.nome+' → '+pDe.nome+', '+fKg(k)+' kg');}catch(e){}
+      autoSave();go('estoque');toast('Desfeito: '+fKg(k)+' kg voltaram para '+pDe.nome,'var(--gr)');
+    },'Desfazer transferência');
+  },'Desfazer');
 }
 
 // ── Reclassificar (antiga Transferência) ─────────────────────────────────
@@ -17276,9 +17358,20 @@ function addEntradaProdBV(prodId){
 // Apaga uma leva lançada errada: o peso dela volta pro estoque. A última leva não
 // sai por aqui — pra desfazer tudo existe o "Cancelar produção".
 function remEntradaProdBV(prodId,idx){
-  var p=_prodAchar(prodId);
-  if(!p||p.status!=='aberta'||!p.entradas||!p.entradas[idx])return;
-  if(p.entradas.length<=1){toast('É a única leva — pra desfazer, cancele a produção.','var(--or)');return;}
+  var p0=_prodAchar(prodId);
+  if(!p0||p0.status!=='aberta'||!p0.entradas||!p0.entradas[idx])return;
+  if(p0.entradas.length<=1){toast('É a única leva — pra desfazer, cancele a produção.','var(--or)');return;}
+  var lv0=p0.entradas[idx];
+  _sincronizarAntes(function(){
+    // depois da conferência, acha a mesma leva de novo (outro aparelho pode já ter apagado)
+    var p=_prodAchar(prodId);if(!p||p.status!=='aberta'||!p.entradas){closeM();toast('Esta produção mudou em outro aparelho','var(--or)');go('producao');return;}
+    var j=-1;for(var i=0;i<p.entradas.length;i++){var e=p.entradas[i];if((lv0.id&&e.id===lv0.id)||(!lv0.id&&e.peso===lv0.peso&&e.hora===lv0.hora&&e.data===lv0.data)){j=i;break;}}
+    if(j<0){closeM();toast('Essa leva já foi apagada em outro aparelho','var(--or)');mVerProdBV(prodId);return;}
+    if(p.entradas.length<=1){toast('É a única leva — pra desfazer, cancele a produção.','var(--or)');return;}
+    _remEntradaProdCont(p,j,prodId);
+  },'Apagar leva');
+}
+function _remEntradaProdCont(p,idx,prodId){
   var lv=p.entradas[idx];
   var matProd=gP(p.matEntradaId);
   if(matProd)matProd.est=+((matProd.est||0)+lv.peso).toFixed(3);
@@ -17461,6 +17554,9 @@ function mCancelarProdBV(prodId){
     +'</div>',460);
 }
 function confCancelarProdBV(prodId){
+  _sincronizarAntes(function(){_confCancelarProdCont(prodId);},'Cancelar produção');
+}
+function _confCancelarProdCont(prodId){
   var p=null;for(var i=0;i<DB.producoes.length;i++)if(DB.producoes[i].id===prodId){p=DB.producoes[i];break;}
   if(!p||p.status!=='aberta'){closeM();go('producao');return;}
   var orig=gP(p.matEntradaId);
