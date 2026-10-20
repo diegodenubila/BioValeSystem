@@ -394,7 +394,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.22';var DADOS_VERSAO=2;
+var APP_VERSION='5.23';var DADOS_VERSAO=2;
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[
@@ -22050,10 +22050,12 @@ function _tabFolha(t){
           +'<div class="ic" style="background:'+GC.ic+';'+(pequeno?'width:30px;height:30px;font-size:15px;margin-bottom:3px':'')+'">'+(String(G.ic).indexOf('svg:')===0?_tabIcSvg(String(G.ic).slice(4),pequeno?18:26,'#fff'):G.ic)+'</div>'
           +'<div class="gn">'+_tabEsc(G.nome.toUpperCase())+'</div></td>';
       }
-      rows+='<tr style="background:'+bg+(k===0&&gi>0?';border-top:3px solid #fff':'')+'">'+cel
-        +'<td class="desc">'+_tabEsc(x.p.nome.toUpperCase())+'</td>'
-        +'<td class="un">'+(x.it.un==='UN'?'UN':'KG')+'</td>'
-        +'<td class="rs">R$</td><td class="pr">'+_tabNum(x.it.preco)+'</td></tr>';
+      // fundo em cada célula (não na linha): na imagem (html2canvas) o fundo da linha cobria o ícone/nome do grupo
+      var cb=' style="background:'+bg+'"';
+      rows+='<tr'+(k===0&&gi>0?' style="border-top:3px solid #fff"':'')+'>'+cel
+        +'<td class="desc"'+cb+'>'+_tabEsc(x.p.nome.toUpperCase())+'</td>'
+        +'<td class="un"'+cb+'>'+(x.it.un==='UN'?'UN':'KG')+'</td>'
+        +'<td class="rs"'+cb+'>R$</td><td class="pr"'+cb+'>'+_tabNum(x.it.preco)+'</td></tr>';
     }
   }
   if(!lista.length)rows='<tr><td colspan="5" style="padding:16px;text-align:center;color:#777">Tabela sem materiais.</td></tr>';
