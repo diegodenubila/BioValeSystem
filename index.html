@@ -799,7 +799,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.40';var DADOS_VERSAO=4;
+var APP_VERSION='5.40.1';var DADOS_VERSAO=4;
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[
@@ -13485,7 +13485,7 @@ function _finEstoque(dLim){
 // Valor do estoque no fim de um mês: guardado ao terminar o mês ("mês fechado"), para não mudar depois
 function _finEstFimMes(mes){
   var p=mes.split('/'),fim=new Date(+p[1],+p[0],0),key=p[1]+'-'+p[0];
-  var f=DB.finMeses&&DB.finMeses[key];if(f&&f.tot!=null)return {tot:+f.tot,val:+f.val||0,rev:+f.rev||0,fechado:true,em:f.em,por:f.por};
+  var f=DB.finMeses&&DB.finMeses[key];if(f&&f.tot!=null)return {tot:+f.tot,val:+f.val||0,rev:+f.rev||0,sem:[],revSem:0,fechado:true,em:f.em,por:f.por}; // 5.40.1: mês guardado não tem a lista 'sem'
   var e=_finEstoque(fim);
   // Só guarda com a nuvem carregada e os caixas antigos do Arquivo lidos (senão o estoque do passado sai errado)
   if(fim<_finHojeD()&&fim.getFullYear()>=2025&&_sbReady&&_cloudLoaded&&_estArqStatus==='ok'){
@@ -13906,7 +13906,7 @@ function _finResHTML(r){
     +L('Perdas e ajustes de inventário',_finSinal(-o.bk.ajuste),null,'s')
     +L('Peças da Revenda',_finSinal(-o.bk.revenda),null,'s')
     +L('Outros (preço mudou, sem registro)',_finSinal(-o.bk.outros),null,'s')
-    +'<div class="fin-mini">Estoque a preço de compra de hoje; meses que já terminaram ficam guardados (&#128274;).'+(o.ef.sem.length?' '+o.ef.sem.length+' material(is) sem preço de compra contam zero.':'')+'</div></details>'
+    +'<div class="fin-mini">Estoque a preço de compra de hoje; meses que já terminaram ficam guardados (&#128274;).'+((o.ef.sem||[]).length?' '+o.ef.sem.length+' material(is) sem preço de compra contam zero.':'')+'</div></details>'
     +L('= Lucro bruto'+(o.recTot>0?' (margem '+Math.round(o.lb/o.recTot*100)+'%)':''),_finSinal(o.lb),_finSinal(a.lb),'t',o.lb>=0?'var(--gr)':'var(--rd)');
   d+='<div class="fin-l g"><span>Despesas da empresa</span><span></span></div>';
   ['folha','ocup','serv','oper','imp'].forEach(function(g){if(Math.abs(o.desp[g])>0.004||Math.abs(a.desp[g])>0.004)d+=L(_FIN_GR[g],'− '+_finN(o.desp[g]),_finN(a.desp[g]),'s','var(--rd)');});
