@@ -1286,6 +1286,11 @@ mark{background:rgba(34,197,94,.28);color:inherit;border-radius:3px;padding:0 1p
 .pz-tabopt:hover,.pz-tabopt.on{background:var(--s2)}
 .pz-tabopt .cl-tp{font-size:12.5px;padding:4px 11px}
 .pz-tabok{margin-left:auto;color:var(--gr);font-weight:700}
+
+/* 5.46.5 — aviso de preço diferente da tabela */
+.pz-difTab{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--orb);border:1px solid rgba(245,158,11,.45);color:var(--or);border-radius:8px;padding:7px 10px;font-size:12px;font-weight:600;margin-bottom:8px}
+.pz-difTab>span{flex:1;min-width:160px;display:flex;align-items:center;gap:5px}
+.pz-difTab>button{background:var(--or);color:#000;border:none;border-radius:7px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
 </style><link rel="manifest" href="data:application/json,%7B%22name%22%3A%22BioVale%22%2C%22short_name%22%3A%22BioVale%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230f172a%22%2C%22theme_color%22%3A%22%2316a34a%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage/svg%2Bxml%2C%3Csvg xmlns%3D'http%3A//www.w3.org/2000/svg' viewBox%3D'0 0 100 100'%3E%3Ccircle cx%3D'50' cy%3D'50' r%3D'50' fill%3D'%2316a34a'/%3E%3Ctext y%3D'.9em' font-size%3D'70' x%3D'15'%3E%E2%99%BB%3C/text%3E%3C/svg%3E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image/svg%2Bxml%22%7D%5D%7D">
 <meta name="theme-color" content="#16a34a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1482,7 +1487,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.46.4';var DADOS_VERSAO=10;
+var APP_VERSION='5.46.5';var DADOS_VERSAO=10;
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[
@@ -3453,6 +3458,14 @@ function pgPesagem(){
   if(!caixaAberto())return '<div class="fc" style="align-items:center;justify-content:center;min-height:60vh;text-align:center"><div style="font-size:44px;margin-bottom:14px">&#128274;</div><div style="font-size:18px;font-weight:700;margin-bottom:8px">Caixa nao aberto</div><div style="font-size:13px;color:var(--mt);margin-bottom:20px">Abra o caixa do dia antes de realizar pesagens.</div><button class="btn btn-bl" onclick="go(\&apos;caixa_dia\&apos;)" style="padding:12px 22px;font-size:14px">Ir para Caixa</button></div>';
   // Restaurar atendimento em andamento se não há abas na memória
   if(!pesAbas.length){if(!loadPesState())novaPesAba();}
+  // 5.46.5: Avulso ainda vazio sempre começa na Porta (compra) / Padrão de venda
+  var _mud=false;
+  (pesAbas||[]).forEach(function(a){
+    if(!a||a.cliId||(a.itens&&a.itens.length))return;
+    var lado=(a.tipo==='Compra'||a.tipo==='Logistica Reversa')?'compra':'venda';var p=_clTabPadrao(lado);
+    if(p&&String(a.tabId)!==String(p.id)){a.tabId=p.id;_mud=true;}
+  });
+  if(_mud)savePesState();
   return '<div id="pes-ct"></div>';
 }
 
@@ -3741,6 +3754,8 @@ function renderPesagem(){
   var cartH='';
   if(!hasIt)cartH='<div class="pz-vazio">Nenhum material ainda.<br>Toque num material para pesar.</div>';
   else{
+    var _difTab=_pesItensForaDaTabela(ab);
+    if(_difTab)cartH+='<div class="pz-difTab"><span>&#9888; '+_difTab+' ite'+(_difTab>1?'ns':'m')+' com preço diferente da '+_abEsc(_tabNomeExib(_clTab(ab.tabId)))+' '+_aj('pes.precoDif')+'</span><button type="button" onclick="reaplicarTabela()">&#8635; Reaplicar</button></div>';
     if(_pesTemDuplicatas())cartH+='<button type="button" class="pz-junta" onclick="_pesJuntarDuplicatas()">&#128260; Juntar materiais repetidos</button>';
     cartH+='<div class="pz-cab"><span style="text-align:left">Material</span><span>Bruto</span><span>Tara</span><span>Líquido</span><span>R$/kg</span><span>Total</span><span></span></div><div class="pz-lista">';
     ab.itens.forEach(function(it,ix){
@@ -4057,7 +4072,9 @@ function _cliFiltrarDOM(q){
 function setPesCli(v){
   // 5.44: usa a tabela do cadastro só se for do mesmo lado (compra na Compra/LR, venda na Venda/Doação); senão a Padrão do lado
   var ab=pesAbas[pesAtiva];ab.cliId=v;var c=v?_clById(v):null;
-  if(c){var lado=(ab.tipo==='Compra'||ab.tipo==='Logistica Reversa')?'compra':'venda';var t=_cliTabPara(c,lado),p=_clTabPadrao(lado);ab.tabId=t?t.id:(p?p.id:ab.tabId);}
+  var lado=(ab.tipo==='Compra'||ab.tipo==='Logistica Reversa')?'compra':'venda';
+  if(c){var t=_cliTabPara(c,lado),p=_clTabPadrao(lado);ab.tabId=t?t.id:(p?p.id:ab.tabId);}
+  else{var p0=_clTabPadrao(lado);if(p0)ab.tabId=p0.id;} // 5.46.5: sem pessoa = Porta (compra) / Padrão de venda
   savePesState();renderPesagem();
 }
 // Detecta quando o usuário escolheu um cliente no campo de busca (datalist)
@@ -4116,6 +4133,12 @@ function _pesTabAbrir(e){if(e)e.stopPropagation();var d=document.getElementById(
 function _pesTabEscolher(id){var d=document.getElementById('pes-tab-drop');if(d)d.style.display='none';setPesTab(id);}
 document.addEventListener('click',function(e){var d=document.getElementById('pes-tab-drop');if(d&&d.style.display!=='none'&&!e.target.closest('#pes-tab-wrap'))d.style.display='none';});
 function setPesTab(v){pesAbas[pesAtiva].tabId=v?parseFloat(v):null;savePesState();renderPesagem();}
+// 5.46.5: quantos itens por kg estão com preço diferente da tabela escolhida (pesou antes de escolher a pessoa, trocou a tabela, mudou o preço à mão)
+function _pesItensForaDaTabela(ab){
+  if(!ab||!ab.tabId)return 0;var n=0;
+  (ab.itens||[]).forEach(function(it){if(it.uni||it.tipo!==ab.tipo)return;var p=gP(it.prodId);if(!p)return;var pr=getPreco(p,ab.tipo,ab.tabId);if(Math.abs((+it.preco||0)-(+pr||0))>0.004)n++;});
+  return n;
+}
 function reaplicarTabela(){
   var ab=pesAbas[pesAtiva];
   if(!ab.tabId||!ab.itens.length)return;
@@ -4263,6 +4286,7 @@ var AJUDA={
   'pes.pagina':'<b>Pesagem</b>: onde se pesa o material de quem chega (compra) ou de quem leva (venda). Cada atendimento fica numa aba. Ao finalizar, o estoque e o caixa do dia são atualizados.',
   'pes.abas':'Cada aba é um atendimento aberto, com o nome do cliente, o tipo e o total. Dá para atender várias pessoas ao mesmo tempo.',
   'pes.atend':'Escolha o tipo e quem é o cliente ou fornecedor. A tabela de preço já vem do cadastro dele.',
+  'pes.precoDif':'Esses itens foram pesados com outro preço: antes de escolher a pessoa, com outra tabela ou com o preço mudado à mão. Toque em Reaplicar para usar os preços da tabela de agora (você vê a lista antes de confirmar).',
   'pes.tabela':'Tabela de preço desta pesagem, com a cor dela. Já vem a tabela do cadastro do cliente. Trocar aqui vale só para esta pesagem e não muda o cadastro.',
   'pes.materiais':'Toque num material para pesar. Os principais são os mais usados; use a busca ou os grupos para achar os outros. No teclado, F1 a F8 abrem os principais.',
   'pes.carrinho':'Tudo o que já foi pesado neste atendimento. Toque numa linha para corrigir peso, tara, desconto, preço ou apagar.',
