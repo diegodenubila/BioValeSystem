@@ -1487,7 +1487,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.46.5';var DADOS_VERSAO=10;
+var APP_VERSION='5.47.1';var DADOS_VERSAO=11;
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[
@@ -1801,8 +1801,26 @@ function buildLoginList(){
       +(pesDonos[u.id]?'<span style="font-size:16px" title="Pesagem pendente">⚠️</span>':'')
       +'</button>';
   }
-  document.getElementById('ul').innerHTML=h;
+  // 5.47: só redesenha quando algo mudou (antes, cada atualização da nuvem redesenhava e "pulava" a tela)
+  var ul=document.getElementById('ul');
+  if(ul&&ul._h!==h){
+    ul.innerHTML=h;ul._h=h;
+    if(SU){var bs=ul.querySelectorAll('.lu');for(var b=0;b<USERS.length&&b<bs.length;b++){if(USERS[b].id===SU.id)bs[b].classList.add('sel');}}
+  }
+  _lsNuvemTxt();
 }
+// Linha discreta na tela de entrada: quando este aparelho conferiu a nuvem pela última vez
+function _lsNuvemTxt(){
+  try{
+    var el=document.getElementById('ls-nuvem');
+    if(!el){var bt=document.querySelector('#ls button[onclick="sincronizarAgora()"]');if(!bt)return;el=document.createElement('div');el.id='ls-nuvem';el.style.cssText='font-size:11px;color:var(--mt);margin-top:6px;display:flex;align-items:center;justify-content:center';bt.parentNode.appendChild(el);}
+    var t=Math.max(_lsNuvemEm||0,_ctUltimaNuvem||0);
+    var txt=!_sbReady?'Sem nuvem neste aparelho':(!t?'Nuvem: conferindo…':'Nuvem: atualizada às '+new Date(t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
+    var h=_abEsc(txt)+_aj('login.nuvem');
+    if(el._h!==h){el.innerHTML=h;el._h=h;}
+  }catch(e){}
+}
+var _lsNuvemEm=0;
 function selU(uid,el){
   for(var i=0;i<USERS.length;i++){if(USERS[i].id===uid){SU=USERS[i];break;}}
   var bs=document.querySelectorAll('.lu');for(var i=0;i<bs.length;i++)bs[i].classList.remove('sel');
@@ -1826,6 +1844,7 @@ function doLogin(){
     _recarregarAcessosNuvem();
     return;
   }
+  _lsAplicarGuardado(); // 5.47: na tela de entrada a nuvem é aplicada com calma; ao entrar, pega a mais nova
   CU=SU;
   document.getElementById('ls').classList.add('H');document.getElementById('wrap').classList.remove('H');
   buildSidebar();buildBottomNav();
@@ -1878,6 +1897,7 @@ function doLogin(){
 function doLogout(){
   // Garante que pesagem atual está salva antes de sair
   if(pesAbas&&pesAbas.length){savePesState();}
+  try{_ctEnviarTodos();}catch(e){}
   CU=SU=null;
   // Limpa RAM mas NÃO apaga localStorage da pesagem
   pesAbas=[];pesAtiva=0;atendHist=[];
@@ -2080,21 +2100,485 @@ function closeSb(){if(window.innerWidth<=768)document.getElementById('sb').class
 
 var pesAbas=[],pesAtiva=0,atendHist=[];
 // ── CARRINHO POR USUÁRIO ──────────────────────────────────────────────────
-// Cada login tem o seu carrinho: DB.pesCarts[id do usuário] = {abas, em, disp, nome}.
-// Ele vai para a nuvem junto com o resto, então a pesagem continua em QUALQUER aparelho
-// com o mesmo login (acabou a luz no PC do caixa -> entra no celular e está tudo lá).
-// O caixa, o financeiro e o Em Aberto continuam um só para a empresa.
+// Cada login tem o seu carrinho: DB.pesCarts[id do usuário] = {abas, fim, presos, em, disp, nome}.
+// 5.47: o carrinho NÃO vai mais dentro do bv_db (o banco inteiro da empresa). Cada login tem a
+// sua linha pequena na nuvem: 'bv_cart_<id>'. Cada peso sobe em menos de 1 s, os outros aparelhos
+// recebem só essa linha e o bv_db só é gravado quando algo acontece de verdade (finalizar,
+// Em Aberto, caixa, estoque...). A pesagem continua em QUALQUER aparelho com o mesmo login.
+// Regras (não tirar):
+// - Toda mudança grava NA HORA no aparelho (localStorage 'bv_ctl_<dono>' + IndexedDB) e sobe
+//   com gravação protegida (_sbCasWrite) juntando com o que outro aparelho fez (_ctJuntar).
+// - fim[idDaAba] = registro de que a aba acabou ({t:'fin'|'ab'|'del'|'assum', num, em, por, ks:[itens]}).
+//   Aba com 'fim' nunca volta a ficar aberta, mesmo que um aparelho atrasado a mande de novo.
+// - Finalizar / Deixar Em Aberto: a aba fica "esperando" (_ct.espera) até o bv_db com o
+//   atendimento (movimento/pendência com abaId) estar confirmado na nuvem. Só então o 'fim' sobe.
+//   Se cair no meio, a aba continua no carrinho da nuvem e o registro com abaId impede finalizar de novo.
+// - Reabrir (Caixa / Em Aberto): primeiro o carrinho com a aba é confirmado na nuvem, só depois
+//   o atendimento sai do caixa (_ctAntesDeTirar).
+// - Itens que ficaram presos num aparelho (sem internet) enquanto a mesma aba foi finalizada ou
+//   mexida em outro: vão para presos[] e a pessoa decide (nunca entram em dobro nem somem sozinhos).
+// O caixa, o financeiro e o Em Aberto continuam um só para a empresa (bv_db).
 function _pesDisp(){return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent||'')?'celular':'computador';}
 // Cada item do carrinho ganha uma identificação: dois itens iguais pesados em aparelhos diferentes
 // não se confundem na junção (antes, dois itens idênticos viravam um só)
 function _pesIdItens(){(pesAbas||[]).forEach(function(a){(a&&a.itens||[]).forEach(function(it){if(it&&typeof it==='object'&&!it._k)it._k='k'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);});});}
+
+// ── Estado da sincronização dos carrinhos (só na memória deste aparelho) ──
+var _ct={base:{},pend:{},desde:{},gen:{},timer:{},voando:{},deNovo:{},espera:{},ts:{},depois:{},falhas:{}};
+var _ctCarregou=false,_ctInicio=Date.now();      // as linhas dos carrinhos já foram lidas da nuvem nesta sessão
+var _ctLegado=null;         // carrinhos que vieram dentro do bv_db (versões até 5.46): migrados para as linhas
+var _ctMigrado=false;
+var _CT_VELHO=20000;        // alteração parada há mais de 20 s sem subir = feita sem internet
+function _ctFinRecente(a){return !!(a&&a._fin&&Date.now()-(a._fin.em||0)<2*60000);}
+function _ctAudit(a,d){try{_auditLog(a,d);}catch(e){}autoSave();}
+// Identificação deste aparelho (para saber se uma finalização que ficou pela metade foi feita aqui)
+function _ctDev(){try{var v=localStorage.getItem('bv_dev_id');if(!v){v='dv'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);localStorage.setItem('bv_dev_id',v);}return v;}catch(e){return 'dv?';}}
+function _ctKey(d){return 'bv_cart_'+d;}
+function _ctDonoDe(ch){return String(ch).slice(8);}
+function _ctNovo(d){return {dono:String(d),nome:'',abas:[],fim:{},presos:[],em:0,disp:'',v:547};}
+function _ctNorm(o,d){
+  o=(o&&typeof o==='object'&&!Array.isArray(o))?o:_ctNovo(d);
+  if(!Array.isArray(o.abas))o.abas=[];
+  if(!o.fim||typeof o.fim!=='object'||Array.isArray(o.fim))o.fim={};
+  if(!Array.isArray(o.presos))o.presos=[];
+  if(o.dono==null)o.dono=String(d);
+  return o;
+}
+function _ctRow(d){
+  d=String(d);if(!DB.pesCarts||typeof DB.pesCarts!=='object')DB.pesCarts={};
+  DB.pesCarts[d]=_ctNorm(DB.pesCarts[d],d);return DB.pesCarts[d];
+}
+function _ctCopia(x){return JSON.parse(JSON.stringify(x));}
+function _ctIdx(lista){var m={};(lista||[]).forEach(function(a){if(a&&a.id!=null)m[String(a.id)]=a;});return m;}
+function _ctKs(a){return (a&&a.itens||[]).map(function(it){return it&&it._k;}).filter(Boolean);}
+// Guarda o carrinho no aparelho na hora (o que garante não perder nada se faltar luz)
+function _ctGuardar(d){
+  d=String(d);
+  var o={row:DB.pesCarts&&DB.pesCarts[d]||null,base:_ct.base[d]||null,pend:!!_ct.pend[d],desde:_ct.desde[d]||0,espera:_ct.espera[d]||{},depois:_ct.depois[d]||null,em:Date.now()};
+  var js=JSON.stringify(o);
+  try{localStorage.setItem('bv_ctl_'+d,js);}catch(e){}
+  _idbPut('bv_ctl_'+d,js);
+  try{var ix=JSON.parse(localStorage.getItem('bv_ctl__idx')||'[]');if(ix.indexOf(d)<0){ix.push(d);localStorage.setItem('bv_ctl__idx',JSON.stringify(ix));_idbPut('bv_ctl__idx',JSON.stringify(ix));}}catch(e){}
+}
+function _ctRestaurar(d,js){
+  try{
+    var o=JSON.parse(js);if(!o)return;
+    if(o.row)DB.pesCarts[d]=_ctNorm(o.row,d);
+    _ct.base[d]=o.base||null;_ct.pend[d]=!!o.pend;_ct.desde[d]=o.desde||0;
+    _ct.espera[d]=o.espera||{};if(o.depois)_ct.depois[d]=o.depois;
+  }catch(e){}
+}
+// Na abertura (antes da nuvem): o que este aparelho guardou dos carrinhos
+function _ctCarregarLocal(){
+  if(!DB.pesCarts||typeof DB.pesCarts!=='object')DB.pesCarts={};
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);if(!k||k.indexOf('bv_ctl_')!==0||k==='bv_ctl__idx')continue;
+      _ctRestaurar(k.slice(7),localStorage.getItem(k));
+    }
+  }catch(e){}
+}
+// Se o navegador perdeu o localStorage mas o IndexedDB ficou: recupera de lá (não sobrescreve o que já tem)
+function _ctCarregarIdb(cb){
+  _idbGet('bv_ctl__idx',function(ix){
+    var lista=[];try{lista=JSON.parse(ix||'[]');}catch(e){}
+    var falta=lista.filter(function(d){try{return !localStorage.getItem('bv_ctl_'+d);}catch(e){return true;}});
+    if(!falta.length){cb();return;}
+    var n=falta.length;
+    falta.forEach(function(d){_idbGet('bv_ctl_'+d,function(js){if(js){_ctRestaurar(d,js);console.warn('[BioVale] carrinho de '+d+' recuperado da cópia segura');}if(--n===0)cb();});});
+  });
+}
+// Uma mudança local no carrinho de 'd': marca pendente, guarda e manda subir
+function _ctMarcar(d){
+  d=String(d);_ct.pend[d]=true;if(!_ct.desde[d])_ct.desde[d]=Date.now();
+  _ct.gen[d]=(_ct.gen[d]||0)+1;_ctGuardar(d);
+  if(_ct.timer[d])clearTimeout(_ct.timer[d]);
+  _ct.timer[d]=setTimeout(function(){_ct.timer[d]=null;_ctEnviar(d);},30);
+}
+function _ctEnviarTodos(){for(var d in _ct.pend){if(_ct.pend[d]){if(_ct.timer[d]){clearTimeout(_ct.timer[d]);_ct.timer[d]=null;}_ctEnviar(d);}}}
+function _ctTemPendente(){for(var d in _ct.pend){if(_ct.pend[d]||_ct.voando[d])return true;}return false;}
+// O que sobe para a nuvem: o carrinho + as abas que estão "esperando" o bv_db (continuam abertas lá, marcadas)
+function _ctParaEnviar(d){
+  var r=_ctCopia(_ctRow(d)),esp=_ct.espera[d]||{};
+  var ids=_ctIdx(r.abas);
+  Object.keys(esp).forEach(function(id){
+    var e=esp[id];if(!e||!e.aba)return;
+    if(r.fim[id])delete r.fim[id];
+    if(!ids[id]){var a=_ctCopia(e.aba);a._fin={num:e.fim.num||'',t:e.fim.t,em:e.fim.em,dev:_ctDev()};r.abas.push(a);}
+  });
+  return r;
+}
+// Junção de um carrinho: base = última versão da nuvem que este aparelho conhece
+// loc = este aparelho · cloud = nuvem agora · velho = alteração local presa há mais de 20 s
+function _ctJuntar(base,loc,cloud,velho,d){
+  loc=_ctNorm(_ctCopia(loc),d);
+  if(!cloud)return loc;
+  cloud=_ctNorm(_ctCopia(cloud),d);base=base?_ctNorm(_ctCopia(base),d):null;
+  var agora=Date.now(),presosNovos=[];
+  var bIdx=base?_ctIdx(base.abas):{},cIdx=_ctIdx(cloud.abas);
+  var fim={};
+  [cloud.fim,loc.fim].forEach(function(f){Object.keys(f||{}).forEach(function(id){
+    var x=f[id];if(!x)return;
+    if(!fim[id])fim[id]=_ctCopia(x);
+    else{var ks={};(fim[id].ks||[]).concat(x.ks||[]).forEach(function(k){ks[k]=1;});fim[id].ks=Object.keys(ks);}
+  });});
+  function preso(a,itens,motivo,f){
+    if(!itens.length)return;
+    presosNovos.push({id:'pr'+agora.toString(36)+Math.random().toString(36).slice(2,6),abaId:String(a.id),label:a.label||'',cliId:a.cliId||'',tipo:a.tipo||'',
+      itens:_ctCopia(itens),motivo:motivo,num:f&&f.num||'',por:f&&f.por||'',em:agora,disp:_pesDisp(),de:loc.nome||''});
+  }
+  // 1) Aba mexida aqui sem internet E mexida em outro aparelho: o que entrou só aqui não junta sozinho
+  loc.abas=loc.abas.map(function(a){
+    if(!a||a.id==null)return a;var id=String(a.id);
+    var c=cIdx[id],b=bIdx[id];
+    if(!velho||!c||!b||fim[id])return a;
+    if(_canon(c)===_canon(b))return a; // só este aparelho mexeu: junta normal
+    var bk={},ck={};_ctKs(b).forEach(function(k){bk[k]=1;});_ctKs(c).forEach(function(k){ck[k]=1;});
+    var novos=(a.itens||[]).filter(function(it){return it&&it._k&&!bk[it._k]&&!ck[it._k];});
+    if(!novos.length)return a;
+    preso(a,novos,'mexida',null);
+    var na=_ctCopia(a);na.itens=(na.itens||[]).filter(function(it){return !(it&&it._k&&novos.some(function(n){return n._k===it._k;}));});
+    // as abas ficam iguais à nuvem para os itens novos daqui: tira também da base para não "apagar lá"
+    return na;
+  });
+  var out=_ctNorm({dono:loc.dono,nome:loc.nome||cloud.nome,em:Math.max(loc.em||0,cloud.em||0),disp:loc.disp||cloud.disp,v:547},d);
+  out.abas=_m3(base?base.abas:undefined,loc.abas,cloud.abas,'')||[];
+  out.presos=_m3(base?base.presos:undefined,loc.presos,cloud.presos,'')||[];
+  // 2) Abas que acabaram: saem do carrinho; itens que nenhum registro conhece viram "presos"
+  var outIdx=_ctIdx(out.abas),lIdx=_ctIdx(loc.abas);
+  Object.keys(fim).forEach(function(id){
+    var f=fim[id],ks={};(f.ks||[]).forEach(function(k){ks[k]=1;});
+    var jaPresos={};out.presos.concat(presosNovos).forEach(function(p){(p.itens||[]).forEach(function(it){if(it&&it._k)jaPresos[it._k]=1;});});
+    [lIdx[id],cIdx[id],outIdx[id]].forEach(function(a){
+      if(!a||a._fin)return;
+      var sobra=(a.itens||[]).filter(function(it){return it&&it._k&&!ks[it._k]&&!jaPresos[it._k];});
+      if(sobra.length){preso(a,sobra,f.t||'fin',f);sobra.forEach(function(it){ks[it._k]=1;jaPresos[it._k]=1;});}
+    });
+    f.ks=Object.keys(ks);
+  });
+  out.abas=out.abas.filter(function(a){return a&&!fim[String(a.id)];});
+  out.presos=out.presos.concat(presosNovos);
+  // registros de abas encerradas com mais de 10 dias saem (o atendimento continua no caixa)
+  Object.keys(fim).forEach(function(id){if(fim[id].em&&agora-fim[id].em>10*86400000)delete fim[id];});
+  out.fim=fim;
+  return out;
+}
+// Sobe o carrinho de 'd' com gravação protegida
+function _ctEnviar(d){
+  d=String(d);
+  if(!_ct.pend[d])return;
+  if(!_sbReady||!_sbClient)return;                 // sem nuvem: fica guardado aqui
+  if(_versaoBloqueada){_versaoBarra();return;}      // versão antiga: não grava
+  if(!_ctCarregou){setTimeout(function(){_ctEnviar(d);},400);return;}
+  if(!_versaoLida&&Date.now()-_versaoT0<8000){_versaoChecarNuvem();setTimeout(function(){_ctEnviar(d);},500);return;}
+  var dep=_ct.depois[d];
+  if(dep&&(_ct.pend[dep]||_ct.voando[dep])){setTimeout(function(){_ctEnviar(d);},400);return;} // assumir: primeiro o carrinho de quem assumiu
+  if(_ct.voando[d]){_ct.deNovo[d]=true;return;}
+  _ct.voando[d]=true;
+  var gen=_ct.gen[d]||0,velho=_ct.desde[d]&&(Date.now()-_ct.desde[d]>_CT_VELHO);
+  var baseObj=null;try{baseObj=_ct.base[d]?JSON.parse(_ct.base[d]):null;}catch(e){baseObj=null;}
+  var loc=_ctParaEnviar(d);
+  var vigia=setTimeout(function(){if(_ct.voando[d]===vigia){_ct.voando[d]=false;setTimeout(function(){_ctEnviar(d);},2000);}},20000);
+  _ct.voando[d]=vigia;
+  _sbCasWrite(_ctKey(d),function(cloud){
+    var m=_ctJuntar(baseObj,loc,cloud,velho,d);
+    var js=JSON.stringify(m);
+    if(cloud&&js===JSON.stringify(_ctNorm(_ctCopia(cloud),d)))return {skip:true,obj:m,json:js};
+    return {json:js,obj:m};
+  },function(res){
+    if(_ct.voando[d]!==vigia)return; // o vigia já liberou: outra tentativa está a caminho
+    clearTimeout(vigia);_ct.voando[d]=false;
+    if(!res.ok){
+      _ct.falhas[d]=(_ct.falhas[d]||0)+1;
+      if(res.motivo==='merge')console.error('[BioVale] junção do carrinho falhou',res.erro);
+      setTimeout(function(){_ctEnviar(d);},res.motivo==='conflito'?600:3000);
+      return;
+    }
+    _ct.falhas[d]=0;
+    var m=res.skipped?_ctNorm(_ctCopia(res.cloud),d):res.out.obj;
+    _ct.base[d]=JSON.stringify(m);
+    if(res.ts)_ct.ts[d]=res.ts;
+    if((_ct.gen[d]||0)===gen&&!_ct.deNovo[d]){_ct.pend[d]=false;_ct.desde[d]=0;}
+    _ctAplicarLocal(d,m,(_ct.gen[d]||0)!==gen);
+    _ctGuardar(d);
+    if(_ct.deNovo[d]||_ct.pend[d]){_ct.deNovo[d]=false;_ct.pend[d]=true;setTimeout(function(){_ctEnviar(d);},30);}
+    _ctUltimaNuvem=Date.now();_ctAtualizarTelas(d);
+  });
+}
+// Põe na memória o carrinho que veio da nuvem (ou da junção). Se este aparelho mexeu de novo
+// enquanto gravava (maisNovo), a mudança nova é refeita por cima na próxima subida.
+function _ctAplicarLocal(d,m,maisNovo){
+  var esp=_ct.espera[d]||{};
+  var vis=_ctCopia(m);
+  vis.abas=vis.abas.filter(function(a){return a&&!esp[String(a.id)];});
+  if(maisNovo){
+    // o usuário mexeu de novo enquanto gravava: fica o que está aqui (a próxima subida junta com a nuvem),
+    // só saem as abas que foram encerradas e entram os itens presos novos
+    var atual=_ctRow(d);
+    Object.keys(atual.fim||{}).forEach(function(id){if(!vis.fim[id])vis.fim[id]=_ctCopia(atual.fim[id]);}); // encerramentos feitos aqui no meio-tempo não se perdem
+    vis.abas=_ctCopia(atual.abas).filter(function(a){return a&&!vis.fim[String(a.id)];});
+    var pid={};(atual.presos||[]).forEach(function(p){pid[String(p.id)]=1;});
+    vis.presos=_ctCopia(atual.presos||[]).concat((vis.presos||[]).filter(function(p){return !pid[String(p.id)];}));
+  }
+  var ant=DB.pesCarts&&DB.pesCarts[d];
+  DB.pesCarts[d]=vis;
+  if(CU&&String(CU.id)===d){
+    // avisa se uma aba que estava aqui foi encerrada por outra pessoa/aparelho
+    var antIdx=_ctIdx(ant&&ant.abas);
+    Object.keys(vis.fim||{}).forEach(function(id){
+      if(antIdx[id]&&!esp[id]){var f=vis.fim[id];
+        if(f.t==='assum')toast('&#9888; '+(antIdx[id].label||'Pesagem')+' foi assumida por '+(f.por||'outro usuário'),'var(--or)');
+        else if(f.t==='fin'||f.t==='ab')toast('&#9888; '+(antIdx[id].label||'Pesagem')+' foi '+(f.t==='ab'?'deixada Em Aberto':'finalizada')+' em outro aparelho'+(f.num?' (nº '+f.num+')':''),'var(--or)');
+      }
+    });
+    _pesRecarregarDoDB();
+  }
+}
+// Linha de carrinho que chegou da nuvem (tempo real, conferência periódica ou abertura)
+var _ctUltimaNuvem=0;
+function _ctAplicarNuvem(d,obj,ts){
+  d=String(d);_ctUltimaNuvem=Date.now();
+  if(ts)_ct.ts[d]=ts;
+  var cloud=_ctNorm(_ctCopia(obj),d),js=JSON.stringify(cloud);
+  if(_ct.base[d]===js&&!_ct.pend[d])return;
+  if(_ct.pend[d]||_ct.voando[d]){_ctEnviar(d);return;} // tem mudança daqui: a gravação junta as duas
+  _ct.base[d]=js;
+  _ctAplicarLocal(d,cloud,false);
+  _ctGuardar(d);
+  _ctLimparFinalizadas();
+  _ctAtualizarTelas(d);
+}
+function _ctAtualizarTelas(d){
+  try{
+    if(!CU)buildLoginList();
+    else if(pgAtiva==='pesagem'){
+      if(_pesMudouFora&&!_modalAberto()){renderPesagem();toast('&#128260; Seu carrinho foi atualizado em outro aparelho','var(--bl)');}
+      else{_pesAtualizarAviso();_pesAtualizarPresos();}
+    }
+    _pesMudouFora=false;
+  }catch(e){}
+}
+// Lê da nuvem as linhas dos carrinhos (todas ou só as que mudaram)
+function _ctCarregarTodas(cb){
+  if(!_sbReady||!_sbClient){if(cb)cb(false);return;}
+  _sbClient.from('biovale_dados').select('chave,valor,atualizado_em').like('chave','bv_cart_%').then(function(r){
+    if(r.error||!r.data){if(cb)cb(false);return;}
+    r.data.forEach(function(row){
+      var d=_ctDonoDe(row.chave),obj=null;try{obj=JSON.parse(row.valor);}catch(e){return;}
+      if(!_ctCarregou&&_ct.pend[d]){_ct.ts[d]=row.atualizado_em;return;} // pendência recuperada: a subida junta
+      _ctAplicarNuvem(d,obj,row.atualizado_em);
+    });
+    var primeira=!_ctCarregou;_ctCarregou=true;
+    if(primeira){_ctEnviarTodos();_ctMigrar();_ctLimparFinalizadas();_ctConferirEspera();_ctFinOrfas();try{buildLoginList();}catch(e){}}
+    if(cb)cb(true);
+  },function(){if(cb)cb(false);});
+}
+// Conferência leve: só os carimbos; busca o conteúdo do que mudou
+function _ctPoll(){
+  if(!_sbReady||!_sbClient)return;
+  if(!_ctCarregou){_ctCarregarTodas();return;}
+  _sbClient.from('biovale_dados').select('chave,atualizado_em').like('chave','bv_cart_%').then(function(r){
+    if(r.error||!r.data)return;
+    var mud=r.data.filter(function(x){return x.atualizado_em!==_ct.ts[_ctDonoDe(x.chave)];}).map(function(x){return x.chave;});
+    if(!mud.length)return;
+    _sbClient.from('biovale_dados').select('chave,valor,atualizado_em').in('chave',mud).then(function(r2){
+      if(r2.error||!r2.data)return;
+      r2.data.forEach(function(row){var obj=null;try{obj=JSON.parse(row.valor);}catch(e){return;}_ctAplicarNuvem(_ctDonoDe(row.chave),obj,row.atualizado_em);});
+    });
+  },function(){});
+}
+function _ctTempoReal(row){
+  if(!row||!row.chave)return;
+  var d=_ctDonoDe(row.chave);
+  if(row.valor===undefined||row.valor===null){_ctPoll();return;}
+  if(row.atualizado_em&&row.atualizado_em===_ct.ts[d])return;
+  try{_ctAplicarNuvem(d,JSON.parse(row.valor),row.atualizado_em);}catch(e){_ctPoll();}
+}
+// Antes de ações sensíveis: sobe o que está pendente e traz a versão mais nova dos carrinhos
+function _ctSincronizar(cb){
+  if(!_sbReady||!_sbClient){cb(false);return;}
+  _ctEnviarTodos();
+  var t0=Date.now();
+  (function esperar(){
+    if(_ctTemPendente()){if(Date.now()-t0>12000){cb(false);return;}setTimeout(esperar,150);return;}
+    _ctCarregarTodas(function(ok){cb(ok);});
+  })();
+}
+function _ctEsperarEnvio(d,cb,lim){
+  var t0=Date.now();d=String(d);_ctEnviarTodos();
+  (function esp(){if(!_ct.pend[d]&&!_ct.voando[d]){cb(true);return;}if(Date.now()-t0>(lim||12000)){cb(false);return;}setTimeout(esp,150);})();
+}
+// ── Registro de que a aba virou atendimento (abaId no caixa / Em Aberto) ──
+function _ctRegistroDaAba(id){
+  id=String(id);var achou=null;
+  function olhaMovs(ms){(ms||[]).forEach(function(m){if(!achou&&m&&m.abaId!=null&&String(m.abaId)===id)achou={t:'fin',num:m.num,itens:m.itensList||[]};});}
+  olhaMovs(DB.caixaDia&&DB.caixaDia.movimentos);
+  (DB.caixasHist||[]).forEach(function(c){if(!achou)olhaMovs(c&&c.movimentos);});
+  (DB.pesagensEmAberto||[]).forEach(function(p){if(!achou&&p&&p.abaId!=null&&String(p.abaId)===id)achou={t:'ab',num:p.num,itens:p.itens||[]};});
+  (DB.emAbertoCancelados||[]).forEach(function(p){if(!achou&&p&&p.abaId!=null&&String(p.abaId)===id)achou={t:'ab',num:p.num,itens:p.itens||[]};});
+  return achou;
+}
+function _ctNumNoRegistro(num){
+  if(num==null||num==='')return null;var s=String(num),r=null;
+  ((DB.caixaDia&&DB.caixaDia.movimentos)||[]).forEach(function(m){if(!r&&m&&String(m.num)===s)r='caixa';});
+  (DB.pesagensEmAberto||[]).forEach(function(p){if(!r&&p&&String(p.num)===s)r='aberto';});
+  return r;
+}
+// Finalizar / Deixar Em Aberto: a aba fica esperando o bv_db subir com o registro
+function _ctEsperaAdd(ab,num,tipo){
+  if(!CU||!ab)return;var d=String(CU.id);
+  if(!_ct.espera[d])_ct.espera[d]={};
+  _ct.espera[d][String(ab.id)]={aba:_ctCopia(ab),fim:{t:tipo,num:num,em:Date.now(),por:CU.nome,ks:_ctKs(ab)},em:Date.now()};
+  _ctGuardar(d);
+}
+// Depois que o bv_db confirmou na nuvem: o 'fim' das abas esperando pode subir
+function _ctConferirEspera(){
+  if(!_cloudLoaded)return;
+  var dbOk=!_pendingLocal&&!_saveInFlight;
+  Object.keys(_ct.espera).forEach(function(d){
+    var esp=_ct.espera[d]||{},mud=false;
+    Object.keys(esp).forEach(function(id){
+      var e=esp[id];if(!e)return;
+      var reg=_ctRegistroDaAba(id);
+      if(reg&&dbOk){
+        var row=_ctRow(d);var ks={};(e.fim.ks||[]).forEach(function(k){ks[k]=1;});(reg.itens||[]).forEach(function(it){if(it&&it._k)ks[it._k]=1;});
+        e.fim.ks=Object.keys(ks);if(reg.num)e.fim.num=reg.num;
+        row.fim[id]=e.fim;row.abas=row.abas.filter(function(a){return String(a.id)!==id;});
+        delete esp[id];mud=true;
+      }else if(!reg&&dbOk&&(Date.now()-(e.em||0)>20000||(e.em||0)<_ctInicio)){ // finalização de antes de religar o aparelho: não espera
+        // a finalização não chegou a ser gravada (página fechou antes): a aba volta, nada se perde
+        var row2=_ctRow(d);
+        if(!row2.abas.some(function(a){return String(a.id)===id;}))row2.abas.push(_ctCopia(e.aba));
+        delete esp[id];mud=true;
+        if(CU&&String(CU.id)===d){_pesRecarregarDoDB();toast('&#9888; A finalização de '+(e.aba.label||'uma pesagem')+' não foi concluída. Ela voltou para o carrinho — confira e finalize de novo.','var(--or)');}
+        _ctAudit('Finalização não concluída',(e.aba.label||'Atendimento')+' voltou para o carrinho ('+((e.aba.itens||[]).length)+' item(ns))');
+      }
+    });
+    if(mud)_ctMarcar(d);
+  });
+}
+function _ctFinOrfas(){
+  if(!_cloudLoaded||!_ctCarregou||_pendingLocal||_saveInFlight)return;
+  var dev=_ctDev(),pc=DB.pesCarts||{};
+  Object.keys(pc).forEach(function(d){
+    var esp=_ct.espera[d]||{},base=null;try{base=_ct.base[d]?JSON.parse(_ct.base[d]):null;}catch(e){}
+    if(!base||!Array.isArray(base.abas))return;
+    var row=_ctRow(d),mud=false;
+    base.abas.forEach(function(a){
+      if(!a||!a._fin||a._fin.dev!==dev||esp[String(a.id)])return;
+      if(row.fim[String(a.id)]||row.abas.some(function(x){return String(x.id)===String(a.id);}))return;
+      if(_ctRegistroDaAba(a.id))return; // virou atendimento: _ctLimparFinalizadas encerra
+      var na=_ctCopia(a);delete na._fin;row.abas.push(na);mud=true;
+      _ctAudit('Finalização não concluída',(a.label||'Atendimento')+' voltou para o carrinho ('+((a.itens||[]).length)+' item(ns)) — o aparelho desligou antes de gravar');
+      if(CU&&String(CU.id)===String(d))setTimeout(function(){toast('&#9888; A finalização de '+(a.label||'uma pesagem')+' não chegou a ser gravada (o aparelho desligou). Ela voltou para o carrinho — confira e finalize de novo.','var(--or)');},600);
+    });
+    if(mud){if(CU&&String(CU.id)===String(d))_pesRecarregarDoDB();_ctMarcar(d);}
+  });
+}
+// Aba que continua no carrinho mas já virou atendimento (ex.: aparelho atrasado mandou de novo)
+function _ctLimparFinalizadas(){
+  if(!_cloudLoaded||_pendingLocal||_saveInFlight)return;
+  var pc=DB.pesCarts||{};
+  Object.keys(pc).forEach(function(d){
+    var row=pc[d];if(!row||!Array.isArray(row.abas))return;
+    var esp=_ct.espera[d]||{},mud=false,presos=[];
+    row.abas=row.abas.filter(function(a){
+      if(!a||esp[String(a.id)]||(a._fin&&Date.now()-(a._fin.em||0)<60000))return true;
+      var reg=_ctRegistroDaAba(a.id);if(!reg)return true;
+      var ks={};(reg.itens||[]).forEach(function(it){if(it&&it._k)ks[it._k]=1;});
+      var sobra=(a.itens||[]).filter(function(it){return it&&it._k&&!ks[it._k];});
+      if(sobra.length)presos.push({id:'pr'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),abaId:String(a.id),label:a.label||'',cliId:a.cliId||'',tipo:a.tipo||'',itens:_ctCopia(sobra),motivo:reg.t,num:reg.num||'',por:'',em:Date.now(),disp:_pesDisp(),de:row.nome||''});
+      sobra.forEach(function(it){ks[it._k]=1;});
+      row.fim[String(a.id)]={t:reg.t,num:reg.num||'',em:Date.now(),por:'',ks:Object.keys(ks)};
+      mud=true;return false;
+    });
+    if(mud){row.presos=(row.presos||[]).concat(presos);if(CU&&String(CU.id)===d)_pesRecarregarDoDB();_ctMarcar(d);}
+  });
+}
+var _ctDupAvisados={},_ctReabOk={};
+// Reserva o próximo nº de atendimento na nuvem (linha 'bv_atendnum', gravação protegida).
+// Sem internet: cb(null) e a finalização usa o contador do aparelho, como antes.
+function _atendReservar(cb){
+  if(!_sbReady||!_sbClient||_versaoBloqueada){cb(null);return;}
+  var feito=false,fim=function(v){if(!feito){feito=true;cb(v);}};
+  setTimeout(function(){fim(null);},8000);
+  _sbCasWrite('bv_atendnum',function(c){
+    var n=Math.max(+(c&&c.n)||0,+DB.atendNum||1000)+1;
+    var o={n:n,em:new Date().toISOString(),por:CU?CU.nome:'',dev:_ctDev()};
+    return {json:JSON.stringify(o),obj:o};
+  },function(res){
+    if(!res.ok||!res.out){fim(null);return;}
+    var n=res.out.obj.n;DB.atendNum=Math.max(+DB.atendNum||0,n);
+    fim(String(n).padStart(6,'0'));
+  });
+}
+function _ctConferirRepetidos(){
+  try{
+    var vistos={},porNum={},movs=(DB.caixaDia&&DB.caixaDia.movimentos)||[];
+    // mesmo nº em dois atendimentos diferentes (dois aparelhos finalizando juntos sem internet)
+    movs.concat(DB.pesagensEmAberto||[]).forEach(function(m){
+      if(!m||m.num==null||m.abaId==null)return;var n=String(m.num),id=String(m.abaId); // só atendimentos novos (com aba de origem)
+      if(porNum[n]&&porNum[n]!==id&&!_ctDupAvisados['n'+n]){
+        _ctDupAvisados['n'+n]=1;
+        _ctAudit('Número de atendimento repetido','nº '+n+' aparece em dois atendimentos diferentes');
+        if(CU)setTimeout(function(){_abAviso('&#9888; Número repetido','Dois atendimentos ficaram com o mesmo nº '+_abEsc(n)+' (aparelhos finalizando ao mesmo tempo sem internet). Os dois estão guardados. Confira no Caixa antes de reabrir algum deles.');},900);
+      }
+      if(!porNum[n])porNum[n]=id;
+    });
+    movs.concat(DB.pesagensEmAberto||[]).forEach(function(m){
+      if(!m||m.abaId==null)return;var k=String(m.abaId);
+      if(vistos[k]&&String(vistos[k])!==String(m.num)&&!_ctDupAvisados[k]){
+        _ctDupAvisados[k]=1;
+        var txt='A mesma pesagem aparece em dois atendimentos: nº '+vistos[k]+' e nº '+m.num+' (um aparelho ficou sem internet e ela foi finalizada de novo em outro). Confira no Caixa e reabra o que estiver repetido.';
+        _ctAudit('Atendimento possivelmente repetido','nº '+vistos[k]+' e nº '+m.num);
+        if(CU)setTimeout(function(){_abAviso('&#9888; Atendimento repetido',txt);},800);
+      }
+      if(!vistos[k])vistos[k]=m.num;
+    });
+  }catch(e){}
+}
+// Reabrir: o carrinho com a aba precisa estar na nuvem ANTES de o atendimento sair do caixa
+function _ctAntesDeTirar(cb){
+  if(!CU){cb(false);return;}
+  _ctEsperarEnvio(CU.id,function(ok){cb(ok);},15000);
+}
+// Carrinhos que vieram dentro do bv_db (versões até 5.46): passam para as linhas novas
+function _ctMigrar(){
+  if(_ctMigrado||!_ctCarregou||!_cloudLoaded)return;
+  var leg=_ctLegado;
+  if(!leg||typeof leg!=='object'||!Object.keys(leg).length){_ctMigrado=true;return;}
+  var todosIds={};Object.keys(DB.pesCarts||{}).forEach(function(d){var r=DB.pesCarts[d];(r.abas||[]).forEach(function(a){if(a)todosIds[String(a.id)]=1;});Object.keys(r.fim||{}).forEach(function(id){todosIds[id]=1;});});
+  Object.keys(_ct.espera).forEach(function(d){Object.keys(_ct.espera[d]||{}).forEach(function(id){todosIds[id]=1;});});
+  var mexidos=[];
+  Object.keys(leg).forEach(function(d){
+    var c=leg[d];if(!c||!Array.isArray(c.abas))return;
+    var novas=c.abas.filter(function(a){return a&&!a.assumida&&a.itens&&a.itens.length&&!todosIds[String(a.id)]&&!_ctRegistroDaAba(a.id);});
+    if(!novas.length)return;
+    var row=_ctRow(d);if(!row.nome)row.nome=c.nome||'';
+    novas.forEach(function(a){row.abas.push(_ctCopia(a));todosIds[String(a.id)]=1;});
+    mexidos.push(d);_ctMarcar(d);
+  });
+  _ctMigrado=true;
+  if(!mexidos.length){if(Object.keys(leg).length){_ctLegado={};autoSave();}return;}
+  // só tira do bv_db depois que TODAS as linhas novas confirmaram na nuvem
+  var t0=Date.now();
+  (function esp(){
+    if(mexidos.some(function(d){return _ct.pend[d]||_ct.voando[d];})){if(Date.now()-t0<120000)setTimeout(esp,500);else _ctMigrado=false;return;}
+    _ctLegado={};autoSave();
+    try{_auditLog('Carrinhos passados para o formato 5.47',mexidos.length+' carrinho(s)');}catch(e){}
+  })();
+}
+function _ctLegadoTemAbas(l){try{return Object.keys(l||{}).some(function(d){var c=l[d];return c&&Array.isArray(c.abas)&&c.abas.some(function(a){return a&&!a.assumida&&a.itens&&a.itens.length;});});}catch(e){return false;}}
+function _ctLegadoSnap(){return _ctLegado&&typeof _ctLegado==='object'?_ctLegado:{};}
+
+// ── Funções que as outras partes do sistema já usam ──
 function _pesGravarNoDB(){
   if(!CU)return;
   _pesIdItens();
-  if(!DB.pesCarts||typeof DB.pesCarts!=='object')DB.pesCarts={};
-  var ant=DB.pesCarts[CU.id];var js=JSON.stringify(pesAbas||[]);
-  if(!ant||JSON.stringify(ant.abas||[])!==js){
-    DB.pesCarts[CU.id]={abas:JSON.parse(js),em:_agoraMs(),disp:_pesDisp(),nome:CU.nome};
+  var d=String(CU.id),row=_ctRow(d);var js=JSON.stringify(pesAbas||[]);
+  if(JSON.stringify(row.abas||[])!==js||row.nome!==CU.nome){
+    row.abas=JSON.parse(js);row.em=_agoraMs();row.disp=_pesDisp();row.nome=CU.nome;
+    _ctMarcar(d);
   }
 }
 function _pesCartsSnap(){_pesGravarNoDB();return DB.pesCarts||{};}
@@ -2102,8 +2586,7 @@ function savePesState(){
   if(!CU)return;
   _pesGravarNoDB();
   try{localStorage.setItem('bv_pesAbas_u'+CU.id,JSON.stringify(pesAbas));localStorage.setItem('bv_pesAtiva_u'+CU.id,String(pesAtiva));}catch(e){}
-  // Toda ação do usuário no carrinho deve propagar para a nuvem.
-  if(_sbReady){autoSave();}
+  // 5.47: o carrinho sobe sozinho (linha própria). O bv_db não é mais regravado a cada peso.
 }
 function loadPesState(){
   if(!CU)return false;
@@ -2113,7 +2596,7 @@ function loadPesState(){
     if(c&&Array.isArray(c.abas))arr=JSON.parse(JSON.stringify(c.abas));
     else{var a=localStorage.getItem('bv_pesAbas_u'+CU.id);if(a)arr=JSON.parse(a);}
   }catch(e){arr=null;}
-  arr=(arr||[]).filter(function(a){return a&&!a.assumida;});
+  arr=(arr||[]).filter(function(a){return a&&!a.assumida&&!_ctFinRecente(a);});
   if(!arr.length)return false;
   var i=0;try{i=parseInt(localStorage.getItem('bv_pesAtiva_u'+CU.id))||0;}catch(e){}
   pesAbas=arr;pesAtiva=Math.max(0,Math.min(i,arr.length-1));
@@ -2122,7 +2605,7 @@ function loadPesState(){
 function clearPesState(){if(!CU)return;try{localStorage.removeItem('bv_pesAbas_u'+CU.id);localStorage.removeItem('bv_pesAtiva_u'+CU.id);}catch(e){}}
 function _pesIdsConhecidos(){
   var ids={};var pc=DB.pesCarts||{};
-  for(var k in pc){var c=pc[k];if(c&&Array.isArray(c.abas))c.abas.forEach(function(a){if(a)ids[String(a.id)]=1;});}
+  for(var k in pc){var c=pc[k];if(c&&Array.isArray(c.abas))c.abas.forEach(function(a){if(a)ids[String(a.id)]=1;});if(c&&c.fim)Object.keys(c.fim).forEach(function(id){ids[id]=1;});}
   (pesAbas||[]).forEach(function(a){if(a)ids[String(a.id)]=1;});
   return ids;
 }
@@ -2133,16 +2616,14 @@ function _pesAdotarAntigas(lista){
   var ids=_pesIdsConhecidos();
   var novas=lista.filter(function(a){return a&&a.itens&&a.itens.length&&!ids[String(a.id)];});
   if(!novas.length)return;
-  if(!DB.pesCarts||typeof DB.pesCarts!=='object')DB.pesCarts={};
-  var c=DB.pesCarts._antigo||{abas:[],nome:'Sem dono (versão anterior)'};
+  var c=_ctRow('_antigo');if(!c.nome)c.nome='Sem dono (versão anterior)';
   c.abas=(c.abas||[]).concat(JSON.parse(JSON.stringify(novas)));
-  DB.pesCarts._antigo=c;
+  _ctMarcar('_antigo');
 }
 function _pesAdotarLegadoLocal(){
   try{
     var raw=localStorage.getItem('bv_pesAbas');
-    if(raw){_pesAdotarAntigas(JSON.parse(raw));localStorage.removeItem('bv_pesAbas');localStorage.removeItem('bv_pesAtiva');
-      if(DB.pesCarts&&DB.pesCarts._antigo&&_sbReady)autoSave();}
+    if(raw){_pesAdotarAntigas(JSON.parse(raw));localStorage.removeItem('bv_pesAbas');localStorage.removeItem('bv_pesAtiva');}
   }catch(e){}
 }
 // Depois de receber dados da nuvem: o carrinho deste login passa a ser o que está na nuvem
@@ -2152,12 +2633,8 @@ function _pesRecarregarDoDB(){
   if(!CU)return;
   var c=DB.pesCarts&&DB.pesCarts[CU.id];
   if(!c||!Array.isArray(c.abas))return; // nada salvo ainda para este login: mantém o que está na tela
-  var assumidas=c.abas.filter(function(a){return a&&a.assumida;});
-  var novas=JSON.parse(JSON.stringify(c.abas.filter(function(a){return a&&!a.assumida;})));
-  if(assumidas.length){
-    assumidas.forEach(function(a){toast('&#9888; '+(a.label||'Pesagem')+' foi assumida por '+((a.assumida&&a.assumida.por)||'outro usuário'),'var(--or)');});
-    setTimeout(function(){if(CU)savePesState();},60); // tira o aviso de "assumida" do carrinho
-  }
+  var novas=JSON.parse(JSON.stringify(c.abas.filter(function(a){return a&&!a.assumida&&!_ctFinRecente(a);})));
+  if(!novas.length&&pesAbas&&pesAbas.length===1&&(!pesAbas[0].itens||!pesAbas[0].itens.length))return; // só a aba vazia da tela
   if(JSON.stringify(novas)===JSON.stringify(pesAbas||[]))return;
   var idAtivo=pesAbas&&pesAbas[pesAtiva]?pesAbas[pesAtiva].id:null;
   pesAbas=novas;pesAtiva=0;
@@ -2173,10 +2650,11 @@ function _pesNomeDono(k,c){
 // Pesagens com itens nos carrinhos dos OUTROS usuários
 function _pesOutros(){
   var out=[];var pc=DB.pesCarts||{};
+  var meus={};(pesAbas||[]).forEach(function(a){if(a)meus[String(a.id)]=1;}); // assumida e ainda subindo: não repete
   for(var k in pc){
     if(CU&&String(k)===String(CU.id))continue;
     var c=pc[k];if(!c||!Array.isArray(c.abas))continue;
-    var abs=c.abas.filter(function(a){return a&&!a.assumida&&a.itens&&a.itens.length;});
+    var abs=c.abas.filter(function(a){return a&&!a.assumida&&a.itens&&a.itens.length&&!meus[String(a.id)]&&!(c.fim&&c.fim[String(a.id)]);});
     if(abs.length)out.push({dono:k,nome:_pesNomeDono(k,c),em:c.em,disp:c.disp,abas:abs});
   }
   return out;
@@ -2190,9 +2668,11 @@ function _pesHtmlOutros(){
   outros.forEach(function(o){
     var quando='';if(o.em){var d=new Date(o.em);quando=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
     o.abas.forEach(function(a){
-      var pode=adm||o.dono==='_antigo';
+      var fin=a._fin&&(Date.now()-(a._fin.em||0)<2*60000);
+      var pode=(adm||o.dono==='_antigo')&&!fin;
       h+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid rgba(245,158,11,.25);font-size:12px">'
         +'<div style="flex:1;min-width:0"><b>'+o.nome+'</b> · '+(a.label||'Atendimento')+' · '+_pesCliNome(a)+' · '+a.itens.length+' item(ns)'
+        +(fin?' · <span style="color:var(--bl)">finalizando…</span>':'')
         +(o.disp||quando?'<div style="font-size:10px;color:var(--mt)">'+(o.disp?'no '+o.disp:'')+(quando?' · mexeu às '+quando:'')+'</div>':'')+'</div>'
         +(pode?'<button class="btnO bOgr" style="font-size:11px;padding:5px 10px;white-space:nowrap" onclick="mPesAssumir(\''+o.dono+'\',\''+a.id+'\')">Assumir</button>':'')
         +'</div>';
@@ -2210,26 +2690,85 @@ function mPesAssumir(dono,abaId){
     +(dono!=='_antigo'?'<div class="al aly" style="font-size:12px">Use quando '+nome+' não puder terminar (saiu, acabou a bateria). Se '+nome+' ainda estiver pesando, combine antes.</div>':'')
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="_pesAssumir(\''+dono+'\',\''+abaId+'\')">Assumir</button></div></div>',420);
 }
+// 5.47: primeiro a pesagem entra no SEU carrinho e confirma na nuvem; só depois sai do carrinho do outro.
+// Se cair no meio, ela aparece nos dois por um tempo — nunca em nenhum.
 function _pesAssumir(dono,abaId){
   closeM();
   _sincronizarAntes(function(ok){
     if(!CU)return;
+    if(!ok){_abAviso('Sem conexão com a nuvem','Para assumir uma pesagem de outro usuário é preciso internet (para conferir que ela ainda está aberta). Tente de novo quando a conexão voltar.');return;}
     var c=DB.pesCarts&&DB.pesCarts[dono];var idx=-1;
-    if(c&&c.abas)for(var i=0;i<c.abas.length;i++){if(String(c.abas[i].id)===String(abaId)&&!c.abas[i].assumida){idx=i;break;}}
+    if(c&&c.abas)for(var i=0;i<c.abas.length;i++){if(String(c.abas[i].id)===String(abaId)&&!c.abas[i].assumida&&!(c.fim&&c.fim[String(abaId)])){idx=i;break;}}
     if(idx<0||!c.abas[idx].itens||!c.abas[idx].itens.length){toast('Essa pesagem já foi finalizada ou assumida','var(--or)');if(pgAtiva==='pesagem')renderPesagem();return;}
-    var ab=JSON.parse(JSON.stringify(c.abas[idx]));
+    if(c.abas[idx]._fin&&Date.now()-(c.abas[idx]._fin.em||0)<2*60000){toast('Essa pesagem está sendo finalizada em outro aparelho','var(--or)');return;}
+    var ab=JSON.parse(JSON.stringify(c.abas[idx]));delete ab._fin;
     var nome=_pesNomeDono(dono,c);
-    if(dono==='_antigo')c.abas.splice(idx,1);
-    // No carrinho do dono fica só um aviso: se o aparelho dele gravar atrasado, a pesagem não volta para lá
-    else c.abas[idx]={id:ab.id,label:ab.label,assumida:{por:CU.nome,porId:CU.id,em:_agoraMs()}};
-    c.em=_agoraMs();
     pesAbas=(pesAbas||[]).filter(function(x){return x&&((x.itens&&x.itens.length)||x.cliId);}); // tira abas vazias
     pesAbas.push(ab);pesAtiva=pesAbas.length-1;
-    _auditLog('Pesagem assumida',(ab.label||'Atendimento')+' de '+nome+' — '+ab.itens.length+' item(ns)');
     savePesState();
+    _ctAudit('Pesagem assumida',(ab.label||'Atendimento')+' de '+nome+' — '+ab.itens.length+' item(ns)');
     if(pgAtiva==='pesagem')renderPesagem();else go('pesagem');
-    toast('&#10003; Pesagem assumida'+(ok?'':' (sem internet: sobe quando a conexão voltar)'),'var(--gr)');
+    // marca no carrinho do outro — só sobe depois que o seu carrinho confirmou na nuvem
+    var dd=String(dono),row=_ctRow(dd);
+    row.fim[String(ab.id)]={t:'assum',por:CU.nome,porId:CU.id,em:Date.now(),ks:_ctKs(ab)};
+    row.abas=row.abas.filter(function(x){return String(x.id)!==String(ab.id);});
+    _ct.depois[dd]=String(CU.id);
+    _ctMarcar(dd);
+    _ctEsperarEnvio(dd,function(ok2){
+      if(ok2){delete _ct.depois[dd];_ctGuardar(dd);toast('&#10003; Pesagem assumida','var(--gr)');}
+      else toast('&#10003; Pesagem assumida. O carrinho de '+nome+' é atualizado quando a conexão firmar.','var(--or)');
+    },20000);
   });
+}
+// ── Itens presos (ficaram só num aparelho) ──
+function _pesPresos(){var c=CU&&DB.pesCarts&&DB.pesCarts[CU.id];return c&&Array.isArray(c.presos)?c.presos:[];}
+function _pesHtmlPresos(){
+  var L=_pesPresos();if(!L.length)return '';
+  var h='';
+  L.forEach(function(p){
+    var kg=0;(p.itens||[]).forEach(function(it){kg+=+(it.pesoLiquido!=null?it.pesoLiquido:it.peso)||0;});
+    var mot=p.motivo==='fin'?'A pesagem já foi <b>finalizada</b> em outro aparelho'+(p.num?' (nº '+p.num+')':'')+'.'
+      :p.motivo==='ab'?'A pesagem já foi deixada <b>Em Aberto</b> em outro aparelho'+(p.num?' (nº '+p.num+')':'')+'.'
+      :p.motivo==='assum'?'A pesagem foi <b>assumida</b> por '+_abEsc(p.por||'outro usuário')+'.'
+      :p.motivo==='del'?'A pesagem foi <b>descartada</b> em outro aparelho.'
+      :'A mesma pesagem foi mexida em outro aparelho enquanto este estava sem internet.';
+    h+='<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.4);border-radius:10px;padding:10px 12px;margin-bottom:8px">'
+      +'<div style="font-size:12.5px;font-weight:700;color:var(--rd);display:flex;align-items:center">&#9888; Itens que não subiram para a nuvem'+_aj('pes.presos')+'</div>'
+      +'<div style="font-size:12px;color:var(--mt);margin:3px 0 6px">'+_abEsc((p.label||'Pesagem')+' · '+_pesCliNome(p))+' · ficaram no '+_abEsc(p.disp||'aparelho')+'. '+mot+'</div>'
+      +(p.itens||[]).map(function(it){var pl=it.pesoLiquido!=null?it.pesoLiquido:it.peso;return '<div style="font-size:12.5px;padding:2px 0">• '+_abEsc(it.nome||'Item')+' — <span class="mono">'+fKg(pl)+' kg</span></div>';}).join('')
+      +'<div style="font-size:11.5px;color:var(--mt);margin-top:4px">Total '+fKg(kg)+' kg. Confira se já foram pesados de novo antes de usar.</div>'
+      +'<div class="brow" style="margin-top:8px">'
+      +'<button class="btnO bOgr" style="font-size:12px" onclick="_pesPresoUsar(\''+p.id+'\',false)">Pôr na pesagem aberta</button>'
+      +'<button class="btnO bOgr" style="font-size:12px" onclick="_pesPresoUsar(\''+p.id+'\',true)">Abrir nova pesagem com eles</button>'
+      +'<button class="btnO bOr" style="font-size:12px" onclick="_pesPresoDescartar(\''+p.id+'\')">Descartar</button>'
+      +'</div></div>';
+  });
+  return h;
+}
+function _pesAtualizarPresos(){var el=document.getElementById('pes-presos');if(el)el.innerHTML=_pesHtmlPresos();}
+function _pesPresoAchar(id){var L=_pesPresos();for(var i=0;i<L.length;i++){if(String(L[i].id)===String(id))return L[i];}return null;}
+function _pesPresoTirar(id){var row=_ctRow(CU.id);row.presos=row.presos.filter(function(p){return String(p.id)!==String(id);});}
+function _pesPresoUsar(id,nova){
+  var p=_pesPresoAchar(id);if(!p){_pesAtualizarPresos();return;}
+  var its=_ctCopia(p.itens||[]);
+  its.forEach(function(it){it._k='k'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}); // itens novos nesta pesagem
+  if(nova||!pesAbas[pesAtiva]){
+    novaPesAba();var ab=pesAbas[pesAtiva];ab.tipo=p.tipo||ab.tipo;if(p.cliId)ab.cliId=p.cliId;ab.label=p.label||ab.label;
+  }
+  var alvo=pesAbas[pesAtiva];alvo.itens=(alvo.itens||[]).concat(its);
+  _pesPresoTirar(id);
+  _ctAudit('Itens presos usados',(its.length)+' item(ns) de '+(p.label||'pesagem')+' foram para '+(alvo.label||'a pesagem aberta'));
+  savePesState();renderPesagem();toast('Itens colocados na pesagem — confira os pesos','var(--gr)');
+}
+function _pesPresoDescartar(id){
+  var p=_pesPresoAchar(id);if(!p){_pesAtualizarPresos();return;}
+  var lista=(p.itens||[]).map(function(it){return _abEsc(it.nome||'Item')+' '+fKg(it.pesoLiquido!=null?it.pesoLiquido:it.peso)+' kg';}).join(', ');
+  confirmar('Descartar estes itens?<br><span style="font-size:12.5px;color:var(--mt)">'+lista+'</span><br>Fica registrado na auditoria.',function(){
+    var p2=_pesPresoAchar(id);if(!p2)return;
+    _pesPresoTirar(id);
+    _ctAudit('Itens presos descartados',(p2.label||'Pesagem')+(p2.num?' (nº '+p2.num+')':'')+' — '+(p2.itens||[]).map(function(it){return (it.nome||'Item')+' '+fKg(it.pesoLiquido!=null?it.pesoLiquido:it.peso)+' kg';}).join(', '));
+    _ctMarcar(CU.id);_pesAtualizarPresos();toast('Itens descartados','var(--or)');
+  },'Descartar');
 }
 
 // ── SUPABASE ──────────────────────────────────────────────────────────────
@@ -2633,7 +3172,7 @@ function _atualizarSistema(){
   var t0=Date.now();
   (function esperar(){
     // espera a nuvem confirmar o que estava pendente (se este aparelho ainda puder gravar)
-    if(!_versaoBloqueada&&(_pendingLocal||_saveInFlight)&&Date.now()-t0<8000){setTimeout(esperar,300);return;}
+    if(!_versaoBloqueada&&(_pendingLocal||_saveInFlight||_ctTemPendente())&&Date.now()-t0<8000){setTimeout(esperar,300);return;}
     setTimeout(function(){ // dá tempo de a cópia segura (IndexedDB) terminar
       location.replace(location.pathname+'?v='+encodeURIComponent(alvo)+'&t='+Date.now()+location.hash);
     },600);
@@ -2777,9 +3316,10 @@ function _m3key(r,vistos){
 }
 // Contadores/saldos em que as duas alterações se SOMAM (ex: estoque: um aparelho
 // tirou 5kg e outro pôs 3kg -> vale o efeito dos dois).
-var _M3_SOMA={est:1,atendNum:1,revProxCodigo:1,saldo:1,qtdEstoque:1,qtdPeca:1}; // saldo das contas e quantidade da revenda também somam
+var _M3_SOMA={est:1,revProxCodigo:1,saldo:1,qtdEstoque:1,qtdPeca:1}; // 5.47: atendNum vale o maior (reservado na nuvem) // saldo das contas e quantidade da revenda também somam
 // base = último estado comum · loc = este aparelho · cloud = o que está na nuvem agora
 function _m3(base,loc,cloud,chave){
+  if(chave==='atendNum'&&typeof loc==='number'&&typeof cloud==='number')return Math.max(loc,cloud); // 5.47
   var jb=_m3js(base),jl=_m3js(loc),jc=_m3js(cloud);
   // Contadores: se os DOIS aparelhos mudaram, vale o efeito dos dois — mesmo que tenham chegado no
   // mesmo número (dois atendimentos fechados ao mesmo tempo = dois incrementos, não um só).
@@ -2905,6 +3445,8 @@ function _aplicarDaNuvem(snap,jsonStr){
     _pesMudouFora=false;
   }catch(e){console.warn('[BioVale] erro ao aplicar nuvem',e);}
   _rtApplying=false;
+  _lsNuvemEm=Date.now();
+  setTimeout(function(){try{_ctConferirEspera();_ctLimparFinalizadas();_ctConferirRepetidos();_ctFinOrfas();}catch(e){}},0);
 }
 
 function _sbStartRealtime(){
@@ -2915,13 +3457,15 @@ function _sbStartRealtime(){
   _sbChannel = _sbClient
     .channel('biovale-realtime')
     .on('postgres_changes',
-      {event:'UPDATE', schema:'public', table:'biovale_dados'},
+      {event:'*', schema:'public', table:'biovale_dados'},
       function(payload){
         console.log('[BioVale RT] evento recebido, chave:', payload.new&&payload.new.chave, '_rtApplying:', _rtApplying);
         if(_rtApplying)return;
         var chave = payload.new && payload.new.chave;
 
         if(chave === 'bv_versao'){ _versaoChecarNuvem(); return; }
+        if(chave && String(chave).indexOf('bv_cart_')===0){ _ctTempoReal(payload.new); return; } // 5.47: carrinho (linha pequena)
+        if(chave === 'bv_db' && payload.eventType!=='UPDATE' && payload.eventType!==undefined){ return; }
         if(chave === 'bv_db'){
           try{
             var snap = JSON.parse(payload.new.valor);
@@ -2931,6 +3475,8 @@ function _sbStartRealtime(){
             } else if(_pendingLocal){
               // temos alteração ainda não enviada: não aplica por cima — a gravação protegida junta as duas
               autoSave();
+            } else if(!CU){
+              _lsGuardar(snap,payload.new.valor); // tela de entrada: guarda a mais nova e aplica com calma
             } else {
               _aplicarDaNuvem(snap,payload.new.valor);
               var now=new Date();var hm=now.getHours()+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
@@ -2983,10 +3529,35 @@ function _sbPollStart(){
 }
 
 var _pollAcessosN=0;
+// ── TELA DE ENTRADA LEVE (5.47) ──
+// Sem ninguém logado, o aparelho não precisa redesenhar a empresa inteira a cada mudança.
+// Guarda só a versão mais nova que chegou e aplica no máximo a cada 30 s (nunca enquanto a pessoa
+// toca num perfil ou digita o PIN). Ao tocar em Entrar, aplica na hora.
+var _lsGuardado=null,_lsUltAplic=0,_lsUltBusca=0,_lsToque=0;
+function _lsGuardar(snap,json){_lsGuardado={snap:snap,json:json||null,base:_baseCloudSavedAt};_lsNuvemEm=Date.now();_lsNuvemTxt();}
+function _lsAplicarGuardado(){
+  var g=_lsGuardado;_lsGuardado=null;if(!g)return;
+  if(_pendingLocal||_saveInFlight)return;                           // tem gravação daqui a caminho: ela junta com a nuvem
+  if(g.base!==_baseCloudSavedAt)return;                             // a memória já mudou depois: a versão guardada ficou velha
+  if(g.snap&&(_ownSavedAts[g.snap.savedAt]||g.snap.savedAt===_baseCloudSavedAt))return;
+  _lsUltAplic=Date.now();
+  _aplicarDaNuvem(g.snap,g.json);
+}
+function _lsAplicarComCalma(){
+  if(CU||!_lsGuardado)return;
+  if(Date.now()-_lsUltAplic<30000||Date.now()-_lsToque<8000)return;
+  _lsAplicarGuardado();
+}
+document.addEventListener('pointerdown',function(){if(!CU)_lsToque=Date.now();},true);
+document.addEventListener('keydown',function(){if(!CU)_lsToque=Date.now();},true);
 function _sbPoll(){
-  if(!_sbReady||!_sbClient||!_cloudLoaded)return;
+  if(!_sbReady||!_sbClient)return;
+  try{_ctPoll();}catch(e){} // 5.47: carrinhos (só os carimbos; leve)
+  if(!_cloudLoaded)return;
   if((++_pollAcessosN)%8===0)_recarregarAcessosNuvem();
   if(_pollAcessosN%2===0)_versaoChecarNuvem();
+  if(!CU&&_lsGuardado){_lsAplicarComCalma();return;}
+  if(!CU&&Date.now()-_lsUltBusca<30000)return; // tela de entrada: o banco grande no máximo a cada 30 s
   // Busca só o timestamp da última atualização (leve)
   _sbClient.from('biovale_dados')
     .select('atualizado_em')
@@ -3008,6 +3579,7 @@ function _sbPoll(){
           // Compara a VERSÃO, não o relógio: aparelhos com hora diferente não se ignoram mais
           if(_ownSavedAts[s.savedAt]||s.savedAt===_baseCloudSavedAt){_lastCloudTs=ts;return;}
           if(_pendingLocal){autoSave();return;}
+          if(!CU){_lsUltBusca=Date.now();_lsGuardar(s);_lastCloudTs=ts;_lsAplicarComCalma();return;}
           _aplicarDaNuvem(s);
           _lastCloudTs=ts;
           var now=new Date();
@@ -3048,7 +3620,7 @@ function saveDB(){
       tabComparacoes:DB.tabComparacoes||[],
       declaracoes:DB.declaracoes||[],
       cfgSistema:_cfgSemChaves(CFG.sistema), // sincroniza configurações do sistema (glossário PCB, critérios…) — 5.40: SEM as chaves de API e sem a senha
-      pesCarts:_pesCartsSnap()
+      pesCarts:_ctLegadoSnap() // 5.47: carrinhos ficam nas linhas bv_cart_<id>; aqui só o que ainda não foi migrado
     };
     // 1. Salva local como fallback imediato. Cada gravação local é independente: se o armazenamento
     //    do navegador encher, a gravação na nuvem continua acontecendo (antes ela era pulada em silêncio).
@@ -3247,7 +3819,7 @@ function _saveToCloudGuarded(snap){
       _baseSnapJson = js; _baseCloudSavedAt = enviar.savedAt;
     }
     if(houveNova){ _pendingLocal = true; setTimeout(autoSave, 50); }
-    else { _pendingLocal = false; _limparPendenciaLocal(); }
+    else { _pendingLocal = false; _limparPendenciaLocal(); setTimeout(function(){try{_ctConferirEspera();_ctLimparFinalizadas();_ctConferirRepetidos();_ctFinOrfas();}catch(e){}},0); }
     var _agora=new Date();
     var _hm=String(_agora.getHours()).padStart(2,'0')+':'+String(_agora.getMinutes()).padStart(2,'0')+':'+String(_agora.getSeconds()).padStart(2,'0');
     // Usuários, funções e configurações: só sobem se ESTE aparelho mudou algo, e sempre JUNTANDO
@@ -3296,6 +3868,7 @@ function loadDB(){
     }
   }catch(e){}
   try{_rolesCloudJson=_rolesJson();_usersCloudJson=JSON.stringify(USERS);}catch(e){}
+  try{_ctCarregarLocal();}catch(e){console.warn('[BioVale] carrinhos locais',e);} // 5.47
   return localOk;
 }
 var _SPECS_DEFAULT={
@@ -3432,10 +4005,12 @@ function _applySnap(s){
   if(Array.isArray(s.tabComparacoes))DB.tabComparacoes=s.tabComparacoes;
   if(Array.isArray(s.declaracoes))DB.declaracoes=s.declaracoes;
   // Carrinhos de pesagem — um por usuário (a nuvem já traz a junção com o que estava pendente aqui)
-  if(s.pesCarts&&typeof s.pesCarts==='object'&&!Array.isArray(s.pesCarts))DB.pesCarts=JSON.parse(JSON.stringify(s.pesCarts));
-  else if(!DB.pesCarts||typeof DB.pesCarts!=='object')DB.pesCarts={};
+  // 5.47: carrinhos vivem nas linhas bv_cart_<id>. O que vier aqui é de versão antiga e é migrado (_ctMigrar).
+  _ctLegado=(s.pesCarts&&typeof s.pesCarts==='object'&&!Array.isArray(s.pesCarts))?JSON.parse(JSON.stringify(s.pesCarts)):{};
+  if(_ctLegadoTemAbas(_ctLegado))_ctMigrado=false; // aparelho antigo gravou carrinho no formato velho: migra de novo
+  if(!_ctMigrado)setTimeout(function(){try{_ctMigrar();}catch(e){}},0);
+  if(!DB.pesCarts||typeof DB.pesCarts!=='object')DB.pesCarts={};
   if(Array.isArray(s.pesAbasCloud))_pesAdotarAntigas(s.pesAbasCloud); // carrinho único das versões anteriores
-  _pesRecarregarDoDB();
   // Garante que as Tabelas Padrão sempre existam (migração de versões antigas)
   var temPadVenda=false,temPadCompra=false;
   for(var i=0;i<DB.tabelas.length;i++){
@@ -3451,7 +4026,7 @@ function _applySnap(s){
 // aparelho podia ser aplicada por cima e a alteração sumia antes de ser gravada)
 function autoSave(){_pendingLocal=true;if(_dbSaveTimer)clearTimeout(_dbSaveTimer);_dbSaveTimer=setTimeout(function(){_dbSaveTimer=null;saveDB();},400);}
 // Ao fechar ou minimizar a página, grava na hora o que estiver esperando
-function _gravarJaSePendente(){if(_dbSaveTimer){clearTimeout(_dbSaveTimer);_dbSaveTimer=null;try{saveDB();}catch(e){}}}
+function _gravarJaSePendente(){if(_dbSaveTimer){clearTimeout(_dbSaveTimer);_dbSaveTimer=null;try{saveDB();}catch(e){}}try{_ctEnviarTodos();}catch(e){}}
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')_gravarJaSePendente();});
 window.addEventListener('pagehide',_gravarJaSePendente);
 function pgPesagem(){
@@ -3798,6 +4373,7 @@ function renderPesagem(){
 
   var unitTab=ab.tipo==='Venda'?'<button type="button" class="pz-chip'+(ab.showUnit?' on':'')+'" onclick="setPesVw(true)">&#127991; Unidades</button>':'';
   cc.innerHTML='<div class="fc pz">'
+    +'<div id="pes-presos">'+_pesHtmlPresos()+'</div>'
     +'<div id="pes-outros">'+_pesHtmlOutros()+'</div>'
     +'<div class="pz-topo"><div style="flex:1;min-width:150px"><div class="pl">Operações</div><div class="pt" style="display:flex;align-items:center;gap:6px">Pesagem '+_aj('pes.pagina')+'</div></div><div class="pz-acoes">'
     +(DB.pesagensEmAberto&&DB.pesagensEmAberto.length>0?'<button type="button" class="pz-chip pz-chip-or" onclick="go(&quot;pendencias&quot;)">&#9203; <span class="pz-txt">Em Aberto</span> ('+DB.pesagensEmAberto.length+')</button>':'')
@@ -3989,7 +4565,8 @@ function _pesTaraUsarGlobal(v){var i=document.getElementById('tara-val');if(i)i.
 function selPesAba(i){pesAtiva=i;savePesState();renderPesagem();}
 function delPesAba(e,i){e.stopPropagation();var _a=pesAbas[i];
   if(_a&&_a.itens&&_a.itens.length&&!e._pesOk){confirmar('Fechar o atendimento de <b>'+_pesNomeAba(_a)+'</b>?<br>'+(_a.itens.length===1?'O item do carrinho será descartado.':'Os '+_a.itens.length+' itens do carrinho serão descartados.'),function(){delPesAba({stopPropagation:function(){},_pesOk:true},i);},'Descartar');return;}
-  pesAbas.splice(i,1);if(pesAtiva>=pesAbas.length)pesAtiva=Math.max(0,pesAbas.length-1);if(!pesAbas.length)novaPesAba();else{savePesState();renderPesagem();}autoSave();}
+  if(_a&&_a.itens&&_a.itens.length&&CU){var _r=_ctRow(CU.id);_r.fim[String(_a.id)]={t:'del',em:Date.now(),por:CU.nome,ks:_ctKs(_a)};_ctAudit('Pesagem descartada',_pesNomeAba(_a)+' — '+_a.itens.length+' item(ns)');}
+  pesAbas.splice(i,1);if(pesAtiva>=pesAbas.length)pesAtiva=Math.max(0,pesAbas.length-1);if(!pesAbas.length)novaPesAba();else{savePesState();renderPesagem();}}
 function setPesTipo(t){
   var ab=pesAbas[pesAtiva];
   ab.tipo=t;ab.showUnit=false;
@@ -4230,6 +4807,9 @@ function toast(msg,cor){
 // ── (?) DE AJUDA — padrão do sistema ─────────────────────
 // Uso: título + _aj('chave')  → os textos ficam todos em AJUDA, agrupados por aba.
 var AJUDA={
+  // 5.47: carrinho na nuvem
+  'login.nuvem':'Hora em que este aparelho conferiu os dados da nuvem pela última vez. Na tela de entrada ele atualiza os dados grandes com calma (a cada 30 segundos) para não travar o celular; as pesagens abertas chegam na hora. Ao tocar em Entrar, ele pega a versão mais nova antes de abrir o sistema.',
+  'pes.presos':'Itens que ficaram só neste aparelho (por exemplo, sem internet) enquanto a mesma pesagem foi mexida ou finalizada em outro. O sistema não junta sozinho para não contar em dobro: veja se já foram pesados de novo e escolha pôr numa pesagem ou descartar. Descartar fica registrado na auditoria.',
   // aba Revenda (5.41)
   'rev.pagina':'<b>Revenda</b>: produtos de reuso vendidos por peça (notebook, monitor, lâmpada…). Aqui você cadastra, conserta, guarda peças para os consertos e acompanha o que vendeu.',
   'rev.subabas':'<b>À venda</b>: o que está pronto para vender. <b>Manutenção</b>: o que precisa de conserto ou peça. <b>Peças</b>: componentes guardados para usar nos consertos. <b>Vendidos</b>: o que já saiu, no período escolhido.',
@@ -5548,12 +6128,26 @@ function _pesConferirAntes(titulo,cont){
       closeM();toast('Esta pesagem já foi finalizada em outro aparelho','var(--or)');if(pgAtiva==='pesagem')renderPesagem();return;
     }
     pesAtiva=idx;
+    // 5.47: esta aba já virou atendimento (por exemplo, finalizada em outro aparelho e este voltou da queda)?
+    var _reg=_ctRegistroDaAba(abId);
+    if(_reg){closeM();_ctLimparFinalizadas();if(pgAtiva==='pesagem')renderPesagem();
+      _abAviso('Esta pesagem já foi '+(_reg.t==='ab'?'deixada Em Aberto':'finalizada'),'Ela já está registrada como atendimento nº '+_abEsc(_reg.num||'')+'. Nada foi lançado de novo. Se ficou algum item só neste aparelho, ele aparece no aviso vermelho da Pesagem.');return;}
+    // reaberta e ainda no caixa / Em Aberto: o reabrir não terminou de subir — não deixa lançar em dobro
+    if(pesAbas[idx].numAtend&&_ctNumNoRegistro(pesAbas[idx].numAtend)){closeM();
+      _abAviso('Espere um pouco','A pesagem nº '+_abEsc(pesAbas[idx].numAtend)+' ainda aparece '+(_ctNumNoRegistro(pesAbas[idx].numAtend)==='aberto'?'no Em Aberto':'no Caixa')+': o reabrir ainda não terminou de chegar na nuvem. Confira a internet e tente de novo em alguns segundos.');return;}
     if(JSON.stringify(pesAbas[idx].itens)!==itensAntes){
       closeM();if(pgAtiva==='pesagem')renderPesagem();
       openM('Carrinho alterado','<div class="mf"><div class="al aly" style="font-size:13px;line-height:1.6">Os itens desta pesagem foram alterados em outro aparelho enquanto você finalizava. Confira o carrinho e finalize de novo.</div><div class="brow"><button class="btn" onclick="closeM()">Conferir</button></div></div>',380);
       return;
     }
     if(!ok)toast('Sem internet: a pesagem fica salva aqui e sobe quando a conexão voltar','var(--or)');
+    // 5.47: o nº do atendimento é reservado na nuvem (antes, dois aparelhos finalizando juntos pegavam o mesmo nº)
+    var _abN=pesAbas[idx];
+    if(ok&&!_abN.numAtend&&!_abN.numRes){
+      _finConferindo=true;
+      _atendReservar(function(n){_finConferindo=false;var i2=-1;for(var q=0;q<pesAbas.length;q++){if(String(pesAbas[q].id)===String(abId)){i2=q;break;}}if(i2<0)return;pesAtiva=i2;if(n){pesAbas[i2].numRes=n;savePesState();}_pesConferirEstoque(cont);});
+      return;
+    }
     _pesConferirEstoque(cont);
   },titulo);
 }
@@ -5613,7 +6207,7 @@ function _finalizarPesagem(snap){
   // nome do cliente antes de gravar as entradas (antes ficava "Atend.1")
   var _cliNomeSnap='';
   if(ab.cliId){for(var _ci=0;_ci<DB.clientes.length;_ci++){if(DB.clientes[_ci].id==ab.cliId){_cliNomeSnap=DB.clientes[_ci].nome;break;}}}
-  var num=ab.numAtend||gerarNum();ab.numAtend=num;ab.obs=obs;
+  var num=ab.numAtend||ab.numRes||gerarNum();ab.numAtend=num;ab.obs=obs;
   var dataOp=_finDataOperacao||hj();
   _pesAplicarTransf(ab,num);
   var totLiq2=+(valReceb-valPagei).toFixed(2);
@@ -5699,18 +6293,20 @@ function _finalizarPesagem(snap){
       recMethods:recMethods,pagMethods:pagMethods,methods:allMethods,obs:obs,
       itensList:ab.itens.slice(),
       label:_cliNomeSnap||ab.label,  // nome resolvido
-      tipo:ab.tipo,cliId:ab.cliId,tabId:ab.tabId
+      tipo:ab.tipo,cliId:ab.cliId,tabId:ab.tabId,
+      abaId:ab.id // 5.47: de qual aba do carrinho veio (impede finalizar a mesma pesagem duas vezes)
     });
   }
-  atendHist.unshift({id:nid(),label:_cliNomeSnap||ab.label,tipo:ab.tipo,cliId:ab.cliId,itens:ab.itens.slice(),num:num,total:totLiq2,recMethods:recMethods,pagMethods:pagMethods,methods:allMethods,obs:obs,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
+  atendHist.unshift({id:nid(),abaId:ab.id,label:_cliNomeSnap||ab.label,tipo:ab.tipo,cliId:ab.cliId,itens:ab.itens.slice(),num:num,total:totLiq2,recMethods:recMethods,pagMethods:pagMethods,methods:allMethods,obs:obs,hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
   _auditLog('Pesagem finalizada','#'+num+' '+ab.tipo+' '+(_cliNomeSnap||ab.label)+' — '+fR(totLiq2));
   try{_agPesLigar(ab,num);}catch(e){console.warn('[BioVale] coleta',e);} // 5.45: liga a coleta (depois de tudo gravado)
   try{_evPesLigar(ab,num);}catch(e){console.warn('[BioVale] evento',e);} // 5.46.1: liga ao evento
   // Snapshot do ab antes de limpar, para gerar o boleto
   var _abSnap={itens:ab.itens.slice(),tipo:ab.tipo,cliId:ab.cliId,tabId:ab.tabId,nfNum:ab.nfNum||''};
+  _ctEsperaAdd(ab,num,'fin'); // 5.47: a aba só sai da nuvem depois que o atendimento estiver confirmado lá
   closeM();pesAbas.splice(pesAtiva,1);
-  if(!pesAbas.length){clearPesState();novaPesAba();autoSave();}else{pesAtiva=Math.min(pesAtiva,pesAbas.length-1);savePesState();renderPesagem();}
-  autoSave();
+  if(!pesAbas.length){clearPesState();novaPesAba();}else{pesAtiva=Math.min(pesAtiva,pesAbas.length-1);savePesState();renderPesagem();}
+  if(_dbSaveTimer){clearTimeout(_dbSaveTimer);_dbSaveTimer=null;}saveDB(); // grava já (não espera os 0,4 s)
   _finDataOperacao=null;
   try{_decAvisoPos({itens:_abSnap.itens,tipo:_abSnap.tipo,cliId:_abSnap.cliId,nome:_cliNomeSnap||ab.label,num:num,data:DB.caixaDia&&DB.caixaDia.data?DB.caixaDia.data:hj()});}catch(e){}
 }
@@ -5725,7 +6321,7 @@ function suspenderAtendimento(){
 }
 function _suspenderCont(obs){
   var ab=pesAbas[pesAtiva];
-  var num=ab.numAtend||gerarNum();
+  var num=ab.numAtend||ab.numRes||gerarNum();
   ab.numAtend=num;ab.obs=obs;
   _pesAplicarTransf(ab,num);
   var valReceb=0,valPagei=0;
@@ -5745,12 +6341,13 @@ function _suspenderCont(obs){
     else if(it.tipo==='Compra'||it.tipo==='Logistica Reversa'||it.tipo==='Doacao'){var p=gP(it.prodId);var pesoEf=it.pesoLiquido!=null?it.pesoLiquido:it.peso;if(p)p.est=+(p.est+pesoEf).toFixed(3);}
   }
   if(!DB.pesagensEmAberto)DB.pesagensEmAberto=[];
-  DB.pesagensEmAberto.unshift({id:_pendId,num:num,label:ab.label,tipo:ab.tipo,cliId:ab.cliId,tabId:ab.tabId,itens:ab.itens.slice(),obs:obs,valTotal:valTotal,valTotalLiq:valTotalLiq,estDoacao:true,user:CU?CU.nome:'',aguardando:'pag',suspendoEm:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),suspendoData:hj(),nfNum:ab.nfNum||''});
+  DB.pesagensEmAberto.unshift({id:_pendId,abaId:ab.id,num:num,label:ab.label,tipo:ab.tipo,cliId:ab.cliId,tabId:ab.tabId,itens:ab.itens.slice(),obs:obs,valTotal:valTotal,valTotalLiq:valTotalLiq,estDoacao:true,user:CU?CU.nome:'',aguardando:'pag',suspendoEm:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),suspendoData:hj(),nfNum:ab.nfNum||''});
   try{_agPesLigar(ab,num);}catch(e){console.warn('[BioVale] coleta',e);} // 5.45: liga a coleta
   try{_evPesLigar(ab,num);}catch(e){console.warn('[BioVale] evento',e);} // 5.46.1: liga ao evento
+  _ctEsperaAdd(ab,num,'ab'); // 5.47
   closeM();pesAbas.splice(pesAtiva,1);
   if(!pesAbas.length){clearPesState();novaPesAba();}else{pesAtiva=Math.min(pesAtiva,pesAbas.length-1);savePesState();renderPesagem();}
-  autoSave();
+  if(_dbSaveTimer){clearTimeout(_dbSaveTimer);_dbSaveTimer=null;}saveDB();
   var msg=document.createElement('div');
   msg.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--or);color:#000;padding:11px 20px;border-radius:8px;font-size:13px;font-weight:700;z-index:999;box-shadow:0 4px 14px rgba(0,0,0,.4)';
   msg.textContent='⏳ Pesagem #'+num+' deixada Em Aberto';
@@ -6058,14 +6655,26 @@ function _abReabrirExec(id){
     if(!p){_abAviso('Já resolvida em outro aparelho','Esta pesagem não está mais em aberto. Nada foi desfeito.');_abRender();return;}
     if((p.pagamentos||[]).length){_abAviso('Não dá para reabrir','Ela recebeu um pagamento de parte em outro aparelho.');_abRender();return;}
     if(!caixaAberto()){_abSoltar(trava);_abCaixaFechado();return;}
-    var idx=DB.pesagensEmAberto.indexOf(p);
-    _abDesfazerEstoque(p);
-    _pesDesfazerTransfItens(p.itens,p.num);
-    DB.pesagensEmAberto.splice(idx,1);
-    pesAbas.push({id:nid(),label:'Pen.#'+p.num,tipo:p.tipo,cliId:p.cliId,tabId:p.tabId,itens:p.itens.slice(),obs:p.obs||'',showUnit:false,numAtend:p.num,nfNum:p.nfNum||''});
-    pesAtiva=pesAbas.length-1;savePesState();
-    try{_auditLog('Em Aberto reaberto','#'+p.num);}catch(e){}
-    autoSave();go('pesagem');
+    // 5.47: a pesagem entra no carrinho e confirma na nuvem ANTES de sair do Em Aberto
+    var _abR={id:nid(),label:'Pen.#'+p.num,tipo:p.tipo,cliId:p.cliId,tabId:p.tabId,itens:_ctCopia(p.itens),obs:p.obs||'',showUnit:false,numAtend:p.num,nfNum:p.nfNum||''};
+    pesAbas.push(_abR);pesAtiva=pesAbas.length-1;savePesState();
+    _ctAntesDeTirar(function(okC){
+      var p2=_abPend(id);
+      if(!okC||!p2){
+        pesAbas=pesAbas.filter(function(a){return String(a.id)!==String(_abR.id);});pesAtiva=Math.max(0,pesAbas.length-1);if(!pesAbas.length)novaPesAba();else savePesState();
+        _abSoltar(trava);
+        if(!okC)_abSemNuvem('Reabrir');else{_abAviso('Já resolvida em outro aparelho','Esta pesagem não está mais em aberto. Nada foi desfeito.');_abRender();}
+        return;
+      }
+      var idx=DB.pesagensEmAberto.indexOf(p2);
+      _abDesfazerEstoque(p2);
+      _pesDesfazerTransfItens(p2.itens,p2.num);
+      DB.pesagensEmAberto.splice(idx,1);
+      for(var _q=0;_q<pesAbas.length;_q++){if(String(pesAbas[_q].id)===String(_abR.id)){pesAtiva=_q;break;}}
+      savePesState();
+      try{_auditLog('Em Aberto reaberto','#'+p2.num);}catch(e){}
+      autoSave();go('pesagem');
+    });
   },'Reabrir');
   });
 }
@@ -7054,6 +7663,22 @@ function _execReabrirDoCaixaCont(numAtend){
   if(!snap){openM('Não encontrado','<div class="mf"><div class="al aly">Esta pesagem não está mais no caixa (já foi reaberta em outro aparelho?).</div><div class="brow"><button class="btn" onclick="closeM()">OK</button></div></div>',380);return;}
   if(!snap.itensList||!snap.itensList.length){openM('Aviso','<div class="mf"><div class="al aly">Este atendimento não tem itens salvos para reabrir.</div><div class="brow"><button class="btn" onclick="closeM()">OK</button></div></div>',380);return;}
   closeM();
+  // 5.47: a pesagem entra no carrinho e confirma na nuvem ANTES de sair do caixa (se cair no meio, ela não some)
+  if(!_ctReabOk[String(numAtend)]){
+    var _abR={id:nid(),label:'Reab.#'+snap.num,tipo:snap.tipo||'Venda',cliId:snap.cliId||'',tabId:snap.tabId||null,itens:_ctCopia(snap.itensList),obs:snap.obs||'',showUnit:false,numAtend:snap.num};
+    pesAbas.push(_abR);pesAtiva=pesAbas.length-1;savePesState();
+    toast('Reabrindo…','var(--bl)');
+    _ctAntesDeTirar(function(ok){
+      if(!ok){
+        pesAbas=pesAbas.filter(function(a){return String(a.id)!==String(_abR.id);});pesAtiva=Math.max(0,pesAbas.length-1);if(!pesAbas.length)novaPesAba();else savePesState();
+        openM('Sem conexão com a nuvem','<div class="mf"><div class="al aly" style="font-size:13px;line-height:1.6">Não consegui confirmar o carrinho na nuvem. Nada foi desfeito: a pesagem continua no caixa. Tente de novo quando a internet firmar.</div><div class="brow"><button class="btn" onclick="closeM()">OK</button></div></div>',400);return;}
+      var s2=null;for(var q=0;q<DB.caixaDia.movimentos.length;q++){if(String(DB.caixaDia.movimentos[q].num)===String(numAtend)){s2=DB.caixaDia.movimentos[q];break;}}
+      if(!s2){pesAbas=pesAbas.filter(function(a){return String(a.id)!==String(_abR.id);});pesAtiva=Math.max(0,pesAbas.length-1);if(!pesAbas.length)novaPesAba();else savePesState();toast('Esta pesagem não está mais no caixa','var(--or)');return;}
+      _ctReabOk[String(numAtend)]=_abR.id;_execReabrirDoCaixaCont(numAtend);
+    });
+    return;
+  }
+  var _abRid=_ctReabOk[String(numAtend)];delete _ctReabOk[String(numAtend)];
   // Reverse stock
   for(var j=0;j<snap.itensList.length;j++){
     var it=snap.itensList[j];
@@ -7080,9 +7705,9 @@ function _execReabrirDoCaixaCont(numAtend){
   DB.caixaDia.movimentos.splice(snapIdx,1);
   // Remove from atendHist if present
   for(var j=0;j<atendHist.length;j++){if(String(atendHist[j].num)===String(numAtend)){atendHist.splice(j,1);break;}}
-  // Push aba e navegar
-  pesAbas.push({id:nid(),label:'Reab.#'+snap.num,tipo:snap.tipo||'Venda',cliId:snap.cliId||'',tabId:snap.tabId||null,itens:snap.itensList.slice(),obs:snap.obs||'',showUnit:false,numAtend:snap.num});
-  pesAtiva=pesAbas.length-1;savePesState();
+  // A aba já está no carrinho (5.47): só vai para ela
+  for(var _q=0;_q<pesAbas.length;_q++){if(String(pesAbas[_q].id)===String(_abRid)){pesAtiva=_q;break;}}
+  savePesState();
   autoSave();go('pesagem');
 }
 function reabrirDoCaixa(numAtend){
@@ -8099,6 +8724,10 @@ function mArquivoVer(chave){
 // Antes de ações sensíveis: envia o que está pendente e traz a versão mais nova da nuvem
 function _sincronizarAntes(cb,titulo){
   if(!_sbReady||!_sbClient||!_cloudLoaded){cb(true);return;}
+  // 5.47: primeiro sobe os carrinhos pendentes e traz a versão mais nova deles
+  _ctSincronizar(function(okCt){_sincronizarAntesDb(function(okDb){cb(okCt&&okDb);},titulo);});
+}
+function _sincronizarAntesDb(cb,titulo){
   var t0=Date.now();toast('Conferindo a nuvem…','var(--bl)');
   if(_pendingLocal&&!_saveInFlight)autoSave();
   (function esperar(){
@@ -14810,37 +15439,55 @@ function desfazerTransfConta(tid){
 }
 
 // ── Ajuste de saldo (único jeito de acertar o saldo de uma conta) ─────
+// 5.47.1: o ajuste leva o saldo para o valor certo E acerta o que os lançamentos explicam.
+// Antes o lançamento de ajuste mexia no saldo e na soma juntos: a diferença "saldo fora dos
+// lançamentos" nunca sumia, e o "Acertar" ainda sugeria baixar o saldo pelo valor da diferença.
+function _finExplica(c){return +((+c.base||0)+_finSomaMovs(c.nome)).toFixed(2);}
 function mFinAjuste(contaId,difSug){
   var L=_finContasAtivas();if(!L.length)return;
   var c=contaId!=null?_finContaId(contaId):null;c=c||L[0];
-  var sug=difSug!=null?+(+c.saldo+(+difSug)).toFixed(2):(Math.abs(_finDifConta(c))>=0.01?+(+c.saldo-_finDifConta(c)).toFixed(2):null);
   openM('&#9878; Ajuste de saldo'+_aj('fin.ajuste'),'<div class="mf">'
-    +'<div class="al alb" style="font-size:12.5px;line-height:1.5">Use quando o saldo do sistema não bate com o dinheiro de verdade (contagem do cofre, extrato do banco). Vira um lançamento <b>fora do lucro</b>, com motivo e quem fez.</div>'
+    +'<div class="al alb" style="font-size:12.5px;line-height:1.5">Digite o saldo de <b>verdade</b> (contagem do cofre ou extrato do banco). O saldo da conta fica igual a ele e a diferença vira um lançamento <b>fora do lucro</b>, com motivo e quem fez.</div>'
     +'<div class="fld"><label>Conta</label><select class="inp" id="aj-c" onchange="_finAjusteConta()">'+_finContaOpts(c.nome)+'</select></div>'
-    +'<div class="g2"><div class="fld"><label>Saldo no sistema</label><div class="inp mono" id="aj-s" style="background:var(--s2)">'+_finN(c.saldo)+'</div></div>'
-    +'<div class="fld"><label>Saldo certo (contado / extrato)</label><input class="inp mono" inputmode="decimal" id="aj-v" value="'+(sug!=null?_abFmt(sug):'')+'" oninput="_finAjusteDif()" placeholder="0,00"></div></div>'
+    +'<div id="aj-s"></div>'
+    +'<div class="fld"><label>Saldo certo (contado / extrato)</label><input class="inp mono" inputmode="decimal" id="aj-v" value="'+(difSug!=null?_abFmt(+(+c.saldo+(+difSug)).toFixed(2)):'')+'" oninput="_finAjusteDif()" placeholder="0,00"></div>'
     +'<div id="aj-dif" class="fin-mini"></div>'
-    +'<div class="fld"><label>Motivo (obrigatório)</label><input class="inp" id="aj-m" placeholder="Ex.: conferência inicial, contagem do cofre, extrato do banco"></div><div id="aj-err"></div>'
+    +'<div class="fld"><label>Motivo (obrigatório)</label><input class="inp" id="aj-m" placeholder="Ex.: conferência com o extrato, contagem do cofre"></div><div id="aj-err"></div>'
     +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" onclick="_finAjusteOk()">Registrar ajuste</button></div></div>',460);
+  _finAjusteConta();
+  setTimeout(function(){var e=document.getElementById('aj-v');if(e)e.focus();},80);
+}
+function _finAjusteConta(){
+  var c=_finConta((document.getElementById('aj-c')||{}).value),s=document.getElementById('aj-s');if(!c||!s)return;
+  var ex=_finExplica(c),dif=+((+c.saldo||0)-ex).toFixed(2);
+  s.innerHTML='<div class="liq-box"><div class="liq-l"><span>Saldo no sistema</span><b class="mono">'+_finN(c.saldo)+'</b></div>'
+    +(c.base!=null&&Math.abs(dif)>=0.005?'<div class="liq-l"><span>Os lançamentos explicam</span><b class="mono">'+_finN(ex)+'</b></div><div class="liq-l"><span style="color:var(--rd)">Saldo fora dos lançamentos</span><b class="mono" style="color:var(--rd)">'+_finSinal(dif)+'</b></div>':'')+'</div>';
   _finAjusteDif();
 }
-function _finAjusteConta(){var c=_finConta((document.getElementById('aj-c')||{}).value);var s=document.getElementById('aj-s');if(c&&s)s.textContent=_finN(c.saldo);_finAjusteDif();}
-function _finAjusteDif(){var c=_finConta((document.getElementById('aj-c')||{}).value),e=document.getElementById('aj-dif'),v=(document.getElementById('aj-v')||{}).value;if(!c||!e)return;if(!String(v||'').trim()){e.innerHTML='';return;}var d=+(_abNum(v)-(+c.saldo||0)).toFixed(2);e.innerHTML=Math.abs(d)<0.005?'Sem diferença.':'Ajuste de <b style="color:'+(d>0?'var(--gr)':'var(--rd)')+'">'+_finSinal(d)+'</b> na conta '+_finE(c.nome)+'.';}
+function _finAjusteDif(){
+  var c=_finConta((document.getElementById('aj-c')||{}).value),e=document.getElementById('aj-dif'),v=(document.getElementById('aj-v')||{}).value;if(!c||!e)return;
+  if(!String(v||'').trim()){e.innerHTML='';return;}
+  var alvo=_abNum(v),ex=c.base!=null?_finExplica(c):(+c.saldo||0),d=+(alvo-ex).toFixed(2);
+  e.innerHTML='O saldo de '+_finE(c.nome)+' fica <b>'+_finN(alvo)+'</b>. '+(Math.abs(d)<0.005?'Nenhum lançamento de ajuste é preciso.':'Lançamento de ajuste: <b style="color:'+(d>0?'var(--gr)':'var(--rd)')+'">'+_finSinal(d)+'</b>.');
+}
 function _finAjusteOk(){
   var nome=(document.getElementById('aj-c')||{}).value,vs=(document.getElementById('aj-v')||{}).value,mot=((document.getElementById('aj-m')||{}).value||'').trim();
   var c=_finConta(nome);if(!c)return;
   if(!String(vs||'').trim()){_cxErr('aj-err','Digite o saldo certo.');return;}
   if(!mot){_cxErr('aj-err','Escreva o motivo.');return;}
   if(!_finContaLivre(nome,'aj-err'))return;
-  var alvo=_abNum(vs),s0=+c.saldo||0;
-  if(Math.abs(alvo-s0)<0.005){_cxErr('aj-err','O saldo já é esse.');return;}
+  var alvo=_abNum(vs),s0=+c.saldo||0,ex0=c.base!=null?_finExplica(c):s0;
+  if(Math.abs(alvo-s0)<0.005&&Math.abs(alvo-ex0)<0.005){_cxErr('aj-err','O saldo já é esse e bate com os lançamentos.');return;}
   closeM();
-  _finTravar(['bvlock_aj_'+c.id+'_'+String(s0).replace('.','_')],'Ajuste de saldo',function(){
+  _finTravar(['bvlock_aj_'+c.id+'_'+String(s0).replace('.','_')+'_'+String(ex0).replace('.','_')],'Ajuste de saldo',function(){
     var cc=_finConta(nome);if(!cc)return;
-    if(Math.abs((+cc.saldo||0)-s0)>0.005){_abAviso('Mudou em outro aparelho','O saldo de '+_finE(nome)+' mudou em outro aparelho ('+fR(cc.saldo)+'). Nada foi lançado: confira e faça o ajuste de novo.');_finRedraw();return;}
-    var d=+(alvo-s0).toFixed(2);
-    _finNovoMov({data:_finEhCaixa(nome)?DB.caixaDia.data:hj(),desc:'Ajuste de saldo: '+mot,tipo:d>0?'entrada':'saida',cat:'Ajuste de saldo',valor:Math.abs(d),conta:nome,ajSaldo:1});
-    _auditLog('Ajuste de saldo',nome+': '+fR(s0)+' → '+fR(alvo)+' ('+mot+')');
+    var ex=cc.base!=null?_finExplica(cc):(+cc.saldo||0);
+    if(Math.abs((+cc.saldo||0)-s0)>0.005||Math.abs(ex-ex0)>0.005){_abAviso('Mudou em outro aparelho','A conta '+_finE(nome)+' mudou em outro aparelho ('+fR(cc.saldo)+'). Nada foi lançado: confira e faça o ajuste de novo.');_finRedraw();return;}
+    var d=+(alvo-ex).toFixed(2);
+    if(Math.abs(d)>=0.005)_finNovoMov({data:_finEhCaixa(nome)?DB.caixaDia.data:hj(),desc:'Ajuste de saldo: '+mot,tipo:d>0?'entrada':'saida',cat:'Ajuste de saldo',valor:Math.abs(d),conta:nome,ajSaldo:1});
+    // o lançamento acima já mexeu no saldo; agora o saldo fica exatamente no valor certo
+    var c2=_finConta(nome);c2.saldo=+alvo.toFixed(2);
+    _auditLog('Ajuste de saldo',nome+': saldo '+fR(s0)+' → '+fR(alvo)+' · lançamentos explicavam '+fR(ex)+' · ajuste '+fR(d)+' ('+mot+')');
     autoSave();_finRedraw();toast('Ajuste registrado','var(--gr)');
   });
 }
@@ -21723,7 +22370,7 @@ function _clJuntarOk(){
     (DB.coletas||[]).forEach(function(k){if(k.cliId!=null&&String(k.cliId)===sb){k.cliId=a.id;n++;}});
     function troca(ab){if(!ab||String(ab.cliId)!==sb)return;ab.cliId=a.id;var t=_cliTabPara(a,(ab.tipo==='Compra'||ab.tipo==='Logistica Reversa')?'compra':'venda');if(t)ab.tabId=t.id;n++;}
     (pesAbas||[]).forEach(troca);
-    var pc=DB.pesCarts||{};for(var k in pc){var x=pc[k];if(x&&Array.isArray(x.abas))x.abas.forEach(troca);}
+    var pc=DB.pesCarts||{};for(var k in pc){var x=pc[k];if(x&&Array.isArray(x.abas)){var _n0=n;x.abas.forEach(troca);if(n>_n0&&!(CU&&String(k)===String(CU.id)))_ctMarcar(k);}}
     _auditLog('Cadastros juntados','Ficou: '+a.nome+' · saiu: '+b.nome+(b.tel?' ('+b.tel+')':'')+(mud.length?' · dados trazidos: '+mud.join(', '):'')+(n?' · '+n+' registro(s) em aberto trocados':''));
     _clMudou++;savePesState();saveDB();closeM();toast('Cadastros juntados','var(--gr)');_clAbrirFicha(a.id);
   },'Juntar cadastros');
@@ -26204,7 +26851,7 @@ function cfgZerarSistema(){
     DB.atendNum=1;
     DB.coletas=[];
     DB.pesagensEmAberto=[];DB.emAbertoCancelados=[];
-    DB.pesCarts={};pesAbas=[];pesAtiva=0;
+    Object.keys(DB.pesCarts||{}).forEach(function(k){var r=_ctRow(k);r.abas=[];r.presos=[];_ctMarcar(k);});pesAbas=[];pesAtiva=0;
     // Estoque e produtos zerados
     DB.produtos=[];
     // Revenda vazia
@@ -26373,6 +27020,8 @@ window.addEventListener('DOMContentLoaded', function(){
           } else { _sanitizeRevenda(); }
           _syncBadge('idle','Nuvem ativa');
           _cloudLoaded = true; // a partir daqui saves guardados são liberados
+          _lsNuvemEm=Date.now();
+          setTimeout(function(){try{_ctMigrar();_ctLimparFinalizadas();_ctConferirEspera();_ctConferirRepetidos();_ctFinOrfas();}catch(e){}},0);
           // Guarda timestamp do último sync
           _sbClient.from('biovale_dados').select('atualizado_em').eq('chave','bv_db').maybeSingle().then(function(r){if(r.data)_lastCloudTs=r.data.atualizado_em||'';});
           buildLoginList();
@@ -26408,6 +27057,8 @@ window.addEventListener('DOMContentLoaded', function(){
           _sbMergeKey('bv_users',function(){return USERS;},function(){return null;},function(m){_usersCloudJson=JSON.stringify(USERS);},function(){});
         }
       });
+      // 5.47: carrinhos (linhas pequenas) — antes recupera a cópia segura, se o navegador perdeu o localStorage
+      _ctCarregarIdb(function(){_ctCarregarTodas(function(ok){if(!ok){(function tenta(){setTimeout(function(){if(!_ctCarregou)_ctCarregarTodas(function(ok2){if(!ok2)tenta();});},4000);})();}});});
       // Carrega ROLES da nuvem
       _sbGet('bv_roles', function(ro){
         _aplicarRolesNuvem(ro);
