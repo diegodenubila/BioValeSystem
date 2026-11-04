@@ -1587,7 +1587,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.48.1';var DADOS_VERSAO=12;
+var APP_VERSION='5.48.2';var DADOS_VERSAO=12;
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[
@@ -3580,6 +3580,76 @@ function baixarBackupNuvem(chave){
     if(r.error||!r.data){toast('Não consegui baixar este backup','var(--rd)');return;}
     var t=r.data.valor;_baixarTexto('biovale-nuvem-'+chave.replace('bv_backup_','')+'.json',typeof t==='string'?t:JSON.stringify(t));
   },function(){toast('Sem conexão com a nuvem','var(--rd)');});
+}
+// 5.48.2: reparo de dados por arquivo (os valores ficam no arquivo, nunca no código: o GitHub é público).
+// Aplica só diferenças sobre o estado atual; o que foi feito depois do arquivo continua valendo.
+var _rep=null;
+function _repE(x){return String(x==null?'':x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function _repArquivo(inp){
+  var f=inp.files&&inp.files[0];if(!f)return;
+  var fr=new FileReader();
+  fr.onload=function(e){
+    var r=null;try{r=JSON.parse(e.target.result);}catch(x){}
+    if(!r||r.tipo!=='bv_reparo'){_abAviso('Arquivo inválido','Este não é um arquivo de reparo da BioVale.');return;}
+    _repPrever(r);
+  };
+  fr.readAsText(f);
+}
+function _repPrever(r){
+  if(!_finAdm()){toast('Só o Administrador','var(--or)');return;}
+  var cd=DB.caixaDia;
+  if(!cd||String(cd.id)!==String(r.caixa.zumbiId)){_abAviso('Reparo já aplicado','O caixa misturado não está mais aberto. Nada a fazer.');return;}
+  _rep=r;
+  var lin=function(a,b){return '<div class="liq-l"><span>'+a+'</span><b class="mono">'+b+'</b></div>';};
+  var sal=r.saldos.map(function(s){var c=_finConta(s.nome);var at=c?+c.saldo:0;return lin(_repE(s.nome),_finN(at)+' → '+_finN(at+s.delta));}).join('');
+  var tir=(cd.movimentos||[]).filter(function(m){return r.caixa.tirarNums.indexOf(String(m.num))>=0;}).length,fica=(cd.movimentos||[]).length-tir;
+  var est=r.estoque.slice().sort(function(a,b){return Math.abs(b.delta)-Math.abs(a.delta);}).map(function(x){var p=gP(x.id);return lin(_repE(x.nome),p?fKg(p.est)+' → '+fKg(p.est+x.delta):'não achado');}).join('');
+  openM('&#128295; '+_repE(r.titulo),'<div class="mf"><div class="al alb" style="font-size:12.5px;line-height:1.5">Só muda o que está na lista. O que foi feito depois continua valendo. Roda uma vez.</div>'
+    +'<div class="liq-box"><b>Caixa</b>'+lin('Passa a ser de',_repE(r.caixa.data)+' · abertura '+_finN(r.caixa.saldoAbertura))+lin('Atendimentos que ficam',fica)+lin('Saem (já estão no caixa fechado)',tir)+'</div>'
+    +'<div class="liq-box"><b>Saldos</b>'+sal+'</div>'
+    +'<div class="liq-box">'+lin('Saem do Em Aberto',r.emAbertoTirar.length)+lin('Pontos que voltam como pagos',r.pontos.length)+lin('Produções que voltam a fechadas',r.producoes.length)+lin('Nº novo para a venda #'+_repE(r.renumerar.num),'sim')+lin('Preço de '+_repE(r.precoProd.nome),_finN(r.precoProd.vV))+'</div>'
+    +'<details class="fin-det"><summary>Estoque: '+r.estoque.length+' materiais</summary>'+est+'</details>'
+    +'<div id="rep-err"></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" style="flex:1" id="rep-ok" onclick="_repAplicar()">Aplicar o reparo</button></div></div>',560);
+}
+function _repAplicar(){
+  var r=_rep;if(!r)return;
+  closeM();
+  _finTravar(['bvlock_reparo_'+r.id],'Reparo',function(){
+    var cd=DB.caixaDia;
+    if(!cd||String(cd.id)!==String(r.caixa.zumbiId)){_abAviso('Reparo já aplicado','Outro aparelho já aplicou. Nada foi mudado.');return;}
+    _atendReservar(function(novoNum){
+      if(!novoNum){_abAviso('Não deu para aplicar','Não consegui reservar o número novo na nuvem. Nada foi mudado.');return;}
+      var cd2=DB.caixaDia;if(!cd2||String(cd2.id)!==String(r.caixa.zumbiId))return;
+      var res=_repExec(r,novoNum);
+      try{_auditLog('Reparo aplicado',r.titulo+' · '+res);}catch(e){}
+      _rep=null;saveDB();
+      _abAviso('Reparo aplicado',_repE(res)+'. Confira Caixa, Em Aberto e Financeiro.');
+      try{if(pgAtiva)go(pgAtiva);}catch(e){}
+    });
+  });
+}
+function _repExec(r,novoNum){
+  var cd=DB.caixaDia,c=r.caixa,oldId=cd.id,n={};
+  // número novo: o movimento do caixa e o lançamento da venda
+  var rn=r.renumerar;
+  (cd.movimentos||[]).forEach(function(m){if(String(m.id)===String(rn.movCaixaId)){m.num=novoNum;n.num=1;}});
+  (DB.movs||[]).forEach(function(m){if(m&&m.tipo===rn.tipoMov&&String(m.desc||'').indexOf('#'+rn.num)>=0&&Math.abs((+m.valor||0)-rn.valor)<0.005&&String(m.cxId)===String(oldId)){m.atNum=novoNum;m.desc=String(m.desc).replace('#'+rn.num,'#'+novoNum);}});
+  (atendHist||[]).forEach(function(a){if(a&&String(a.num)===String(rn.num)&&a.total===rn.valor)a.num=novoNum;});
+  // caixa certo
+  cd.movimentos=(cd.movimentos||[]).filter(function(m){return c.tirarNums.indexOf(String(m.num))<0;});
+  cd.id=c.certoId;cd.data=c.data;cd.saldoAbertura=c.saldoAbertura;cd.abertoPor=c.abertoPor;cd.abertoHora=c.abertoHora;
+  (DB.movs||[]).forEach(function(m){if(m&&String(m.cxId)===String(oldId)&&m.data===c.data)m.cxId=c.certoId;});
+  DB.caixaOntem=r.caixaOntem;
+  var ids={};r.emAbertoTirar.forEach(function(i){ids[String(i)]=1;});
+  DB.pesagensEmAberto=(DB.pesagensEmAberto||[]).filter(function(p){return !ids[String(p.id)];});
+  r.saldos.forEach(function(s){var x=_finConta(s.nome);if(x)x.saldo=+((+x.saldo||0)+s.delta).toFixed(2);});
+  r.estoque.forEach(function(s){var p=gP(s.id);if(p)p.est=+((+p.est||0)+s.delta).toFixed(3);});
+  var nPt=0;r.pontos.forEach(function(s){(DB.funcs||[]).forEach(function(f){if(String(f.id)!==String(s.func))return;(f.pontos||[]).forEach(function(p,i){if(String(p.id)===String(s.id)){f.pontos[i]=s.certo;nPt++;}});});});
+  var nPr=0;r.producoes.forEach(function(s){for(var i=0;i<DB.producoes.length;i++){if(String(DB.producoes[i].id)===String(s.id)&&DB.producoes[i].status==='aberta'){DB.producoes[i]=s;nPr++;}}});
+  var pp=gP(r.precoProd.id);if(pp){pp.vV=r.precoProd.vV;pp.vC=r.precoProd.vC;}
+  r.tabelas.forEach(function(t){(DB.tabelas||[]).forEach(function(u){if(String(u.id)!==String(t.id))return;u.atualizadaEm=t.atualizadaEm;t.itens.forEach(function(x){(u.itens||[]).forEach(function(i){if(String(i.id)===String(x.id))i.preco=x.preco;});});});});
+  if(DB.mercado&&r.mercado){if(!DB.mercado.dias)DB.mercado.dias={};Object.keys(r.mercado.dias).forEach(function(k){DB.mercado.dias[k]=r.mercado.dias[k];});if(String(DB.mercado.ultimaBusca||'')<String(r.mercado.ultimaBusca||''))DB.mercado.ultimaBusca=r.mercado.ultimaBusca;}
+  return 'caixa '+c.data+', '+r.saldos.length+' saldos, '+r.estoque.length+' materiais, '+nPt+' pontos, '+nPr+' produções, venda virou #'+novoNum;
 }
 // Aplica um estado vindo da nuvem (ou da junção) na memória e na tela
 function _aplicarDaNuvem(snap,jsonStr){
@@ -26291,7 +26361,7 @@ function _backupAntesDeRestaurar(cb){
 function _restAviso(tit,msg){openM(tit,'<div class="mf"><div style="font-size:13px;line-height:1.6">'+msg+'</div><div class="brow"><button class="btn" onclick="closeM()">Fechar</button></div></div>',420);}
 function mRestaurarBackupNuvem(){
   if(!_sbReady){_restAviso('Nuvem não conectada','Conecte-se à internet para ver os backups da nuvem.');return;}
-  openM('&#9729; Backups Diários na Nuvem','<div style="margin-bottom:10px"><button class="btnO bOb" style="width:100%" onclick="mArquivo()">&#128451; Arquivo permanente (caixas e auditoria antigos)</button>'+(function(){try{return localStorage.getItem('bv_quar_info')?'<button class="btnO bOgr" style="width:100%;margin-top:6px" onclick="baixarQuarentena()">&#11015; Baixar cópia guardada neste aparelho</button>':'';}catch(e){return '';}})()+'</div><div id="bkp-lista" style="max-height:55vh;overflow-y:auto"><div style="text-align:center;padding:30px;color:var(--mt);font-size:13px">Carregando backups…</div></div>',460);
+  openM('&#9729; Backups Diários na Nuvem','<div style="margin-bottom:10px"><button class="btnO bOb" style="width:100%" onclick="mArquivo()">&#128451; Arquivo permanente (caixas e auditoria antigos)</button>'+(_finAdm()?'<label class="btnO bOgr" style="display:block;text-align:center;margin-top:6px;cursor:pointer">&#128295; Aplicar arquivo de reparo<input type="file" accept=".json" style="display:none" onchange="_repArquivo(this)"></label>':'')+(function(){try{return localStorage.getItem('bv_quar_info')?'<button class="btnO bOgr" style="width:100%;margin-top:6px" onclick="baixarQuarentena()">&#11015; Baixar cópia guardada neste aparelho</button>':'';}catch(e){return '';}})()+'</div><div id="bkp-lista" style="max-height:55vh;overflow-y:auto"><div style="text-align:center;padding:30px;color:var(--mt);font-size:13px">Carregando backups…</div></div>',460);
   _listarBackups(function(arr){
     var cont=document.getElementById('bkp-lista');
     if(!cont)return;
