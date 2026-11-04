@@ -1587,7 +1587,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.48.2';var DADOS_VERSAO=12;
+var APP_VERSION='5.48.3';var DADOS_VERSAO=12;
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[
@@ -3538,6 +3538,9 @@ function _m3Guardas(loc,cloud,r){
   };
   // Caixa fechado nunca volta a ficar aberto por causa de uma gravação atrasada
   var arq=rc?fechado(rc.id):null;
+  // 5.48.3: se a nuvem também tem este caixa aberto, não é gravação atrasada; caixa reaberto de verdade também não
+  if(arq&&cc&&String(cc.id)===String(rc.id))arq=null;
+  if(arq&&rc.reaberto&&(+rc.reabN||0)>(+arq.reabN||0))arq=null;
   if(arq){
     var fica=cc&&String(cc.id)!==String(rc.id)&&!fechado(cc.id)?JSON.parse(JSON.stringify(cc)):null;
     r.caixaDia=fica;soAqui(rc,arq);
@@ -3595,31 +3598,31 @@ function _repArquivo(inp){
   };
   fr.readAsText(f);
 }
+function _repArq(r){var H=DB.caixasHist||[];for(var i=0;i<H.length;i++){if(H[i]&&String(H[i].id)===String(r.caixa.zumbiId))return H[i];}return null;}
+function _repExtras(r){var a=_repArq(r);if(!a)return [];return (a.movimentos||[]).filter(function(m){return r.caixa.fechadoNums.indexOf(String(m.num))<0;});}
 function _repPrever(r){
   if(!_finAdm()){toast('Só o Administrador','var(--or)');return;}
-  var cd=DB.caixaDia;
-  if(!cd||String(cd.id)!==String(r.caixa.zumbiId)){_abAviso('Reparo já aplicado','O caixa misturado não está mais aberto. Nada a fazer.');return;}
+  var ex=_repExtras(r),cd=DB.caixaDia;
+  if(!ex.length){_abAviso('Reparo já aplicado','Os atendimentos de hoje não estão mais no caixa de 30/10. Nada a fazer.');return;}
   _rep=r;
   var lin=function(a,b){return '<div class="liq-l"><span>'+a+'</span><b class="mono">'+b+'</b></div>';};
   var sal=r.saldos.map(function(s){var c=_finConta(s.nome);var at=c?+c.saldo:0;return lin(_repE(s.nome),_finN(at)+' → '+_finN(at+s.delta));}).join('');
-  var tir=(cd.movimentos||[]).filter(function(m){return r.caixa.tirarNums.indexOf(String(m.num))>=0;}).length,fica=(cd.movimentos||[]).length-tir;
   var est=r.estoque.slice().sort(function(a,b){return Math.abs(b.delta)-Math.abs(a.delta);}).map(function(x){var p=gP(x.id);return lin(_repE(x.nome),p?fKg(p.est)+' → '+fKg(p.est+x.delta):'não achado');}).join('');
   openM('&#128295; '+_repE(r.titulo),'<div class="mf"><div class="al alb" style="font-size:12.5px;line-height:1.5">Só muda o que está na lista. O que foi feito depois continua valendo. Roda uma vez.</div>'
-    +'<div class="liq-box"><b>Caixa</b>'+lin('Passa a ser de',_repE(r.caixa.data)+' · abertura '+_finN(r.caixa.saldoAbertura))+lin('Atendimentos que ficam',fica)+lin('Saem (já estão no caixa fechado)',tir)+'</div>'
+    +'<div class="liq-box"><b>Caixa</b>'+lin('Caixa de hoje',_repE(r.caixa.data)+' · abertura '+_finN(r.caixa.saldoAbertura))+lin('Voltam para hoje (estavam no caixa de 30/10)',ex.length)+lin('Atendimentos que já estão no caixa aberto',cd&&cd.aberto?(cd.movimentos||[]).length:0)+'</div>'
     +'<div class="liq-box"><b>Saldos</b>'+sal+'</div>'
-    +'<div class="liq-box">'+lin('Saem do Em Aberto',r.emAbertoTirar.length)+lin('Pontos que voltam como pagos',r.pontos.length)+lin('Produções que voltam a fechadas',r.producoes.length)+lin('Nº novo para a venda #'+_repE(r.renumerar.num),'sim')+lin('Preço de '+_repE(r.precoProd.nome),_finN(r.precoProd.vV))+'</div>'
+    +'<div class="liq-box">'+lin('Saem do Em Aberto',(DB.pesagensEmAberto||[]).filter(function(p){return r.emAbertoTirar.map(String).indexOf(String(p.id))>=0;}).length)+lin('Pontos que voltam como pagos',r.pontos.length)+lin('Produções que voltam a fechadas',r.producoes.length)+lin('Nº novo para a venda #'+_repE(r.renumerar.num),'sim')+lin('Preço de '+_repE(r.precoProd.nome),_finN(r.precoProd.vV))+lin('Sai o pagamento repetido #'+_repE(r.tirarLanc.num),_finN(r.tirarLanc.valor))+'</div>'
     +'<details class="fin-det"><summary>Estoque: '+r.estoque.length+' materiais</summary>'+est+'</details>'
-    +'<div id="rep-err"></div><div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" style="flex:1" id="rep-ok" onclick="_repAplicar()">Aplicar o reparo</button></div></div>',560);
+    +'<div class="brow"><button class="btnO bOgr" onclick="closeM()">Cancelar</button><button class="btn" style="flex:1" id="rep-ok" onclick="_repAplicar()">Aplicar o reparo</button></div></div>',560);
 }
 function _repAplicar(){
   var r=_rep;if(!r)return;
   closeM();
-  _finTravar(['bvlock_reparo_'+r.id],'Reparo',function(){
-    var cd=DB.caixaDia;
-    if(!cd||String(cd.id)!==String(r.caixa.zumbiId)){_abAviso('Reparo já aplicado','Outro aparelho já aplicou. Nada foi mudado.');return;}
+  _finTravar(['bvlock_reparo2_'+r.id],'Reparo',function(){
+    if(!_repExtras(r).length){_abAviso('Reparo já aplicado','Outro aparelho já aplicou. Nada foi mudado.');return;}
     _atendReservar(function(novoNum){
       if(!novoNum){_abAviso('Não deu para aplicar','Não consegui reservar o número novo na nuvem. Nada foi mudado.');return;}
-      var cd2=DB.caixaDia;if(!cd2||String(cd2.id)!==String(r.caixa.zumbiId))return;
+      if(!_repExtras(r).length)return;
       var res=_repExec(r,novoNum);
       try{_auditLog('Reparo aplicado',r.titulo+' · '+res);}catch(e){}
       _rep=null;saveDB();
@@ -3629,27 +3632,41 @@ function _repAplicar(){
   });
 }
 function _repExec(r,novoNum){
-  var cd=DB.caixaDia,c=r.caixa,oldId=cd.id,n={};
-  // número novo: o movimento do caixa e o lançamento da venda
-  var rn=r.renumerar;
-  (cd.movimentos||[]).forEach(function(m){if(String(m.id)===String(rn.movCaixaId)){m.num=novoNum;n.num=1;}});
-  (DB.movs||[]).forEach(function(m){if(m&&m.tipo===rn.tipoMov&&String(m.desc||'').indexOf('#'+rn.num)>=0&&Math.abs((+m.valor||0)-rn.valor)<0.005&&String(m.cxId)===String(oldId)){m.atNum=novoNum;m.desc=String(m.desc).replace('#'+rn.num,'#'+novoNum);}});
-  (atendHist||[]).forEach(function(a){if(a&&String(a.num)===String(rn.num)&&a.total===rn.valor)a.num=novoNum;});
-  // caixa certo
-  cd.movimentos=(cd.movimentos||[]).filter(function(m){return c.tirarNums.indexOf(String(m.num))<0;});
+  var c=r.caixa,arq=_repArq(r),ex=_repExtras(r),cd=DB.caixaDia,idAtual=cd&&cd.id;
+  // caixa de hoje: usa o que estiver aberto; se não houver, cria
+  if(!cd||!cd.aberto){cd={v537:1,aberto:true,movimentos:[],sangrias:[],reforcos:[]};DB.caixaDia=cd;}
+  arq.movimentos=(arq.movimentos||[]).filter(function(m){return ex.indexOf(m)<0;});
+  cd.movimentos=(cd.movimentos||[]).concat(ex);
   cd.id=c.certoId;cd.data=c.data;cd.saldoAbertura=c.saldoAbertura;cd.abertoPor=c.abertoPor;cd.abertoHora=c.abertoHora;
-  (DB.movs||[]).forEach(function(m){if(m&&String(m.cxId)===String(oldId)&&m.data===c.data)m.cxId=c.certoId;});
+  (DB.movs||[]).forEach(function(m){if(!m)return;
+    if(idAtual!=null&&String(m.cxId)===String(idAtual))m.cxId=c.certoId;
+    if(String(m.cxId)===String(c.zumbiId)&&m.data===c.data)m.cxId=c.certoId;});
+  // número novo da venda
+  var rn=r.renumerar;
+  cd.movimentos.forEach(function(m){if(String(m.id)===String(rn.movCaixaId))m.num=novoNum;});
+  (DB.movs||[]).forEach(function(m){if(m&&m.tipo===rn.tipoMov&&m.data===c.data&&String(m.desc||'').indexOf('#'+rn.num)>=0&&Math.abs((+m.valor||0)-rn.valor)<0.005){m.atNum=novoNum;m.desc=String(m.desc).replace('#'+rn.num,'#'+novoNum);}});
+  (atendHist||[]).forEach(function(a){if(a&&String(a.num)===String(rn.num)&&a.total===rn.valor)a.num=novoNum;});
   DB.caixaOntem=r.caixaOntem;
   var ids={};r.emAbertoTirar.forEach(function(i){ids[String(i)]=1;});
   DB.pesagensEmAberto=(DB.pesagensEmAberto||[]).filter(function(p){return !ids[String(p.id)];});
   r.saldos.forEach(function(s){var x=_finConta(s.nome);if(x)x.saldo=+((+x.saldo||0)+s.delta).toFixed(2);});
   r.estoque.forEach(function(s){var p=gP(s.id);if(p)p.est=+((+p.est||0)+s.delta).toFixed(3);});
   var nPt=0;r.pontos.forEach(function(s){(DB.funcs||[]).forEach(function(f){if(String(f.id)!==String(s.func))return;(f.pontos||[]).forEach(function(p,i){if(String(p.id)===String(s.id)){f.pontos[i]=s.certo;nPt++;}});});});
-  var nPr=0;r.producoes.forEach(function(s){for(var i=0;i<DB.producoes.length;i++){if(String(DB.producoes[i].id)===String(s.id)&&DB.producoes[i].status==='aberta'){DB.producoes[i]=s;nPr++;}}});
+  var nPr=0,nDup=0;r.producoes.forEach(function(s){for(var i=0;i<DB.producoes.length;i++){var at=DB.producoes[i];if(String(at.id)!==String(s.id))continue;
+    if(at.status==='aberta'){DB.producoes[i]=s;nPr++;}
+    else if(at.status==='fechada'&&at.dataFim===c.data&&at.dataFim!==s.dataFim){ // fechada de novo hoje: tira o que entrou no estoque em dobro
+      (at.saidas||[]).forEach(function(x){var q=gP(x.prodId);if(q)q.est=+((q.est||0)-(+x.peso||0)).toFixed(3);});
+      if(at.destinoSobra==='pendente'&&(+at.sobra||0)>0.001&&at.matEntradaId){var o=gP(at.matEntradaId);if(o)o.est=+((o.est||0)-(+at.sobra)).toFixed(3);}
+      DB.producoes[i]=s;nPr++;nDup++;}
+  }});
   var pp=gP(r.precoProd.id);if(pp){pp.vV=r.precoProd.vV;pp.vC=r.precoProd.vC;}
   r.tabelas.forEach(function(t){(DB.tabelas||[]).forEach(function(u){if(String(u.id)!==String(t.id))return;u.atualizadaEm=t.atualizadaEm;t.itens.forEach(function(x){(u.itens||[]).forEach(function(i){if(String(i.id)===String(x.id))i.preco=x.preco;});});});});
   if(DB.mercado&&r.mercado){if(!DB.mercado.dias)DB.mercado.dias={};Object.keys(r.mercado.dias).forEach(function(k){DB.mercado.dias[k]=r.mercado.dias[k];});if(String(DB.mercado.ultimaBusca||'')<String(r.mercado.ultimaBusca||''))DB.mercado.ultimaBusca=r.mercado.ultimaBusca;}
-  return 'caixa '+c.data+', '+r.saldos.length+' saldos, '+r.estoque.length+' materiais, '+nPt+' pontos, '+nPr+' produções, venda virou #'+novoNum;
+  // pagamento repetido: sai do lançamento e do caixa, sem mexer no saldo (o Pix real foi um só)
+  var tl=r.tirarLanc,nTl=0;
+  DB.movs=(DB.movs||[]).filter(function(m){if(m&&String(m.id)===String(tl.movId)&&Math.abs((+m.valor||0)-tl.valor)<0.005){nTl++;return false;}return true;});
+  (DB.caixasHist||[]).forEach(function(h){if(h&&String(h.id)===String(tl.caixaId))h.movimentos=(h.movimentos||[]).filter(function(m){return !(String(m.num)===String(tl.num)&&m.liquidadoPendencia);});});
+  return 'caixa '+c.data+', '+ex.length+' atendimentos de volta, '+r.saldos.length+' saldos, '+r.estoque.length+' materiais, '+nPt+' pontos, '+nPr+' produções ('+nDup+' fechada(s) em dobro), venda virou #'+novoNum+', '+nTl+' pagamento repetido retirado';
 }
 // Aplica um estado vindo da nuvem (ou da junção) na memória e na tela
 function _aplicarDaNuvem(snap,jsonStr){
@@ -26321,6 +26338,14 @@ function exportarBackupJSON(){
 
 function restaurarBackup(input){
   var file=input.files[0];if(!file)return;
+  // 5.48.3: arquivo de reparo não é backup: vai para a prévia do reparo, sem passar pela restauração
+  var _rl=new FileReader();
+  _rl.onload=function(e){var d=null;try{d=JSON.parse(e.target.result);}catch(x){}
+    if(d&&d.tipo==='bv_reparo'){input.value='';_repPrever(d);return;}
+    _restaurarBackupCont(input,file);};
+  _rl.readAsText(file);
+}
+function _restaurarBackupCont(input,file){
   confirmar('ATENÇÃO: Isso vai substituir <b>TODOS os dados atuais</b> pelo backup. Tem certeza?',function(){
     var reader=new FileReader();
     reader.onload=function(e){
