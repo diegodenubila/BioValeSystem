@@ -1518,7 +1518,7 @@ mark{background:rgba(34,197,94,.28);color:inherit;border-radius:3px;padding:0 1p
     <div class="perr" id="pe"></div>
     <button class="lbtn" onclick="doLogin()">Entrar</button>
   </div>
-</div></div>
+</div><div id="ls-versao" style="position:fixed;right:10px;bottom:calc(8px + env(safe-area-inset-bottom,0px));font-size:11px;color:var(--mt);display:flex;align-items:center;gap:2px;z-index:5"></div></div>
 <div id="wrap" class="H">
   <div id="sb">
     <div class="sbh" style="padding:10px 14px;gap:8px;align-items:center">
@@ -1587,7 +1587,7 @@ var ALLPAGES=[
   {id:'classificador', label:'Classificador PCB', icon:'&#9107;'},
   {id:'configuracoes',label:'Configuracoes',icon:'&#9881;'},
 ];
-var APP_VERSION='5.48.3';var DADOS_VERSAO=12;
+var APP_VERSION='5.49';var DADOS_VERSAO=12;
 var APP_BUILD=new Date('2026-05-30').getTime();
 var DB={
   produtos:[
@@ -1919,6 +1919,17 @@ function _lsNuvemTxt(){
     var h=_abEsc(txt)+_aj('login.nuvem');
     if(el._h!==h){el.innerHTML=h;el._h=h;}
   }catch(e){}
+  _lsVersaoTxt();
+}
+// 5.49: versão no canto da tela de entrada; logo depois de atualizar, mostra o aviso por 8 s
+var _lsAtualizadoAte=0;
+function _lsVersaoTxt(){
+  try{
+    var el=document.getElementById('ls-versao');if(!el)return;
+    var novo=Date.now()<_lsAtualizadoAte;
+    var h=(novo?'<span style="color:var(--gr);font-weight:700">&#10003; Atualizado para a v'+APP_VERSION+'</span>':'v'+APP_VERSION)+_aj('login.versao');
+    if(el._h!==h){el.innerHTML=h;el._h=h;}
+  }catch(e){}
 }
 var _lsNuvemEm=0;
 function selU(uid,el){
@@ -1944,6 +1955,10 @@ function doLogin(){
     _recarregarAcessosNuvem();
     return;
   }
+  _entrarSistema(_pri,null);
+}
+// 5.49: 'volta' = continuar logado depois de atualizar (mesma aba, sem o aviso de pesagem por cima)
+function _entrarSistema(_pri,volta){
   _lsAplicarGuardado(); // 5.47: na tela de entrada a nuvem é aplicada com calma; ao entrar, pega a mais nova
   CU=SU;
   document.getElementById('ls').classList.add('H');document.getElementById('wrap').classList.remove('H');
@@ -1960,7 +1975,9 @@ function doLogin(){
   _pesAdotarLegadoLocal();
   var hadPes=loadPesState();
   var hasPendente=hadPes&&pesAbas&&pesAbas.some(function(a){return a.itens&&a.itens.length>0;});
-  if(hasPendente){
+  if(volta){
+    go(volta);
+  }else if(hasPendente){
     go('pesagem');
     setTimeout(function(){
       var totalItens=0,_nAb=0;pesAbas.forEach(function(a){if(a.itens&&a.itens.length){totalItens+=a.itens.length;_nAb++;}});
@@ -1977,22 +1994,9 @@ function doLogin(){
     go(_pri);
   }
   setTimeout(_atualizarBadgeNotif,500);
-  _auditLog('Login realizado');
+  if(!volta)_auditLog('Login realizado');
   setTimeout(_mkAutoCheck,2500); // cotações do Mercado: 1x por dia útil
-  // Verifica se a versão mudou desde o último acesso
-  var lastVer=localStorage.getItem('bv_last_version');
-  if(lastVer&&lastVer!==APP_VERSION){
-    setTimeout(function(){
-      openM('🎉 Sistema Atualizado!',
-        '<div style="text-align:center;padding:10px">'
-        +'<div style="font-size:40px;margin-bottom:10px">🚀</div>'
-        +'<div style="font-size:16px;font-weight:700;margin-bottom:6px">BioVale v'+APP_VERSION+'</div>'
-        +'<div style="font-size:12px;color:var(--mt);margin-bottom:16px">Atualizado de v'+lastVer+' para v'+APP_VERSION+'</div>'
-        +'<button class="btn" style="width:100%" onclick="closeM()">Entendido!</button>'
-        +'</div>',360);
-    },800);
-  }
-  localStorage.setItem('bv_last_version',APP_VERSION);
+  _apGravar(!volta); // 5.49: lista de aparelhos
 }
 function doLogout(){
   // Garante que pesagem atual está salva antes de sair
@@ -3228,23 +3232,26 @@ function _versaoPublicar(){
   },function(){});
 }
 // Reforço: lê só o começo do arquivo publicado (onde fica a versão) — não baixa o arquivo inteiro
+function _versaoLerSite(cb){
+  try{
+    fetch(location.pathname+'?vchk='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-600000'}})
+      .then(function(r){return (r.ok||r.status===206)?r.text():'';})
+      .then(function(t){
+        var m=t.match(/var APP_VERSION='([\d.]+)';var DADOS_VERSAO=(\d+);/)||t.match(/var APP_VERSION='([\d.]+)'/);
+        cb(m?m[1]:null,m&&m[2]?parseInt(m[2]):0);
+      }).catch(function(){cb(null,0);});
+  }catch(e){cb(null,0);}
+}
 function _versaoChecarSite(forcar){
   if(!/^https?:$/.test(location.protocol))return;
   if(!forcar&&Date.now()-_versaoSiteEm<15*60000)return;
   _versaoSiteEm=Date.now();
-  try{
-    fetch(location.pathname+'?vchk='+Date.now(),{cache:'no-store',headers:{Range:'bytes=0-200000'}})
-      .then(function(r){return (r.ok||r.status===206)?r.text():'';})
-      .then(function(t){
-        var m=t.match(/var APP_VERSION='([\d.]+)';var DADOS_VERSAO=(\d+);/)||t.match(/var APP_VERSION='([\d.]+)'/);
-        if(m&&_verCmp(m[1],APP_VERSION)>0)_versaoAvisar(m[1],m[2]&&parseInt(m[2])>DADOS_VERSAO);
-      }).catch(function(){});
-  }catch(e){}
+  _versaoLerSite(function(v,d){if(v&&_verCmp(v,APP_VERSION)>0)_versaoAvisar(v,d>DADOS_VERSAO);});
 }
 function _versaoAvisar(v,bloquear){
   if(bloquear&&!_versaoBloqueada){_versaoBloqueada=true;_syncBadge('error','Sistema desatualizado — atualize para gravar');}
   if(!_versaoNova||_verCmp(v,_versaoNova)>0)_versaoNova=v;
-  _versaoBarra();
+  if(_versaoBloqueada||_updFaixa||!_updPodeAuto())_versaoBarra();
 }
 function _versaoBarra(msgExtra){
   var el=document.getElementById('bv-upd-bar');
@@ -3257,7 +3264,7 @@ function _versaoBarra(msgExtra){
     +(bloq?'background:#991b1b;color:#fff;':'background:#1d4ed8;color:#fff;');
   var txt=bloq
     ?'&#9888; Este aparelho está com a versão antiga ('+APP_VERSION+'). Atualize para continuar gravando — o que você fez está guardado aqui.'
-    :'&#128640; Nova versão do sistema ('+_versaoNova+') disponível.';
+    :(_updFaixa?'&#128640; Versão nova esperando há 30 min. Salve o que está fazendo e atualize.'+_aj('upd.faixa'):'&#128640; Nova versão do sistema ('+_versaoNova+') disponível.');
   if(msgExtra)txt=msgExtra;
   el.innerHTML='<div style="flex:1;min-width:0">'+txt+'</div>'
     +'<button id="bv-upd-btn" onclick="_atualizarSistema()" style="flex-shrink:0;background:#fff;color:'+(bloq?'#991b1b':'#1d4ed8')+';border:0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:800;cursor:pointer">Atualizar agora</button>';
@@ -3274,9 +3281,201 @@ function _atualizarSistema(){
     // espera a nuvem confirmar o que estava pendente (se este aparelho ainda puder gravar)
     if(!_versaoBloqueada&&(_pendingLocal||_saveInFlight||_ctTemPendente())&&Date.now()-t0<8000){setTimeout(esperar,300);return;}
     setTimeout(function(){ // dá tempo de a cópia segura (IndexedDB) terminar
+      _updGuardarLogin();
       location.replace(location.pathname+'?v='+encodeURIComponent(alvo)+'&t='+Date.now()+location.hash);
     },600);
   })();
+}
+// ── 5.49: ATUALIZAÇÃO AUTOMÁTICA ─────────────────────────────
+// Atualiza sozinho só num momento em que nada se perde: aparelho parado, sem janela aberta,
+// sem campo preenchido, tudo confirmado na nuvem e o site já entregando a versão nova.
+var _updToque=Date.now(),_updDesde=0,_updFaixa=false,_updLendo=false,_updChecadoEm=0,_updSujos=[];
+var _UPD_PARADO_ENTRADA=10000,_UPD_PARADO=60000,_UPD_PARADO_PESAGEM=180000,_UPD_FAIXA=30*60000;
+function _updPodeAuto(){return /^https?:$/.test(location.protocol);}
+function _updMexeu(){_updToque=Date.now();}
+['pointerdown','keydown','wheel','touchmove','scroll'].forEach(function(ev){document.addEventListener(ev,_updMexeu,{capture:true,passive:true});});
+document.addEventListener('visibilitychange',_updMexeu); // voltou ao aparelho: conta o tempo parado do zero
+function _updCampoMudou(e){
+  _updMexeu();
+  var el=e.target;
+  if(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)&&_updSujos.indexOf(el)<0)_updSujos.push(el);
+}
+document.addEventListener('input',_updCampoMudou,true);
+document.addEventListener('change',_updCampoMudou,true);
+function _updCampoPreenchido(){
+  if(!CU){var pi=document.getElementById('pi');return !!(pi&&pi.value);}
+  _updSujos=_updSujos.filter(function(el){
+    if(!el.isConnected||!el.getClientRects().length)return false; // o campo saiu da tela
+    if(el.tagName==='SELECT'||el.type==='checkbox'||el.type==='radio'||el.type==='file')return true;
+    return el.value!==el.defaultValue;
+  });
+  if(_updSujos.length)return true;
+  var a=document.activeElement;
+  return !!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.value);
+}
+// Câmera ligada ou tela por cima (leitor, pré-visualização, assinatura…)
+function _updTelaPorCima(){
+  var vs=document.querySelectorAll('video');
+  for(var i=0;i<vs.length;i++){if(vs[i].srcObject)return true;}
+  var fs=document.body.children,vh=window.innerHeight||600;
+  for(var j=0;j<fs.length;j++){
+    var el=fs[j];if(/^(ls|wrap|bv-upd-bar|bv-clock-warn|SCRIPT|STYLE)$/.test(el.id||el.tagName))continue;
+    var st=getComputedStyle(el);
+    if(st.position==='fixed'&&st.display!=='none'&&el.offsetHeight>vh*0.4)return true;
+  }
+  return false;
+}
+function _updPendente(){
+  if(_versaoBloqueada)return false; // este aparelho não pode gravar: o que fez fica guardado nele até atualizar
+  return !!(_pendingLocal||_saveInFlight||_dbSaveTimer||_ctTemPendente());
+}
+function _updSeguro(){
+  if(document.hidden||navigator.onLine===false||!_cloudLoaded||(CU&&!_ctCarregou))return false;
+  var espera=!CU?_UPD_PARADO_ENTRADA:(pgAtiva==='pesagem'?_UPD_PARADO_PESAGEM:_UPD_PARADO);
+  if(Date.now()-_updToque<espera)return false;
+  return !_modalAberto()&&!_updTelaPorCima()&&!_updCampoPreenchido()&&!_updPendente();
+}
+function _updGuardarLogin(){
+  try{if(CU)sessionStorage.setItem('bv_upd_cu',JSON.stringify({id:CU.id,pg:pgAtiva,em:Date.now()}));}catch(e){}
+}
+// No máximo 3 recargas por versão em 30 min: nunca fica recarregando sem parar
+function _updTentativa(alvo,somar){
+  var t=null;try{t=JSON.parse(sessionStorage.getItem('bv_upd_tent')||'null');}catch(e){}
+  if(!t||t.alvo!==alvo||Date.now()-t.em>_UPD_FAIXA)t={alvo:alvo,n:0,em:Date.now()};
+  if(somar){t.n++;try{sessionStorage.setItem('bv_upd_tent',JSON.stringify(t));}catch(e){}}
+  return t.n;
+}
+function _updTick(){
+  if(!_versaoNova||_verCmp(_versaoNova,APP_VERSION)<=0){_updDesde=0;return;}
+  if(!_updDesde)_updDesde=Date.now();
+  if(!_updPodeAuto())return;
+  if(!_updFaixa&&Date.now()-_updDesde>=_UPD_FAIXA){_updFaixa=true;_versaoBarra();}
+  if(_updLendo||Date.now()-_updChecadoEm<60000||!_updSeguro())return;
+  if(_updTentativa(_versaoNova)>=3){if(!_updFaixa){_updFaixa=true;_versaoBarra();}return;}
+  if(CU&&pesAbas&&pesAbas.length&&!_versaoBloqueada){
+    savePesState();                 // se havia algo só na memória, sobe primeiro e tenta no próximo ciclo
+    if(_updPendente())return;
+  }
+  _updChecadoEm=Date.now();_updLendo=true;
+  _versaoLerSite(function(v){
+    _updLendo=false;
+    if(!v||_verCmp(v,_versaoNova)<0)return; // sem internet ou GitHub ainda liberando: tenta de novo em 1 min
+    if(!_updSeguro())return;                // alguém mexeu enquanto conferia
+    _updTentativa(_versaoNova,true);
+    try{sessionStorage.setItem('bv_upd_alvo',_versaoNova);}catch(e){}
+    _updGuardarLogin();
+    location.replace(location.pathname+'?v='+encodeURIComponent(_versaoNova)+'&t='+Date.now()+location.hash);
+  });
+}
+setInterval(_updTick,5000);
+// Depois da recarga da atualização: entra de novo no mesmo login e na mesma aba (uso único)
+function _updRestaurarLogin(){
+  var t=null;
+  try{t=JSON.parse(sessionStorage.getItem('bv_upd_cu')||'null');sessionStorage.removeItem('bv_upd_cu');}catch(e){}
+  if(!t||CU||Date.now()-t.em>180000)return;
+  var u=null;for(var i=0;i<USERS.length;i++){if(String(USERS[i].id)===String(t.id)){u=USERS[i];break;}}
+  if(!u||u.bloqueado)return;
+  var r=getRoleById(u.perfil),pgs=r?r.pages:(PPAGES[u.perfil]||[]);
+  var pri=null;for(var k=0;k<pgs.length;k++){if(pgs[k]!=='producao_analise'){pri=pgs[k];break;}}
+  if(!pri)return;
+  (function esp(n){
+    if(CU)return;
+    if(!_ctCarregou&&n<30){setTimeout(function(){esp(n+1);},200);return;} // o carrinho vem primeiro
+    SU=u;
+    _entrarSistema(pri,pgs.indexOf(t.pg)>=0?t.pg:pri);
+    _updAvisarAtualizado();
+  })(0);
+}
+var _updFoiAtualizado=false;
+function _updAvisarAtualizado(){if(_updFoiAtualizado){_updFoiAtualizado=false;toast('Atualizado para a v'+APP_VERSION);}}
+(function(){
+  try{
+    var ant=localStorage.getItem('bv_last_version');
+    if(ant&&ant!==APP_VERSION){_updFoiAtualizado=true;_lsAtualizadoAte=Date.now()+8000;setTimeout(_lsVersaoTxt,8100);}
+    localStorage.setItem('bv_last_version',APP_VERSION);
+  }catch(e){}
+})();
+// ── 5.49: LISTA DE APARELHOS ─────────────────────────────────
+// Cada aparelho tem a sua linha, pequena e sem dados secretos. Gravar nela não toca no bv_db.
+function _apTipo(){
+  var u=navigator.userAgent||'';
+  var so=/Android/.test(u)?'Android':(/iPhone|iPad/.test(u)?'iPhone/iPad':(/Windows/.test(u)?'Windows':(/Mac/.test(u)?'Mac':(/Linux/.test(u)?'Linux':'Outro'))));
+  var nav=/Edg\//.test(u)?'Edge':(/Chrome\//.test(u)?'Chrome':(/Firefox\//.test(u)?'Firefox':(/Safari\//.test(u)?'Safari':'')));
+  return so+(nav?' · '+nav:'');
+}
+function _apGravar(login){
+  if(!_sbReady||!_sbClient||!_cloudLoaded)return;
+  var dev=_ctDev();if(!dev)return;
+  var agora=new Date(_agoraMs()).toISOString();
+  _sbCasWrite('bv_aparelho_'+dev,function(c){
+    c=c||{};
+    var o={dev:dev,nome:c.nome||'',tipo:_apTipo(),ver:APP_VERSION,user:login&&CU?CU.nome:(c.user||''),login:login?agora:(c.login||''),em:agora};
+    return {json:JSON.stringify(o),obj:o};
+  },function(){});
+}
+setInterval(function(){if(!document.hidden)_apGravar(false);},10*60000);
+var _apLista=[];
+function _apCarregar(){
+  var box=document.getElementById('cfg-apar');if(!box)return;
+  if(!_sbReady||!_sbClient){box.innerHTML='<div style="font-size:12px;color:var(--mt)">Sem nuvem neste aparelho.</div>';return;}
+  _sbClient.from('biovale_dados').select('chave,valor').like('chave','bv_aparelho_%').then(function(r){
+    var el=document.getElementById('cfg-apar');if(!el)return;
+    if(r.error||!r.data){el.innerHTML='<div style="font-size:12px;color:var(--rd)">Não consegui ler a lista agora. Tente de novo em instantes.</div>';return;}
+    var ls=[];r.data.forEach(function(row){try{var o=JSON.parse(row.valor);if(o&&o.dev)ls.push(o);}catch(e){}});
+    ls.sort(function(a,b){return String(b.em||'').localeCompare(String(a.em||''));});
+    _apLista=ls;el.innerHTML=_apHtml(ls);
+  },function(){});
+}
+function _apQuando(iso){
+  if(!iso)return '—';
+  var d=new Date(iso);if(isNaN(d.getTime()))return '—';
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+function _apHtml(ls){
+  if(!ls.length)return '<div style="font-size:12px;color:var(--mt)">Nenhum aparelho apareceu ainda. Cada um entra na lista quando abrir a versão nova.</div>';
+  var ult=APP_VERSION;
+  if(_versaoNova&&_verCmp(_versaoNova,ult)>0)ult=_versaoNova;
+  ls.forEach(function(a){if(a.ver&&_verCmp(a.ver,ult)>0)ult=a.ver;});
+  var meu=_ctDev();
+  return ls.map(function(a){
+    var ok=a.ver&&_verCmp(a.ver,ult)>=0,dev=String(a.dev).replace(/[^\w-]/g,'');
+    return '<div style="background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px;margin-bottom:8px">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+      +'<div style="flex:1;min-width:140px;font-size:13px;font-weight:700">'+_abEsc(a.nome||a.tipo||'Aparelho')+(a.dev===meu?' <span style="font-size:10px;font-weight:600;color:var(--bl)">este aparelho</span>':'')+'</div>'
+      +'<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;'+(ok?'color:var(--gr);background:rgba(34,197,94,.12)':'color:var(--or);background:rgba(245,158,11,.14)')+'">'+(ok?'Atualizado':'Ainda não atualizou')+'</span>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:4px 12px;font-size:11.5px;color:var(--mt);margin-bottom:8px">'
+      +'<div>Versão: <b style="color:var(--tx)">v'+_abEsc(a.ver||'?')+'</b></div>'
+      +(a.nome?'<div>Tipo: <b style="color:var(--tx)">'+_abEsc(a.tipo||'?')+'</b></div>':'')
+      +'<div>Último login: <b style="color:var(--tx)">'+_abEsc(a.user||'—')+(a.login?', '+_apQuando(a.login):'')+'</b></div>'
+      +'<div>Visto por último: <b style="color:var(--tx)">'+_apQuando(a.em)+'</b></div>'
+      +'</div>'
+      +'<div style="display:flex;gap:6px;justify-content:flex-end">'
+      +'<button class="btnO bOgr" style="font-size:11px;padding:4px 10px" onclick="_apRenomear(\''+dev+'\')">Renomear</button>'
+      +(a.dev===meu?'':'<button class="btnO bOgr" style="font-size:11px;padding:4px 10px" onclick="_apEsquecer(\''+dev+'\')">Esquecer</button>')
+      +'</div></div>';
+  }).join('');
+}
+function _apRenomear(dev){
+  var a=_apLista.filter(function(x){return x.dev===dev;})[0];if(!a)return;
+  openM('Nome do aparelho','<div class="fld"><label>Nome</label><input class="inp" id="ap-nome" maxlength="30" placeholder="Ex: PC do caixa" value="'+_abEsc(a.nome||'')+'"></div>'
+    +'<button class="btn" style="width:100%" onclick="_apSalvarNome(\''+dev+'\')">Salvar</button>',340);
+}
+function _apSalvarNome(dev){
+  var i=document.getElementById('ap-nome');if(!i)return;
+  var nome=i.value.trim().slice(0,30);
+  _sbCasWrite('bv_aparelho_'+dev,function(c){
+    if(!c)return {skip:true};
+    c.nome=nome;return {json:JSON.stringify(c),obj:c};
+  },function(r){
+    if(!r.ok){toast('Não consegui salvar agora','var(--or)');return;}
+    closeM();_apCarregar();
+  });
+}
+function _apEsquecer(dev){
+  confirmar('Tirar este aparelho da lista? Se ele abrir o sistema de novo, volta a aparecer.',function(){
+    _sbClient.from('biovale_dados').delete().eq('chave','bv_aparelho_'+dev).then(function(){_apCarregar();},function(){toast('Sem conexão agora','var(--or)');});
+  },'Esquecer');
 }
 // Depois de recarregar: limpa o endereço e confere se o GitHub já entregou a versão nova
 (function(){
@@ -3708,6 +3907,7 @@ function _sbStartRealtime(){
         var chave = payload.new && payload.new.chave;
 
         if(chave === 'bv_versao'){ _versaoChecarNuvem(); return; }
+        if(chave && String(chave).indexOf('bv_aparelho_')===0){ if(pgAtiva==='configuracoes'&&cfgAba==='aparelhos')_apCarregar(); return; } // 5.49
         if(chave && String(chave).indexOf('bv_cart_')===0){ _ctTempoReal(payload.new); return; } // 5.47: carrinho (linha pequena)
         if(chave && String(chave).indexOf('bv_dash_')===0){ _dashLayRT(payload.new); return; } // 5.48: arrumação do Dashboard (por login)
         if(chave === 'bv_db' && payload.eventType!=='UPDATE' && payload.eventType!==undefined){ return; }
@@ -5079,6 +5279,9 @@ var AJUDA={
   'dash.eventos':'Eventos, férias e bloqueios de hoje, amanhã ou dos próximos 7 dias.',
   'dash.mercado':'Dólar, cobre e ouro de hoje (atualiza uma vez por dia). Toque para ver tudo na aba Mercado.',
   // 5.47: carrinho na nuvem
+  'login.versao':'Versão do sistema neste aparelho. Ele atualiza sozinho quando está parado.',
+  'upd.faixa':'Tem versão nova, mas o aparelho não achou um momento parado. Termine o que está fazendo e toque em Atualizar agora.',
+  'cfg.aparelhos':'Aparelhos que usam o sistema e a versão de cada um. Laranja quer dizer que o aparelho ainda não atualizou.',
   'login.nuvem':'Hora em que este aparelho conferiu os dados da nuvem pela última vez. Na tela de entrada ele atualiza os dados grandes com calma (a cada 30 segundos) para não travar o celular; as pesagens abertas chegam na hora. Ao tocar em Entrar, ele pega a versão mais nova antes de abrir o sistema.',
   'pes.presos':'Itens que ficaram só neste aparelho (por exemplo, sem internet) enquanto a mesma pesagem foi mexida ou finalizada em outro. O sistema não junta sozinho para não contar em dobro: veja se já foram pesados de novo e escolha pôr numa pesagem ou descartar. Descartar fica registrado na auditoria.',
   // aba Revenda (5.41)
@@ -26194,6 +26397,7 @@ function pgConfig(){
     +'<option value="usuarios" '+(cfgAba==='usuarios'?'selected':'')+'>&#128101; Usuarios</option>'
     +'<option value="ia" '+(cfgAba==='ia'?'selected':'')+'>&#129302; Inteligencia Artificial</option>'
     +'<option value="auditoria" '+(cfgAba==="auditoria"?'selected':'')+'>&#128065; Auditoria</option>'
+    +(CU&&CU.perfil==='adm'?'<option value="aparelhos" '+(cfgAba==='aparelhos'?'selected':'')+'>&#128241; Aparelhos</option>':'')
     +'</select>'
     +'<div style="position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--mt);font-size:11px">&#9660;</div></div>'
     +_cfgConteudo()
@@ -26214,7 +26418,14 @@ function _cfgConteudo(){
     return _cfgIA();
   }
   if(cfgAba==='auditoria'){return _cfgAuditoria();}
+  if(cfgAba==='aparelhos')return _cfgAparelhos();
   return '';
+}
+function _cfgAparelhos(){
+  if(!(CU&&CU.perfil==='adm'))return '';
+  setTimeout(_apCarregar,0);
+  return '<div class="card">'+_cfgSectionHeader('&#128241;','Aparelhos'+_aj('cfg.aparelhos'),'Quem usa o sistema e em qual versão')
+    +'<div style="padding:14px"><div id="cfg-apar" style="font-size:12px;color:var(--mt)">Carregando…</div></div></div>';
 }
 function _cfgRevenda(){
   var rows='';
@@ -27130,6 +27341,7 @@ window.addEventListener('DOMContentLoaded', function(){
           setTimeout(_startBackupMeioPeriodo, 2000);
           setTimeout(_arquivarExcesso, 8000); // move para o Arquivo o que passou do limite (nada é apagado)
           _versaoChecarNuvem();setTimeout(function(){_versaoChecarSite(true);},20000);
+          _updRestaurarLogin();if(!CU)_apGravar(false);
         } else {
           // sbGet devolve null tanto para "nuvem vazia" quanto para ERRO de leitura. Só sobe o que
           // há localmente se a nuvem estiver REALMENTE vazia — nunca por causa de uma falha de rede.
